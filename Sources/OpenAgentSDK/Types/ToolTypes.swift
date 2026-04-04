@@ -1,0 +1,36 @@
+import Foundation
+
+/// JSON Schema dictionary type for tool input definitions.
+public typealias ToolInputSchema = [String: Any]
+
+/// Protocol defining a tool that can be executed by the agent.
+public protocol ToolProtocol: Sendable {
+    var name: String { get }
+    var description: String { get }
+    var inputSchema: ToolInputSchema { get }
+    var isReadOnly: Bool { get }
+
+    func call(input: Any, context: ToolContext) async -> ToolResult
+}
+
+/// Result returned from a tool execution.
+public struct ToolResult: Sendable, Equatable {
+    public let toolUseId: String
+    public let content: String
+    public let isError: Bool
+
+    public init(toolUseId: String, content: String, isError: Bool) {
+        self.toolUseId = toolUseId
+        self.content = content
+        self.isError = isError
+    }
+}
+
+/// Context provided to tool executions.
+public struct ToolContext: Sendable {
+    public let cwd: String
+
+    public init(cwd: String) {
+        self.cwd = cwd
+    }
+}

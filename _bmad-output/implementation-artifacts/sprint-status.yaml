@@ -1,0 +1,128 @@
+# generated: 2026-04-04
+# last_updated: 2026-04-04
+# project: open-agent-sdk-swift
+# project_key: NOKEY
+# tracking_system: file-system
+# story_location: _bmad-output/implementation-artifacts
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Epic Status Transitions:
+#   - backlog → in-progress: Automatically when first story is created (via create-story)
+#   - in-progress → done: Manually when all stories reach 'done' status
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created in stories folder
+#   - in-progress: Developer actively working on implementation
+#   - review: Ready for code review (via Dev's code-review workflow)
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when first story is created
+# - Stories can be worked in parallel if team capacity allows
+# - SM typically creates next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+
+generated: 2026-04-04
+last_updated: 2026-04-04
+# updated: 1-1-spm-package-core-types → in-progress
+project: open-agent-sdk-swift
+project_key: NOKEY
+tracking_system: file-system
+story_location: _bmad-output/implementation-artifacts
+
+development_status:
+  # Epic 1: 基础设施与 Agent 设置
+  epic-1: in-progress
+  1-1-spm-package-core-types: review
+  1-2-custom-anthropic-api-client: backlog
+  1-3-sdk-config-env-vars: backlog
+  1-4-agent-creation-config: backlog
+  1-5-agent-loop-blocking-response: backlog
+  epic-1-retrospective: optional
+
+  # Epic 2: 流式响应与生产就绪 Agent
+  epic-2: backlog
+  2-1-async-stream-response: backlog
+  2-2-token-usage-cost-tracking: backlog
+  2-3-budget-enforcement: backlog
+  2-4-llm-api-retry-max-tokens-recovery: backlog
+  2-5-auto-conversation-compaction: backlog
+  2-6-tool-result-micro-compaction: backlog
+  epic-2-retrospective: optional
+
+  # Epic 3: 工具系统与核心工具
+  epic-3: backlog
+  3-1-tool-protocol-registry: backlog
+  3-2-custom-tool-define-tool: backlog
+  3-3-tool-executor-concurrent-serial: backlog
+  3-4-core-file-tools-read-write-edit: backlog
+  3-5-core-search-tools-glob-grep: backlog
+  3-6-core-system-tools-bash-ask-user-tool-search: backlog
+  3-7-core-web-tools-web-fetch-web-search: backlog
+  epic-3-retrospective: optional
+
+  # Epic 4: 多 Agent 编排
+  epic-4: backlog
+  4-1-task-store-mailbox-store: backlog
+  4-2-team-store-agent-registry: backlog
+  4-3-agent-tool-sub-agent-spawn: backlog
+  4-4-send-message-tool: backlog
+  4-5-task-tools-create-list-update-get-stop-output: backlog
+  4-6-team-tools-create-delete: backlog
+  4-7-notebook-edit-tool: backlog
+  epic-4-retrospective: optional
+
+  # Epic 5: 专业工具与管理存储
+  epic-5: backlog
+  5-1-worktree-store-tools: backlog
+  5-2-plan-store-tools: backlog
+  5-3-cron-store-tools: backlog
+  5-4-todo-store-tools: backlog
+  5-5-lsp-tool: backlog
+  5-6-config-remote-trigger-tools: backlog
+  5-7-mcp-resource-tools: backlog
+  epic-5-retrospective: optional
+
+  # Epic 6: MCP 协议集成
+  epic-6: backlog
+  6-1-mcp-client-manager-stdio: backlog
+  6-2-mcp-http-sse-transport: backlog
+  6-3-in-process-mcp-server: backlog
+  6-4-mcp-tool-agent-integration: backlog
+  epic-6-retrospective: optional
+
+  # Epic 7: 会话持久化
+  epic-7: backlog
+  7-1-session-store-json-persistence: backlog
+  7-2-session-load-restore: backlog
+  7-3-session-fork: backlog
+  7-4-session-management-list-rename-tag-delete: backlog
+  epic-7-retrospective: optional
+
+  # Epic 8: 钩子系统与权限控制
+  epic-8: backlog
+  8-1-hook-event-types-registry: backlog
+  8-2-function-hook-registration-execution: backlog
+  8-3-shell-hook-execution: backlog
+  8-4-permission-modes: backlog
+  8-5-custom-authorization-callback: backlog
+  epic-8-retrospective: optional
+
+  # Epic 9: 文档与开发者体验
+  epic-9: backlog
+  9-1-swift-docc-api-docs: backlog
+  9-2-readme-quickstart-guide: backlog
+  9-3-runnable-code-examples: backlog
+  epic-9-retrospective: optional

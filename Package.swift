@@ -1,0 +1,36 @@
+// swift-tools-version: 5.9
+
+import PackageDescription
+
+let package = Package(
+    name: "OpenAgentSDK",
+    platforms: [
+        .macOS(.v13),
+    ],
+    products: [
+        .library(
+            name: "OpenAgentSDK",
+            targets: ["OpenAgentSDK"]
+        ),
+    ],
+    dependencies: [
+        .package(
+            url: "https://github.com/DePasqualeOrg/mcp-swift-sdk.git",
+            from: "0.1.0"
+        ),
+    ],
+    targets: [
+        .target(
+            name: "OpenAgentSDK",
+            dependencies: [
+                .product(name: "MCP", package: "mcp-swift-sdk"),
+            ],
+            path: "Sources/OpenAgentSDK"
+        ),
+        .testTarget(
+            name: "OpenAgentSDKTests",
+            dependencies: ["OpenAgentSDK"],
+            path: "Tests/OpenAgentSDKTests"
+        ),
+    ]
+)
