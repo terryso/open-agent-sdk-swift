@@ -45,6 +45,27 @@ public struct AgentOptions: Sendable {
         self.tools = tools
         self.mcpServers = mcpServers
     }
+
+    /// Create AgentOptions from an SDKConfiguration, using its resolved values
+    /// as defaults for the core SDK properties. Agent-specific properties
+    /// (systemPrompt, thinking, permissionMode, etc.) retain their defaults.
+    ///
+    /// - Parameter config: The SDK configuration providing base values.
+    public init(from config: SDKConfiguration) {
+        self.apiKey = config.apiKey
+        self.model = config.model
+        self.baseURL = config.baseURL
+        self.maxTurns = config.maxTurns
+        self.maxTokens = config.maxTokens
+        self.systemPrompt = nil
+        self.maxBudgetUsd = nil
+        self.thinking = nil
+        self.permissionMode = .default
+        self.canUseTool = nil
+        self.cwd = nil
+        self.tools = nil
+        self.mcpServers = nil
+    }
 }
 
 /// Result of a completed agent query.
