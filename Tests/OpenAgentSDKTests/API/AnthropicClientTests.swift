@@ -25,8 +25,15 @@ final class MockURLProtocol: URLProtocol {
     }
 
     override func startLoading() {
-        MockURLProtocol.lastRequest = request
-        MockURLProtocol.allRequests.append(request)
+        // Capture request with body: URLSession converts httpBody to httpBodyStream,
+        // so read from stream to preserve body data for test assertions.
+        var capturedRequest = request
+        if capturedRequest.httpBody == nil, let stream = capturedRequest.httpBodyStream {
+            capturedRequest.httpBody = Self.readBodyFromStream(stream)
+        }
+
+        MockURLProtocol.lastRequest = capturedRequest
+        MockURLProtocol.allRequests.append(capturedRequest)
 
         guard let url = request.url?.absoluteString,
               let mock = MockURLProtocol.mockResponses[url] else {
@@ -47,6 +54,24 @@ final class MockURLProtocol: URLProtocol {
         client?.urlProtocol(self, didReceive: httpResponse, cacheStoragePolicy: .notAllowed)
         client?.urlProtocol(self, didLoad: mock.body)
         client?.urlProtocolDidFinishLoading(self)
+    }
+
+    private static func readBodyFromStream(_ stream: InputStream) -> Data? {
+        stream.open()
+        defer { stream.close() }
+
+        let bufferSize = 4096
+        var data = Data()
+        var buffer = [UInt8](repeating: 0, count: bufferSize)
+
+        while stream.hasBytesAvailable {
+            let bytesRead = stream.read(&buffer, maxLength: bufferSize)
+            if bytesRead < 0 { return nil }
+            if bytesRead == 0 { break }
+            data.append(buffer, count: bytesRead)
+        }
+
+        return data
     }
 
     override func stopLoading() {}
