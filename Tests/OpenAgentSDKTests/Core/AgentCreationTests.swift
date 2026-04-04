@@ -16,8 +16,8 @@ final class AgentCreationFactoryTests: XCTestCase {
         let options = AgentOptions(
             apiKey: "sk-test-key",
             model: "claude-opus-4",
-            maxTurns: 5,
-            systemPrompt: "You are a helpful assistant."
+            systemPrompt: "You are a helpful assistant.",
+            maxTurns: 5
         )
 
         let agent = createAgent(options: options)
@@ -330,14 +330,11 @@ final class AgentPublicAPITests: XCTestCase {
         let options = AgentOptions(apiKey: secretKey, model: "claude-sonnet-4-6")
         let agent = createAgent(options: options)
 
-        // If Agent conforms to CustomStringConvertible
-        if let describable = agent as? CustomStringConvertible {
-            let description = describable.description
-            XCTAssertFalse(description.contains(secretKey),
-                           "Agent description must not contain API key. Got: \(description)")
-            XCTAssertFalse(description.contains("sk-ant-secret"),
-                           "Agent description must not contain API key prefix. Got: \(description)")
-        }
+        let description = agent.description
+        XCTAssertFalse(description.contains(secretKey),
+                       "Agent description must not contain API key. Got: \(description)")
+        XCTAssertFalse(description.contains("sk-ant-secret"),
+                       "Agent description must not contain API key prefix. Got: \(description)")
     }
 
     /// AC6: Agent class is not an actor — it holds immutable configuration.
