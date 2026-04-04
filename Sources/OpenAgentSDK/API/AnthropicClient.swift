@@ -130,10 +130,10 @@ public actor AnthropicClient {
 
         let request = try buildRequest(body: body)
 
-        let bytes: URLSession.AsyncBytes
+        let data: Data
         let response: URLResponse
         do {
-            (bytes, response) = try await urlSession.bytes(for: request)
+            (data, response) = try await urlSession.data(for: request)
         } catch let error as URLError {
             let statusCode: Int
             if error.code == .timedOut {
@@ -147,50 +147,19 @@ public actor AnthropicClient {
 
         try validateHTTPResponse(response, data: nil)
 
+        guard let responseText = String(data: data, encoding: .utf8) else {
+            throw SDKError.apiError(statusCode: 0, message: "Empty streaming response")
+        }
+
+        let parsedEvents = SSELineParser.parse(text: responseText)
+
         return AsyncThrowingStream { continuation in
-            let task = Task {
-                var buffer = ""
-
-                do {
-                    for try await line in bytes.lines {
-                        if Task.isCancelled { break }
-
-                        buffer += line + "\n"
-
-                        // Check for complete SSE event (ends with blank line)
-                        // SSE events are separated by blank lines
-                        if line.isEmpty && !buffer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                            let events = SSELineParser.parse(text: buffer)
-                            for parsed in events {
-                                if let event = SSEEventDispatcher.dispatch(event: parsed.event, data: parsed.data) {
-                                    continuation.yield(event)
-                                }
-                            }
-                            buffer = ""
-                        }
-                    }
-
-                    // Process any remaining buffered content
-                    let remaining = buffer.trimmingCharacters(in: .whitespacesAndNewlines)
-                    if !remaining.isEmpty {
-                        let events = SSELineParser.parse(text: buffer)
-                        for parsed in events {
-                            if let event = SSEEventDispatcher.dispatch(event: parsed.event, data: parsed.data) {
-                                continuation.yield(event)
-                            }
-                        }
-                    }
-                } catch {
-                    continuation.finish(throwing: error)
-                    return
+            for parsed in parsedEvents {
+                if let event = SSEEventDispatcher.dispatch(event: parsed.event, data: parsed.data) {
+                    continuation.yield(event)
                 }
-
-                continuation.finish()
             }
-
-            continuation.onTermination = { _ in
-                task.cancel()
-            }
+            continuation.finish()
         }
     }
 
