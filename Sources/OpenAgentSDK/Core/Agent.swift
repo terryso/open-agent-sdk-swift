@@ -277,6 +277,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                                         inputTokens: inputTokens,
                                         outputTokens: 0
                                     )
+                                    // Calculate cost for input tokens at message start
+                                    totalCostUsd += estimateCost(model: currentModel, usage: TokenUsage(inputTokens: inputTokens, outputTokens: 0))
                                 }
 
                             case .contentBlockDelta(_, let delta):
