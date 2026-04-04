@@ -500,6 +500,38 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
 
     // MARK: - Private Helpers
 
+    // MARK: Micro-Compaction Integration (Story 2.6)
+
+    /// Process a tool result through micro-compaction if it exceeds the threshold.
+    ///
+    /// This method checks whether a tool result's content exceeds `MICRO_COMPACT_THRESHOLD`
+    /// (50,000 characters) and, if so, compresses it using the LLM. Error results are
+    /// never compacted. On compression failure, the original content is preserved.
+    ///
+    /// **Integration point for Epic 3:** When tool execution is added to the agent loop,
+    /// call this method on each tool result before appending it to the `messages` array:
+    /// ```swift
+    /// // In prompt() and stream() after tool execution:
+    /// let rawResult = await tool.call(input: toolInput, context: toolContext)
+    /// let processedContent = await processToolResult(rawResult.content, isError: rawResult.isError)
+    /// messages.append([
+    ///     "role": "user",
+    ///     "content": [["type": "tool_result", "tool_use_id": rawResult.toolUseId, "content": processedContent]]
+    /// ])
+    /// ```
+    ///
+    /// - Parameters:
+    ///   - content: The raw tool result content string.
+    ///   - isError: Whether the tool result is an error (errors are never compacted).
+    /// - Returns: The micro-compacted content (with `[微压缩]` marker) if compression was
+    ///   performed, or the original content if no compression was needed or on failure.
+    func processToolResult(_ content: String, isError: Bool = false) async -> String {
+        guard shouldMicroCompact(content: content, isError: isError) else {
+            return content
+        }
+        return await microCompact(client: client, model: model, content: content)
+    }
+
     /// Yield an error result to the stream continuation and finish it.
     ///
     /// Used by all three error paths in `stream()` to avoid duplication.

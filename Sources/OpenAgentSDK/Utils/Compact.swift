@@ -126,6 +126,102 @@ func compactConversation(
     }
 }
 
+// MARK: - Micro Compaction (Story 2.6)
+
+/// Threshold (in characters) above which tool results are micro-compacted.
+/// Matches the TypeScript SDK default of 50,000 characters.
+let MICRO_COMPACT_THRESHOLD = 50_000
+
+/// Check whether a tool result string should be micro-compacted.
+///
+/// Returns `true` when the content exceeds `MICRO_COMPACT_THRESHOLD` characters
+/// and does not already carry a micro-compact marker (prevents double-compaction).
+///
+/// - Parameter content: The raw tool result text.
+/// - Parameter isError: Whether the tool result is an error (errors are never compacted).
+/// - Returns: `true` when micro-compaction should be attempted.
+func shouldMicroCompact(content: String, isError: Bool = false) -> Bool {
+    guard !isError else { return false }
+    guard content.count > MICRO_COMPACT_THRESHOLD else { return false }
+    // Do not re-compact content that was already micro-compacted
+    return !content.hasPrefix("[微压缩]")
+}
+
+/// Compress a large tool result using the LLM.
+///
+/// On success the returned string contains a `[微压缩]` header with length
+/// metadata followed by the LLM-generated summary. On failure the original content
+/// is returned unchanged.
+///
+/// The LLM call is wrapped with `withRetry` for resilience. Costs from this call
+/// are **not** added to the caller's `totalCostUsd` (internal operation).
+///
+/// - Parameters:
+///   - client: The Anthropic client to use for the summarization call.
+///   - model: The model identifier.
+///   - content: The raw tool result text to compress.
+/// - Returns: The compressed string (with header) on success, or the original content on failure.
+func microCompact(
+    client: AnthropicClient,
+    model: String,
+    content: String
+) async -> String {
+    do {
+        let prompt = buildMicroCompactPrompt(content)
+
+        let response = try await withRetry {
+            try await client.sendMessage(
+                model: model,
+                messages: [
+                    ["role": "user", "content": prompt]
+                ],
+                maxTokens: 8192,
+                system: "You are a content summarizer for tool results. Compress the following tool output while preserving: 1. File paths and names 2. Error messages and stack traces (in full) 3. Key-value pairs (keys in full, values summarized if >200 chars) 4. Structure and formatting cues (headers, lists, indentation levels) 5. Any numeric data or metrics 6. The first and last 200 characters of any code blocks. Remove: verbose logging output (keep first/last lines), redundant file content listings, whitespace and padding, repeated patterns (note the count and show one example). Output the compressed version directly."
+            )
+        }
+
+        // Extract summary text from response
+        var summary = ""
+        if let responseContent = response["content"] as? [[String: Any]] {
+            summary = responseContent
+                .filter { $0["type"] as? String == "text" }
+                .compactMap { $0["text"] as? String }
+                .joined(separator: "\n")
+        }
+
+        guard !summary.isEmpty else {
+            return content
+        }
+
+        return "[微压缩] 原始长度: \(content.count), 压缩后长度: \(summary.count)\n\n\(summary)"
+    } catch {
+        // On failure, preserve original content unchanged
+        return content
+    }
+}
+
+/// Build the user prompt sent to the LLM for micro-compaction.
+///
+/// Takes a truncated view of the content (first + last 25,000 characters) so
+/// the prompt itself does not blow past context limits.
+private func buildMicroCompactPrompt(_ content: String) -> String {
+    let previewLength = 25_000
+    // shouldMicroCompact guarantees content.count > 50_000, so we always preview.
+    // Show first and last 25K chars to keep the prompt within context limits.
+    let head = String(content.prefix(previewLength))
+    let tail = String(content.suffix(previewLength))
+    return """
+    Compress the following tool output, preserving all key information.
+    The content is \(content.count) characters long; showing first \(previewLength) and last \(previewLength) characters.
+
+    --- BEGIN (first \(previewLength) chars) ---
+    \(head)
+    --- MIDDLE OMITTED (\(content.count - previewLength * 2) chars) ---
+    \(tail)
+    --- END ---
+    """
+}
+
 /// Build a compaction prompt from the message array.
 private func buildCompactionPrompt(_ messages: [[String: Any]]) -> String {
     var parts: [String] = ["Please summarize this conversation:\n"]

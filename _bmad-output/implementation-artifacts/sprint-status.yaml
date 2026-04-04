@@ -1,5 +1,7 @@
 # generated: 2026-04-04
 # last_updated: 2026-04-05
+# updated: 2-6-tool-result-micro-compaction → done
+# updated: 2-6-tool-result-micro-compaction → ready-for-dev
 # updated: 2-5-auto-conversation-compaction → in-progress
 # updated: 2-5-auto-conversation-compaction → ready-for-dev
 # updated: 2-5-auto-conversation-compaction → done
@@ -39,6 +41,7 @@
 
 generated: 2026-04-04
 last_updated: 2026-04-05
+# updated: 2-6-tool-result-micro-compaction → ready-for-dev
 # updated: 2-4-llm-api-retry-max-tokens-recovery → done
 # updated: 2-5-auto-conversation-compaction → ready-for-dev
 # updated: 2-3-budget-enforcement → ready-for-dev
@@ -78,7 +81,7 @@ development_status:
   2-3-budget-enforcement: done
   2-4-llm-api-retry-max-tokens-recovery: done
   2-5-auto-conversation-compaction: done
-  2-6-tool-result-micro-compaction: backlog
+  2-6-tool-result-micro-compaction: done
   epic-2-retrospective: optional
 
   # Epic 3: 工具系统与核心工具
