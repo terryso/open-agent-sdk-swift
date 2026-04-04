@@ -126,8 +126,19 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
         var status: QueryStatus = .success
         var maxTokensRecoveryAttempts = 0
         let MAX_TOKENS_RECOVERY = 3
+        var compactState = createAutoCompactState()
 
         while turnCount < maxTurns {
+            // Auto-compact if context is too large (FR9)
+            if shouldAutoCompact(messages: messages, model: model, state: compactState) {
+                let (newMessages, _, newState) = await compactConversation(
+                    client: client, model: model,
+                    messages: messages, state: compactState
+                )
+                messages = newMessages
+                compactState = newState
+            }
+
             let response: [String: Any]
             do {
                 // Capture values to satisfy Sendable requirements in the @Sendable closure.
@@ -271,8 +282,25 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                 var turnCount = 0
                 var maxTokensRecoveryAttempts = 0
                 let MAX_TOKENS_RECOVERY = 3
+                var compactState = createAutoCompactState()
 
                 while turnCount < capturedMaxTurns {
+                    // Auto-compact if context is too large (FR9)
+                    if shouldAutoCompact(messages: messages, model: capturedModel, state: compactState) {
+                        let (newMessages, _, newState) = await compactConversation(
+                            client: capturedClient, model: capturedModel,
+                            messages: messages, state: compactState
+                        )
+                        messages = newMessages
+                        compactState = newState
+
+                        // Emit compact boundary event
+                        continuation.yield(.system(SDKMessage.SystemData(
+                            subtype: .compactBoundary,
+                            message: "Conversation compacted to fit within context window"
+                        )))
+                    }
+
                     let eventStream: AsyncThrowingStream<SSEEvent, Error>
                     do {
                         // Capture messages snapshot for the @Sendable closure.

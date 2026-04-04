@@ -1,5 +1,8 @@
 # generated: 2026-04-04
 # last_updated: 2026-04-05
+# updated: 2-5-auto-conversation-compaction → in-progress
+# updated: 2-5-auto-conversation-compaction → ready-for-dev
+# updated: 2-5-auto-conversation-compaction → done
 # project: open-agent-sdk-swift
 # project_key: NOKEY
 # tracking_system: file-system
@@ -37,6 +40,7 @@
 generated: 2026-04-04
 last_updated: 2026-04-05
 # updated: 2-4-llm-api-retry-max-tokens-recovery → done
+# updated: 2-5-auto-conversation-compaction → ready-for-dev
 # updated: 2-3-budget-enforcement → ready-for-dev
 # updated: 1-5-agent-loop-blocking-response → in-progress
 # updated: 1-5-agent-loop-blocking-response → review
@@ -73,7 +77,7 @@ development_status:
   2-2-token-usage-cost-tracking: done
   2-3-budget-enforcement: done
   2-4-llm-api-retry-max-tokens-recovery: done
-  2-5-auto-conversation-compaction: backlog
+  2-5-auto-conversation-compaction: done
   2-6-tool-result-micro-compaction: backlog
   epic-2-retrospective: optional
 
