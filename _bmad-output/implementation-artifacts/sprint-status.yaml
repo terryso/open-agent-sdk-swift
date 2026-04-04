@@ -36,6 +36,9 @@
 
 generated: 2026-04-04
 last_updated: 2026-04-04
+# updated: 1-5-agent-loop-blocking-response → in-progress
+# updated: 1-5-agent-loop-blocking-response → review
+# updated: 1-5-agent-loop-blocking-response → done
 # updated: 1-4-agent-creation-config → ready-for-dev
 # updated: 1-3-sdk-config-env-vars → ready-for-dev
 # updated: 1-1-spm-package-core-types → in-progress
@@ -50,12 +53,12 @@ story_location: _bmad-output/implementation-artifacts
 
 development_status:
   # Epic 1: 基础设施与 Agent 设置
-  epic-1: in-progress
+  epic-1: done
   1-1-spm-package-core-types: done
   1-2-custom-anthropic-api-client: done
   1-3-sdk-config-env-vars: done
   1-4-agent-creation-config: done
-  1-5-agent-loop-blocking-response: backlog
+  1-5-agent-loop-blocking-response: done
   epic-1-retrospective: optional
 
   # Epic 2: 流式响应与生产就绪 Agent

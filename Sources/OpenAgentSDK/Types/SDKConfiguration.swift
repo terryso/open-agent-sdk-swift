@@ -114,8 +114,8 @@ public struct SDKConfiguration: Sendable, Equatable, CustomStringConvertible,
     ///
     /// For `apiKey` and `baseURL`: a non-nil override takes precedence; otherwise
     /// the environment variable is used.
-    /// For `model`: an override that differs from the default takes precedence;
-    /// otherwise the environment variable is used.
+    /// For `model`, `maxTurns`, `maxTokens`: the override value is always used.
+    /// Only Optional fields fall back to environment variables.
     ///
     /// - Parameter overrides: Programmatic configuration values. Pass `nil` to use
     ///   only environment variables and defaults.
@@ -129,12 +129,10 @@ public struct SDKConfiguration: Sendable, Equatable, CustomStringConvertible,
 
         return SDKConfiguration(
             apiKey: overrides.apiKey ?? env.apiKey,
-            model: overrides.model != Self.defaultModel ? overrides.model : env.model,
+            model: overrides.model,
             baseURL: overrides.baseURL ?? env.baseURL,
-            maxTurns: overrides.maxTurns != Self.defaultMaxTurns
-                ? overrides.maxTurns : env.maxTurns,
-            maxTokens: overrides.maxTokens != Self.defaultMaxTokens
-                ? overrides.maxTokens : env.maxTokens
+            maxTurns: overrides.maxTurns,
+            maxTokens: overrides.maxTokens
         )
     }
 

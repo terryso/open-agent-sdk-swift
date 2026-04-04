@@ -389,4 +389,18 @@ final class SDKConfigurationAgentOptionsTests: XCTestCase {
         XCTAssertEqual(config.baseURL, "https://env-url.com",
                        "baseURL should come from env when not overridden programmatically")
     }
+
+    /// Regression test: explicitly setting a non-optional field to its default value
+    /// should NOT fall back to the environment variable.
+    func testResolvedExplicitDefaultNotOverriddenByEnv() {
+        setenv("CODEANY_MODEL", "claude-opus-4", 1)
+        defer { unsetenv("CODEANY_MODEL") }
+
+        // User explicitly sets model to the default value
+        let overrides = SDKConfiguration(model: "claude-sonnet-4-6")
+        let config = SDKConfiguration.resolved(overrides: overrides)
+
+        XCTAssertEqual(config.model, "claude-sonnet-4-6",
+                       "Explicitly setting model to its default should not be overridden by env var")
+    }
 }

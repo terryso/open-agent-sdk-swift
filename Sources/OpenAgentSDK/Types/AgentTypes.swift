@@ -68,6 +68,16 @@ public struct AgentOptions: Sendable {
     }
 }
 
+/// Status of a completed agent query.
+public enum QueryStatus: String, Sendable, Equatable {
+    /// The query completed successfully (terminated by end_turn or stop_sequence).
+    case success
+    /// The agent loop exceeded the configured maxTurns limit.
+    case errorMaxTurns
+    /// An API error occurred during execution (HTTP error, network failure, etc.).
+    case errorDuringExecution
+}
+
 /// Result of a completed agent query.
 public struct QueryResult: Sendable {
     public let text: String
@@ -75,13 +85,15 @@ public struct QueryResult: Sendable {
     public let numTurns: Int
     public let durationMs: Int
     public let messages: [SDKMessage]
+    public let status: QueryStatus
 
-    public init(text: String, usage: TokenUsage, numTurns: Int, durationMs: Int, messages: [SDKMessage]) {
+    public init(text: String, usage: TokenUsage, numTurns: Int, durationMs: Int, messages: [SDKMessage], status: QueryStatus = .success) {
         self.text = text
         self.usage = usage
         self.numTurns = numTurns
         self.durationMs = durationMs
         self.messages = messages
+        self.status = status
     }
 }
 
