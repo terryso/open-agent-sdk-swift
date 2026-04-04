@@ -124,16 +124,26 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
         var turnCount = 0
         var lastAssistantText = ""
         var status: QueryStatus = .success
+        var maxTokensRecoveryAttempts = 0
+        let MAX_TOKENS_RECOVERY = 3
 
         while turnCount < maxTurns {
             let response: [String: Any]
             do {
-                response = try await client.sendMessage(
-                    model: model,
-                    messages: messages,
-                    maxTokens: maxTokens,
-                    system: buildSystemPrompt()
-                )
+                // Capture values to satisfy Sendable requirements in the @Sendable closure.
+                let retryClient = self.client
+                let retryModel = self.model
+                let retryMaxTokens = self.maxTokens
+                let retrySystemPrompt = self.buildSystemPrompt()
+                let retryMessages = messages
+                response = try await withRetry {
+                    try await retryClient.sendMessage(
+                        model: retryModel,
+                        messages: retryMessages,
+                        maxTokens: retryMaxTokens,
+                        system: retrySystemPrompt
+                    )
+                }
             } catch {
                 return QueryResult(
                     text: lastAssistantText,
@@ -190,7 +200,14 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
 
             // max_tokens: response was truncated but loop continues.
             // Add a continuation prompt so the model can complete its response.
-            messages.append(["role": "user", "content": "continue"])
+            // Limited to MAX_TOKENS_RECOVERY attempts to prevent infinite continuation.
+            if maxTokensRecoveryAttempts < MAX_TOKENS_RECOVERY {
+                maxTokensRecoveryAttempts += 1
+                messages.append(["role": "user", "content": "Please continue from where you left off."])
+            } else {
+                // Recovery attempts exhausted — return partial result with .success
+                break
+            }
         }
 
         // Determine status: if we exhausted maxTurns without a clean stop, it's an error
@@ -252,16 +269,26 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                 var totalUsage = TokenUsage(inputTokens: 0, outputTokens: 0)
                 var totalCostUsd: Double = 0.0
                 var turnCount = 0
+                var maxTokensRecoveryAttempts = 0
+                let MAX_TOKENS_RECOVERY = 3
 
                 while turnCount < capturedMaxTurns {
                     let eventStream: AsyncThrowingStream<SSEEvent, Error>
                     do {
-                        eventStream = try await capturedClient.streamMessage(
-                            model: capturedModel,
-                            messages: messages,
-                            maxTokens: capturedMaxTokens,
-                            system: capturedSystemPrompt
-                        )
+                        // Capture messages snapshot for the @Sendable closure.
+                        let retryClient = capturedClient
+                        let retryModel = capturedModel
+                        let retryMaxTokens = capturedMaxTokens
+                        let retrySystemPrompt = capturedSystemPrompt
+                        let retryMessages = messages
+                        eventStream = try await withRetry {
+                            try await retryClient.streamMessage(
+                                model: retryModel,
+                                messages: retryMessages,
+                                maxTokens: retryMaxTokens,
+                                system: retrySystemPrompt
+                            )
+                        }
                     } catch {
                         // API connection error — yield error result and terminate
                         Self.yieldStreamError(
@@ -401,7 +428,14 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
 
                     // max_tokens: response was truncated but loop continues.
                     // Add a continuation prompt so the model can complete its response.
-                    messages.append(["role": "user", "content": "continue"])
+                    // Limited to MAX_TOKENS_RECOVERY attempts to prevent infinite continuation.
+                    if maxTokensRecoveryAttempts < MAX_TOKENS_RECOVERY {
+                        maxTokensRecoveryAttempts += 1
+                        messages.append(["role": "user", "content": "Please continue from where you left off."])
+                    } else {
+                        // Recovery attempts exhausted — return partial result with .success
+                        break
+                    }
                 }
 
                 // Determine final status and yield result

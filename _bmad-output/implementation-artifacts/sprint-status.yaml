@@ -1,5 +1,5 @@
 # generated: 2026-04-04
-# last_updated: 2026-04-04
+# last_updated: 2026-04-05
 # project: open-agent-sdk-swift
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,8 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-04-04
-last_updated: 2026-04-04
+last_updated: 2026-04-05
+# updated: 2-4-llm-api-retry-max-tokens-recovery → done
 # updated: 2-3-budget-enforcement → ready-for-dev
 # updated: 1-5-agent-loop-blocking-response → in-progress
 # updated: 1-5-agent-loop-blocking-response → review
@@ -71,7 +72,7 @@ development_status:
 # updated: 2-1-async-stream-response → done (manual acceptance verified all 7 ACs)
   2-2-token-usage-cost-tracking: done
   2-3-budget-enforcement: done
-  2-4-llm-api-retry-max-tokens-recovery: backlog
+  2-4-llm-api-retry-max-tokens-recovery: done
   2-5-auto-conversation-compaction: backlog
   2-6-tool-result-micro-compaction: backlog
   epic-2-retrospective: optional
