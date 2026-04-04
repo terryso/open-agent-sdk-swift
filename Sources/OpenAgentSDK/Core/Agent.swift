@@ -178,10 +178,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                 break
             }
 
-            // max_tokens also terminates in this story (no recovery)
-            if stopReason == "max_tokens" {
-                break
-            }
+            // max_tokens: response was truncated but loop continues.
+            // The next turn gives the model another chance to complete.
         }
 
         // Determine status: if we exhausted maxTurns without a clean stop, it's an error
