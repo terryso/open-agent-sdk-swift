@@ -76,6 +76,8 @@ public enum QueryStatus: String, Sendable, Equatable {
     case errorMaxTurns
     /// An API error occurred during execution (HTTP error, network failure, etc.).
     case errorDuringExecution
+    /// The accumulated cost exceeded the configured maxBudgetUsd limit.
+    case errorMaxBudgetUsd
 }
 
 /// Result of a completed agent query.

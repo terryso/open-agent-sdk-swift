@@ -158,6 +158,16 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                 totalCostUsd += estimateCost(model: model, usage: turnUsage)
             }
 
+            // Check budget limit after cost accumulation
+            if let budget = options.maxBudgetUsd, totalCostUsd > budget {
+                status = .errorMaxBudgetUsd
+                // Extract content before breaking so partial text is preserved
+                if let content = response["content"] {
+                    lastAssistantText = extractText(from: content)
+                }
+                break
+            }
+
             // Extract content from response
             let content = response["content"]
             if let content {
@@ -184,7 +194,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
         }
 
         // Determine status: if we exhausted maxTurns without a clean stop, it's an error
-        if turnCount >= maxTurns {
+        // Only override if not already set to a more specific error (e.g., budget exceeded)
+        if turnCount >= maxTurns, status == .success {
             status = .errorMaxTurns
         }
 
@@ -221,6 +232,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
         let capturedSystemPrompt = buildSystemPrompt()
         let capturedMessages = buildMessages(prompt: text)
         let capturedClient = client
+        let capturedMaxBudgetUsd = options.maxBudgetUsd
 
         // Serialize captured messages to Data for Sendable compliance across
         // the AsyncStream closure boundary, then deserialize inside the Task.
@@ -281,6 +293,30 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                                     totalCostUsd += estimateCost(model: currentModel, usage: TokenUsage(inputTokens: inputTokens, outputTokens: 0))
                                 }
 
+                                // Check budget after input token cost accumulation
+                                if let budget = capturedMaxBudgetUsd, totalCostUsd > budget {
+                                    let elapsed = ContinuousClock.now - startTime
+                                    let durationMs = Self.computeDurationMs(elapsed)
+                                    let previousText = messages.compactMap { msg -> String? in
+                                        guard let content = msg["content"] as? [[String: Any]] else { return nil }
+                                        return content
+                                            .filter { $0["type"] as? String == "text" }
+                                            .compactMap { $0["text"] as? String }
+                                            .joined()
+                                    }.joined(separator: " ")
+
+                                    continuation.yield(.result(SDKMessage.ResultData(
+                                        subtype: .errorMaxBudgetUsd,
+                                        text: previousText,
+                                        usage: totalUsage,
+                                        numTurns: turnCount,
+                                        durationMs: durationMs,
+                                        totalCostUsd: totalCostUsd
+                                    )))
+                                    continuation.finish()
+                                    return
+                                }
+
                             case .contentBlockDelta(_, let delta):
                                 if let deltaText = delta["text"] as? String {
                                     accumulatedText += deltaText
@@ -295,6 +331,31 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                                 )
                                 totalUsage = totalUsage + turnUsage
                                 totalCostUsd += estimateCost(model: currentModel, usage: turnUsage)
+
+                                // Check budget after cost accumulation
+                                if let budget = capturedMaxBudgetUsd, totalCostUsd > budget {
+                                    let elapsed = ContinuousClock.now - startTime
+                                    let durationMs = Self.computeDurationMs(elapsed)
+                                    let previousText = messages.compactMap { msg -> String? in
+                                        guard let content = msg["content"] as? [[String: Any]] else { return nil }
+                                        return content
+                                            .filter { $0["type"] as? String == "text" }
+                                            .compactMap { $0["text"] as? String }
+                                            .joined()
+                                    }.joined(separator: " ")
+                                    let finalText = previousText.isEmpty ? accumulatedText : "\(previousText) \(accumulatedText)"
+
+                                    continuation.yield(.result(SDKMessage.ResultData(
+                                        subtype: .errorMaxBudgetUsd,
+                                        text: finalText,
+                                        usage: totalUsage,
+                                        numTurns: turnCount + 1,
+                                        durationMs: durationMs,
+                                        totalCostUsd: totalCostUsd
+                                    )))
+                                    continuation.finish()
+                                    return
+                                }
 
                             case .messageStop:
                                 turnCount += 1
