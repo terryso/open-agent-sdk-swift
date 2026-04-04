@@ -8,13 +8,13 @@ import XCTest
 final class MockURLProtocol: URLProtocol {
 
     /// Static storage for mock responses keyed by URL string.
-    static var mockResponses: [String: (statusCode: Int, headers: [String: String], body: Data)] = [:]
+    nonisolated(unsafe) static var mockResponses: [String: (statusCode: Int, headers: [String: String], body: Data)] = [:]
 
     /// Records the last request sent through this protocol for inspection.
-    static var lastRequest: URLRequest?
+    nonisolated(unsafe) static var lastRequest: URLRequest?
 
     /// Records all requests sent through this protocol.
-    static var allRequests: [URLRequest] = []
+    nonisolated(unsafe) static var allRequests: [URLRequest] = []
 
     override class func canInit(with request: URLRequest) -> Bool {
         return true

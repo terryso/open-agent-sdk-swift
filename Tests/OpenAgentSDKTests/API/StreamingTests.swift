@@ -740,8 +740,12 @@ final class SSEEventTests: XCTestCase {
 
     /// Verify SSEEvent conforms to Sendable for safe concurrency.
     func testSSEEventIsSendable() {
-        // Compile-time check: if SSEEvent is not Sendable, this won't compile.
-        let event: @Sendable SSEEvent = .ping
+        // Compile-time check: SSEEvent conforms to Sendable via @unchecked Sendable.
+        let event: SSEEvent = .ping
+        // Force the value to cross a concurrency boundary to verify Sendable conformance.
+        Task { @Sendable in
+            _ = event
+        }
         XCTAssertNotNil(event)
     }
 }

@@ -54,7 +54,7 @@ public actor AnthropicClient {
     ///   - thinking: Optional thinking configuration.
     ///   - temperature: Optional temperature value.
     /// - Returns: The full API response as a dictionary.
-    public func sendMessage(
+    public nonisolated func sendMessage(
         model: String,
         messages: [[String: Any]],
         maxTokens: Int,
@@ -106,7 +106,7 @@ public actor AnthropicClient {
     ///
     /// - Parameters: Same as `sendMessage`.
     /// - Returns: An async throwing stream of SSEEvent values.
-    public func streamMessage(
+    public nonisolated func streamMessage(
         model: String,
         messages: [[String: Any]],
         maxTokens: Int,
@@ -197,7 +197,7 @@ public actor AnthropicClient {
     // MARK: - Private Helpers
 
     /// Builds a URLRequest for the Messages API endpoint.
-    private func buildRequest(body: [String: Any]) throws -> URLRequest {
+    private nonisolated func buildRequest(body: [String: Any]) throws -> URLRequest {
         guard let url = URL(string: baseURL.absoluteString + "/v1/messages") else {
             throw SDKError.apiError(statusCode: 0, message: "Invalid URL")
         }
@@ -219,7 +219,7 @@ public actor AnthropicClient {
     }
 
     /// Validates an HTTP response, throwing SDKError for non-2xx status codes.
-    private func validateHTTPResponse(_ response: URLResponse?, data: Data?) throws {
+    private nonisolated func validateHTTPResponse(_ response: URLResponse?, data: Data?) throws {
         guard let httpResponse = response as? HTTPURLResponse else {
             throw SDKError.apiError(statusCode: 0, message: "Invalid response")
         }

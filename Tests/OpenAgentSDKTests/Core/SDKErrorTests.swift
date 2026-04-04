@@ -47,7 +47,7 @@ final class SDKErrorTests: XCTestCase {
     }
 
     func testAbortErrorCase() {
-        let error = SDKError.abortError
+        _ = SDKError.abortError
         // Verify the case exists — no associated values
     }
 
