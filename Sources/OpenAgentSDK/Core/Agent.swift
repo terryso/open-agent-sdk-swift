@@ -181,7 +181,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
             // Extract content from response
             let content = response["content"]
             if let content {
-                lastAssistantText = extractText(from: content)
+                lastAssistantText += extractText(from: content)
             }
 
             // Add assistant message to conversation history
