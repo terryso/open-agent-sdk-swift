@@ -1,6 +1,7 @@
 # Story 1.3: SDK 配置与环境变量
 
-Status: in-progress
+Status: done
+Acceptance: verified (2026-04-04) — all 6 AC passed manual review, 30 tests, build passes
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
