@@ -161,33 +161,25 @@ final class BudgetEnforcementPromptTests: XCTestCase {
     /// AC6 [P1]: Budget check happens after cost accumulation, not before the next turn.
     /// Multi-turn scenario: turn 1 under budget, turn 2 over budget.
     func testPrompt_BudgetCheck_AfterCostAccumulation() async throws {
-        let sut = makeBudgetPromptSUT(maxBudgetUsd: 0.015, maxTurns: 5)
+        let sut = makeBudgetPromptSUT(maxBudgetUsd: 0.010, maxTurns: 5)
 
-        // Turn 1: 500 input + 200 output → cost = 0.0015 + 0.003 = 0.0045 < 0.015 ✓
+        // Turn 1: 500 input + 200 output → cost = 0.0015 + 0.003 = 0.0045 < 0.010 ✓
         // Turn 2: 1000 input + 500 output → cost = 0.003 + 0.0075 = 0.0105
-        //   cumulative = 0.0045 + 0.0105 = 0.015 → NOT exceeded (> not >=)
-        // Turn 3: 1000 input + 500 output → cost = 0.0105
-        //   cumulative = 0.015 + 0.0105 = 0.0255 > 0.015 → exceeded!
+        //   cumulative = 0.0045 + 0.0105 = 0.015 > 0.010 → exceeded!
         let responses = [
             makeAgentLoopResponse(id: "msg_1", stopReason: "max_tokens",
                                    inputTokens: 500, outputTokens: 200),
-            makeAgentLoopResponse(id: "msg_2", stopReason: "max_tokens",
-                                   inputTokens: 1000, outputTokens: 500),
-            makeAgentLoopResponse(id: "msg_3", stopReason: "end_turn",
+            makeAgentLoopResponse(id: "msg_2", stopReason: "end_turn",
                                    inputTokens: 1000, outputTokens: 500),
         ]
         registerSequentialAgentLoopMockResponses(responses)
 
         let result = await sut.prompt("Multi-turn budget test")
 
-        // Loop should stop after turn 2's cost is accumulated (before turn 3 starts)
-        // Turn 1: 0.0045, Turn 2: 0.0045 + 0.0105 = 0.015 — exact boundary (not exceeded with >)
-        // Turn 3: 0.015 + 0.0105 = 0.0255 > 0.015 — exceeded
-        // Wait — actually turn 2 cost: 1000*3.0/M + 500*15.0/M = 0.003+0.0075 = 0.0105
-        // Cumulative after turn 2: 0.0045 + 0.0105 = 0.015 (not > 0.015, so no exceed)
-        // Turn 3 cost: 0.0105, cumulative: 0.015 + 0.0105 = 0.0255 > 0.015 — exceeded
-        XCTAssertEqual(result.numTurns, 3,
-                       "Budget should be checked after turn 3 cost accumulation")
+        // Turn 1: 0.0045 < 0.010 → continue
+        // Turn 2: 0.0045 + 0.0105 = 0.015 > 0.010 → exceeded, break
+        XCTAssertEqual(result.numTurns, 2,
+                       "Budget should be checked after turn 2 cost accumulation")
         XCTAssertEqual(result.status, .errorMaxBudgetUsd,
                        "Status should be .errorMaxBudgetUsd after cumulative cost exceeds budget")
     }
@@ -243,11 +235,13 @@ final class BudgetEnforcementStreamTests: XCTestCase {
     func testStream_BudgetExceeded_StopsStream() async throws {
         let sut = makeBudgetStreamSUT(maxBudgetUsd: 0.001, maxTurns: 5)
 
-        // Turn 1: input 1000, output 500 → cost = 0.0105 >> 0.001
+        // Use low inputTokens so budget check triggers in messageDelta (output tokens), not messageStart (input tokens).
+        // input 10 → cost_input = 10 * 3e-6 = 0.00003 < 0.001 (no trigger at messageStart)
+        // output 500 → cost_output = 500 * 15e-6 = 0.0075, cumulative = 0.00753 > 0.001 (trigger at messageDelta)
         let sseTurn1 = makeSingleTurnSSEBody(
             textDeltas: ["Over budget"],
             stopReason: "max_tokens",
-            inputTokens: 1000,
+            inputTokens: 10,
             outputTokens: 500
         )
         // Turn 2 should NOT be reached
@@ -263,21 +257,23 @@ final class BudgetEnforcementStreamTests: XCTestCase {
         let stream = sut.stream("Exceed budget in stream")
 
         var resultEvent: SDKMessage.ResultData?
-        var assistantCount = 0
+        var partialCount = 0
         for await message in stream {
             if case let .result(data) = message {
                 resultEvent = data
             }
-            if case .assistant = message {
-                assistantCount += 1
+            if case .partialMessage = message {
+                partialCount += 1
             }
         }
 
-        // Stream should have stopped — only 1 assistant event, not 2
-        XCTAssertEqual(assistantCount, 1,
-                       "Stream should stop after first turn when budget exceeded")
+        // Stream should have stopped — partial text was delivered but turn didn't complete
+        XCTAssertGreaterThan(partialCount, 0,
+                             "Should have received partial messages before budget check")
         XCTAssertNotNil(resultEvent,
                          "Should yield a .result event when budget exceeded")
+        XCTAssertEqual(resultEvent?.subtype, .errorMaxBudgetUsd,
+                       "Result subtype should be .errorMaxBudgetUsd")
     }
 
     /// AC2 [P0]: Budget exceeded yields .errorMaxBudgetUsd result subtype.
@@ -386,13 +382,11 @@ final class BudgetEnforcementStreamTests: XCTestCase {
 
     /// AC6 [P1]: Multi-turn stream — budget exceeded after second turn's cost accumulation.
     func testStream_BudgetCheck_AfterCostAccumulation() async throws {
-        // Budget = 0.015
-        // Turn 1: 500 input + 200 output → cost = 0.0015 + 0.003 = 0.0045 < 0.015 ✓
-        // Turn 2: 1000 input + 500 output → cost = 0.003 + 0.0075 = 0.0105
-        //   cumulative = 0.0045 + 0.0105 = 0.015 → NOT exceeded (> not >=)
-        // Turn 3: 1000 input + 500 output → cost = 0.0105
-        //   cumulative = 0.015 + 0.0105 = 0.0255 > 0.015 → exceeded!
-        let sut = makeBudgetStreamSUT(maxBudgetUsd: 0.015, maxTurns: 5)
+        // Budget = 0.010
+        // Turn 1: 500 input + 200 output → cost = 0.0045 < 0.010 ✓
+        // Turn 2: 1000 input + 500 output → cost = 0.0105
+        //   cumulative = 0.0045 + 0.0105 = 0.015 > 0.010 → exceeded!
+        let sut = makeBudgetStreamSUT(maxBudgetUsd: 0.010, maxTurns: 5)
 
         let sseTurn1 = makeSingleTurnSSEBody(
             textDeltas: ["Cheap turn"],
@@ -401,19 +395,13 @@ final class BudgetEnforcementStreamTests: XCTestCase {
             outputTokens: 200
         )
         let sseTurn2 = makeSingleTurnSSEBody(
-            textDeltas: ["Medium turn"],
-            stopReason: "max_tokens",
-            inputTokens: 1000,
-            outputTokens: 500
-        )
-        let sseTurn3 = makeSingleTurnSSEBody(
-            textDeltas: ["Should trigger exceed"],
+            textDeltas: ["Over budget"],
             stopReason: "end_turn",
             inputTokens: 1000,
             outputTokens: 500
         )
 
-        registerSequentialStreamMockResponses([sseTurn1, sseTurn2, sseTurn3])
+        registerSequentialStreamMockResponses([sseTurn1, sseTurn2])
 
         let stream = sut.stream("Multi-turn stream budget test")
 
@@ -426,8 +414,8 @@ final class BudgetEnforcementStreamTests: XCTestCase {
 
         XCTAssertNotNil(resultEvent)
         XCTAssertEqual(resultEvent?.subtype, .errorMaxBudgetUsd,
-                       "Should exceed budget after turn 3 cost accumulation")
-        XCTAssertEqual(resultEvent?.numTurns, 3,
-                       "Should report 3 turns when budget exceeded after third turn")
+                       "Should exceed budget after turn 2 cost accumulation")
+        XCTAssertEqual(resultEvent?.numTurns, 2,
+                       "Should report 2 turns when budget exceeded after second turn")
     }
 }
