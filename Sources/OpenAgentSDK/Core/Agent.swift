@@ -134,14 +134,11 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                     system: buildSystemPrompt()
                 )
             } catch {
-                let elapsed = ContinuousClock.now - startTime
-                let durationMs = Int(elapsed.components.seconds * 1000)
-                    + Int(elapsed.components.attoseconds / 1_000_000_000_000)
                 return QueryResult(
                     text: lastAssistantText,
                     usage: totalUsage,
                     numTurns: turnCount,
-                    durationMs: durationMs,
+                    durationMs: Self.computeDurationMs(ContinuousClock.now - startTime),
                     messages: [],
                     status: .errorDuringExecution
                 )
@@ -179,7 +176,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
             }
 
             // max_tokens: response was truncated but loop continues.
-            // The next turn gives the model another chance to complete.
+            // Add a continuation prompt so the model can complete its response.
+            messages.append(["role": "user", "content": "continue"])
         }
 
         // Determine status: if we exhausted maxTurns without a clean stop, it's an error
@@ -187,22 +185,206 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
             status = .errorMaxTurns
         }
 
-        // Calculate duration in milliseconds
-        let elapsed = ContinuousClock.now - startTime
-        let durationMs = Int(elapsed.components.seconds * 1000)
-            + Int(elapsed.components.attoseconds / 1_000_000_000_000)
-
         return QueryResult(
             text: lastAssistantText,
             usage: totalUsage,
             numTurns: turnCount,
-            durationMs: durationMs,
+            durationMs: Self.computeDurationMs(ContinuousClock.now - startTime),
             messages: [],
             status: status
         )
     }
 
+    // MARK: - Stream (AsyncStream Response)
+
+    /// Send a prompt to the agent and return a stream of SDKMessage events.
+    ///
+    /// This streaming method runs the agent loop: sends the user message to the LLM,
+    /// and yields `SDKMessage` events as they arrive. The stream terminates when the
+    /// loop ends (via `end_turn`, reaching `maxTurns`, or an API error).
+    ///
+    /// - Parameter text: The user's input text to send to the agent.
+    /// - Returns: An `AsyncStream<SDKMessage>` that yields typed events as the LLM
+    ///   processes the request.
+    public func stream(_ text: String) -> AsyncStream<SDKMessage> {
+        let startTime = ContinuousClock.now
+
+        // Capture immutable values before entering the AsyncStream closure
+        // to satisfy Swift 6 strict concurrency requirements.
+        let capturedMaxTurns = maxTurns
+        let capturedModel = model
+        let capturedMaxTokens = maxTokens
+        let capturedSystemPrompt = buildSystemPrompt()
+        let capturedMessages = buildMessages(prompt: text)
+        let capturedClient = client
+
+        // Serialize captured messages to Data for Sendable compliance across
+        // the AsyncStream closure boundary, then deserialize inside the Task.
+        guard let messagesData = try? JSONSerialization.data(withJSONObject: capturedMessages, options: []) else {
+            // If serialization fails, return an immediately-finishing stream
+            return AsyncStream<SDKMessage> { $0.finish() }
+        }
+
+        return AsyncStream<SDKMessage> { continuation in
+            let task = Task {
+                // Deserialize messages inside the isolated Task context
+                guard let decodedMessages = try? JSONSerialization.jsonObject(with: messagesData, options: []) as? [[String: Any]] else {
+                    continuation.finish()
+                    return
+                }
+                var messages = decodedMessages
+                var totalUsage = TokenUsage(inputTokens: 0, outputTokens: 0)
+                var turnCount = 0
+
+                while turnCount < capturedMaxTurns {
+                    let eventStream: AsyncThrowingStream<SSEEvent, Error>
+                    do {
+                        eventStream = try await capturedClient.streamMessage(
+                            model: capturedModel,
+                            messages: messages,
+                            maxTokens: capturedMaxTokens,
+                            system: capturedSystemPrompt
+                        )
+                    } catch {
+                        // API connection error — yield error result and terminate
+                        Self.yieldStreamError(
+                            continuation: continuation, text: "",
+                            usage: totalUsage, turnCount: turnCount, startTime: startTime
+                        )
+                        return
+                    }
+
+                    // Process SSE event stream
+                    var accumulatedText = ""
+                    var currentModel = capturedModel
+                    var currentStopReason = ""
+
+                    do {
+                        for try await event in eventStream {
+                            switch event {
+                            case .messageStart(let message):
+                                currentModel = message["model"] as? String ?? capturedModel
+
+                            case .contentBlockDelta(_, let delta):
+                                if let deltaText = delta["text"] as? String {
+                                    accumulatedText += deltaText
+                                    continuation.yield(.partialMessage(SDKMessage.PartialData(text: deltaText)))
+                                }
+
+                            case .messageDelta(let delta, let usage):
+                                currentStopReason = delta["stop_reason"] as? String ?? ""
+                                let turnUsage = TokenUsage(
+                                    inputTokens: usage["input_tokens"] as? Int ?? 0,
+                                    outputTokens: usage["output_tokens"] as? Int ?? 0
+                                )
+                                totalUsage = totalUsage + turnUsage
+
+                            case .messageStop:
+                                turnCount += 1
+                                continuation.yield(.assistant(SDKMessage.AssistantData(
+                                    text: accumulatedText,
+                                    model: currentModel,
+                                    stopReason: currentStopReason
+                                )))
+
+                                // Add assistant message to conversation history
+                                messages.append([
+                                    "role": "assistant",
+                                    "content": [["type": "text", "text": accumulatedText]]
+                                ])
+
+                            case .error:
+                                // SSE error event — yield error result and terminate
+                                Self.yieldStreamError(
+                                    continuation: continuation, text: accumulatedText,
+                                    usage: totalUsage, turnCount: turnCount, startTime: startTime
+                                )
+                                return
+
+                            case .contentBlockStart, .contentBlockStop, .ping:
+                                break // No SDKMessage yielded for these events
+                            }
+                        }
+                    } catch {
+                        // Stream iteration error — yield error result and terminate
+                        Self.yieldStreamError(
+                            continuation: continuation, text: accumulatedText,
+                            usage: totalUsage, turnCount: turnCount, startTime: startTime
+                        )
+                        return
+                    }
+
+                    // Check termination conditions
+                    if currentStopReason == "end_turn" || currentStopReason == "stop_sequence" {
+                        break
+                    }
+
+                    // max_tokens: response was truncated but loop continues.
+                    // Add a continuation prompt so the model can complete its response.
+                    messages.append(["role": "user", "content": "continue"])
+                }
+
+                // Determine final status and yield result
+                let elapsed = ContinuousClock.now - startTime
+                let durationMs = Self.computeDurationMs(elapsed)
+
+                let subtype: SDKMessage.ResultData.Subtype =
+                    turnCount >= capturedMaxTurns ? .errorMaxTurns : .success
+
+                // Collect all assistant text from conversation history
+                let finalText = messages.compactMap { msg -> String? in
+                    guard let content = msg["content"] as? [[String: Any]] else { return nil }
+                    return content
+                        .filter { $0["type"] as? String == "text" }
+                        .compactMap { $0["text"] as? String }
+                        .joined()
+                }.joined()
+
+                continuation.yield(.result(SDKMessage.ResultData(
+                    subtype: subtype,
+                    text: finalText,
+                    usage: totalUsage,
+                    numTurns: turnCount,
+                    durationMs: durationMs
+                )))
+                continuation.finish()
+            }
+            continuation.onTermination = { @Sendable _ in
+                task.cancel()
+            }
+        }
+    }
+
     // MARK: - Private Helpers
+
+    /// Yield an error result to the stream continuation and finish it.
+    ///
+    /// Used by all three error paths in `stream()` to avoid duplication.
+    private static func yieldStreamError(
+        continuation: AsyncStream<SDKMessage>.Continuation,
+        text: String,
+        usage: TokenUsage,
+        turnCount: Int,
+        startTime: ContinuousClock.Instant
+    ) {
+        continuation.yield(.result(SDKMessage.ResultData(
+            subtype: .errorDuringExecution,
+            text: text,
+            usage: usage,
+            numTurns: turnCount,
+            durationMs: computeDurationMs(ContinuousClock.now - startTime)
+        )))
+        continuation.finish()
+    }
+
+    /// Compute duration in milliseconds from a Swift `Duration` value.
+    ///
+    /// - Parameter elapsed: The duration to convert.
+    /// - Returns: The duration in whole milliseconds.
+    private static func computeDurationMs(_ elapsed: Duration) -> Int {
+        Int(elapsed.components.seconds * 1000)
+            + Int(elapsed.components.attoseconds / 1_000_000_000_000)
+    }
 
     /// Extract plain text from Anthropic API response content blocks.
     ///
