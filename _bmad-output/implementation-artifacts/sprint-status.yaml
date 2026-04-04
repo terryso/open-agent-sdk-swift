@@ -37,6 +37,10 @@
 generated: 2026-04-04
 last_updated: 2026-04-04
 # updated: 1-1-spm-package-core-types → in-progress
+# updated: 1-2-custom-anthropic-api-client → ready-for-dev
+# updated: 1-2-custom-anthropic-api-client → in-progress
+# updated: 1-2-custom-anthropic-api-client → review
+# updated: 1-2-custom-anthropic-api-client → done
 project: open-agent-sdk-swift
 project_key: NOKEY
 tracking_system: file-system
@@ -45,8 +49,8 @@ story_location: _bmad-output/implementation-artifacts
 development_status:
   # Epic 1: 基础设施与 Agent 设置
   epic-1: in-progress
-  1-1-spm-package-core-types: review
-  1-2-custom-anthropic-api-client: backlog
+  1-1-spm-package-core-types: done
+  1-2-custom-anthropic-api-client: done
   1-3-sdk-config-env-vars: backlog
   1-4-agent-creation-config: backlog
   1-5-agent-loop-blocking-response: backlog

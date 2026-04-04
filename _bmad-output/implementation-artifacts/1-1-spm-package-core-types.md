@@ -1,6 +1,6 @@
 # Story 1.1: SPM 包与核心类型系统
 
-Status: review
+Status: done
 
 ## Story
 
