@@ -239,13 +239,13 @@ final class WithRetryTests: XCTestCase {
         )
 
         var callCount = 0
-        let result = try await withRetry(retryConfig: fastConfig) {
+        let result = try await withRetry({
             callCount += 1
             if callCount < 3 {
                 throw SDKError.apiError(statusCode: 503, message: "Service unavailable")
             }
             return "success"
-        }
+        }, retryConfig: fastConfig)
         XCTAssertEqual(result, "success",
                        "Should return success result after retries")
         XCTAssertEqual(callCount, 3,
@@ -263,10 +263,10 @@ final class WithRetryTests: XCTestCase {
 
         var callCount = 0
         do {
-            _ = try await withRetry(retryConfig: fastConfig) {
+            _ = try await withRetry({
                 callCount += 1
                 throw SDKError.apiError(statusCode: 401, message: "Unauthorized")
-            }
+            }, retryConfig: fastConfig)
             XCTFail("Should have thrown an error")
         } catch let error as SDKError {
             XCTAssertEqual(error, .apiError(statusCode: 401, message: "Unauthorized"),
@@ -287,10 +287,10 @@ final class WithRetryTests: XCTestCase {
 
         var callCount = 0
         do {
-            _ = try await withRetry(retryConfig: fastConfig) {
+            _ = try await withRetry({
                 callCount += 1
                 throw SDKError.apiError(statusCode: 429, message: "Rate limit")
-            }
+            }, retryConfig: fastConfig)
             XCTFail("Should have thrown after all retries exhausted")
         } catch let error as SDKError {
             XCTAssertEqual(error, .apiError(statusCode: 429, message: "Rate limit"),
