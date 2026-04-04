@@ -48,6 +48,7 @@ last_updated: 2026-04-04
 # updated: 1-2-custom-anthropic-api-client → done
 # updated: epic-2 → in-progress
 # updated: 2-1-async-stream-response → ready-for-dev
+# updated: 2-2-token-usage-cost-tracking → ready-for-dev
 project: open-agent-sdk-swift
 project_key: NOKEY
 tracking_system: file-system
@@ -67,7 +68,7 @@ development_status:
   epic-2: in-progress
   2-1-async-stream-response: done
 # updated: 2-1-async-stream-response → done (manual acceptance verified all 7 ACs)
-  2-2-token-usage-cost-tracking: backlog
+  2-2-token-usage-cost-tracking: done
   2-3-budget-enforcement: backlog
   2-4-llm-api-retry-max-tokens-recovery: backlog
   2-5-auto-conversation-compaction: backlog

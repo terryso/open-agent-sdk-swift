@@ -86,14 +86,16 @@ public struct QueryResult: Sendable {
     public let durationMs: Int
     public let messages: [SDKMessage]
     public let status: QueryStatus
+    public let totalCostUsd: Double
 
-    public init(text: String, usage: TokenUsage, numTurns: Int, durationMs: Int, messages: [SDKMessage], status: QueryStatus = .success) {
+    public init(text: String, usage: TokenUsage, numTurns: Int, durationMs: Int, messages: [SDKMessage], status: QueryStatus = .success, totalCostUsd: Double = 0.0) {
         self.text = text
         self.usage = usage
         self.numTurns = numTurns
         self.durationMs = durationMs
         self.messages = messages
         self.status = status
+        self.totalCostUsd = totalCostUsd
     }
 }
 

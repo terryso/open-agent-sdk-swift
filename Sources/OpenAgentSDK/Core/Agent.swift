@@ -120,6 +120,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
 
         var messages = buildMessages(prompt: text)
         var totalUsage = TokenUsage(inputTokens: 0, outputTokens: 0)
+        var totalCostUsd: Double = 0.0
         var turnCount = 0
         var lastAssistantText = ""
         var status: QueryStatus = .success
@@ -140,7 +141,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                     numTurns: turnCount,
                     durationMs: Self.computeDurationMs(ContinuousClock.now - startTime),
                     messages: [],
-                    status: .errorDuringExecution
+                    status: .errorDuringExecution,
+                    totalCostUsd: totalCostUsd
                 )
             }
 
@@ -153,6 +155,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                     outputTokens: usage["output_tokens"] as? Int ?? 0
                 )
                 totalUsage = totalUsage + turnUsage
+                totalCostUsd += estimateCost(model: model, usage: turnUsage)
             }
 
             // Extract content from response
@@ -191,7 +194,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
             numTurns: turnCount,
             durationMs: Self.computeDurationMs(ContinuousClock.now - startTime),
             messages: [],
-            status: status
+            status: status,
+            totalCostUsd: totalCostUsd
         )
     }
 
@@ -234,6 +238,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                 }
                 var messages = decodedMessages
                 var totalUsage = TokenUsage(inputTokens: 0, outputTokens: 0)
+                var totalCostUsd: Double = 0.0
                 var turnCount = 0
 
                 while turnCount < capturedMaxTurns {
@@ -249,7 +254,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                         // API connection error — yield error result and terminate
                         Self.yieldStreamError(
                             continuation: continuation, text: "",
-                            usage: totalUsage, turnCount: turnCount, startTime: startTime
+                            usage: totalUsage, turnCount: turnCount, startTime: startTime,
+                            totalCostUsd: totalCostUsd
                         )
                         return
                     }
@@ -286,6 +292,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                                     outputTokens: usage["output_tokens"] as? Int ?? 0
                                 )
                                 totalUsage = totalUsage + turnUsage
+                                totalCostUsd += estimateCost(model: currentModel, usage: turnUsage)
 
                             case .messageStop:
                                 turnCount += 1
@@ -305,7 +312,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                                 // SSE error event — yield error result and terminate
                                 Self.yieldStreamError(
                                     continuation: continuation, text: accumulatedText,
-                                    usage: totalUsage, turnCount: turnCount, startTime: startTime
+                                    usage: totalUsage, turnCount: turnCount, startTime: startTime,
+                                    totalCostUsd: totalCostUsd
                                 )
                                 return
 
@@ -317,7 +325,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                         // Stream iteration error — yield error result and terminate
                         Self.yieldStreamError(
                             continuation: continuation, text: accumulatedText,
-                            usage: totalUsage, turnCount: turnCount, startTime: startTime
+                            usage: totalUsage, turnCount: turnCount, startTime: startTime,
+                            totalCostUsd: totalCostUsd
                         )
                         return
                     }
@@ -353,7 +362,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                     text: finalText,
                     usage: totalUsage,
                     numTurns: turnCount,
-                    durationMs: durationMs
+                    durationMs: durationMs,
+                    totalCostUsd: totalCostUsd
                 )))
                 continuation.finish()
             }
@@ -373,14 +383,16 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
         text: String,
         usage: TokenUsage,
         turnCount: Int,
-        startTime: ContinuousClock.Instant
+        startTime: ContinuousClock.Instant,
+        totalCostUsd: Double = 0.0
     ) {
         continuation.yield(.result(SDKMessage.ResultData(
             subtype: .errorDuringExecution,
             text: text,
             usage: usage,
             numTurns: turnCount,
-            durationMs: computeDurationMs(ContinuousClock.now - startTime)
+            durationMs: computeDurationMs(ContinuousClock.now - startTime),
+            totalCostUsd: totalCostUsd
         )))
         continuation.finish()
     }
