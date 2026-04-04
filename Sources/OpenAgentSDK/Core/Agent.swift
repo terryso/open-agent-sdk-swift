@@ -264,6 +264,14 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                             switch event {
                             case .messageStart(let message):
                                 currentModel = message["model"] as? String ?? capturedModel
+                                // Extract input_tokens from the nested message.usage object
+                                if let msgUsage = message["usage"] as? [String: Any] {
+                                    let inputTokens = msgUsage["input_tokens"] as? Int ?? 0
+                                    totalUsage = totalUsage + TokenUsage(
+                                        inputTokens: inputTokens,
+                                        outputTokens: 0
+                                    )
+                                }
 
                             case .contentBlockDelta(_, let delta):
                                 if let deltaText = delta["text"] as? String {
