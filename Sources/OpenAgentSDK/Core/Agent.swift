@@ -139,6 +139,12 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                 compactState = newState
             }
 
+            // Build tool definitions for API call
+            let apiTools: [[String: Any]]? = {
+                guard let registeredTools = options.tools, !registeredTools.isEmpty else { return nil }
+                return toApiTools(registeredTools)
+            }()
+
             let response: [String: Any]
             do {
                 // Capture values to satisfy Sendable requirements in the @Sendable closure.
@@ -147,12 +153,14 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                 let retryMaxTokens = self.maxTokens
                 let retrySystemPrompt = self.buildSystemPrompt()
                 let retryMessages = messages
+                let retryApiTools = apiTools
                 response = try await withRetry {
                     try await retryClient.sendMessage(
                         model: retryModel,
                         messages: retryMessages,
                         maxTokens: retryMaxTokens,
-                        system: retrySystemPrompt
+                        system: retrySystemPrompt,
+                        tools: retryApiTools
                     )
                 }
             } catch {
@@ -262,6 +270,12 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
         let capturedClient = client
         let capturedMaxBudgetUsd = options.maxBudgetUsd
 
+        // Build tool definitions for API call
+        let capturedApiTools: [[String: Any]]? = {
+            guard let registeredTools = options.tools, !registeredTools.isEmpty else { return nil }
+            return toApiTools(registeredTools)
+        }()
+
         // Serialize captured messages to Data for Sendable compliance across
         // the AsyncStream closure boundary, then deserialize inside the Task.
         guard let messagesData = try? JSONSerialization.data(withJSONObject: capturedMessages, options: []) else {
@@ -269,12 +283,19 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
             return AsyncStream<SDKMessage> { $0.finish() }
         }
 
+        // Serialize captured tools to Data for Sendable compliance (may be nil)
+        let toolsData = capturedApiTools.flatMap { try? JSONSerialization.data(withJSONObject: $0, options: []) }
+
         return AsyncStream<SDKMessage> { continuation in
             let task = Task {
                 // Deserialize messages inside the isolated Task context
                 guard let decodedMessages = try? JSONSerialization.jsonObject(with: messagesData, options: []) as? [[String: Any]] else {
                     continuation.finish()
                     return
+                }
+                // Deserialize tools inside the isolated Task context
+                let decodedApiTools: [[String: Any]]? = toolsData.flatMap { data in
+                    try? JSONSerialization.jsonObject(with: data, options: []) as? [[String: Any]]
                 }
                 var messages = decodedMessages
                 var totalUsage = TokenUsage(inputTokens: 0, outputTokens: 0)
@@ -309,12 +330,14 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                         let retryMaxTokens = capturedMaxTokens
                         let retrySystemPrompt = capturedSystemPrompt
                         let retryMessages = messages
+                        let retryApiTools = decodedApiTools
                         eventStream = try await withRetry {
                             try await retryClient.streamMessage(
                                 model: retryModel,
                                 messages: retryMessages,
                                 maxTokens: retryMaxTokens,
-                                system: retrySystemPrompt
+                                system: retrySystemPrompt,
+                                tools: retryApiTools
                             )
                         }
                     } catch {

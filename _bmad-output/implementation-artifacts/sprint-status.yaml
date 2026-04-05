@@ -1,6 +1,10 @@
 # generated: 2026-04-04
 # last_updated: 2026-04-05
-# updated: 2-6-tool-result-micro-compaction → done
+# updated: 3-1-tool-protocol-registry → review
+# updated: 3-1-tool-protocol-registry → in-progress
+# updated: 3-1-tool-protocol-registry → ready-for-dev
+# updated: epic-3 → in-progress
+# updated: 3-1-tool-protocol-registry → ready-for-dev
 # updated: 2-6-tool-result-micro-compaction → ready-for-dev
 # updated: 2-5-auto-conversation-compaction → in-progress
 # updated: 2-5-auto-conversation-compaction → ready-for-dev
@@ -41,6 +45,8 @@
 
 generated: 2026-04-04
 last_updated: 2026-04-05
+# updated: 3-1-tool-protocol-registry → review
+# updated: epic-3 → in-progress
 # updated: 2-6-tool-result-micro-compaction → ready-for-dev
 # updated: 2-4-llm-api-retry-max-tokens-recovery → done
 # updated: 2-5-auto-conversation-compaction → ready-for-dev
@@ -74,7 +80,7 @@ development_status:
   epic-1-retrospective: optional
 
   # Epic 2: 流式响应与生产就绪 Agent
-  epic-2: in-progress
+  epic-2: done
   2-1-async-stream-response: done
 # updated: 2-1-async-stream-response → done (manual acceptance verified all 7 ACs)
   2-2-token-usage-cost-tracking: done
@@ -85,8 +91,8 @@ development_status:
   epic-2-retrospective: optional
 
   # Epic 3: 工具系统与核心工具
-  epic-3: backlog
-  3-1-tool-protocol-registry: backlog
+  epic-3: in-progress
+  3-1-tool-protocol-registry: done
   3-2-custom-tool-define-tool: backlog
   3-3-tool-executor-concurrent-serial: backlog
   3-4-core-file-tools-read-write-edit: backlog
