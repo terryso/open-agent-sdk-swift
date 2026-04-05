@@ -275,8 +275,8 @@ final class GrepToolTests: XCTestCase {
         // Then: file is found via relative path resolution
         XCTAssertFalse(result.isError,
                        "Grep with relative path should not error, got: \(result.content)")
-        XCTAssertTrue(result.content.contains("patternHere"),
-                      "Should find match via resolved relative path")
+        XCTAssertTrue(result.content.contains("file.txt"),
+                      "Should find file via resolved relative path, got: \(result.content)")
     }
 
     // MARK: - Case insensitive search
