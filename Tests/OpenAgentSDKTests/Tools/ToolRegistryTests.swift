@@ -153,14 +153,19 @@ final class ToolRegistryTests: XCTestCase {
 
     /// AC2 [P0]: getAllBaseTools(tier: .core) should return an empty array in this story
     /// (core tools are implemented in stories 3.4-3.7).
-    func testGetAllBaseTools_Core_ReturnsEmptyArray() {
-        // Given: no tools implemented yet (Story 3.1 scope)
+    func testGetAllBaseTools_Core_ReturnsFileTools() {
+        // Given: file tools implemented in Story 3.4
         // When: requesting core tier tools
         let tools = getAllBaseTools(tier: .core)
+        let names = Set(tools.map { $0.name })
 
-        // Then: returns empty array (placeholder until 3.4-3.7)
-        XCTAssertTrue(tools.isEmpty,
-                       "getAllBaseTools(.core) should return empty array in Story 3.1")
+        // Then: core tier includes Read, Write, Edit
+        XCTAssertTrue(names.contains("Read"),
+                       "Core tier should include Read tool")
+        XCTAssertTrue(names.contains("Write"),
+                       "Core tier should include Write tool")
+        XCTAssertTrue(names.contains("Edit"),
+                       "Core tier should include Edit tool")
     }
 
     /// AC2 [P0]: getAllBaseTools for advanced/specialist tiers should return empty arrays.
