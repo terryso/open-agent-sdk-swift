@@ -166,6 +166,8 @@ final class SDKMessageTests: XCTestCase {
             switch message {
             case .assistant:
                 break
+            case .toolUse:
+                break
             case .toolResult:
                 break
             case .result:
