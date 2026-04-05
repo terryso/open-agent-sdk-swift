@@ -43,15 +43,24 @@ public func toApiTools(_ tools: [ToolProtocol]) -> [[String: Any]] {
 
 /// Returns all base tools for the specified tier.
 ///
-/// In this story (3.1), no concrete tools are implemented yet,
-/// so this always returns an empty array. Concrete tools are added
-/// in stories 3.4-3.7 (core), 4.x (advanced), and 5.x (specialist).
+/// For the `.core` tier, returns the built-in file tools: Read, Write, and Edit.
+/// Additional tools (Bash, Glob, Grep, etc.) are added in stories 3.5-3.7.
+/// The `.advanced` and `.specialist` tiers currently return empty arrays.
 ///
 /// - Parameter tier: The tool tier to retrieve.
-/// - Returns: An array of tools for the specified tier (currently always empty).
+/// - Returns: An array of tools for the specified tier.
 public func getAllBaseTools(tier: ToolTier) -> [ToolProtocol] {
-    // Placeholder: concrete tools added in future stories
-    return []
+    switch tier {
+    case .core:
+        return [
+            createReadTool(),
+            createWriteTool(),
+            createEditTool(),
+            // Story 3.5-3.7 will add: Bash, Glob, Grep, WebFetch, WebSearch, AskUser, ToolSearch
+        ]
+    case .advanced, .specialist:
+        return []
+    }
 }
 
 /// Filters a list of tools by allowed and disallowed name lists.
