@@ -3,6 +3,7 @@ import Foundation
 /// Streaming message union type for agent communication.
 public enum SDKMessage: Sendable {
     case assistant(AssistantData)
+    case toolUse(ToolUseData)
     case toolResult(ToolResultData)
     case result(ResultData)
     case partialMessage(PartialData)
@@ -14,6 +15,7 @@ public enum SDKMessage: Sendable {
     public var text: String {
         switch self {
         case .assistant(let data): return data.text
+        case .toolUse(let data): return data.toolName
         case .result(let data): return data.text
         case .partialMessage(let data): return data.text
         case .toolResult(let data): return data.content
@@ -80,6 +82,18 @@ public enum SDKMessage: Sendable {
             self.text = text
             self.model = model
             self.stopReason = stopReason
+        }
+    }
+
+    public struct ToolUseData: Sendable, Equatable {
+        public let toolName: String
+        public let toolUseId: String
+        public let input: String
+
+        public init(toolName: String, toolUseId: String, input: String) {
+            self.toolName = toolName
+            self.toolUseId = toolUseId
+            self.input = input
         }
     }
 

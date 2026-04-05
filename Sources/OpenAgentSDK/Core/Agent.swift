@@ -199,6 +199,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
 
             // Extract content from response
             let content = response["content"]
+            let contentBlocks = content as? [[String: Any]] ?? []
             if let content {
                 lastAssistantText += extractText(from: content)
             }
@@ -211,6 +212,40 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
 
             // Check stop_reason
             let stopReason = response["stop_reason"] as? String ?? ""
+
+            // Handle tool_use: extract blocks, execute tools, feed results back
+            if stopReason == "tool_use" {
+                let toolUseBlocks = ToolExecutor.extractToolUseBlocks(from: contentBlocks)
+
+                if !toolUseBlocks.isEmpty {
+                    let registeredTools = options.tools ?? []
+                    let toolResults = await ToolExecutor.executeTools(
+                        toolUseBlocks: toolUseBlocks,
+                        tools: registeredTools,
+                        context: ToolContext(cwd: options.cwd ?? "")
+                    )
+
+                    // Micro-compaction: process each result before appending
+                    var processedResults: [ToolResult] = []
+                    for result in toolResults {
+                        let processedContent = await processToolResult(result.content, isError: result.isError)
+                        processedResults.append(ToolResult(
+                            toolUseId: result.toolUseId,
+                            content: processedContent,
+                            isError: result.isError
+                        ))
+                    }
+
+                    // Append tool_result user message
+                    messages.append(ToolExecutor.buildToolResultMessage(from: processedResults))
+
+                    // Reset maxTokensRecoveryAttempts (consistent with TS SDK)
+                    maxTokensRecoveryAttempts = 0
+
+                    // Continue to next LLM call
+                    continue
+                }
+            }
 
             // Terminate on end_turn or stop_sequence
             if stopReason == "end_turn" || stopReason == "stop_sequence" {
@@ -269,6 +304,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
         let capturedMessages = buildMessages(prompt: text)
         let capturedClient = client
         let capturedMaxBudgetUsd = options.maxBudgetUsd
+        let capturedToolProtocols: [ToolProtocol] = options.tools ?? []
+        let capturedCwd = options.cwd ?? ""
 
         // Build tool definitions for API call
         let capturedApiTools: [[String: Any]]? = {
@@ -354,6 +391,10 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                     var accumulatedText = ""
                     var currentModel = capturedModel
                     var currentStopReason = ""
+                    // Track all content blocks for assistant message history
+                    var contentBlocks: [[String: Any]] = []
+                    // Track tool_use blocks being accumulated
+                    var toolUseAccumulator: [Int: (id: String, name: String, inputJson: String)] = [:]
 
                     do {
                         for try await event in eventStream {
@@ -395,10 +436,45 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                                     return
                                 }
 
-                            case .contentBlockDelta(_, let delta):
+                            case .contentBlockDelta(let index, let delta):
+                                // Handle text delta
                                 if let deltaText = delta["text"] as? String {
                                     accumulatedText += deltaText
                                     continuation.yield(.partialMessage(SDKMessage.PartialData(text: deltaText)))
+                                }
+                                // Handle tool_use input_json_delta
+                                if let partialJson = delta["partial_json"] as? String {
+                                    if var existing = toolUseAccumulator[index] {
+                                        existing.inputJson += partialJson
+                                        toolUseAccumulator[index] = existing
+                                    }
+                                }
+
+                            case .contentBlockStart(let index, let contentBlock):
+                                // Track tool_use blocks from contentBlockStart
+                                if contentBlock["type"] as? String == "tool_use" {
+                                    let id = contentBlock["id"] as? String ?? ""
+                                    let name = contentBlock["name"] as? String ?? ""
+                                    toolUseAccumulator[index] = (id: id, name: name, inputJson: "")
+                                }
+
+                            case .contentBlockStop(let index):
+                                // Finalize tool_use block when it stops
+                                if let accumulated = toolUseAccumulator[index] {
+                                    let block: [String: Any] = [
+                                        "type": "tool_use",
+                                        "id": accumulated.id,
+                                        "name": accumulated.name,
+                                        "input": Self.parseInputJson(accumulated.inputJson)
+                                    ]
+                                    contentBlocks.append(block)
+
+                                    // Emit toolUse event to stream
+                                    continuation.yield(.toolUse(SDKMessage.ToolUseData(
+                                        toolName: accumulated.name,
+                                        toolUseId: accumulated.id,
+                                        input: accumulated.inputJson
+                                    )))
                                 }
 
                             case .messageDelta(let delta, let usage):
@@ -437,16 +513,28 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
 
                             case .messageStop:
                                 turnCount += 1
+
+                                // If there's accumulated text, add it as a text content block
+                                if !accumulatedText.isEmpty && !toolUseAccumulator.isEmpty {
+                                    // Prepend text block to contentBlocks if we also have tool_use
+                                    contentBlocks.insert(["type": "text", "text": accumulatedText], at: 0)
+                                } else if !accumulatedText.isEmpty {
+                                    contentBlocks.insert(["type": "text", "text": accumulatedText], at: 0)
+                                }
+
                                 continuation.yield(.assistant(SDKMessage.AssistantData(
                                     text: accumulatedText,
                                     model: currentModel,
                                     stopReason: currentStopReason
                                 )))
 
-                                // Add assistant message to conversation history
+                                // Add assistant message to conversation history (with all content blocks)
+                                let assistantContent: Any = contentBlocks.isEmpty
+                                    ? [["type": "text", "text": accumulatedText]] as [[String: Any]]
+                                    : contentBlocks
                                 messages.append([
                                     "role": "assistant",
-                                    "content": [["type": "text", "text": accumulatedText]]
+                                    "content": assistantContent
                                 ])
 
                             case .error:
@@ -458,7 +546,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                                 )
                                 return
 
-                            case .contentBlockStart, .contentBlockStop, .ping:
+                            case .ping:
                                 break // No SDKMessage yielded for these events
                             }
                         }
@@ -475,6 +563,54 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                     // Check termination conditions
                     if currentStopReason == "end_turn" || currentStopReason == "stop_sequence" {
                         break
+                    }
+
+                    // Handle tool_use: execute tools and feed results back
+                    if currentStopReason == "tool_use" && !toolUseAccumulator.isEmpty {
+                        // Convert accumulated tool_use data to ToolUseBlock array
+                        let toolUseBlocks = toolUseAccumulator.sorted(by: { $0.key < $1.key }).map { _, item in
+                            ToolUseBlock(id: item.id, name: item.name, input: Self.parseInputJson(item.inputJson))
+                        }
+
+                        if !toolUseBlocks.isEmpty {
+                            let toolResults = await ToolExecutor.executeTools(
+                                toolUseBlocks: toolUseBlocks,
+                                tools: capturedToolProtocols,
+                                context: ToolContext(cwd: capturedCwd)
+                            )
+
+                            // Micro-compaction: process each result
+                            var processedResults: [ToolResult] = []
+                            for result in toolResults {
+                                let processedContent = await Self.processToolResultStatic(
+                                    client: capturedClient,
+                                    model: capturedModel,
+                                    content: result.content,
+                                    isError: result.isError
+                                )
+                                processedResults.append(ToolResult(
+                                    toolUseId: result.toolUseId,
+                                    content: processedContent,
+                                    isError: result.isError
+                                ))
+
+                                // Emit toolResult event to stream
+                                continuation.yield(.toolResult(SDKMessage.ToolResultData(
+                                    toolUseId: result.toolUseId,
+                                    content: processedContent,
+                                    isError: result.isError
+                                )))
+                            }
+
+                            // Append tool_result user message
+                            messages.append(ToolExecutor.buildToolResultMessage(from: processedResults))
+
+                            // Reset maxTokensRecoveryAttempts
+                            maxTokensRecoveryAttempts = 0
+
+                            // Continue to next LLM call
+                            continue
+                        }
                     }
 
                     // max_tokens: response was truncated but loop continues.
@@ -553,6 +689,41 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
             return content
         }
         return await microCompact(client: client, model: model, content: content)
+    }
+
+    /// Static version of processToolResult for use inside stream() closures
+    /// where `self` is not available.
+    ///
+    /// - Parameters:
+    ///   - client: The Anthropic client for micro-compaction LLM calls.
+    ///   - model: The model identifier.
+    ///   - content: The raw tool result content string.
+    ///   - isError: Whether the tool result is an error (errors are never compacted).
+    /// - Returns: The micro-compacted content or the original if no compaction needed.
+    private static func processToolResultStatic(
+        client: AnthropicClient,
+        model: String,
+        content: String,
+        isError: Bool
+    ) async -> String {
+        guard shouldMicroCompact(content: content, isError: isError) else {
+            return content
+        }
+        return await microCompact(client: client, model: model, content: content)
+    }
+
+    /// Parse a JSON string into a dictionary, returning empty dict on failure.
+    ///
+    /// Used when converting accumulated tool_use input JSON from SSE deltas.
+    /// - Parameter jsonString: The JSON string to parse.
+    /// - Returns: The parsed dictionary, or an empty dictionary on failure.
+    private static func parseInputJson(_ jsonString: String) -> [String: Any] {
+        guard !jsonString.isEmpty,
+              let data = jsonString.data(using: .utf8),
+              let dict = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any] else {
+            return [:]
+        }
+        return dict
     }
 
     /// Yield an error result to the stream continuation and finish it.
