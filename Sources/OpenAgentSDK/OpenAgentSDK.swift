@@ -21,7 +21,11 @@
 /// - ``MODEL_PRICING`` — Pricing table
 ///
 /// ## Tool System
-/// - ``defineTool(name:description:inputSchema:isReadOnly:execute:)`` — Factory function to create tools with Codable input
+/// - ``defineTool(name:description:inputSchema:isReadOnly:execute:)`` — Factory function to create tools with Codable input and String return
+/// - ``defineTool(name:description:inputSchema:isReadOnly:execute:)-9hwyt`` — Factory function for tools returning ``ToolExecuteResult``
+/// - ``defineTool(name:description:inputSchema:isReadOnly:execute:)-4p40y`` — Factory function for no-input tools
+/// - ``ToolExecuteResult`` — Structured return type with content and isError fields
+/// - ``ToolContext`` — Execution context with cwd and toolUseId
 /// - ``toApiTool(_:)`` — Convert a tool to Anthropic API format
 /// - ``toApiTools(_:)`` — Convert an array of tools to API format
 /// - ``ToolTier`` — Tool tier enum (core, advanced, specialist)

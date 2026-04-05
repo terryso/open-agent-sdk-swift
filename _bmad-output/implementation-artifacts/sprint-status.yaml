@@ -1,5 +1,6 @@
 # generated: 2026-04-04
 # last_updated: 2026-04-05
+# updated: 3-2-custom-tool-define-tool → ready-for-dev
 # updated: 3-1-tool-protocol-registry → review
 # updated: 3-1-tool-protocol-registry → in-progress
 # updated: 3-1-tool-protocol-registry → ready-for-dev
@@ -45,6 +46,7 @@
 
 generated: 2026-04-04
 last_updated: 2026-04-05
+# updated: 3-2-custom-tool-define-tool → review
 # updated: 3-1-tool-protocol-registry → review
 # updated: epic-3 → in-progress
 # updated: 2-6-tool-result-micro-compaction → ready-for-dev
@@ -93,7 +95,7 @@ development_status:
   # Epic 3: 工具系统与核心工具
   epic-3: in-progress
   3-1-tool-protocol-registry: done
-  3-2-custom-tool-define-tool: backlog
+  3-2-custom-tool-define-tool: done
   3-3-tool-executor-concurrent-serial: backlog
   3-4-core-file-tools-read-write-edit: backlog
   3-5-core-search-tools-glob-grep: backlog

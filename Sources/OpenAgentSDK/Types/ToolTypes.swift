@@ -26,11 +26,25 @@ public struct ToolResult: Sendable, Equatable {
     }
 }
 
+/// Structured result returned by tool execution closures that need to
+/// explicitly signal success or error.
+public struct ToolExecuteResult: Sendable, Equatable {
+    public let content: String
+    public let isError: Bool
+
+    public init(content: String, isError: Bool) {
+        self.content = content
+        self.isError = isError
+    }
+}
+
 /// Context provided to tool executions.
 public struct ToolContext: Sendable {
     public let cwd: String
+    public let toolUseId: String
 
-    public init(cwd: String) {
+    public init(cwd: String, toolUseId: String = "") {
         self.cwd = cwd
+        self.toolUseId = toolUseId
     }
 }
