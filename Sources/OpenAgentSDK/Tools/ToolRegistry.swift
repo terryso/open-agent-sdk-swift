@@ -43,8 +43,8 @@ public func toApiTools(_ tools: [ToolProtocol]) -> [[String: Any]] {
 
 /// Returns all base tools for the specified tier.
 ///
-/// For the `.core` tier, returns the built-in file tools: Read, Write, and Edit.
-/// Additional tools (Bash, Glob, Grep, etc.) are added in stories 3.5-3.7.
+/// For the `.core` tier, returns the built-in tools: Read, Write, Edit, Glob, and Grep.
+/// Additional tools (Bash, WebFetch, etc.) are added in stories 3.6-3.7.
 /// The `.advanced` and `.specialist` tiers currently return empty arrays.
 ///
 /// - Parameter tier: The tool tier to retrieve.
@@ -56,7 +56,9 @@ public func getAllBaseTools(tier: ToolTier) -> [ToolProtocol] {
             createReadTool(),
             createWriteTool(),
             createEditTool(),
-            // Story 3.5-3.7 will add: Bash, Glob, Grep, WebFetch, WebSearch, AskUser, ToolSearch
+            createGlobTool(),
+            createGrepTool(),
+            // Story 3.6-3.7 will add: Bash, WebFetch, WebSearch, AskUser, ToolSearch
         ]
     case .advanced, .specialist:
         return []
