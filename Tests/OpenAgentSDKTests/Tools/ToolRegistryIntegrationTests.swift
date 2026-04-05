@@ -48,7 +48,7 @@ final class ToolRegistryIntegrationTests: XCTestCase {
             )!
             client?.urlProtocol(self, didReceive: httpResponse, cacheStoragePolicy: .notAllowed)
             client?.urlProtocol(self, didLoad: mock.body)
-            client?.urlProtocol(self, didFinishLoading: self)
+            client?.urlProtocolDidFinishLoading(self)
         }
 
         private static func readBodyFromStream(_ stream: InputStream) -> Data? {
@@ -437,7 +437,7 @@ final class ToolRegistryIntegrationTests: XCTestCase {
 // MARK: - Mock Tools for Integration Tests
 
 /// Simple mock tool with no schema complexity.
-private struct SimpleMockTool: ToolProtocol, Sendable {
+private struct SimpleMockTool: ToolProtocol, @unchecked Sendable {
     let name: String
     let description: String
     let inputSchema: ToolInputSchema = ["type": "object", "properties": [:]]
@@ -449,7 +449,7 @@ private struct SimpleMockTool: ToolProtocol, Sendable {
 }
 
 /// Mock tool with a custom input schema.
-private struct SchemaMockTool: ToolProtocol, Sendable {
+private struct SchemaMockTool: ToolProtocol, @unchecked Sendable {
     let name: String
     let description: String
     let inputSchema: ToolInputSchema

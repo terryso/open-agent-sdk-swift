@@ -410,7 +410,7 @@ final class ToolRegistryTests: XCTestCase {
 
 /// A simple mock tool for testing purposes.
 /// Conforms to ToolProtocol and Sendable.
-private struct MockTool: ToolProtocol, Sendable {
+private struct MockTool: ToolProtocol, @unchecked Sendable {
     let name: String
     let description: String
     let inputSchema: ToolInputSchema
