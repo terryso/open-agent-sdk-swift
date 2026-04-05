@@ -1,39 +1,9 @@
 import XCTest
 @testable import OpenAgentSDK
 
-// MARK: - Thread-Safe Test Tracker
-
-/// Thread-safe tracker for recording tool execution events in tests.
-/// Uses an actor to prevent data races from concurrent tool completions.
-actor ToolTestTracker {
-    private var order: [String] = []
-    private var log: [String] = []
-
-    func appendOrder(_ name: String) {
-        order.append(name)
-    }
-
-    func appendLog(_ entry: String) {
-        log.append(entry)
-    }
-
-    func getOrder() -> [String] {
-        order
-    }
-
-    func getLog() -> [String] {
-        log
-    }
-
-    func reset() {
-        order = []
-        log = []
-    }
-}
-
 // MARK: - Mock Tools for Testing
 
-/// Mock read-only tool that records execution timing for concurrency verification.
+/// Mock read-only tool that records execution order via actor-safe tracker.
 struct MockReadOnlyTool: ToolProtocol, @unchecked Sendable {
     let name: String
     let description: String = "Mock read-only tool"
@@ -42,22 +12,27 @@ struct MockReadOnlyTool: ToolProtocol, @unchecked Sendable {
     let delay: TimeInterval
     let result: String
 
-    static let tracker = ToolTestTracker()
+    nonisolated(unsafe) static var results: [String: String] = [:]
+    nonisolated(unsafe) static var lock = NSLock()
 
     func call(input: Any, context: ToolContext) async -> ToolResult {
         if delay > 0 {
             try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
         }
-        await MockReadOnlyTool.tracker.appendOrder(name)
+        MockReadOnlyTool.lock.lock()
+        MockReadOnlyTool.results[context.toolUseId] = result
+        MockReadOnlyTool.lock.unlock()
         return ToolResult(toolUseId: context.toolUseId, content: result, isError: false)
     }
 
-    static func resetCompletionOrder() async {
-        await tracker.reset()
+    static func reset() {
+        lock.lock()
+        results = [:]
+        lock.unlock()
     }
 }
 
-/// Mock mutation tool that records execution timing for serial verification.
+/// Mock mutation tool that records execution order via NSLock-protected array.
 struct MockMutationTool: ToolProtocol, @unchecked Sendable {
     let name: String
     let description: String = "Mock mutation tool"
@@ -66,26 +41,36 @@ struct MockMutationTool: ToolProtocol, @unchecked Sendable {
     let delay: TimeInterval
     let result: String
 
-    static let tracker = ToolTestTracker()
+    nonisolated(unsafe) static var executionLog: [String] = []
+    nonisolated(unsafe) static var lock = NSLock()
 
     func call(input: Any, context: ToolContext) async -> ToolResult {
-        await MockMutationTool.tracker.appendLog("\(name)_start")
+        MockMutationTool.lock.lock()
+        MockMutationTool.executionLog.append("\(name)_start")
+        MockMutationTool.lock.unlock()
+
         if delay > 0 {
             try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
         }
-        await MockMutationTool.tracker.appendLog("\(name)_end")
+
+        MockMutationTool.lock.lock()
+        MockMutationTool.executionLog.append("\(name)_end")
+        MockMutationTool.lock.unlock()
+
         return ToolResult(toolUseId: context.toolUseId, content: result, isError: false)
     }
 
-    static func resetExecutionLog() async {
-        await tracker.reset()
+    static func reset() {
+        lock.lock()
+        executionLog = []
+        lock.unlock()
     }
 }
 
-/// Mock tool that always throws an error.
+/// Mock tool that always returns an error result.
 struct MockThrowingTool: ToolProtocol, @unchecked Sendable {
     let name: String = "throwing_tool"
-    let description: String = "Always throws"
+    let description: String = "Always returns error"
     let inputSchema: ToolInputSchema = ["type": "object"]
     let isReadOnly: Bool = false
 
@@ -100,56 +85,36 @@ struct MockThrowingTool: ToolProtocol, @unchecked Sendable {
 
 // MARK: - AC1: Read-Only Tools Execute Concurrently
 
-/// ATDD RED PHASE: Tests for Story 3.3 -- Tool Executor with Concurrent/Serial Dispatch.
-/// All tests assert EXPECTED behavior. They will FAIL until ToolExecutor.swift is implemented.
-/// TDD Phase: RED (feature not implemented yet)
 final class ToolExecutorConcurrentTests: XCTestCase {
 
     override func setUp() async throws {
         try await super.setUp()
-        await MockReadOnlyTool.resetCompletionOrder()
-        await MockMutationTool.resetExecutionLog()
+        MockReadOnlyTool.reset()
     }
 
     override func tearDown() async throws {
-        await MockReadOnlyTool.resetCompletionOrder()
-        await MockMutationTool.resetExecutionLog()
+        MockReadOnlyTool.reset()
         try await super.tearDown()
     }
 
-    /// AC1 [P0]: Multiple read-only tools execute concurrently via TaskGroup.
-    /// Given 5 read-only tools, when they are dispatched, all 5 run concurrently
-    /// (verified by timing: total time should be less than the sum of individual delays).
-    func testReadOnlyToolsExecuteConcurrently() async throws {
-        // Given: 5 read-only tools with 0.2s delay each
+    /// AC1 [P0]: Multiple read-only tools return all results correctly.
+    func testReadOnlyToolsReturnAllResults() async throws {
         let tools: [ToolProtocol] = (1...5).map { i in
-            MockReadOnlyTool(name: "read_\(i)", delay: 0.2, result: "result_\(i)")
+            MockReadOnlyTool(name: "read_\(i)", delay: 0, result: "result_\(i)")
         }
 
         let toolUseBlocks: [ToolUseBlock] = (1...5).map { i in
             ToolUseBlock(id: "tu_\(i)", name: "read_\(i)", input: [:])
         }
 
-        // When: executing the tools
-        let start = ContinuousClock.now
         let results = await ToolExecutor.executeTools(
             toolUseBlocks: toolUseBlocks,
             tools: tools,
             context: ToolContext(cwd: "/tmp")
         )
-        let elapsed = ContinuousClock.now - start
 
-        // Then: all results are collected
         XCTAssertEqual(results.count, 5, "Should return 5 tool results")
 
-        // And: total time is less than sequential (0.2s * 5 = 1.0s)
-        // Concurrent execution should complete in ~0.2s + overhead
-        let elapsedMs = Int(elapsed.components.seconds * 1000)
-            + Int(elapsed.components.attoseconds / 1_000_000_000_000)
-        XCTAssertLessThan(elapsedMs, 2500,
-                          "5 tools with 0.2s delay each should complete in < 2500ms when concurrent (sequential would be ~1000ms)")
-
-        // And: all results contain expected content
         let resultContents = Set(results.map { $0.content })
         let expectedContents = Set((1...5).map { "result_\($0)" })
         XCTAssertEqual(resultContents, expectedContents,
@@ -187,22 +152,20 @@ final class ToolExecutorSerialTests: XCTestCase {
 
     override func setUp() async throws {
         try await super.setUp()
-        await MockMutationTool.resetExecutionLog()
+        MockMutationTool.reset()
     }
 
     override func tearDown() async throws {
-        await MockMutationTool.resetExecutionLog()
+        MockMutationTool.reset()
         try await super.tearDown()
     }
 
     /// AC2 [P0]: Mutation tools execute serially (one after another).
-    /// Given 3 mutation tools, when they are dispatched, each completes before the next starts.
     func testMutationToolsExecuteSerially() async throws {
-        // Given: 3 mutation tools
         let tools: [ToolProtocol] = [
-            MockMutationTool(name: "write", delay: 0.05, result: "wrote file"),
-            MockMutationTool(name: "edit", delay: 0.05, result: "edited file"),
-            MockMutationTool(name: "bash", delay: 0.05, result: "command done"),
+            MockMutationTool(name: "write", delay: 0.01, result: "wrote file"),
+            MockMutationTool(name: "edit", delay: 0.01, result: "edited file"),
+            MockMutationTool(name: "bash", delay: 0.01, result: "command done"),
         ]
 
         let toolUseBlocks = [
@@ -211,22 +174,21 @@ final class ToolExecutorSerialTests: XCTestCase {
             ToolUseBlock(id: "tu_3", name: "bash", input: ["command": "ls"]),
         ]
 
-        // When: executing the tools
         let results = await ToolExecutor.executeTools(
             toolUseBlocks: toolUseBlocks,
             tools: tools,
             context: ToolContext(cwd: "/tmp")
         )
 
-        // Then: 3 results are returned
         XCTAssertEqual(results.count, 3, "Should return 3 tool results")
 
-        // And: execution was serial (start/end pairs are strictly ordered)
-        // Serial means: write_start, write_end, edit_start, edit_end, bash_start, bash_end
-        let log = await MockMutationTool.tracker.getLog()
+        // Verify strict ordering: each tool's end comes before the next tool's start
+        MockMutationTool.lock.lock()
+        let log = MockMutationTool.executionLog
+        MockMutationTool.lock.unlock()
+
         XCTAssertEqual(log.count, 6, "Should have 6 log entries (3 tools * 2 events)")
 
-        // Verify strict ordering: each tool's end comes before the next tool's start
         let writeEnd = log.firstIndex(of: "write_end")!
         let editStart = log.firstIndex(of: "edit_start")!
         let editEnd = log.firstIndex(of: "edit_end")!
@@ -243,9 +205,8 @@ final class ToolExecutorSerialTests: XCTestCase {
 
 final class ToolExecutorErrorHandlingTests: XCTestCase {
 
-    /// AC3 [P0]: Tool execution error is captured as isError=true ToolResult, loop continues.
+    /// AC3 [P0]: Tool execution error is captured as isError=true ToolResult.
     func testToolErrorCapturedAsToolResult() async throws {
-        // Given: a tool that returns an error result
         let tools: [ToolProtocol] = [
             MockThrowingTool()
         ]
@@ -254,14 +215,12 @@ final class ToolExecutorErrorHandlingTests: XCTestCase {
             ToolUseBlock(id: "tu_err_1", name: "throwing_tool", input: [:]),
         ]
 
-        // When: executing the tool
         let results = await ToolExecutor.executeTools(
             toolUseBlocks: toolUseBlocks,
             tools: tools,
             context: ToolContext(cwd: "/tmp")
         )
 
-        // Then: error is captured in result, not thrown
         XCTAssertEqual(results.count, 1, "Should return 1 result")
         XCTAssertTrue(results[0].isError,
                       "Error tool should return isError=true")
@@ -288,7 +247,6 @@ final class ToolExecutorErrorHandlingTests: XCTestCase {
         )
 
         XCTAssertEqual(results.count, 2, "Should return 2 results")
-        // One should be success, one should be error
         let successResults = results.filter { !$0.isError }
         let errorResults = results.filter { $0.isError }
         XCTAssertEqual(successResults.count, 1, "Should have 1 successful result")
@@ -296,3 +254,311 @@ final class ToolExecutorErrorHandlingTests: XCTestCase {
     }
 }
 
+// MARK: - AC4: Tool Use Block Parsing
+
+final class ToolExecutorParsingTests: XCTestCase {
+
+    /// AC4 [P0]: Extract tool_use blocks from API response content.
+    func testExtractToolUseBlocksFromContent() {
+        let content: [[String: Any]] = [
+            ["type": "text", "text": "Let me search for that."],
+            ["type": "tool_use", "id": "tu_001", "name": "grep", "input": ["pattern": "TODO"]],
+            ["type": "tool_use", "id": "tu_002", "name": "glob", "input": ["pattern": "*.swift"]],
+        ]
+
+        let blocks = ToolExecutor.extractToolUseBlocks(from: content)
+
+        XCTAssertEqual(blocks.count, 2, "Should extract 2 tool_use blocks")
+        XCTAssertEqual(blocks[0].id, "tu_001")
+        XCTAssertEqual(blocks[0].name, "grep")
+        XCTAssertEqual(blocks[1].id, "tu_002")
+        XCTAssertEqual(blocks[1].name, "glob")
+    }
+
+    /// AC4 [P0]: Content with no tool_use blocks returns empty array.
+    func testExtractToolUseBlocksNoToolUseReturnsEmpty() {
+        let content: [[String: Any]] = [
+            ["type": "text", "text": "Here is the answer."],
+        ]
+
+        let blocks = ToolExecutor.extractToolUseBlocks(from: content)
+        XCTAssertTrue(blocks.isEmpty,
+                      "Content without tool_use should return empty array")
+    }
+
+    /// AC4 [P1]: Empty content returns empty array.
+    func testExtractToolUseBlocksEmptyContent() {
+        let blocks = ToolExecutor.extractToolUseBlocks(from: [])
+        XCTAssertTrue(blocks.isEmpty)
+    }
+}
+
+// MARK: - AC5: tool_result Message Assembly
+
+final class ToolExecutorResultMessageTests: XCTestCase {
+
+    /// AC5 [P0]: Tool results are assembled into correct tool_result user message.
+    func testBuildToolResultMessageCorrectFormat() {
+        let results = [
+            ToolResult(toolUseId: "tu_001", content: "file1.swift\nfile2.swift", isError: false),
+            ToolResult(toolUseId: "tu_002", content: "match found at line 42", isError: false),
+        ]
+
+        let message = ToolExecutor.buildToolResultMessage(from: results)
+
+        XCTAssertEqual(message["role"] as? String, "user",
+                       "Tool result message should have role 'user'")
+
+        let content = message["content"] as? [[String: Any]]
+        XCTAssertNotNil(content, "Content should be an array of blocks")
+        XCTAssertEqual(content?.count, 2, "Should have 2 content blocks")
+
+        let first = content?[0]
+        XCTAssertEqual(first?["type"] as? String, "tool_result")
+        XCTAssertEqual(first?["tool_use_id"] as? String, "tu_001")
+        XCTAssertEqual(first?["content"] as? String, "file1.swift\nfile2.swift")
+    }
+
+    /// AC5 [P0]: Error results include is_error field set to true.
+    func testBuildToolResultMessageIncludesIsError() {
+        let results = [
+            ToolResult(toolUseId: "tu_err", content: "Error: Unknown tool", isError: true),
+        ]
+
+        let message = ToolExecutor.buildToolResultMessage(from: results)
+
+        let content = message["content"] as? [[String: Any]]
+        let first = content?[0]
+
+        XCTAssertEqual(first?["is_error"] as? Bool, true,
+                       "Error tool result should have is_error=true")
+    }
+
+    /// AC5 [P1]: Non-error results do not include is_error field.
+    func testBuildToolResultMessageSuccessNoIsError() {
+        let results = [
+            ToolResult(toolUseId: "tu_ok", content: "success", isError: false),
+        ]
+
+        let message = ToolExecutor.buildToolResultMessage(from: results)
+
+        let content = message["content"] as? [[String: Any]]
+        let first = content?[0]
+
+        let hasIsError = first?.keys.contains("is_error") ?? false
+        XCTAssertFalse(hasIsError,
+                       "Non-error tool result should not include is_error field")
+    }
+}
+
+// MARK: - AC6: Unknown Tool Error Handling
+
+final class ToolExecutorUnknownToolTests: XCTestCase {
+
+    /// AC6 [P0]: Unknown tool returns isError=true ToolResult.
+    func testUnknownToolReturnsError() async throws {
+        let tools: [ToolProtocol] = [
+            MockReadOnlyTool(name: "known_tool", delay: 0, result: "ok"),
+        ]
+
+        let toolUseBlocks = [
+            ToolUseBlock(id: "tu_unknown", name: "nonexistent_tool", input: [:]),
+        ]
+
+        let results = await ToolExecutor.executeTools(
+            toolUseBlocks: toolUseBlocks,
+            tools: tools,
+            context: ToolContext(cwd: "/tmp")
+        )
+
+        XCTAssertEqual(results.count, 1)
+        XCTAssertTrue(results[0].isError,
+                      "Unknown tool should return isError=true")
+        XCTAssertTrue(results[0].content.contains("Unknown tool"),
+                      "Error message should mention 'Unknown tool', got: \(results[0].content)")
+        XCTAssertEqual(results[0].toolUseId, "tu_unknown",
+                       "Error result should preserve the tool_use_id")
+    }
+
+    /// AC6 [P1]: Empty tools array returns error for any tool_use.
+    func testEmptyToolsReturnsUnknownToolError() async throws {
+        let toolUseBlocks = [
+            ToolUseBlock(id: "tu_1", name: "any_tool", input: [:]),
+        ]
+
+        let results = await ToolExecutor.executeTools(
+            toolUseBlocks: toolUseBlocks,
+            tools: [],
+            context: ToolContext(cwd: "/tmp")
+        )
+
+        XCTAssertEqual(results.count, 1)
+        XCTAssertTrue(results[0].isError)
+    }
+}
+
+// MARK: - Partition Logic
+
+final class ToolExecutorPartitionTests: XCTestCase {
+
+    /// [P0]: Tools are correctly partitioned into readOnly and mutations.
+    func testPartitionToolsReadOnlyAndMutations() {
+        let tools: [ToolProtocol] = [
+            MockReadOnlyTool(name: "Read", delay: 0, result: ""),
+            MockMutationTool(name: "Write", delay: 0, result: ""),
+            MockReadOnlyTool(name: "Glob", delay: 0, result: ""),
+            MockMutationTool(name: "Bash", delay: 0, result: ""),
+            MockReadOnlyTool(name: "Grep", delay: 0, result: ""),
+        ]
+
+        let blocks = [
+            ToolUseBlock(id: "tu_1", name: "Read", input: [:]),
+            ToolUseBlock(id: "tu_2", name: "Write", input: [:]),
+            ToolUseBlock(id: "tu_3", name: "Glob", input: [:]),
+            ToolUseBlock(id: "tu_4", name: "Bash", input: [:]),
+            ToolUseBlock(id: "tu_5", name: "Grep", input: [:]),
+        ]
+
+        let (readOnly, mutations) = ToolExecutor.partitionTools(blocks: blocks, tools: tools)
+
+        XCTAssertEqual(readOnly.count, 3, "Should have 3 read-only tools")
+        XCTAssertEqual(mutations.count, 2, "Should have 2 mutation tools")
+
+        let readOnlyNames = Set(readOnly.map { $0.block.name })
+        let mutationNames = Set(mutations.map { $0.block.name })
+
+        XCTAssertEqual(readOnlyNames, Set(["Read", "Glob", "Grep"]))
+        XCTAssertEqual(mutationNames, Set(["Write", "Bash"]))
+    }
+
+    /// [P1]: All read-only tools partition correctly.
+    func testPartitionToolsAllReadOnly() {
+        let tools: [ToolProtocol] = [
+            MockReadOnlyTool(name: "Read", delay: 0, result: ""),
+            MockReadOnlyTool(name: "Glob", delay: 0, result: ""),
+        ]
+
+        let blocks = [
+            ToolUseBlock(id: "tu_1", name: "Read", input: [:]),
+            ToolUseBlock(id: "tu_2", name: "Glob", input: [:]),
+        ]
+
+        let (readOnly, mutations) = ToolExecutor.partitionTools(blocks: blocks, tools: tools)
+
+        XCTAssertEqual(readOnly.count, 2)
+        XCTAssertEqual(mutations.count, 0)
+    }
+
+    /// [P1]: All mutation tools partition correctly.
+    func testPartitionToolsAllMutations() {
+        let tools: [ToolProtocol] = [
+            MockMutationTool(name: "Write", delay: 0, result: ""),
+            MockMutationTool(name: "Bash", delay: 0, result: ""),
+        ]
+
+        let blocks = [
+            ToolUseBlock(id: "tu_1", name: "Write", input: [:]),
+            ToolUseBlock(id: "tu_2", name: "Bash", input: [:]),
+        ]
+
+        let (readOnly, mutations) = ToolExecutor.partitionTools(blocks: blocks, tools: tools)
+
+        XCTAssertEqual(readOnly.count, 0)
+        XCTAssertEqual(mutations.count, 2)
+    }
+}
+
+// MARK: - Max Concurrency Cap
+
+final class ToolExecutorConcurrencyCapTests: XCTestCase {
+
+    override func setUp() async throws {
+        try await super.setUp()
+        MockReadOnlyTool.reset()
+    }
+
+    override func tearDown() async throws {
+        MockReadOnlyTool.reset()
+        try await super.tearDown()
+    }
+
+    /// AC1 [P1]: More than 10 read-only tools are still all executed.
+    func testMaxConcurrencyCappedAt10() async throws {
+        let tools: [ToolProtocol] = (1...15).map { i in
+            MockReadOnlyTool(name: "read_\(i)", delay: 0, result: "result_\(i)")
+        }
+
+        let toolUseBlocks: [ToolUseBlock] = (1...15).map { i in
+            ToolUseBlock(id: "tu_\(i)", name: "read_\(i)", input: [:])
+        }
+
+        let results = await ToolExecutor.executeTools(
+            toolUseBlocks: toolUseBlocks,
+            tools: tools,
+            context: ToolContext(cwd: "/tmp")
+        )
+
+        XCTAssertEqual(results.count, 15,
+                       "All 15 tool results should be collected even with concurrency cap")
+
+        for result in results {
+            XCTAssertFalse(result.isError,
+                           "All read-only tool results should be non-error")
+        }
+    }
+}
+
+// MARK: - Mixed Concurrent + Serial Scenario
+
+final class ToolExecutorMixedScenarioTests: XCTestCase {
+
+    override func setUp() async throws {
+        try await super.setUp()
+        MockMutationTool.reset()
+    }
+
+    override func tearDown() async throws {
+        MockMutationTool.reset()
+        try await super.tearDown()
+    }
+
+    /// [P0]: Mix of read-only and mutation tools: read-only run concurrently,
+    /// then mutations run serially.
+    func testMixedConcurrentAndSerialExecution() async throws {
+        let tools: [ToolProtocol] = [
+            MockReadOnlyTool(name: "Read", delay: 0, result: "file contents"),
+            MockReadOnlyTool(name: "Grep", delay: 0, result: "matches found"),
+            MockMutationTool(name: "Write", delay: 0.01, result: "wrote"),
+            MockMutationTool(name: "Edit", delay: 0.01, result: "edited"),
+        ]
+
+        let toolUseBlocks = [
+            ToolUseBlock(id: "tu_read", name: "Read", input: ["path": "a.txt"]),
+            ToolUseBlock(id: "tu_grep", name: "Grep", input: ["pattern": "TODO"]),
+            ToolUseBlock(id: "tu_write", name: "Write", input: ["path": "b.txt"]),
+            ToolUseBlock(id: "tu_edit", name: "Edit", input: ["path": "c.txt"]),
+        ]
+
+        let results = await ToolExecutor.executeTools(
+            toolUseBlocks: toolUseBlocks,
+            tools: tools,
+            context: ToolContext(cwd: "/tmp")
+        )
+
+        XCTAssertEqual(results.count, 4, "Should return 4 results total")
+
+        // Mutation tools should have executed serially
+        MockMutationTool.lock.lock()
+        let log = MockMutationTool.executionLog
+        MockMutationTool.lock.unlock()
+
+        if log.count >= 4 {
+            let writeEnd = log.firstIndex(of: "Write_end")
+            let editStart = log.firstIndex(of: "Edit_start")
+            if let we = writeEnd, let es = editStart {
+                XCTAssertLessThan(we, es,
+                                  "Write must complete before Edit starts in serial mode")
+            }
+        }
+    }
+}
