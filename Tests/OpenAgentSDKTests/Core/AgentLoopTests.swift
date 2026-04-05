@@ -136,7 +136,8 @@ extension XCTestCase {
             model: model,
             systemPrompt: systemPrompt,
             maxTurns: maxTurns,
-            maxTokens: maxTokens
+            maxTokens: maxTokens,
+            retryConfig: RetryConfig(maxRetries: 3, baseDelayMs: 1, maxDelayMs: 1, retryableStatusCodes: [429, 500, 502, 503, 529])
         )
 
         return Agent(options: options, client: client)

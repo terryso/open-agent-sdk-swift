@@ -158,7 +158,8 @@ final class ToolRegistryIntegrationTests: XCTestCase {
             options: AgentOptions(
                 apiKey: "test-key",
                 model: "claude-sonnet-4-6",
-                tools: tools
+                tools: tools,
+                retryConfig: RetryConfig(maxRetries: 3, baseDelayMs: 1, maxDelayMs: 1, retryableStatusCodes: [429, 500, 502, 503, 529])
             ),
             client: AnthropicClient(apiKey: "test-key", urlSession: session)
         )
@@ -202,7 +203,8 @@ final class ToolRegistryIntegrationTests: XCTestCase {
         let agent = Agent(
             options: AgentOptions(
                 apiKey: "test-key",
-                model: "claude-sonnet-4-6"
+                model: "claude-sonnet-4-6",
+                retryConfig: RetryConfig(maxRetries: 3, baseDelayMs: 1, maxDelayMs: 1, retryableStatusCodes: [429, 500, 502, 503, 529])
             ),
             client: AnthropicClient(apiKey: "test-key", urlSession: session)
         )
@@ -286,7 +288,8 @@ final class ToolRegistryIntegrationTests: XCTestCase {
             options: AgentOptions(
                 apiKey: "test-key",
                 model: "claude-sonnet-4-6",
-                tools: tools
+                tools: tools,
+                retryConfig: RetryConfig(maxRetries: 3, baseDelayMs: 1, maxDelayMs: 1, retryableStatusCodes: [429, 500, 502, 503, 529])
             ),
             client: AnthropicClient(apiKey: "test-key", urlSession: session)
         )
@@ -332,7 +335,8 @@ final class ToolRegistryIntegrationTests: XCTestCase {
             options: AgentOptions(
                 apiKey: "test-key",
                 model: "claude-sonnet-4-6",
-                tools: tools
+                tools: tools,
+                retryConfig: RetryConfig(maxRetries: 3, baseDelayMs: 1, maxDelayMs: 1, retryableStatusCodes: [429, 500, 502, 503, 529])
             ),
             client: AnthropicClient(apiKey: "test-key", urlSession: session)
         )
@@ -371,7 +375,8 @@ final class ToolRegistryIntegrationTests: XCTestCase {
         let agent = Agent(
             options: AgentOptions(
                 apiKey: "test-key",
-                model: "claude-sonnet-4-6"
+                model: "claude-sonnet-4-6",
+                retryConfig: RetryConfig(maxRetries: 3, baseDelayMs: 1, maxDelayMs: 1, retryableStatusCodes: [429, 500, 502, 503, 529])
             ),
             client: AnthropicClient(apiKey: "test-key", urlSession: session)
         )

@@ -310,7 +310,8 @@ extension XCTestCase {
             apiKey: apiKey,
             model: model,
             maxTurns: maxTurns,
-            tools: tools
+            tools: tools,
+            retryConfig: RetryConfig(maxRetries: 3, baseDelayMs: 1, maxDelayMs: 1, retryableStatusCodes: [429, 500, 502, 503, 529])
         )
 
         return Agent(options: options, client: client)

@@ -5,28 +5,28 @@ import Foundation
 /// Provides sensible defaults matching NFR15: up to 3 retries with exponential
 /// backoff starting at 2 seconds, capped at 30 seconds. Retryable status codes
 /// cover the standard transient server errors (429, 500, 502, 503, 529).
-struct RetryConfig: Sendable {
+public struct RetryConfig: Sendable {
     /// Maximum number of retry attempts (not counting the initial call).
-    let maxRetries: Int
+    public let maxRetries: Int
 
     /// Base delay in milliseconds for exponential backoff.
-    let baseDelayMs: Int
+    public let baseDelayMs: Int
 
     /// Maximum delay in milliseconds (caps the exponential growth).
-    let maxDelayMs: Int
+    public let maxDelayMs: Int
 
     /// HTTP status codes that qualify for automatic retry.
-    let retryableStatusCodes: Set<Int>
+    public let retryableStatusCodes: Set<Int>
 
     /// Default configuration per NFR15.
-    static let `default` = RetryConfig(
+    public static let `default` = RetryConfig(
         maxRetries: 3,
         baseDelayMs: 2000,
         maxDelayMs: 30000,
         retryableStatusCodes: [429, 500, 502, 503, 529]
     )
 
-    init(maxRetries: Int = 3, baseDelayMs: Int = 2000, maxDelayMs: Int = 30000, retryableStatusCodes: Set<Int> = [429, 500, 502, 503, 529]) {
+    public init(maxRetries: Int = 3, baseDelayMs: Int = 2000, maxDelayMs: Int = 30000, retryableStatusCodes: Set<Int> = [429, 500, 502, 503, 529]) {
         precondition(maxRetries >= 0, "maxRetries must be non-negative")
         precondition(baseDelayMs >= 0, "baseDelayMs must be non-negative")
         precondition(maxDelayMs >= 0, "maxDelayMs must be non-negative")

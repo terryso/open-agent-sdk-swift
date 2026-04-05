@@ -268,7 +268,7 @@ final class GrepToolTests: XCTestCase {
         // When: searching with relative path and cwd
         let result = await callTool(
             tool,
-            input: ["pattern": "patternHere", "path": "src"],
+            input: ["pattern": "patternHere", "path": "src", "output_mode": "content"],
             cwd: tempDir
         )
 

@@ -154,7 +154,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                 let retrySystemPrompt = self.buildSystemPrompt()
                 let retryMessages = messages
                 let retryApiTools = apiTools
-                response = try await withRetry {
+                let retryCfg = self.options.retryConfig ?? RetryConfig.default
+                response = try await withRetry({
                     try await retryClient.sendMessage(
                         model: retryModel,
                         messages: retryMessages,
@@ -162,7 +163,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                         system: retrySystemPrompt,
                         tools: retryApiTools
                     )
-                }
+                }, retryConfig: retryCfg)
             } catch {
                 return QueryResult(
                     text: lastAssistantText,
@@ -306,6 +307,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
         let capturedMaxBudgetUsd = options.maxBudgetUsd
         let capturedToolProtocols: [ToolProtocol] = options.tools ?? []
         let capturedCwd = options.cwd ?? ""
+        let capturedRetryConfig = options.retryConfig ?? RetryConfig.default
 
         // Build tool definitions for API call
         let capturedApiTools: [[String: Any]]? = {
@@ -368,7 +370,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                         let retrySystemPrompt = capturedSystemPrompt
                         let retryMessages = messages
                         let retryApiTools = decodedApiTools
-                        eventStream = try await withRetry {
+                        let retryCfg = capturedRetryConfig
+                        eventStream = try await withRetry({
                             try await retryClient.streamMessage(
                                 model: retryModel,
                                 messages: retryMessages,
@@ -376,7 +379,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                                 system: retrySystemPrompt,
                                 tools: retryApiTools
                             )
-                        }
+                        }, retryConfig: retryCfg)
                     } catch {
                         // API connection error — yield error result and terminate
                         Self.yieldStreamError(

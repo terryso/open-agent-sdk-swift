@@ -39,7 +39,8 @@ final class BudgetEnforcementPromptTests: XCTestCase {
             model: model,
             maxTurns: maxTurns,
             maxTokens: 4096,
-            maxBudgetUsd: maxBudgetUsd
+            maxBudgetUsd: maxBudgetUsd,
+            retryConfig: RetryConfig(maxRetries: 3, baseDelayMs: 1, maxDelayMs: 1, retryableStatusCodes: [429, 500, 502, 503, 529])
         )
 
         return Agent(options: options, client: client)
@@ -222,7 +223,8 @@ final class BudgetEnforcementStreamTests: XCTestCase {
             model: model,
             maxTurns: maxTurns,
             maxTokens: 4096,
-            maxBudgetUsd: maxBudgetUsd
+            maxBudgetUsd: maxBudgetUsd,
+            retryConfig: RetryConfig(maxRetries: 3, baseDelayMs: 1, maxDelayMs: 1, retryableStatusCodes: [429, 500, 502, 503, 529])
         )
 
         return Agent(options: options, client: client)

@@ -15,6 +15,7 @@ public struct AgentOptions: Sendable {
     public var cwd: String?
     public var tools: [ToolProtocol]?
     public var mcpServers: [String: McpServerConfig]?
+    public var retryConfig: RetryConfig?
 
     public init(
         apiKey: String? = nil,
@@ -29,7 +30,8 @@ public struct AgentOptions: Sendable {
         canUseTool: CanUseToolFn? = nil,
         cwd: String? = nil,
         tools: [ToolProtocol]? = nil,
-        mcpServers: [String: McpServerConfig]? = nil
+        mcpServers: [String: McpServerConfig]? = nil,
+        retryConfig: RetryConfig? = nil
     ) {
         self.apiKey = apiKey
         self.model = model
@@ -44,6 +46,7 @@ public struct AgentOptions: Sendable {
         self.cwd = cwd
         self.tools = tools
         self.mcpServers = mcpServers
+        self.retryConfig = retryConfig
     }
 
     /// Create AgentOptions from an SDKConfiguration, using its resolved values
@@ -65,6 +68,7 @@ public struct AgentOptions: Sendable {
         self.cwd = nil
         self.tools = nil
         self.mcpServers = nil
+        self.retryConfig = nil
     }
 }
 
