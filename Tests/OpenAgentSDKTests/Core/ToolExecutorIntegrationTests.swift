@@ -204,15 +204,20 @@ final class ToolExecutorIntegrationTests: XCTestCase {
 
         let sut = makeToolAgentSUT(tools: tools)
 
-        // We need 3 responses: tool_use -> tool result -> end_turn
-        // The second API call will include the (potentially compacted) tool result
-        // and the LLM will respond with end_turn
+        // We need 3 responses:
+        // 1) tool_use response (first agent loop call)
+        // 2) micro-compact response (summarize the large tool result)
+        // 3) end_turn response (second agent loop call after tool result is appended)
         let responses = [
             makeToolUseResponse(
                 toolUseBlocks: [
                     ["type": "tool_use", "id": "tu_big", "name": "Read", "input": ["path": "big.txt"]]
                 ],
                 stopReason: "tool_use"
+            ),
+            makeAgentLoopResponse(
+                content: [["type": "text", "text": "Summary of the large file content."]],
+                stopReason: "end_turn"
             ),
             makeAgentLoopResponse(
                 content: [["type": "text", "text": "Read the large file."]],
