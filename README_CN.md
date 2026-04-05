@@ -2,8 +2,10 @@
 
 [![Swift](https://img.shields.io/badge/Swift-6.1-orange)](https://swift.org)
 [![Platform](https://img.shields.io/badge/platform-macOS%2013%2B-blue)](https://developer.apple.com/macos/)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
+[![CI](https://github.com/terryso/open-agent-sdk-swift/actions/workflows/ci.yml/badge.svg)](https://github.com/terryso/open-agent-sdk-swift/actions/workflows/ci.yml)
+[![Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/terryso/fd930407e9ccdbba80306ea7993dcd4d/raw/coverage.json)](https://github.com/terryso/open-agent-sdk-swift/actions)
 [![BMAD](https://bmad-badge.vercel.app/terryso/open-agent-sdk-swift.svg)](https://github.com/bmad-code-org/BMAD-METHOD)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
 
 [English](./README.md)
 
