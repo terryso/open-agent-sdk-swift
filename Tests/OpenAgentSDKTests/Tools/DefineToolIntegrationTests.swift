@@ -15,7 +15,7 @@ final class DefineToolIntegrationTests: XCTestCase {
     // MARK: - Helpers
 
     /// Simulates a tool_use content block returned by the LLM.
-    private func makeToolUseBlock(id: String, name: String, input: [String: Any]) -> [String: Any] {
+    private func buildToolUseBlock(id: String, name: String, input: [String: Any]) -> [String: Any] {
         return [
             "type": "tool_use",
             "id": id,
@@ -55,7 +55,7 @@ final class DefineToolIntegrationTests: XCTestCase {
             description: "A tool that always fails",
             inputSchema: ["type": "object"],
             isReadOnly: true
-        ) { (input: Input, context: ToolContext) async -> String in
+        ) { (input: Input, context: ToolContext) async throws -> String in
             throw NSError(domain: "tool", code: 1, userInfo: [NSLocalizedDescriptionKey: "Intentional failure"])
         }
     }
@@ -83,7 +83,7 @@ final class DefineToolIntegrationTests: XCTestCase {
     /// executes the closure, and returns the correct ToolResult.
     func testEndToEnd_CustomTool_DecodesAndExecutes() async {
         let tool = makeUpperCaseTool()
-        let toolUseBlock = makeToolUseBlock(
+        let toolUseBlock = buildToolUseBlock(
             id: "toolu_e2e_001",
             name: "upper_case",
             input: ["text": "hello world"]
@@ -105,7 +105,7 @@ final class DefineToolIntegrationTests: XCTestCase {
     /// AC2 [P0]: Given invalid JSON input from the LLM, the tool returns isError=true.
     func testEndToEnd_CustomTool_InvalidInput_ReturnsError() async {
         let tool = makeUpperCaseTool()
-        let toolUseBlock = makeToolUseBlock(
+        let toolUseBlock = buildToolUseBlock(
             id: "toolu_e2e_002",
             name: "upper_case",
             input: ["wrong_field": "value"]
@@ -125,7 +125,7 @@ final class DefineToolIntegrationTests: XCTestCase {
     /// AC3 [P0]: Given a tool whose closure throws, the error is caught and isError=true.
     func testEndToEnd_CustomTool_ClosureError_CaughtGracefully() async {
         let tool = makeFailingTool()
-        let toolUseBlock = makeToolUseBlock(
+        let toolUseBlock = buildToolUseBlock(
             id: "toolu_e2e_003",
             name: "failing_tool",
             input: ["value": "test"]
@@ -253,7 +253,7 @@ final class DefineToolIntegrationTests: XCTestCase {
             "reverse": reverseTool
         ]
 
-        let toolUseBlock = makeToolUseBlock(
+        let toolUseBlock = buildToolUseBlock(
             id: "toolu_multi_001",
             name: "reverse",
             input: ["text": "hello"]

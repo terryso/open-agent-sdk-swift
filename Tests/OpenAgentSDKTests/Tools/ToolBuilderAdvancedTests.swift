@@ -29,7 +29,7 @@ final class ToolBuilderAdvancedTests: XCTestCase {
             description: "A tool that throws",
             inputSchema: ["type": "object", "properties": ["value": ["type": "string"]]],
             isReadOnly: true
-        ) { (input: Input, context: ToolContext) async -> String in
+        ) { (input: Input, context: ToolContext) async throws -> String in
             throw ToolExecutionError()
         }
 
@@ -60,7 +60,7 @@ final class ToolBuilderAdvancedTests: XCTestCase {
             description: "Throws descriptive error",
             inputSchema: ["type": "object"],
             isReadOnly: true
-        ) { (input: Input, context: ToolContext) async -> String in
+        ) { (input: Input, context: ToolContext) async throws -> String in
             throw DescriptiveError()
         }
 
@@ -87,7 +87,7 @@ final class ToolBuilderAdvancedTests: XCTestCase {
             description: "Throws generic error",
             inputSchema: ["type": "object"],
             isReadOnly: true
-        ) { (input: Input, context: ToolContext) async -> String in
+        ) { (input: Input, context: ToolContext) async throws -> String in
             throw NSError(domain: "test", code: 42, userInfo: [NSLocalizedDescriptionKey: "generic failure"])
         }
 
