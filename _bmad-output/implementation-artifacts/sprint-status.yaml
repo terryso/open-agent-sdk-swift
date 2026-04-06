@@ -1,6 +1,8 @@
 # generated: 2026-04-04
-# last_updated: 2026-04-06
+# last_updated: 2026-04-07
+# updated: 4-2-team-store-agent-registry → ready-for-dev
 # updated: epic-4 → in-progress
+# updated: 4-2-team-store-agent-registry → review
 # updated: 4-1-task-store-mailbox-store → ready-for-dev
 # updated: 3-7-core-web-tools-web-fetch-web-search → review
 # updated: 3-7-core-web-tools-web-fetch-web-search → ready-for-dev
@@ -119,7 +121,7 @@ development_status:
   # Epic 4: 多 Agent 编排
   epic-4: in-progress
   4-1-task-store-mailbox-store: done
-  4-2-team-store-agent-registry: backlog
+  4-2-team-store-agent-registry: done
   4-3-agent-tool-sub-agent-spawn: backlog
   4-4-send-message-tool: backlog
   4-5-task-tools-create-list-update-get-stop-output: backlog

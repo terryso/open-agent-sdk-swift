@@ -38,11 +38,20 @@
 /// ## Stores
 /// - ``TaskStore`` — Thread-safe task management actor
 /// - ``MailboxStore`` — Thread-safe inter-agent messaging actor
+/// - ``TeamStore`` — Thread-safe team management actor
+/// - ``AgentRegistry`` — Thread-safe sub-agent registration and discovery actor
 /// - ``Task`` — Task data structure
 /// - ``TaskStatus`` — Task status enum
 /// - ``TaskStoreError`` — Task store error type
 /// - ``AgentMessage`` — Inter-agent message data structure
 /// - ``AgentMessageType`` — Message type enum
+/// - ``Team`` — Team data structure
+/// - ``TeamMember`` — Team member data structure
+/// - ``TeamRole`` — Team member role enum
+/// - ``TeamStatus`` — Team status enum
+/// - ``AgentRegistryEntry`` — Agent registry entry data structure
+/// - ``TeamStoreError`` — Team store error type
+/// - ``AgentRegistryError`` — Agent registry error type
 
 /// Current SDK version.
 public let SDK_VERSION = "0.1.0"
