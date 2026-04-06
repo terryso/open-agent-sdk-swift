@@ -220,10 +220,21 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
 
                 if !toolUseBlocks.isEmpty {
                     let registeredTools = options.tools ?? []
+                    // Create agent spawner if AgentTool is registered
+                    let spawner: SubAgentSpawner? = {
+                        let hasAgentTool = registeredTools.contains { $0.name == "Agent" }
+                        guard hasAgentTool else { return nil }
+                        return DefaultSubAgentSpawner(
+                            apiKey: options.apiKey ?? "",
+                            baseURL: options.baseURL,
+                            parentModel: model,
+                            parentTools: registeredTools
+                        )
+                    }()
                     let toolResults = await ToolExecutor.executeTools(
                         toolUseBlocks: toolUseBlocks,
                         tools: registeredTools,
-                        context: ToolContext(cwd: options.cwd ?? "")
+                        context: ToolContext(cwd: options.cwd ?? "", agentSpawner: spawner)
                     )
 
                     // Micro-compaction: process each result before appending
@@ -308,6 +319,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
         let capturedToolProtocols: [ToolProtocol] = options.tools ?? []
         let capturedCwd = options.cwd ?? ""
         let capturedRetryConfig = options.retryConfig ?? RetryConfig.default
+        let capturedApiKey = options.apiKey ?? ""
+        let capturedBaseURL = options.baseURL
 
         // Build tool definitions for API call
         let capturedApiTools: [[String: Any]]? = {
@@ -576,10 +589,21 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                         }
 
                         if !toolUseBlocks.isEmpty {
+                            // Create agent spawner if AgentTool is registered
+                            let streamSpawner: SubAgentSpawner? = {
+                                let hasAgentTool = capturedToolProtocols.contains { $0.name == "Agent" }
+                                guard hasAgentTool else { return nil }
+                                return DefaultSubAgentSpawner(
+                                    apiKey: capturedApiKey,
+                                    baseURL: capturedBaseURL,
+                                    parentModel: capturedModel,
+                                    parentTools: capturedToolProtocols
+                                )
+                            }()
                             let toolResults = await ToolExecutor.executeTools(
                                 toolUseBlocks: toolUseBlocks,
                                 tools: capturedToolProtocols,
-                                context: ToolContext(cwd: capturedCwd)
+                                context: ToolContext(cwd: capturedCwd, agentSpawner: streamSpawner)
                             )
 
                             // Micro-compaction: process each result

@@ -157,7 +157,7 @@ enum ToolExecutor {
                         await executeSingleTool(
                             block: item.block,
                             tool: item.tool,
-                            context: ToolContext(cwd: context.cwd, toolUseId: item.block.id)
+                            context: ToolContext(cwd: context.cwd, toolUseId: item.block.id, agentSpawner: context.agentSpawner)
                         )
                     }
                 }
@@ -194,7 +194,7 @@ enum ToolExecutor {
             let result = await executeSingleTool(
                 block: item.block,
                 tool: item.tool,
-                context: ToolContext(cwd: context.cwd, toolUseId: item.block.id)
+                context: ToolContext(cwd: context.cwd, toolUseId: item.block.id, agentSpawner: context.agentSpawner)
             )
             results.append(result)
         }

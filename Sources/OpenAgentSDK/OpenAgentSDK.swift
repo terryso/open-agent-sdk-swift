@@ -52,6 +52,12 @@
 /// - ``AgentRegistryEntry`` — Agent registry entry data structure
 /// - ``TeamStoreError`` — Team store error type
 /// - ``AgentRegistryError`` — Agent registry error type
+///
+/// ## Sub-Agent Spawning
+/// - ``SubAgentSpawner`` — Protocol for spawning sub-agents (defined in Types/)
+/// - ``SubAgentResult`` — Result from sub-agent execution
+/// - ``AgentDefinition`` — Sub-agent configuration with tools and maxTurns
+/// - ``createAgentTool()`` — Factory for the Agent tool
 
 /// Current SDK version.
 public let SDK_VERSION = "0.1.0"

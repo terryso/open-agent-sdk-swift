@@ -111,11 +111,56 @@ public struct AgentDefinition: Sendable {
     public let description: String?
     public let model: String?
     public let systemPrompt: String?
+    /// Optional list of allowed tool names for the sub-agent.
+    /// When nil, the sub-agent inherits all parent tools (minus AgentTool).
+    public let tools: [String]?
+    /// Optional maximum number of turns for the sub-agent loop.
+    /// When nil, defaults to 10.
+    public let maxTurns: Int?
 
-    public init(name: String, description: String? = nil, model: String? = nil, systemPrompt: String? = nil) {
+    public init(
+        name: String,
+        description: String? = nil,
+        model: String? = nil,
+        systemPrompt: String? = nil,
+        tools: [String]? = nil,
+        maxTurns: Int? = nil
+    ) {
         self.name = name
         self.description = description
         self.model = model
         self.systemPrompt = systemPrompt
+        self.tools = tools
+        self.maxTurns = maxTurns
     }
+}
+
+// MARK: - Sub-Agent Spawning
+
+/// Result returned from a sub-agent execution.
+public struct SubAgentResult: Sendable, Equatable {
+    public let text: String
+    public let toolCalls: [String]
+    public let isError: Bool
+
+    public init(text: String, toolCalls: [String] = [], isError: Bool = false) {
+        self.text = text
+        self.toolCalls = toolCalls
+        self.isError = isError
+    }
+}
+
+/// Protocol for spawning sub-agents, defined in Types/ to allow
+/// Tools/ to use it without importing Core/.
+///
+/// Core/ provides the concrete ``DefaultSubAgentSpawner`` implementation.
+/// Tools/ accesses the spawner through ``ToolContext/agentSpawner``.
+public protocol SubAgentSpawner: Sendable {
+    func spawn(
+        prompt: String,
+        model: String?,
+        systemPrompt: String?,
+        allowedTools: [String]?,
+        maxTurns: Int?
+    ) async -> SubAgentResult
 }

@@ -42,9 +42,14 @@ public struct ToolExecuteResult: Sendable, Equatable {
 public struct ToolContext: Sendable {
     public let cwd: String
     public let toolUseId: String
+    /// Optional sub-agent spawner for tools that need to create child agents.
+    /// Set by Core/ when AgentTool is registered. Nil when sub-agent spawning
+    /// is not available (e.g., no Agent tool in the tool set).
+    public let agentSpawner: (any SubAgentSpawner)?
 
-    public init(cwd: String, toolUseId: String = "") {
+    public init(cwd: String, toolUseId: String = "", agentSpawner: (any SubAgentSpawner)? = nil) {
         self.cwd = cwd
         self.toolUseId = toolUseId
+        self.agentSpawner = agentSpawner
     }
 }
