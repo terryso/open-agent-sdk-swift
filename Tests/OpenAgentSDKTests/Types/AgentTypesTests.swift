@@ -141,27 +141,19 @@ final class AgentTypesTests: XCTestCase {
     // MARK: - AC6: SubAgentSpawner protocol
 
     /// AC6 [P0]: SubAgentSpawner protocol exists and can be implemented.
-    func testSubAgentSpawner_protocolExists() {
+    func testSubAgentSpawner_protocolExists() async {
         // This test verifies that SubAgentSpawner is a valid protocol
         // by creating a concrete implementation
         let spawner = MockTestSpawner(result: SubAgentResult(text: "OK"))
 
-        // Verify the protocol method exists via async call
-        let expectation = self.expectation(description: "spawner responds to spawn")
-
-        _Concurrency.Task {
-            let result = await spawner.spawn(
-                prompt: "test",
-                model: nil,
-                systemPrompt: nil,
-                allowedTools: nil,
-                maxTurns: nil
-            )
-            XCTAssertEqual(result.text, "OK")
-            expectation.fulfill()
-        }
-
-        waitForExpectations(timeout: 5.0)
+        let result = await spawner.spawn(
+            prompt: "test",
+            model: nil,
+            systemPrompt: nil,
+            allowedTools: nil,
+            maxTurns: nil
+        )
+        XCTAssertEqual(result.text, "OK")
     }
 }
 
