@@ -246,7 +246,13 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                     let toolResults = await ToolExecutor.executeTools(
                         toolUseBlocks: toolUseBlocks,
                         tools: registeredTools,
-                        context: ToolContext(cwd: options.cwd ?? "", agentSpawner: spawner)
+                        context: ToolContext(
+                            cwd: options.cwd ?? "",
+                            agentSpawner: spawner,
+                            mailboxStore: options.mailboxStore,
+                            teamStore: options.teamStore,
+                            senderName: options.agentName
+                        )
                     )
 
                     // Micro-compaction: process each result before appending
@@ -335,6 +341,9 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
         let capturedRetryConfig = options.retryConfig ?? RetryConfig.default
         let capturedApiKey = options.apiKey ?? ""
         let capturedBaseURL = options.baseURL
+        let capturedMailboxStore = options.mailboxStore
+        let capturedTeamStore = options.teamStore
+        let capturedAgentName = options.agentName
 
         // Build tool definitions for API call
         let capturedApiTools: [[String: Any]]? = {
@@ -622,7 +631,13 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                             let toolResults = await ToolExecutor.executeTools(
                                 toolUseBlocks: toolUseBlocks,
                                 tools: capturedToolProtocols,
-                                context: ToolContext(cwd: capturedCwd, agentSpawner: streamSpawner)
+                                context: ToolContext(
+                                    cwd: capturedCwd,
+                                    agentSpawner: streamSpawner,
+                                    mailboxStore: capturedMailboxStore,
+                                    teamStore: capturedTeamStore,
+                                    senderName: capturedAgentName
+                                )
                             )
 
                             // Micro-compaction: process each result

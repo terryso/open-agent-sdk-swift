@@ -180,12 +180,12 @@ graph TD
     E["<b>10+ 内置工具</b><br/>Bash · Read · Write · Edit · Glob · Grep<br/>WebFetch · WebSearch · AskUser · Agent"]
     F["<b>MCP 服务器</b><br/><i>stdio / SSE / HTTP（计划中）</i>"]
 
-    style A fill:#e1f5fe,stroke:#0288d1
-    style B fill:#fff3e0,stroke:#f57c00
-    style C fill:#f3e5f5,stroke:#7b1fa2
-    style D fill:#e8f5e9,stroke:#388e3c
-    style E fill:#fce4ec,stroke:#c62828
-    style F fill:#e0f2f1,stroke:#00695c
+    style A fill:#0277bd,stroke:#01579b,color:#fff,stroke-width:2px
+    style B fill:#ef6c00,stroke:#e65100,color:#fff,stroke-width:2px
+    style C fill:#6a1b9a,stroke:#4a148c,color:#fff,stroke-width:2px
+    style D fill:#2e7d32,stroke:#1b5e20,color:#fff,stroke-width:2px
+    style E fill:#b71c1c,stroke:#7f0000,color:#fff,stroke-width:2px
+    style F fill:#00695c,stroke:#004d40,color:#fff,stroke-width:2px
 ```
 
 ## 环境变量

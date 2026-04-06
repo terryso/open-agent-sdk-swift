@@ -58,6 +58,7 @@
 /// - ``SubAgentResult`` — Result from sub-agent execution
 /// - ``AgentDefinition`` — Sub-agent configuration with tools and maxTurns
 /// - ``createAgentTool()`` — Factory for the Agent tool
+/// - ``createSendMessageTool()`` — Factory for the SendMessage tool
 
 /// Current SDK version.
 public let SDK_VERSION = "0.1.0"

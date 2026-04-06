@@ -23,6 +23,15 @@ public struct AgentOptions: Sendable {
     public var tools: [ToolProtocol]?
     public var mcpServers: [String: McpServerConfig]?
     public var retryConfig: RetryConfig?
+    /// Optional agent name for identifying this agent in multi-agent scenarios.
+    /// Used by messaging tools (e.g., SendMessage) to identify the sender.
+    public var agentName: String?
+    /// Optional mailbox store for inter-agent messaging.
+    /// Injected into ToolContext for use by messaging tools.
+    public var mailboxStore: MailboxStore?
+    /// Optional team store for team management.
+    /// Injected into ToolContext for use by messaging tools.
+    public var teamStore: TeamStore?
 
     public init(
         apiKey: String? = nil,
@@ -39,7 +48,10 @@ public struct AgentOptions: Sendable {
         cwd: String? = nil,
         tools: [ToolProtocol]? = nil,
         mcpServers: [String: McpServerConfig]? = nil,
-        retryConfig: RetryConfig? = nil
+        retryConfig: RetryConfig? = nil,
+        agentName: String? = nil,
+        mailboxStore: MailboxStore? = nil,
+        teamStore: TeamStore? = nil
     ) {
         self.apiKey = apiKey
         self.model = model
@@ -56,6 +68,9 @@ public struct AgentOptions: Sendable {
         self.tools = tools
         self.mcpServers = mcpServers
         self.retryConfig = retryConfig
+        self.agentName = agentName
+        self.mailboxStore = mailboxStore
+        self.teamStore = teamStore
     }
 
     /// Create AgentOptions from an SDKConfiguration, using its resolved values
@@ -79,6 +94,9 @@ public struct AgentOptions: Sendable {
         self.tools = nil
         self.mcpServers = nil
         self.retryConfig = nil
+        self.agentName = nil
+        self.mailboxStore = nil
+        self.teamStore = nil
     }
 }
 

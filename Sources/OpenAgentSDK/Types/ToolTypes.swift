@@ -46,10 +46,29 @@ public struct ToolContext: Sendable {
     /// Set by Core/ when AgentTool is registered. Nil when sub-agent spawning
     /// is not available (e.g., no Agent tool in the tool set).
     public let agentSpawner: (any SubAgentSpawner)?
+    /// Optional mailbox store for inter-agent messaging tools (e.g., SendMessage).
+    /// Injected by Core/ when the tool set includes messaging-capable tools.
+    public let mailboxStore: MailboxStore?
+    /// Optional team store for team lookup in messaging tools (e.g., SendMessage).
+    /// Injected by Core/ when the tool set includes messaging-capable tools.
+    public let teamStore: TeamStore?
+    /// Optional sender name identifying the current agent in multi-agent scenarios.
+    /// Used by messaging tools to identify the message sender.
+    public let senderName: String?
 
-    public init(cwd: String, toolUseId: String = "", agentSpawner: (any SubAgentSpawner)? = nil) {
+    public init(
+        cwd: String,
+        toolUseId: String = "",
+        agentSpawner: (any SubAgentSpawner)? = nil,
+        mailboxStore: MailboxStore? = nil,
+        teamStore: TeamStore? = nil,
+        senderName: String? = nil
+    ) {
         self.cwd = cwd
         self.toolUseId = toolUseId
         self.agentSpawner = agentSpawner
+        self.mailboxStore = mailboxStore
+        self.teamStore = teamStore
+        self.senderName = senderName
     }
 }
