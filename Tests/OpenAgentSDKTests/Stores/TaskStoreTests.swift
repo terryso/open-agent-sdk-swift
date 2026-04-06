@@ -229,6 +229,8 @@ final class TaskStoreTests: XCTestCase {
             } else {
                 XCTFail("Expected invalidStatusTransition error, got: \(error)")
             }
+        } catch {
+            XCTFail("Unexpected error: \(error)")
         }
     }
 
@@ -249,6 +251,8 @@ final class TaskStoreTests: XCTestCase {
             } else {
                 XCTFail("Expected invalidStatusTransition error, got: \(error)")
             }
+        } catch {
+            XCTFail("Unexpected error: \(error)")
         }
     }
 
@@ -269,6 +273,8 @@ final class TaskStoreTests: XCTestCase {
             } else {
                 XCTFail("Expected invalidStatusTransition error, got: \(error)")
             }
+        } catch {
+            XCTFail("Unexpected error: \(error)")
         }
     }
 
@@ -289,6 +295,8 @@ final class TaskStoreTests: XCTestCase {
             } else {
                 XCTFail("Expected taskNotFound error, got: \(error)")
             }
+        } catch {
+            XCTFail("Unexpected error: \(error)")
         }
     }
 

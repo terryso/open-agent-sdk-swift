@@ -743,7 +743,7 @@ final class SSEEventTests: XCTestCase {
         // Compile-time check: SSEEvent conforms to Sendable via @unchecked Sendable.
         let event: SSEEvent = .ping
         // Force the value to cross a concurrency boundary to verify Sendable conformance.
-        Task { @Sendable in
+        _Concurrency.Task { @Sendable in
             _ = event
         }
         XCTAssertNotNil(event)
