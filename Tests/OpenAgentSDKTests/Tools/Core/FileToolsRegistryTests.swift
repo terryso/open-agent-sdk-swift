@@ -3,9 +3,9 @@ import XCTest
 
 // MARK: - Core File Tools Registry Integration Tests (Story 3.4)
 
-/// ATDD RED PHASE: Tests for Story 3.4 & 3.5 — ToolRegistry core tier integration.
+/// ATDD RED PHASE: Tests for Story 3.4, 3.5 & 3.6 — ToolRegistry core tier integration.
 /// All tests assert EXPECTED behavior. They will FAIL until:
-///   - `getAllBaseTools(tier: .core)` returns Read, Write, Edit, Glob, Grep tools
+///   - `getAllBaseTools(tier: .core)` returns Read, Write, Edit, Glob, Grep, Bash, AskUser, ToolSearch tools
 ///   - Each tool has correct name, schema, and isReadOnly properties
 /// TDD Phase: RED (feature not implemented yet)
 final class FileToolsRegistryTests: XCTestCase {
@@ -173,13 +173,73 @@ final class FileToolsRegistryTests: XCTestCase {
                       "Grep tool should be marked isReadOnly=true")
     }
 
-    /// AC7 [P1]: Core tier now returns 5 tools (Read, Write, Edit, Glob, Grep).
-    func testGetAllBaseTools_coreTier_returnsFiveTools() {
+    /// Core tier returns 8 tools (Read, Write, Edit, Glob, Grep, Bash, AskUser, ToolSearch).
+    func testGetAllBaseTools_coreTier_returnsEightTools() {
         // When: requesting core tier tools
         let tools = getAllBaseTools(tier: .core)
 
-        // Then: exactly 5 tools
-        XCTAssertEqual(tools.count, 5,
-                       "Core tier should return exactly 5 tools (Read, Write, Edit, Glob, Grep), got \(tools.count): \(tools.map { $0.name })")
+        // Then: exactly 8 tools
+        XCTAssertEqual(tools.count, 8,
+                       "Core tier should return exactly 8 tools (Read, Write, Edit, Glob, Grep, Bash, AskUser, ToolSearch), got \(tools.count): \(tools.map { $0.name })")
+    }
+
+    // MARK: - AC9: Bash, AskUser, ToolSearch registered in core tier (Story 3.6)
+
+    /// AC9 [P0]: getAllBaseTools(.core) includes Bash, AskUser, and ToolSearch tools.
+    func testGetAllBaseTools_coreTier_includesBashAskUserToolSearch() {
+        // When: requesting core tier tools
+        let tools = getAllBaseTools(tier: .core)
+
+        // Then: Bash, AskUser, and ToolSearch are present alongside existing tools
+        let names = Set(tools.map { $0.name })
+        XCTAssertTrue(names.contains("Bash"),
+                      "Core tier should include Bash tool, got: \(names)")
+        XCTAssertTrue(names.contains("AskUser"),
+                      "Core tier should include AskUser tool, got: \(names)")
+        XCTAssertTrue(names.contains("ToolSearch"),
+                      "Core tier should include ToolSearch tool, got: \(names)")
+        // Also verify pre-existing tools still present
+        XCTAssertTrue(names.contains("Read"),
+                      "Core tier should still include Read tool")
+        XCTAssertTrue(names.contains("Write"),
+                      "Core tier should still include Write tool")
+        XCTAssertTrue(names.contains("Edit"),
+                      "Core tier should still include Edit tool")
+        XCTAssertTrue(names.contains("Glob"),
+                      "Core tier should still include Glob tool")
+        XCTAssertTrue(names.contains("Grep"),
+                      "Core tier should still include Grep tool")
+    }
+
+    /// AC9 [P0]: Bash is NOT read-only (it is a mutation tool).
+    func testGetAllBaseTools_coreTier_bashIsNotReadOnly() {
+        // Given: core tier tools
+        let tools = getAllBaseTools(tier: .core)
+        let toolMap = Dictionary(uniqueKeysWithValues: tools.map { ($0.name, $0) })
+
+        // Then: Bash is NOT read-only
+        let bashTool = toolMap["Bash"]
+        XCTAssertNotNil(bashTool, "Bash tool should be present in core tier")
+        XCTAssertFalse(bashTool!.isReadOnly,
+                       "Bash tool should NOT be marked isReadOnly (it is a mutation tool)")
+    }
+
+    /// AC9 [P0]: AskUser and ToolSearch are both marked as isReadOnly=true.
+    func testGetAllBaseTools_coreTier_askUserToolSearchAreReadOnly() {
+        // Given: core tier tools
+        let tools = getAllBaseTools(tier: .core)
+        let toolMap = Dictionary(uniqueKeysWithValues: tools.map { ($0.name, $0) })
+
+        // Then: AskUser is read-only
+        let askUserTool = toolMap["AskUser"]
+        XCTAssertNotNil(askUserTool, "AskUser tool should be present in core tier")
+        XCTAssertTrue(askUserTool!.isReadOnly,
+                      "AskUser tool should be marked isReadOnly=true")
+
+        // Then: ToolSearch is read-only
+        let toolSearchTool = toolMap["ToolSearch"]
+        XCTAssertNotNil(toolSearchTool, "ToolSearch tool should be present in core tier")
+        XCTAssertTrue(toolSearchTool!.isReadOnly,
+                      "ToolSearch tool should be marked isReadOnly=true")
     }
 }

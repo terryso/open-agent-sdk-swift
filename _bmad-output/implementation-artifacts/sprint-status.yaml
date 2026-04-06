@@ -1,5 +1,6 @@
 # generated: 2026-04-04
 # last_updated: 2026-04-05
+# updated: 3-6-core-system-tools-bash-ask-user-tool-search → ready-for-dev
 # updated: 3-5-core-search-tools-glob-grep → ready-for-dev
 # updated: 3-4-core-file-tools-read-write-edit → ready-for-dev
 # updated: 3-4-core-file-tools-read-write-edit → done
@@ -50,6 +51,7 @@
 
 generated: 2026-04-04
 last_updated: 2026-04-05
+# updated: 3-6-core-system-tools-bash-ask-user-tool-search → ready-for-dev
 # updated: 3-4-core-file-tools-read-write-edit → in-progress
 # updated: 3-2-custom-tool-define-tool → review
 # updated: 3-1-tool-protocol-registry → review
@@ -104,7 +106,7 @@ development_status:
   3-3-tool-executor-concurrent-serial: done
   3-4-core-file-tools-read-write-edit: done
   3-5-core-search-tools-glob-grep: done
-  3-6-core-system-tools-bash-ask-user-tool-search: backlog
+  3-6-core-system-tools-bash-ask-user-tool-search: done
   3-7-core-web-tools-web-fetch-web-search: backlog
   epic-3-retrospective: optional
 
