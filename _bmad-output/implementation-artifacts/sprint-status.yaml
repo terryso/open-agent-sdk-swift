@@ -1,6 +1,10 @@
 # generated: 2026-04-04
-# last_updated: 2026-04-05
+# last_updated: 2026-04-06
+# updated: 3-7-core-web-tools-web-fetch-web-search → done
+# updated: 3-7-core-web-tools-web-fetch-web-search → review
+# updated: 3-7-core-web-tools-web-fetch-web-search → ready-for-dev
 # updated: 3-6-core-system-tools-bash-ask-user-tool-search → ready-for-dev
+# updated: 3-7-core-web-tools-web-fetch-web-search → ready-for-dev
 # updated: 3-5-core-search-tools-glob-grep → ready-for-dev
 # updated: 3-4-core-file-tools-read-write-edit → ready-for-dev
 # updated: 3-4-core-file-tools-read-write-edit → done
@@ -50,7 +54,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-04-04
-last_updated: 2026-04-05
+last_updated: 2026-04-06
 # updated: 3-6-core-system-tools-bash-ask-user-tool-search → ready-for-dev
 # updated: 3-4-core-file-tools-read-write-edit → in-progress
 # updated: 3-2-custom-tool-define-tool → review
@@ -107,7 +111,7 @@ development_status:
   3-4-core-file-tools-read-write-edit: done
   3-5-core-search-tools-glob-grep: done
   3-6-core-system-tools-bash-ask-user-tool-search: done
-  3-7-core-web-tools-web-fetch-web-search: backlog
+  3-7-core-web-tools-web-fetch-web-search: done
   epic-3-retrospective: optional
 
   # Epic 4: 多 Agent 编排

@@ -3,7 +3,7 @@ import XCTest
 
 // MARK: - Core File Tools Registry Integration Tests (Story 3.4)
 
-/// ATDD RED PHASE: Tests for Story 3.4, 3.5 & 3.6 — ToolRegistry core tier integration.
+/// ATDD RED PHASE: Tests for Story 3.4, 3.5, 3.6 & 3.7 — ToolRegistry core tier integration.
 /// All tests assert EXPECTED behavior. They will FAIL until:
 ///   - `getAllBaseTools(tier: .core)` returns Read, Write, Edit, Glob, Grep, Bash, AskUser, ToolSearch tools
 ///   - Each tool has correct name, schema, and isReadOnly properties
@@ -173,14 +173,14 @@ final class FileToolsRegistryTests: XCTestCase {
                       "Grep tool should be marked isReadOnly=true")
     }
 
-    /// Core tier returns 8 tools (Read, Write, Edit, Glob, Grep, Bash, AskUser, ToolSearch).
-    func testGetAllBaseTools_coreTier_returnsEightTools() {
+    /// Core tier returns all 10 tools (Read, Write, Edit, Glob, Grep, Bash, AskUser, ToolSearch, WebFetch, WebSearch).
+    func testGetAllBaseTools_coreTier_returnsTenTools() {
         // When: requesting core tier tools
         let tools = getAllBaseTools(tier: .core)
 
-        // Then: exactly 8 tools
-        XCTAssertEqual(tools.count, 8,
-                       "Core tier should return exactly 8 tools (Read, Write, Edit, Glob, Grep, Bash, AskUser, ToolSearch), got \(tools.count): \(tools.map { $0.name })")
+        // Then: exactly 10 tools
+        XCTAssertEqual(tools.count, 10,
+                       "Core tier should return exactly 10 tools, got \(tools.count): \(tools.map { $0.name })")
     }
 
     // MARK: - AC9: Bash, AskUser, ToolSearch registered in core tier (Story 3.6)
@@ -241,5 +241,66 @@ final class FileToolsRegistryTests: XCTestCase {
         XCTAssertNotNil(toolSearchTool, "ToolSearch tool should be present in core tier")
         XCTAssertTrue(toolSearchTool!.isReadOnly,
                       "ToolSearch tool should be marked isReadOnly=true")
+    }
+
+    // MARK: - AC9: WebFetch, WebSearch registered in core tier (Story 3.7)
+
+    /// AC9 [P0]: getAllBaseTools(.core) includes WebFetch and WebSearch tools.
+    func testGetAllBaseTools_coreTier_includesWebFetchAndWebSearch() {
+        // When: requesting core tier tools
+        let tools = getAllBaseTools(tier: .core)
+
+        // Then: WebFetch and WebSearch are present alongside all existing tools
+        let names = Set(tools.map { $0.name })
+        XCTAssertTrue(names.contains("WebFetch"),
+                      "Core tier should include WebFetch tool, got: \(names)")
+        XCTAssertTrue(names.contains("WebSearch"),
+                      "Core tier should include WebSearch tool, got: \(names)")
+        // Also verify all pre-existing tools still present
+        XCTAssertTrue(names.contains("Read"),
+                      "Core tier should still include Read tool")
+        XCTAssertTrue(names.contains("Write"),
+                      "Core tier should still include Write tool")
+        XCTAssertTrue(names.contains("Edit"),
+                      "Core tier should still include Edit tool")
+        XCTAssertTrue(names.contains("Glob"),
+                      "Core tier should still include Glob tool")
+        XCTAssertTrue(names.contains("Grep"),
+                      "Core tier should still include Grep tool")
+        XCTAssertTrue(names.contains("Bash"),
+                      "Core tier should still include Bash tool")
+        XCTAssertTrue(names.contains("AskUser"),
+                      "Core tier should still include AskUser tool")
+        XCTAssertTrue(names.contains("ToolSearch"),
+                      "Core tier should still include ToolSearch tool")
+    }
+
+    /// AC9 [P0]: WebFetch and WebSearch are both marked as isReadOnly=true.
+    func testGetAllBaseTools_coreTier_webToolsAreReadOnly() {
+        // Given: core tier tools
+        let tools = getAllBaseTools(tier: .core)
+        let toolMap = Dictionary(uniqueKeysWithValues: tools.map { ($0.name, $0) })
+
+        // Then: WebFetch is read-only
+        let webFetchTool = toolMap["WebFetch"]
+        XCTAssertNotNil(webFetchTool, "WebFetch tool should be present in core tier")
+        XCTAssertTrue(webFetchTool!.isReadOnly,
+                      "WebFetch tool should be marked isReadOnly=true")
+
+        // Then: WebSearch is read-only
+        let webSearchTool = toolMap["WebSearch"]
+        XCTAssertNotNil(webSearchTool, "WebSearch tool should be present in core tier")
+        XCTAssertTrue(webSearchTool!.isReadOnly,
+                      "WebSearch tool should be marked isReadOnly=true")
+    }
+
+    /// AC9 [P0]: Core tier returns all 10 tools (Read, Write, Edit, Glob, Grep, Bash, AskUser, ToolSearch, WebFetch, WebSearch).
+    func testGetAllBaseTools_coreTier_includesAllTenTools() {
+        // When: requesting core tier tools
+        let tools = getAllBaseTools(tier: .core)
+
+        // Then: exactly 10 tools
+        XCTAssertEqual(tools.count, 10,
+                       "Core tier should return exactly 10 tools (Read, Write, Edit, Glob, Grep, Bash, AskUser, ToolSearch, WebFetch, WebSearch), got \(tools.count): \(tools.map { $0.name })")
     }
 }
