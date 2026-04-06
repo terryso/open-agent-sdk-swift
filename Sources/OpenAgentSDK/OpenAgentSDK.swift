@@ -34,6 +34,15 @@
 /// - ``getAllBaseTools(tier:)`` — Get all base tools for a tier
 /// - ``filterTools(tools:allowed:disallowed:)`` — Filter tools by name
 /// - ``assembleToolPool(baseTools:customTools:mcpTools:allowed:disallowed:)`` — Assemble deduplicated tool pool
+///
+/// ## Stores
+/// - ``TaskStore`` — Thread-safe task management actor
+/// - ``MailboxStore`` — Thread-safe inter-agent messaging actor
+/// - ``Task`` — Task data structure
+/// - ``TaskStatus`` — Task status enum
+/// - ``TaskStoreError`` — Task store error type
+/// - ``AgentMessage`` — Inter-agent message data structure
+/// - ``AgentMessageType`` — Message type enum
 
 /// Current SDK version.
 public let SDK_VERSION = "0.1.0"

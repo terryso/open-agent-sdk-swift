@@ -14,7 +14,7 @@ struct MockReadOnlyTool: ToolProtocol, @unchecked Sendable {
 
     func call(input: Any, context: ToolContext) async -> ToolResult {
         if delay > 0 {
-            try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+            try? await _Concurrency.Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
         }
         return ToolResult(toolUseId: context.toolUseId, content: result, isError: false)
     }
@@ -31,7 +31,7 @@ struct MockMutationTool: ToolProtocol, @unchecked Sendable {
 
     func call(input: Any, context: ToolContext) async -> ToolResult {
         if delay > 0 {
-            try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+            try? await _Concurrency.Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
         }
         return ToolResult(toolUseId: context.toolUseId, content: result, isError: false)
     }

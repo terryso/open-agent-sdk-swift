@@ -15,3 +15,7 @@
 - **Edit tool missing old_string == new_string guard** — TS SDK rejects identical strings, Swift tool silently succeeds with no-op. Not in story AC, defensive enhancement for future [FileEditTool.swift]
 - **Edit tool missing replace_all parameter** — TS SDK supports replacing all occurrences via boolean flag. Not in story AC, future story enhancement [FileEditTool.swift]
 - **NFR2 performance test not verified** — No test confirms <1MB file reads complete in 500ms. Requires performance test infrastructure not available locally [FileReadTool.swift]
+
+## Deferred from: code review of 4-1-task-store-mailbox-store (2026-04-06)
+
+- **Task struct name collision with Swift Concurrency's Task** — `Task` struct collides with `_Concurrency.Task`. Already mitigated with `_Concurrency.Task` qualification in existing code, but remains a latent naming risk for future code. Pre-existing design decision documented in Dev Notes [TaskTypes.swift:17]

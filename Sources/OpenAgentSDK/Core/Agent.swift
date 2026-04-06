@@ -326,7 +326,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
         let toolsData = capturedApiTools.flatMap { try? JSONSerialization.data(withJSONObject: $0, options: []) }
 
         return AsyncStream<SDKMessage> { continuation in
-            let task = Task {
+            let task = _Concurrency.Task {
                 // Deserialize messages inside the isolated Task context
                 guard let decodedMessages = try? JSONSerialization.jsonObject(with: messagesData, options: []) as? [[String: Any]] else {
                     continuation.finish()

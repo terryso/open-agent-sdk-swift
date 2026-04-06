@@ -104,7 +104,7 @@ func withRetry<T>(
                 throw error
             }
             let delayNs = getRetryDelay(attempt: attempt, config: retryConfig)
-            try await Task.sleep(nanoseconds: delayNs)
+            try await _Concurrency.Task.sleep(nanoseconds: delayNs)
         }
     }
     guard let error = lastError else {
