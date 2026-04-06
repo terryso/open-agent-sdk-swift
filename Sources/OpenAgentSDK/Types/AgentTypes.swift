@@ -1,10 +1,17 @@
 import Foundation
 
+/// LLM provider selection for the agent.
+public enum LLMProvider: String, Sendable, Equatable {
+    case anthropic
+    case openai
+}
+
 /// Configuration options for creating an agent.
 public struct AgentOptions: Sendable {
     public var apiKey: String?
     public var model: String
     public var baseURL: String?
+    public var provider: LLMProvider
     public var systemPrompt: String?
     public var maxTurns: Int
     public var maxTokens: Int
@@ -21,6 +28,7 @@ public struct AgentOptions: Sendable {
         apiKey: String? = nil,
         model: String = "claude-sonnet-4-6",
         baseURL: String? = nil,
+        provider: LLMProvider = .anthropic,
         systemPrompt: String? = nil,
         maxTurns: Int = 10,
         maxTokens: Int = 16384,
@@ -36,6 +44,7 @@ public struct AgentOptions: Sendable {
         self.apiKey = apiKey
         self.model = model
         self.baseURL = baseURL
+        self.provider = provider
         self.systemPrompt = systemPrompt
         self.maxTurns = maxTurns
         self.maxTokens = maxTokens
@@ -58,6 +67,7 @@ public struct AgentOptions: Sendable {
         self.apiKey = config.apiKey
         self.model = config.model
         self.baseURL = config.baseURL
+        self.provider = .anthropic
         self.maxTurns = config.maxTurns
         self.maxTokens = config.maxTokens
         self.systemPrompt = nil

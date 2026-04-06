@@ -6,3 +6,4 @@ Packages/
 xcuserdata/
 DerivedData/
 .DS_Store
+.env

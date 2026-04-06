@@ -61,7 +61,7 @@ func shouldAutoCompact(
 
 /// Compact conversation by summarizing with the LLM.
 func compactConversation(
-    client: AnthropicClient,
+    client: any LLMClient,
     model: String,
     messages: [[String: Any]],
     state: AutoCompactState
@@ -78,7 +78,11 @@ func compactConversation(
                     ["role": "user", "content": compactionPrompt]
                 ],
                 maxTokens: 8192,
-                system: "You are a conversation summarizer. Create a detailed summary of the conversation that preserves all important context, decisions made, files modified, tool outputs, and current state. The summary should allow the conversation to continue seamlessly."
+                system: "You are a conversation summarizer. Create a detailed summary of the conversation that preserves all important context, decisions made, files modified, tool outputs, and current state. The summary should allow the conversation to continue seamlessly.",
+                tools: nil,
+                toolChoice: nil,
+                thinking: nil,
+                temperature: nil
             )
         }
 
@@ -162,7 +166,7 @@ func shouldMicroCompact(content: String, isError: Bool = false) -> Bool {
 ///   - content: The raw tool result text to compress.
 /// - Returns: The compressed string (with header) on success, or the original content on failure.
 func microCompact(
-    client: AnthropicClient,
+    client: any LLMClient,
     model: String,
     content: String
 ) async -> String {
@@ -176,7 +180,11 @@ func microCompact(
                     ["role": "user", "content": prompt]
                 ],
                 maxTokens: 8192,
-                system: "You are a content summarizer for tool results. Compress the following tool output while preserving: 1. File paths and names 2. Error messages and stack traces (in full) 3. Key-value pairs (keys in full, values summarized if >200 chars) 4. Structure and formatting cues (headers, lists, indentation levels) 5. Any numeric data or metrics 6. The first and last 200 characters of any code blocks. Remove: verbose logging output (keep first/last lines), redundant file content listings, whitespace and padding, repeated patterns (note the count and show one example). Output the compressed version directly."
+                system: "You are a content summarizer for tool results. Compress the following tool output while preserving: 1. File paths and names 2. Error messages and stack traces (in full) 3. Key-value pairs (keys in full, values summarized if >200 chars) 4. Structure and formatting cues (headers, lists, indentation levels) 5. Any numeric data or metrics 6. The first and last 200 characters of any code blocks. Remove: verbose logging output (keep first/last lines), redundant file content listings, whitespace and padding, repeated patterns (note the count and show one example). Output the compressed version directly.",
+                tools: nil,
+                toolChoice: nil,
+                thinking: nil,
+                temperature: nil
             )
         }
 

@@ -32,5 +32,10 @@ let package = Package(
             dependencies: ["OpenAgentSDK"],
             path: "Tests/OpenAgentSDKTests"
         ),
+        .executableTarget(
+            name: "E2ETest",
+            dependencies: ["OpenAgentSDK"],
+            path: "Sources/E2ETest"
+        ),
     ]
 )

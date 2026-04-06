@@ -1,8 +1,8 @@
 import Foundation
 
-/// An AI agent that processes prompts using the Anthropic API.
+/// An AI agent that processes prompts using an LLM API.
 ///
-/// `Agent` holds immutable configuration and an internal ``AnthropicClient`` for
+/// `Agent` holds immutable configuration and an internal ``LLMClient`` for
 /// communicating with the LLM provider. Create instances using the module-level
 /// ``createAgent(options:)`` factory function.
 ///
@@ -36,14 +36,14 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
     /// The full agent options (used internally for prompt/stream calls).
     let options: AgentOptions
 
-    /// The Anthropic API client (actor) used for communication.
-    let client: AnthropicClient
+    /// The LLM API client used for communication.
+    let client: any LLMClient
 
     // MARK: - Initialization
 
     /// Create an Agent with the given options.
     ///
-    /// The agent stores the options and creates an internal ``AnthropicClient``
+    /// The agent stores the options and creates an internal ``LLMClient``
     /// for API communication. If `apiKey` is `nil`, the agent can still be created
     /// but subsequent prompt/stream calls will fail due to missing authentication.
     ///
@@ -55,25 +55,33 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
         self.maxTurns = options.maxTurns
         self.maxTokens = options.maxTokens
 
-        // AnthropicClient requires a non-nil String — use empty string as fallback.
-        // Calls to prompt()/stream() will fail naturally if no key was provided.
+        // Create the appropriate client based on provider.
+        // Empty API key fallback — calls will fail naturally if no key was provided.
         let apiKey = options.apiKey ?? ""
-        self.client = AnthropicClient(
-            apiKey: apiKey,
-            baseURL: options.baseURL
-        )
+        switch options.provider {
+        case .openai:
+            self.client = OpenAIClient(
+                apiKey: apiKey,
+                baseURL: options.baseURL
+            )
+        case .anthropic:
+            self.client = AnthropicClient(
+                apiKey: apiKey,
+                baseURL: options.baseURL
+            )
+        }
     }
 
-    /// Create an Agent with the given options and a pre-configured ``AnthropicClient``.
+    /// Create an Agent with the given options and a pre-configured ``LLMClient``.
     ///
     /// This initializer is intended for testing and advanced scenarios where the
-    /// caller needs to control the ``AnthropicClient`` configuration (e.g., custom
+    /// caller needs to control the client configuration (e.g., custom
     /// URLSession for mock network interception).
     ///
     /// - Parameters:
     ///   - options: The configuration options for this agent.
-    ///   - client: A pre-configured ``AnthropicClient`` instance to use for API calls.
-    public init(options: AgentOptions, client: AnthropicClient) {
+    ///   - client: A pre-configured ``LLMClient`` instance to use for API calls.
+    public init(options: AgentOptions, client: any LLMClient) {
         self.options = options
         self.model = options.model
         self.systemPrompt = options.systemPrompt
@@ -124,6 +132,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
         var turnCount = 0
         var lastAssistantText = ""
         var status: QueryStatus = .success
+        var loopExitedCleanly = false
         var maxTokensRecoveryAttempts = 0
         let MAX_TOKENS_RECOVERY = 3
         var compactState = createAutoCompactState()
@@ -161,7 +170,10 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                         messages: retryMessages,
                         maxTokens: retryMaxTokens,
                         system: retrySystemPrompt,
-                        tools: retryApiTools
+                        tools: retryApiTools,
+                        toolChoice: nil,
+                        thinking: nil,
+                        temperature: nil
                     )
                 }, retryConfig: retryCfg)
             } catch {
@@ -261,6 +273,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
 
             // Terminate on end_turn or stop_sequence
             if stopReason == "end_turn" || stopReason == "stop_sequence" {
+                loopExitedCleanly = true
                 break
             }
 
@@ -272,13 +285,14 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                 messages.append(["role": "user", "content": "Please continue from where you left off."])
             } else {
                 // Recovery attempts exhausted — return partial result with .success
+                loopExitedCleanly = true
                 break
             }
         }
 
         // Determine status: if we exhausted maxTurns without a clean stop, it's an error
         // Only override if not already set to a more specific error (e.g., budget exceeded)
-        if turnCount >= maxTurns, status == .success {
+        if !loopExitedCleanly, turnCount >= maxTurns, status == .success {
             status = .errorMaxTurns
         }
 
@@ -354,6 +368,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                 var totalCostUsd: Double = 0.0
                 var turnCount = 0
                 var maxTokensRecoveryAttempts = 0
+                var loopExitedCleanly = false
                 let MAX_TOKENS_RECOVERY = 3
                 var compactState = createAutoCompactState()
 
@@ -390,7 +405,10 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                                 messages: retryMessages,
                                 maxTokens: retryMaxTokens,
                                 system: retrySystemPrompt,
-                                tools: retryApiTools
+                                tools: retryApiTools,
+                                toolChoice: nil,
+                                thinking: nil,
+                                temperature: nil
                             )
                         }, retryConfig: retryCfg)
                     } catch {
@@ -578,6 +596,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
 
                     // Check termination conditions
                     if currentStopReason == "end_turn" || currentStopReason == "stop_sequence" {
+                        loopExitedCleanly = true
                         break
                     }
 
@@ -648,6 +667,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                         messages.append(["role": "user", "content": "Please continue from where you left off."])
                     } else {
                         // Recovery attempts exhausted — return partial result with .success
+                        loopExitedCleanly = true
                         break
                     }
                 }
@@ -657,7 +677,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                 let durationMs = Self.computeDurationMs(elapsed)
 
                 let subtype: SDKMessage.ResultData.Subtype =
-                    turnCount >= capturedMaxTurns ? .errorMaxTurns : .success
+                    (!loopExitedCleanly && turnCount >= capturedMaxTurns) ? .errorMaxTurns : .success
 
                 // Collect all assistant text from conversation history
                 let finalText = messages.compactMap { msg -> String? in
@@ -728,7 +748,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
     ///   - isError: Whether the tool result is an error (errors are never compacted).
     /// - Returns: The micro-compacted content or the original if no compaction needed.
     private static func processToolResultStatic(
-        client: AnthropicClient,
+        client: any LLMClient,
         model: String,
         content: String,
         isError: Bool

@@ -2,7 +2,7 @@ import Foundation
 
 /// Custom Anthropic API client implemented as an actor for safe concurrency.
 /// Communicates directly with the Anthropic Messages API using URLSession.
-public actor AnthropicClient {
+public actor AnthropicClient: LLMClient {
 
     // MARK: - Properties
 
