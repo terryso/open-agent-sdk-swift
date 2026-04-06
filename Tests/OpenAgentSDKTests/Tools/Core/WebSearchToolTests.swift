@@ -4,15 +4,22 @@ import XCTest
 
 // MARK: - WebSearchTool ATDD Tests (Story 3.7)
 
-/// Tests for Story 3.7 — WebSearchTool using mocked HTTP responses.
+/// Tests for Story 3.7 — WebSearchTool using MockURLProtocol.
 /// No real network calls are made. All responses are deterministic.
 final class WebSearchToolTests: XCTestCase {
 
     // MARK: - Helpers
 
+    /// Creates a URLSession backed by the shared MockURLProtocol.
+    private func makeMockSession() -> URLSession {
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [MockURLProtocol.self]
+        return URLSession(configuration: config)
+    }
+
     /// Creates the WebSearch tool with a mock URLSession.
-    private func makeWebSearchTool(session: URLSession) -> ToolProtocol {
-        return createWebSearchTool(session: session)
+    private func makeWebSearchTool() -> ToolProtocol {
+        return createWebSearchTool(session: makeMockSession())
     }
 
     /// Calls the tool with a dictionary input and returns the ToolResult.
@@ -43,11 +50,27 @@ final class WebSearchToolTests: XCTestCase {
         return html
     }
 
+    /// Registers mock DDG response for a query by pre-computing the DDG search URL.
+    private func mockDDGResponse(query: String, html: String, statusCode: Int = 200) {
+        let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
+        let urlString = "https://html.duckduckgo.com/html/?q=\(encoded)"
+        MockURLProtocol.mockResponses[urlString] = (
+            statusCode: statusCode,
+            headers: ["Content-Type": "text/html"],
+            body: html.data(using: .utf8)!
+        )
+    }
+
     // MARK: - Setup / Teardown
 
+    override func setUp() {
+        super.setUp()
+        MockURLProtocol.reset()
+    }
+
     override func tearDown() {
+        MockURLProtocol.reset()
         super.tearDown()
-        MockURLProtocol.mockResponse = nil
     }
 
     // MARK: - AC6: WebSearch executes search queries
@@ -58,12 +81,8 @@ final class WebSearchToolTests: XCTestCase {
             (title: "Swift.org", url: "https://swift.org", snippet: "Welcome to Swift"),
             (title: "Apple Developer", url: "https://developer.apple.com/swift/", snippet: "Swift resources"),
         ])
-        MockURLProtocol.mockResponse = (
-            data: html.data(using: .utf8),
-            statusCode: 200,
-            headers: ["Content-Type": "text/html"]
-        )
-        let tool = makeWebSearchTool(session: makeMockSession())
+        mockDDGResponse(query: "Swift programming", html: html)
+        let tool = makeWebSearchTool()
 
         let result = await callTool(tool, input: ["query": "Swift programming"])
 
@@ -83,12 +102,8 @@ final class WebSearchToolTests: XCTestCase {
         let html = makeDuckDuckGoHTML(results: [
             (title: "Apple Dev", url: "https://developer.apple.com", snippet: "Docs"),
         ])
-        MockURLProtocol.mockResponse = (
-            data: html.data(using: .utf8),
-            statusCode: 200,
-            headers: ["Content-Type": "text/html"]
-        )
-        let tool = makeWebSearchTool(session: makeMockSession())
+        mockDDGResponse(query: "Apple developer", html: html)
+        let tool = makeWebSearchTool()
 
         let result = await callTool(tool, input: ["query": "Apple developer"])
 
@@ -102,17 +117,12 @@ final class WebSearchToolTests: XCTestCase {
         let html = makeDuckDuckGoHTML(results: [
             (title: "OpenAI API", url: "https://openai.com/api", snippet: "Build with AI"),
         ])
-        MockURLProtocol.mockResponse = (
-            data: html.data(using: .utf8),
-            statusCode: 200,
-            headers: ["Content-Type": "text/html"]
-        )
-        let tool = makeWebSearchTool(session: makeMockSession())
+        mockDDGResponse(query: "OpenAI API", html: html)
+        let tool = makeWebSearchTool()
 
         let result = await callTool(tool, input: ["query": "OpenAI API"])
 
         XCTAssertFalse(result.isError, "Should not error, got: \(result.content)")
-        // Verify format: "1. {title}\n   {url}\n   {snippet}"
         XCTAssertTrue(result.content.contains("1. OpenAI API"),
                       "Should have numbered title, got: \(result.content)")
         XCTAssertTrue(result.content.contains("https://openai.com/api"),
@@ -126,20 +136,16 @@ final class WebSearchToolTests: XCTestCase {
     /// AC7 [P0]: WebSearch respects num_results parameter.
     func testWebSearch_numResults_limitsOutput() async {
         let html = makeDuckDuckGoHTML(results: [
-            (title: "Result 1", url: "https://r1.com", snippet: "S1"),
-            (title: "Result 2", url: "https://r2.com", snippet: "S2"),
-            (title: "Result 3", url: "https://r3.com", snippet: "S3"),
-            (title: "Result 4", url: "https://r4.com", snippet: "S4"),
+            (title: "R1", url: "https://r1.com", snippet: "S1"),
+            (title: "R2", url: "https://r2.com", snippet: "S2"),
+            (title: "R3", url: "https://r3.com", snippet: "S3"),
+            (title: "R4", url: "https://r4.com", snippet: "S4"),
         ])
-        MockURLProtocol.mockResponse = (
-            data: html.data(using: .utf8),
-            statusCode: 200,
-            headers: ["Content-Type": "text/html"]
-        )
-        let tool = makeWebSearchTool(session: makeMockSession())
+        mockDDGResponse(query: "programming languages", html: html)
+        let tool = makeWebSearchTool()
 
         let result = await callTool(tool, input: [
-            "query": "programming",
+            "query": "programming languages",
             "num_results": 2
         ])
 
@@ -162,18 +168,14 @@ final class WebSearchToolTests: XCTestCase {
             (title: "R5", url: "https://r5.com", snippet: "S5"),
             (title: "R6", url: "https://r6.com", snippet: "S6"),
         ])
-        MockURLProtocol.mockResponse = (
-            data: html.data(using: .utf8),
-            statusCode: 200,
-            headers: ["Content-Type": "text/html"]
-        )
-        let tool = makeWebSearchTool(session: makeMockSession())
+        mockDDGResponse(query: "test query", html: html)
+        let tool = makeWebSearchTool()
 
-        let result = await callTool(tool, input: ["query": "test"])
+        let result = await callTool(tool, input: ["query": "test query"])
 
         XCTAssertFalse(result.isError, "Should not error, got: \(result.content)")
         XCTAssertFalse(result.content.contains("6."),
-                       "Default should limit to 5, should NOT have #6, got: \(result.content)")
+                       "Default should limit to 5 results, should NOT have #6, got: \(result.content)")
     }
 
     /// AC7: WebSearch clamps negative num_results to 1.
@@ -182,21 +184,19 @@ final class WebSearchToolTests: XCTestCase {
             (title: "R1", url: "https://r1.com", snippet: "S1"),
             (title: "R2", url: "https://r2.com", snippet: "S2"),
         ])
-        MockURLProtocol.mockResponse = (
-            data: html.data(using: .utf8),
-            statusCode: 200,
-            headers: ["Content-Type": "text/html"]
-        )
-        let tool = makeWebSearchTool(session: makeMockSession())
+        mockDDGResponse(query: "negative test", html: html)
+        let tool = makeWebSearchTool()
 
         let result = await callTool(tool, input: [
-            "query": "test",
+            "query": "negative test",
             "num_results": -5
         ])
 
         XCTAssertFalse(result.isError, "Should not error, got: \(result.content)")
         XCTAssertTrue(result.content.contains("1."),
                       "Should have at least result #1, got: \(result.content)")
+        XCTAssertFalse(result.content.contains("2."),
+                       "Should only have 1 result with negative clamp, got: \(result.content)")
     }
 
     // MARK: - AC8: WebSearch no results handling
@@ -204,12 +204,8 @@ final class WebSearchToolTests: XCTestCase {
     /// AC8 [P0]: WebSearch returns descriptive message when no results found.
     func testWebSearch_noResults_returnsMessage() async {
         let html = "<html><body>No results here</body></html>"
-        MockURLProtocol.mockResponse = (
-            data: html.data(using: .utf8),
-            statusCode: 200,
-            headers: ["Content-Type": "text/html"]
-        )
-        let tool = makeWebSearchTool(session: makeMockSession())
+        mockDDGResponse(query: "obscure query", html: html)
+        let tool = makeWebSearchTool()
 
         let result = await callTool(tool, input: ["query": "obscure query"])
 
@@ -225,14 +221,10 @@ final class WebSearchToolTests: XCTestCase {
 
     /// [P0]: WebSearch returns isError for HTTP failure.
     func testWebSearch_httpError_returnsError() async {
-        MockURLProtocol.mockResponse = (
-            data: Data(),
-            statusCode: 503,
-            headers: [:]
-        )
-        let tool = makeWebSearchTool(session: makeMockSession())
+        mockDDGResponse(query: "error test", html: "error", statusCode: 503)
+        let tool = makeWebSearchTool()
 
-        let result = await callTool(tool, input: ["query": "test"])
+        let result = await callTool(tool, input: ["query": "error test"])
 
         XCTAssertTrue(result.isError, "HTTP error should be isError=true")
         XCTAssertTrue(result.content.contains("503"),
@@ -253,14 +245,10 @@ final class WebSearchToolTests: XCTestCase {
         </div>
         </body></html>
         """
-        MockURLProtocol.mockResponse = (
-            data: html.data(using: .utf8),
-            statusCode: 200,
-            headers: ["Content-Type": "text/html"]
-        )
-        let tool = makeWebSearchTool(session: makeMockSession())
+        mockDDGResponse(query: "filter test", html: html)
+        let tool = makeWebSearchTool()
 
-        let result = await callTool(tool, input: ["query": "test"])
+        let result = await callTool(tool, input: ["query": "filter test"])
 
         XCTAssertFalse(result.isError, "Should not error, got: \(result.content)")
         XCTAssertFalse(result.content.contains("duckduckgo.com"),
