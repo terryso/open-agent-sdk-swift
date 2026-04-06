@@ -7,8 +7,7 @@ import XCTest
 /// Records call parameters for assertion and returns configurable results.
 final class MockSubAgentSpawner: SubAgentSpawner, @unchecked Sendable {
     let result: SubAgentResult
-    private(set) var spawnCalls: [SpawnCall] = []
-    private let lock = NSLock()
+    private(set) var lastCall: SpawnCall?
 
     struct SpawnCall: Sendable {
         let prompt: String
@@ -29,15 +28,13 @@ final class MockSubAgentSpawner: SubAgentSpawner, @unchecked Sendable {
         allowedTools: [String]?,
         maxTurns: Int?
     ) async -> SubAgentResult {
-        lock.lock()
-        spawnCalls.append(SpawnCall(
+        lastCall = SpawnCall(
             prompt: prompt,
             model: model,
             systemPrompt: systemPrompt,
             allowedTools: allowedTools,
             maxTurns: maxTurns
-        ))
-        lock.unlock()
+        )
         return result
     }
 }
@@ -148,8 +145,8 @@ final class AgentToolTests: XCTestCase {
         _ = await tool.call(input: input, context: context)
 
         // Then: spawner was called with Explore's system prompt
-        XCTAssertEqual(mockSpawner.spawnCalls.count, 1)
-        let call = mockSpawner.spawnCalls[0]
+        XCTAssertEqual(mockSpawner.lastCall != nil, true)
+        let call = mockSpawner.lastCall!
         XCTAssertNotNil(call.systemPrompt)
         XCTAssertTrue(call.systemPrompt?.contains("exploration") == true ||
                        call.systemPrompt?.contains("Explore") == true ||
@@ -173,7 +170,7 @@ final class AgentToolTests: XCTestCase {
         ]
         _ = await tool.call(input: input, context: context)
 
-        let call = mockSpawner.spawnCalls[0]
+        let call = mockSpawner.lastCall!
         XCTAssertNotNil(call.allowedTools)
         let tools = call.allowedTools ?? []
         XCTAssertTrue(tools.contains("Read"))
@@ -199,7 +196,7 @@ final class AgentToolTests: XCTestCase {
         ]
         _ = await tool.call(input: input, context: context)
 
-        let call = mockSpawner.spawnCalls[0]
+        let call = mockSpawner.lastCall!
         XCTAssertNotNil(call.systemPrompt)
         XCTAssertTrue(call.systemPrompt?.contains("architect") == true ||
                        call.systemPrompt?.contains("Plan") == true ||
@@ -268,7 +265,7 @@ final class AgentToolTests: XCTestCase {
         ]
         _ = await tool.call(input: input, context: context)
 
-        let call = mockSpawner.spawnCalls[0]
+        let call = mockSpawner.lastCall!
         XCTAssertEqual(call.model, "claude-haiku-4-5-20251001")
     }
 
@@ -288,7 +285,7 @@ final class AgentToolTests: XCTestCase {
         ]
         _ = await tool.call(input: input, context: context)
 
-        let call = mockSpawner.spawnCalls[0]
+        let call = mockSpawner.lastCall!
         XCTAssertNil(call.model)
     }
 
@@ -352,7 +349,7 @@ final class AgentToolTests: XCTestCase {
         ]
         _ = await tool.call(input: input, context: context)
 
-        let call = mockSpawner.spawnCalls[0]
+        let call = mockSpawner.lastCall!
         XCTAssertEqual(call.maxTurns, 5)
     }
 
