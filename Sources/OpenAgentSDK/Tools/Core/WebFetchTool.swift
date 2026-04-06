@@ -35,7 +35,17 @@ private enum WebFetchConstants {
 /// - **User-Agent**: Sets `Mozilla/5.0 (compatible; AgentSDK/1.0)`.
 ///
 /// - Returns: A `ToolProtocol` instance for the WebFetch tool.
-public func createWebFetchTool() -> ToolProtocol {
+public func createWebFetchTool(session: URLSession? = nil) -> ToolProtocol {
+    // Use provided session or create default with timeout
+    let urlSession: URLSession
+    if let session {
+        urlSession = session
+    } else {
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForResource = WebFetchConstants.defaultTimeout
+        urlSession = URLSession(configuration: config)
+    }
+
     return defineTool(
         name: "WebFetch",
         description:
@@ -66,11 +76,6 @@ public func createWebFetchTool() -> ToolProtocol {
             )
         }
 
-        // Configure session with timeout
-        let config = URLSessionConfiguration.default
-        config.timeoutIntervalForResource = WebFetchConstants.defaultTimeout
-        let session = URLSession(configuration: config)
-
         // Build request
         var request = URLRequest(url: url)
         request.setValue("Mozilla/5.0 (compatible; AgentSDK/1.0)", forHTTPHeaderField: "User-Agent")
@@ -84,7 +89,7 @@ public func createWebFetchTool() -> ToolProtocol {
         let data: Data
         let response: URLResponse
         do {
-            (data, response) = try await session.data(for: request)
+            (data, response) = try await urlSession.data(for: request)
         } catch {
             return ToolExecuteResult(
                 content: "Error fetching \(input.url): \(error.localizedDescription)",

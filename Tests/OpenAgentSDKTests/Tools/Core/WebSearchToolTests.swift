@@ -1,24 +1,18 @@
+import Foundation
 import XCTest
 @testable import OpenAgentSDK
 
 // MARK: - WebSearchTool ATDD Tests (Story 3.7)
 
-/// ATDD GREEN PHASE: Tests for Story 3.7 -- WebSearchTool.
-/// Feature is implemented. All tests should PASS:
-///   - `Sources/OpenAgentSDK/Tools/Core/WebSearchTool.swift` exists
-///   - `createWebSearchTool() -> ToolProtocol` is implemented
-///   - The tool executes search queries via DuckDuckGo HTML search
-///   - Results are parsed with title, URL, and snippet
-///   - num_results limits output count
-///   - No results returns descriptive message
-/// TDD Phase: GREEN (feature implemented)
+/// Tests for Story 3.7 — WebSearchTool using mocked HTTP responses.
+/// No real network calls are made. All responses are deterministic.
 final class WebSearchToolTests: XCTestCase {
 
     // MARK: - Helpers
 
-    /// Creates the WebSearch tool via the public factory function.
-    private func makeWebSearchTool() -> ToolProtocol {
-        return createWebSearchTool()
+    /// Creates the WebSearch tool with a mock URLSession.
+    private func makeWebSearchTool(session: URLSession) -> ToolProtocol {
+        return createWebSearchTool(session: session)
     }
 
     /// Calls the tool with a dictionary input and returns the ToolResult.
@@ -34,202 +28,287 @@ final class WebSearchToolTests: XCTestCase {
         return await tool.call(input: input, context: context)
     }
 
+    /// Builds a mock DuckDuckGo HTML page with the given search results.
+    private func makeDuckDuckGoHTML(results: [(title: String, url: String, snippet: String)]) -> String {
+        var html = "<html><body>"
+        for result in results {
+            html += """
+            <div class="result">
+                <a rel="nofollow" class="result__a" href="\(result.url)">\(result.title)</a>
+                <a class="result__snippet" href="\(result.url)">\(result.snippet)</a>
+            </div>
+            """
+        }
+        html += "</body></html>"
+        return html
+    }
+
+    // MARK: - Setup / Teardown
+
+    override func tearDown() {
+        super.tearDown()
+        MockURLProtocol.mockResponse = nil
+    }
+
     // MARK: - AC6: WebSearch executes search queries
 
     /// AC6 [P0]: WebSearch returns formatted results for a query.
-    /// Note: DuckDuckGo may not return results in CI environments (rate limiting / blocking).
-    /// The test passes if either results are properly formatted OR a no-results message is returned.
     func testWebSearch_returnsResults() async {
-        let tool = makeWebSearchTool()
-
-        // When: searching for a common term
-        let result = await callTool(tool, input: [
-            "query": "Swift programming language"
+        let html = makeDuckDuckGoHTML(results: [
+            (title: "Swift.org", url: "https://swift.org", snippet: "Welcome to Swift"),
+            (title: "Apple Developer", url: "https://developer.apple.com/swift/", snippet: "Swift resources"),
         ])
+        MockURLProtocol.mockResponse = (
+            data: html.data(using: .utf8),
+            statusCode: 200,
+            headers: ["Content-Type": "text/html"]
+        )
+        let tool = makeWebSearchTool(session: makeMockSession())
 
-        // Then: results are returned with title, URL, and snippet format
-        XCTAssertFalse(result.isError,
-                       "Search should not error, got: \(result.content)")
-        XCTAssertFalse(result.content.isEmpty,
-                       "Search results should not be empty")
-        // Results should be numbered (if results exist) or be a no-results message
-        let hasNumberedResults = result.content.contains("1.")
-        let hasNoResults = result.content.contains("No results found")
-        XCTAssertTrue(hasNumberedResults || hasNoResults,
-                      "Results should be numbered or no-results message, got: \(result.content)")
+        let result = await callTool(tool, input: ["query": "Swift programming"])
+
+        XCTAssertFalse(result.isError, "Should not error, got: \(result.content)")
+        XCTAssertTrue(result.content.contains("1."),
+                      "Should have result #1, got: \(result.content)")
+        XCTAssertTrue(result.content.contains("2."),
+                      "Should have result #2, got: \(result.content)")
+        XCTAssertTrue(result.content.contains("Swift.org"),
+                      "Should contain title, got: \(result.content)")
+        XCTAssertTrue(result.content.contains("https://swift.org"),
+                      "Should contain URL, got: \(result.content)")
     }
 
-    /// AC6 [P0]: WebSearch results contain URLs (when results are available).
+    /// AC6 [P0]: WebSearch results contain URLs.
     func testWebSearch_resultsContainUrls() async {
-        let tool = makeWebSearchTool()
-
-        // When: searching for something
-        let result = await callTool(tool, input: [
-            "query": "Apple developer documentation"
+        let html = makeDuckDuckGoHTML(results: [
+            (title: "Apple Dev", url: "https://developer.apple.com", snippet: "Docs"),
         ])
+        MockURLProtocol.mockResponse = (
+            data: html.data(using: .utf8),
+            statusCode: 200,
+            headers: ["Content-Type": "text/html"]
+        )
+        let tool = makeWebSearchTool(session: makeMockSession())
 
-        // Then: results should contain http URLs (or no-results message in CI)
-        XCTAssertFalse(result.isError,
-                       "Search should not error, got: \(result.content)")
-        let hasUrls = result.content.contains("http")
-        let hasNoResults = result.content.contains("No results found")
-        XCTAssertTrue(hasUrls || hasNoResults,
-                      "Results should contain URLs or no-results message, got: \(result.content)")
+        let result = await callTool(tool, input: ["query": "Apple developer"])
+
+        XCTAssertFalse(result.isError, "Should not error, got: \(result.content)")
+        XCTAssertTrue(result.content.contains("https://developer.apple.com"),
+                      "Should contain URL, got: \(result.content)")
     }
 
-    /// AC6 [P0]: WebSearch results are formatted with title, URL, snippet (when available).
+    /// AC6 [P0]: WebSearch results are formatted as "{n}. {title}\n   {url}\n   {snippet}".
     func testWebSearch_resultsFormattedCorrectly() async {
-        let tool = makeWebSearchTool()
-
-        // When: searching for a term
-        let result = await callTool(tool, input: [
-            "query": "OpenAI API"
+        let html = makeDuckDuckGoHTML(results: [
+            (title: "OpenAI API", url: "https://openai.com/api", snippet: "Build with AI"),
         ])
+        MockURLProtocol.mockResponse = (
+            data: html.data(using: .utf8),
+            statusCode: 200,
+            headers: ["Content-Type": "text/html"]
+        )
+        let tool = makeWebSearchTool(session: makeMockSession())
 
-        // Then: formatted as "{n}. {title}\n   {url}\n   {snippet}" (or no-results message)
-        XCTAssertFalse(result.isError,
-                       "Search should not error, got: \(result.content)")
-        let hasFormattedResults = result.content.contains("1.") && result.content.contains("http")
-        let hasNoResults = result.content.contains("No results found")
-        XCTAssertTrue(hasFormattedResults || hasNoResults,
-                      "Results should be formatted or no-results message, got: \(result.content)")
+        let result = await callTool(tool, input: ["query": "OpenAI API"])
+
+        XCTAssertFalse(result.isError, "Should not error, got: \(result.content)")
+        // Verify format: "1. {title}\n   {url}\n   {snippet}"
+        XCTAssertTrue(result.content.contains("1. OpenAI API"),
+                      "Should have numbered title, got: \(result.content)")
+        XCTAssertTrue(result.content.contains("https://openai.com/api"),
+                      "Should contain URL, got: \(result.content)")
+        XCTAssertTrue(result.content.contains("Build with AI"),
+                      "Should contain snippet, got: \(result.content)")
     }
 
     // MARK: - AC7: WebSearch result count limiting
 
-    /// AC7 [P0]: WebSearch respects num_results parameter (when results are available).
+    /// AC7 [P0]: WebSearch respects num_results parameter.
     func testWebSearch_numResults_limitsOutput() async {
-        let tool = makeWebSearchTool()
+        let html = makeDuckDuckGoHTML(results: [
+            (title: "Result 1", url: "https://r1.com", snippet: "S1"),
+            (title: "Result 2", url: "https://r2.com", snippet: "S2"),
+            (title: "Result 3", url: "https://r3.com", snippet: "S3"),
+            (title: "Result 4", url: "https://r4.com", snippet: "S4"),
+        ])
+        MockURLProtocol.mockResponse = (
+            data: html.data(using: .utf8),
+            statusCode: 200,
+            headers: ["Content-Type": "text/html"]
+        )
+        let tool = makeWebSearchTool(session: makeMockSession())
 
-        // When: searching with num_results = 2
         let result = await callTool(tool, input: [
-            "query": "programming languages",
+            "query": "programming",
             "num_results": 2
         ])
 
-        // Then: at most 2 numbered results appear (or no-results message in CI)
-        XCTAssertFalse(result.isError,
-                       "Search should not error, got: \(result.content)")
-        let hasNoResults = result.content.contains("No results found")
-        if !hasNoResults {
-            // Only assert format when results are actually returned
-            let hasResult1 = result.content.contains("1.")
-            let hasResult2 = result.content.contains("2.")
-            let hasResult3 = result.content.contains("3.")
-            XCTAssertTrue(hasResult1,
-                          "Should have result #1, got: \(result.content)")
-            XCTAssertTrue(hasResult2,
-                          "Should have result #2, got: \(result.content)")
-            XCTAssertFalse(hasResult3,
-                           "Should NOT have result #3 when num_results=2, got: \(result.content)")
-        }
+        XCTAssertFalse(result.isError, "Should not error, got: \(result.content)")
+        XCTAssertTrue(result.content.contains("1."),
+                      "Should have result #1, got: \(result.content)")
+        XCTAssertTrue(result.content.contains("2."),
+                      "Should have result #2, got: \(result.content)")
+        XCTAssertFalse(result.content.contains("3."),
+                       "Should NOT have result #3 when num_results=2, got: \(result.content)")
     }
 
     /// AC7 [P1]: WebSearch defaults to 5 results when num_results is not specified.
     func testWebSearch_defaultNumResults_isFive() async {
-        let tool = makeWebSearchTool()
+        let html = makeDuckDuckGoHTML(results: [
+            (title: "R1", url: "https://r1.com", snippet: "S1"),
+            (title: "R2", url: "https://r2.com", snippet: "S2"),
+            (title: "R3", url: "https://r3.com", snippet: "S3"),
+            (title: "R4", url: "https://r4.com", snippet: "S4"),
+            (title: "R5", url: "https://r5.com", snippet: "S5"),
+            (title: "R6", url: "https://r6.com", snippet: "S6"),
+        ])
+        MockURLProtocol.mockResponse = (
+            data: html.data(using: .utf8),
+            statusCode: 200,
+            headers: ["Content-Type": "text/html"]
+        )
+        let tool = makeWebSearchTool(session: makeMockSession())
 
-        // When: searching without specifying num_results
+        let result = await callTool(tool, input: ["query": "test"])
+
+        XCTAssertFalse(result.isError, "Should not error, got: \(result.content)")
+        XCTAssertFalse(result.content.contains("6."),
+                       "Default should limit to 5, should NOT have #6, got: \(result.content)")
+    }
+
+    /// AC7: WebSearch clamps negative num_results to 1.
+    func testWebSearch_negativeNumResults_clampedToOne() async {
+        let html = makeDuckDuckGoHTML(results: [
+            (title: "R1", url: "https://r1.com", snippet: "S1"),
+            (title: "R2", url: "https://r2.com", snippet: "S2"),
+        ])
+        MockURLProtocol.mockResponse = (
+            data: html.data(using: .utf8),
+            statusCode: 200,
+            headers: ["Content-Type": "text/html"]
+        )
+        let tool = makeWebSearchTool(session: makeMockSession())
+
         let result = await callTool(tool, input: [
-            "query": "test query"
+            "query": "test",
+            "num_results": -5
         ])
 
-        // Then: at most 5 results returned (check that result 6 doesn't exist)
-        XCTAssertFalse(result.isError,
-                       "Search should not error, got: \(result.content)")
-        // If we have enough results, "6." should not be present
-        let hasResult6 = result.content.contains("6.")
-        XCTAssertFalse(hasResult6,
-                       "Default should limit to 5 results, should NOT have result #6, got: \(result.content)")
+        XCTAssertFalse(result.isError, "Should not error, got: \(result.content)")
+        XCTAssertTrue(result.content.contains("1."),
+                      "Should have at least result #1, got: \(result.content)")
     }
 
     // MARK: - AC8: WebSearch no results handling
 
     /// AC8 [P0]: WebSearch returns descriptive message when no results found.
     func testWebSearch_noResults_returnsMessage() async {
-        let tool = makeWebSearchTool()
+        let html = "<html><body>No results here</body></html>"
+        MockURLProtocol.mockResponse = (
+            data: html.data(using: .utf8),
+            statusCode: 200,
+            headers: ["Content-Type": "text/html"]
+        )
+        let tool = makeWebSearchTool(session: makeMockSession())
 
-        // When: searching for gibberish that should return no results
-        let result = await callTool(tool, input: [
-            "query": "zzzzzzzzzzzzzzzzyyyyyyyyyyxxxxxwwwwww nonexist12345"
-        ])
+        let result = await callTool(tool, input: ["query": "obscure query"])
 
-        // Then: not an error, but a descriptive "no results" message
-        // (may or may not have results depending on DDG, so we test the format)
         XCTAssertFalse(result.isError,
                        "No results should NOT be isError=true, got: \(result.content)")
-        XCTAssertFalse(result.content.isEmpty,
-                       "Should return a message (either results or no-results notice)")
+        XCTAssertTrue(result.content.contains("No results found"),
+                      "Should say 'No results found', got: \(result.content)")
+        XCTAssertTrue(result.content.contains("obscure query"),
+                      "Should echo the query, got: \(result.content)")
     }
 
-    // MARK: - AC6: Search error handling
+    // MARK: - Search error handling
 
-    /// [P0]: WebSearch returns isError for network failure.
-    func testWebSearch_searchError_returnsError() async {
-        let tool = makeWebSearchTool()
+    /// [P0]: WebSearch returns isError for HTTP failure.
+    func testWebSearch_httpError_returnsError() async {
+        MockURLProtocol.mockResponse = (
+            data: Data(),
+            statusCode: 503,
+            headers: [:]
+        )
+        let tool = makeWebSearchTool(session: makeMockSession())
 
-        // When: the search URL is unreachable (we cannot directly control this,
-        // but an empty or invalid query may trigger different behavior)
-        // Use a tool call with an invalid URL parameter to test error path
-        // Actually, since the URL is constructed internally, we test with a very long query
-        // that might cause issues. A better approach: the tool should handle all errors gracefully.
-        let result = await callTool(tool, input: [
-            "query": "test"
-        ])
+        let result = await callTool(tool, input: ["query": "test"])
 
-        // Then: should return a valid ToolResult (not crash)
-        XCTAssertFalse(result.content.isEmpty,
-                       "Should always return content, even on error")
+        XCTAssertTrue(result.isError, "HTTP error should be isError=true")
+        XCTAssertTrue(result.content.contains("503"),
+                      "Error should mention status code, got: \(result.content)")
+    }
+
+    /// [P0]: WebSearch filters out DuckDuckGo internal links.
+    func testWebSearch_filtersInternalLinks() async {
+        let html = """
+        <html><body>
+        <div class="result">
+            <a rel="nofollow" class="result__a" href="https://duckduckgo.com/internal">Internal</a>
+            <a class="result__snippet" href="#">Internal snippet</a>
+        </div>
+        <div class="result">
+            <a rel="nofollow" class="result__a" href="https://example.com">External</a>
+            <a class="result__snippet" href="#">External snippet</a>
+        </div>
+        </body></html>
+        """
+        MockURLProtocol.mockResponse = (
+            data: html.data(using: .utf8),
+            statusCode: 200,
+            headers: ["Content-Type": "text/html"]
+        )
+        let tool = makeWebSearchTool(session: makeMockSession())
+
+        let result = await callTool(tool, input: ["query": "test"])
+
+        XCTAssertFalse(result.isError, "Should not error, got: \(result.content)")
+        XCTAssertFalse(result.content.contains("duckduckgo.com"),
+                       "Should filter out internal DDG links, got: \(result.content)")
+        XCTAssertTrue(result.content.contains("example.com"),
+                      "Should include external results, got: \(result.content)")
     }
 
     // MARK: - Tool metadata
 
     /// [P0]: WebSearch tool should be named "WebSearch".
     func testWebSearchTool_hasCorrectName() {
-        let tool = makeWebSearchTool()
-        XCTAssertEqual(tool.name, "WebSearch",
-                       "WebSearch tool should be named 'WebSearch'")
+        let tool = createWebSearchTool()
+        XCTAssertEqual(tool.name, "WebSearch")
     }
 
     /// [P0]: WebSearch tool should be marked as read-only.
     func testWebSearchTool_isReadOnly_true() {
-        let tool = makeWebSearchTool()
-        XCTAssertTrue(tool.isReadOnly,
-                      "WebSearch tool should be marked as read-only")
+        let tool = createWebSearchTool()
+        XCTAssertTrue(tool.isReadOnly)
     }
 
     /// [P0]: WebSearch tool should have `query` in required schema fields.
     func testWebSearchTool_hasQueryInRequiredSchema() {
-        let tool = makeWebSearchTool()
+        let tool = createWebSearchTool()
         let schema = tool.inputSchema
         let required = schema["required"] as? [String]
-        XCTAssertNotNil(required,
-                        "inputSchema should have 'required' array")
-        XCTAssertTrue(required!.contains("query"),
-                      "'query' should be in required fields")
+        XCTAssertNotNil(required)
+        XCTAssertTrue(required!.contains("query"))
     }
 
     /// [P0]: WebSearch tool schema should have `query` and optional `num_results` properties.
     func testWebSearchTool_hasCorrectSchemaProperties() {
-        let tool = makeWebSearchTool()
+        let tool = createWebSearchTool()
         let schema = tool.inputSchema
         let properties = schema["properties"] as? [String: Any]
-        XCTAssertNotNil(properties,
-                        "inputSchema should have 'properties' dictionary")
-        XCTAssertNotNil(properties!["query"],
-                        "Schema should have 'query' property")
-        XCTAssertNotNil(properties!["num_results"],
-                        "Schema should have 'num_results' property")
+        XCTAssertNotNil(properties)
+        XCTAssertNotNil(properties!["query"])
+        XCTAssertNotNil(properties!["num_results"])
     }
 
     /// [P0]: WebSearch `num_results` schema type should be "integer" not "number".
     func testWebSearchTool_numResultsSchema_isInteger() {
-        let tool = makeWebSearchTool()
+        let tool = createWebSearchTool()
         let schema = tool.inputSchema
         let properties = schema["properties"] as? [String: Any]
         let numResultsProp = properties?["num_results"] as? [String: Any]
-        XCTAssertNotNil(numResultsProp,
-                        "num_results property should exist in schema")
+        XCTAssertNotNil(numResultsProp)
         XCTAssertEqual(numResultsProp?["type"] as? String, "integer",
                        "num_results should use 'integer' type, not 'number'")
     }

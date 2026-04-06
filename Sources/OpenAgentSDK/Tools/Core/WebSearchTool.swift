@@ -40,7 +40,17 @@ private struct SearchResult {
 /// - **Cross-platform**: Uses Foundation's `URLSession` (works on macOS and Linux).
 ///
 /// - Returns: A `ToolProtocol` instance for the WebSearch tool.
-public func createWebSearchTool() -> ToolProtocol {
+public func createWebSearchTool(session: URLSession? = nil) -> ToolProtocol {
+    // Use provided session or create default with timeout
+    let urlSession: URLSession
+    if let session {
+        urlSession = session
+    } else {
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForResource = WebSearchConstants.defaultTimeout
+        urlSession = URLSession(configuration: config)
+    }
+
     return defineTool(
         name: "WebSearch",
         description:
@@ -71,11 +81,6 @@ public func createWebSearchTool() -> ToolProtocol {
             )
         }
 
-        // Configure session
-        let config = URLSessionConfiguration.default
-        config.timeoutIntervalForResource = WebSearchConstants.defaultTimeout
-        let session = URLSession(configuration: config)
-
         // Build request
         var request = URLRequest(url: searchUrl)
         request.setValue(WebSearchConstants.userAgent, forHTTPHeaderField: "User-Agent")
@@ -84,7 +89,7 @@ public func createWebSearchTool() -> ToolProtocol {
         let data: Data
         let response: URLResponse
         do {
-            (data, response) = try await session.data(for: request)
+            (data, response) = try await urlSession.data(for: request)
         } catch {
             return ToolExecuteResult(
                 content: "Search error: \(error.localizedDescription)",
