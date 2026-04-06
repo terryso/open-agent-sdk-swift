@@ -7,7 +7,11 @@ public actor TaskStore {
 
     private var tasks: [String: Task] = [:]
     private var taskCounter: Int = 0
-    private let dateFormatter = ISO8601DateFormatter()
+    private let dateFormatter: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
 
     // MARK: - Initialization
 
