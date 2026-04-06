@@ -9,7 +9,7 @@
 
 [中文文档](./README_CN.md)
 
-Open-source Agent SDK for Swift — run the full agent loop **in-process** with native Swift concurrency. Build AI-powered applications with streaming responses, built-in tools, and MCP support.
+Open-source Agent SDK for Swift — run the full agent loop **in-process** with native Swift concurrency. Build AI-powered applications with streaming responses, 10+ built-in tools, sub-agent support, and multi-provider LLM integration.
 
 > **Inspired by** [open-agent-sdk-typescript](https://github.com/codeany-ai/open-agent-sdk-typescript) — bringing the same agentic architecture to the Swift ecosystem.
 
@@ -17,25 +17,26 @@ Also available in **TypeScript**: [open-agent-sdk-typescript](https://github.com
 
 ## Status
 
-This project is in **early development**. The foundation (type system, configuration, API client, agent creation) is in place, with the agentic loop, built-in tools, and advanced features coming soon.
-
 **Implemented:**
 - [x] Type system (messages, tools, errors, permissions, sessions, hooks)
 - [x] SDK configuration (environment variables + programmatic)
-- [x] Anthropic API client with streaming support
-- [x] Agent creation and configuration
-- [x] CI pipeline
+- [x] Multi-provider LLM support (Anthropic + OpenAI-compatible APIs)
+- [x] Agent creation with full agentic loop
+- [x] Streaming and blocking query APIs
+- [x] 10 built-in tools (Bash, Read, Write, Edit, Glob, Grep, WebFetch, WebSearch, AskUser, ToolSearch)
+- [x] Sub-agent spawning (Agent tool with built-in Explore/Plan agents)
+- [x] Tool registry with deduplication and filtering
+- [x] Error handling with retry logic
+- [x] CI pipeline with code coverage
 
 **In Progress / Planned:**
-- [ ] Agentic loop (QueryEngine)
-- [ ] 34 built-in tools (Bash, Read, Write, Edit, Glob, Grep, ...)
 - [ ] MCP (Model Context Protocol) integration
 - [ ] Session persistence
-- [ ] Hook system (21 lifecycle events)
-- [ ] Multi-agent orchestration
+- [ ] Hook system execution (types defined)
 - [ ] Budget tracking
-- [ ] Permission system
+- [ ] Permission enforcement
 - [ ] Auto-compaction
+- [ ] NotebookEdit tool
 
 ## Installation
 
@@ -78,14 +79,6 @@ let config = SDKConfiguration(
 )
 ```
 
-Third-party providers (e.g. OpenRouter) are supported via `CODEANY_BASE_URL`:
-
-```bash
-export CODEANY_BASE_URL=https://openrouter.ai/api
-export CODEANY_API_KEY=sk-or-...
-export CODEANY_MODEL=anthropic/claude-sonnet-4
-```
-
 ### Create an Agent
 
 ```swift
@@ -100,21 +93,78 @@ let agent = createAgent(options: AgentOptions(
 ))
 ```
 
-### Streaming Query (coming soon)
+### Blocking Query
 
 ```swift
-for await message in agent.query("Read Package.swift and tell me the project name.") {
+let result = await agent.prompt("Read Package.swift and tell me the project name.")
+print(result.text)
+print("Used \(result.usage.inputTokens) input + \(result.usage.outputTokens) output tokens")
+```
+
+### Streaming Query
+
+```swift
+for await message in agent.stream("Read Package.swift and tell me the project name.") {
     switch message {
-    case .assistant(let content):
-        print(content)
-    case .toolUse(let tool, let input):
-        print("Using tool: \(tool)")
-    case .result(let summary):
-        print("Done: \(summary)")
+    case .assistant(let data):
+        print(data.text)
+    case .toolUse(let data):
+        print("Using tool: \(data.toolName)")
+    case .result(let data):
+        print("Done: \(data.text)")
     default:
         break
     }
 }
+```
+
+### Multi-Provider Support
+
+Use OpenAI-compatible APIs (GLM, Ollama, OpenRouter, etc.):
+
+```swift
+let agent = createAgent(options: AgentOptions(
+    provider: .openai,
+    apiKey: "your-openai-key",
+    model: "gpt-4o",
+    baseURL: "https://api.openai.com/v1",
+    systemPrompt: "You are a helpful assistant."
+))
+```
+
+Or via environment variables:
+
+```bash
+export CODEANY_API_KEY=your-key
+export CODEANY_BASE_URL=https://api.openai.com/v1
+export CODEANY_MODEL=gpt-4o
+# Agent will auto-detect provider from base URL
+```
+
+### Custom Tools
+
+```swift
+import OpenAgentSDK
+
+let myTool = defineTool(
+    name: "get_weather",
+    description: "Get current weather for a city",
+    inputSchema: [
+        "type": "object",
+        "properties": [
+            "city": ["type": "string", "description": "City name"]
+        ],
+        "required": ["city"]
+    ]
+) { input, context in
+    let city = input["city"] as? String ?? "Unknown"
+    return "Weather in \(city): 22°C, sunny"
+}
+
+let agent = createAgent(options: AgentOptions(
+    apiKey: "sk-...",
+    tools: [myTool]
+))
 ```
 
 ## Architecture
@@ -122,13 +172,13 @@ for await message in agent.query("Read Package.swift and tell me the project nam
 ```mermaid
 graph TD
     A["<b>Your Application</b><br/><i>import OpenAgentSDK</i>"] --> B
-    B["<b>Agent</b><br/>query() / prompt()<br/><i>Session state, tool pool,<br/>MCP connections</i>"] --> C
-    C["<b>QueryEngine</b><br/>submitMessage()<br/><i>API call → tools → repeat</i>"] --> D
+    B["<b>Agent</b><br/>prompt() / stream()<br/><i>Session state, tool pool</i>"] --> C
+    C["<b>Agentic Loop</b><br/><i>API call → tools → repeat</i>"] --> D
     C --> E
     C --> F
-    D["<b>LLM API Client</b><br/><i>Streaming</i>"]
-    E["<b>34 Built-in Tools</b><br/>Bash · Read · Edit · ..."]
-    F["<b>MCP Servers</b><br/>stdio / SSE / HTTP"]
+    D["<b>LLMClient Protocol</b><br/>AnthropicClient · OpenAIClient"]
+    E["<b>10+ Built-in Tools</b><br/>Bash · Read · Write · Edit · Glob · Grep<br/>WebFetch · WebSearch · AskUser · Agent"]
+    F["<b>MCP Servers</b><br/><i>stdio / SSE / HTTP (planned)</i>"]
 
     style A fill:#e1f5fe,stroke:#0288d1
     style B fill:#fff3e0,stroke:#f57c00
@@ -140,19 +190,27 @@ graph TD
 
 ## Environment Variables
 
-| Variable             | Description            |
-| -------------------- | ---------------------- |
-| `CODEANY_API_KEY`    | API key (required)     |
-| `CODEANY_MODEL`      | Default model override |
-| `CODEANY_BASE_URL`   | Custom API endpoint    |
+| Variable             | Description                              |
+| -------------------- | ---------------------------------------- |
+| `CODEANY_API_KEY`    | API key (required)                       |
+| `CODEANY_MODEL`      | Default model (default: `claude-sonnet-4-6`) |
+| `CODEANY_BASE_URL`   | Custom API endpoint for third-party providers |
 
-## Built-in Tools (Planned)
+## Built-in Tools
 
-| Tier        | Tools                                                                 |
-| ----------- | --------------------------------------------------------------------- |
-| **Core**    | Bash, Read, Write, Edit, Glob, Grep, WebFetch, WebSearch, AskUser, ToolSearch |
-| **Advanced**| NotebookEdit, Agent (subagents), Task management, Team coordination, SendMessage, EnterWorktree, EnterPlanMode |
-| **Specialist** | LSP, MCP resources, Cron scheduling, Remote triggers, Config |
+| Tool         | Description                                    | Status |
+| ------------ | ---------------------------------------------- | ------ |
+| **Bash**     | Execute shell commands with timeout            | ✅      |
+| **Read**     | Read file contents                             | ✅      |
+| **Write**    | Create or overwrite files                      | ✅      |
+| **Edit**     | Find and replace in files                      | ✅      |
+| **Glob**     | Search files by pattern                        | ✅      |
+| **Grep**     | Search file contents with regex                | ✅      |
+| **WebFetch** | Fetch and read web pages                       | ✅      |
+| **WebSearch**| Search the web                                 | ✅      |
+| **AskUser**  | Ask user for input during execution            | ✅      |
+| **ToolSearch**| Search available tools                        | ✅      |
+| **Agent**    | Spawn sub-agents (Explore, Plan types)         | ✅      |
 
 ## Requirements
 
