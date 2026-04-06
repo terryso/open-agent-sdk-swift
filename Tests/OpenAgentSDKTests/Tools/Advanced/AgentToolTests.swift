@@ -5,7 +5,7 @@ import XCTest
 
 /// Mock spawner for testing AgentTool without real API calls.
 /// Records call parameters for assertion and returns configurable results.
-final class MockSubAgentSpawner: SubAgentSpawner {
+final class MockSubAgentSpawner: SubAgentSpawner, @unchecked Sendable {
     let result: SubAgentResult
     private(set) var spawnCalls: [SpawnCall] = []
     private let lock = NSLock()
