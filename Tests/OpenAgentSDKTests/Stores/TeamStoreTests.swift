@@ -182,7 +182,7 @@ final class TeamStoreTests: XCTestCase {
     // MARK: - AC2: TeamStore CRUD -- Delete
 
     /// AC2 [P0]: Deleting an existing team returns true and removes it.
-    func testDeleteTeam_existingId_returnsTrue() async {
+    func testDeleteTeam_existingId_returnsTrue() async throws {
         // Given: a TeamStore with a team
         let store = TeamStore()
         let team = await store.create(name: "Delete me")
@@ -217,7 +217,7 @@ final class TeamStoreTests: XCTestCase {
     }
 
     /// AC2 [P0]: Deleting an already disbanded team throws teamAlreadyDisbanded.
-    func testDeleteTeam_alreadyDisbanded_throwsError() async {
+    func testDeleteTeam_alreadyDisbanded_throwsError() async throws {
         // Given: a TeamStore with a disbanded (deleted) team
         let store = TeamStore()
         let team = await store.create(name: "Disbanded team")
