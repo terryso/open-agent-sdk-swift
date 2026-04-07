@@ -79,6 +79,8 @@
 /// - ``createLSPTool()`` — Factory for the LSP tool
 /// - ``createConfigTool()`` — Factory for the Config tool
 /// - ``createRemoteTriggerTool()`` — Factory for the RemoteTrigger tool
+/// - ``createListMcpResourcesTool()`` — Factory for the ListMcpResources tool
+/// - ``createReadMcpResourceTool()`` — Factory for the ReadMcpResource tool
 ///
 /// ## Specialist Stores
 /// - ``WorktreeStore`` — Thread-safe worktree management actor

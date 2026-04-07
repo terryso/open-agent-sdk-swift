@@ -1,5 +1,5 @@
 # generated: 2026-04-04
-# last_updated: 2026-04-07 (5-6-config-remote-trigger-tools → done)
+# last_updated: 2026-04-07 (5-7-mcp-resource-tools → done)
 # updated: 5-4-todo-store-tools → review
 # updated: 5-3-cron-store-tools → review
 # updated: 5-1-worktree-store-tools → review
@@ -68,7 +68,7 @@
 
 generated: 2026-04-04
 last_updated: 2026-04-07
-# updated: 5-5-lsp-tool → review
+# updated: 5-7-mcp-resource-tools → done
 # updated: 4-7-notebook-edit-tool → review
 # updated: 4-7-notebook-edit-tool → ready-for-dev
 # updated: 4-4-send-message-tool → done
@@ -145,14 +145,14 @@ development_status:
   epic-4-retrospective: optional
 
   # Epic 5: 专业工具与管理存储
-  epic-5: in-progress
+  epic-5: done
   5-1-worktree-store-tools: done
   5-2-plan-store-tools: done
   5-3-cron-store-tools: done
   5-4-todo-store-tools: done
   5-5-lsp-tool: done
   5-6-config-remote-trigger-tools: done
-  5-7-mcp-resource-tools: backlog
+  5-7-mcp-resource-tools: done
   epic-5-retrospective: optional
 
   # Epic 6: MCP 协议集成

@@ -19,3 +19,8 @@
 ## Deferred from: code review of 4-1-task-store-mailbox-store (2026-04-06)
 
 - **Task struct name collision with Swift Concurrency's Task** — `Task` struct collides with `_Concurrency.Task`. Already mitigated with `_Concurrency.Task` qualification in existing code, but remains a latent naming risk for future code. Pre-existing design decision documented in Dev Notes [TaskTypes.swift:17]
+
+## Deferred from: code review of 5-7-mcp-resource-tools (2026-04-07)
+
+- **mcpConnections thread safety (latent risk)** — `nonisolated(unsafe) var mcpConnections` is genuinely mutable shared state. Acceptable for single-agent but would clobber with concurrent multi-agent. Design choice matching TS SDK pattern [ListMcpResourcesTool.swift:8]
+- **AC5: missing tool count hint in listing-not-supported** — TS SDK shows `({tools.length} tools available)` but Swift MCPConnectionInfo lacks tools field. Deferred to Epic 6 when real MCP connections exist [ListMcpResourcesTool.swift:79-91]

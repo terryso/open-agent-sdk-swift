@@ -79,6 +79,8 @@ public func getAllBaseTools(tier: ToolTier) -> [ToolProtocol] {
             createLSPTool(),
             createConfigTool(),
             createRemoteTriggerTool(),
+            createListMcpResourcesTool(),
+            createReadMcpResourceTool(),
         ]
     }
 }

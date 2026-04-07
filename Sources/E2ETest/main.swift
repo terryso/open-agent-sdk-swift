@@ -55,6 +55,11 @@ await TrackingTests.run(apiKey: apiKey, model: model, baseURL: baseURL)
 // ================================================================
 ToolRegistryTests.run()
 
+// ================================================================
+// MCP Resource Tools (ListMcpResources, ReadMcpResource)
+// ================================================================
+await McpResourceToolTests.run()
+
 // SECTION 17-20, 24, 26, 28, 30: Store Operations (incl. WorktreeStore, PlanStore, CronStore, TodoStore)
 await StoreTests.run()
 
