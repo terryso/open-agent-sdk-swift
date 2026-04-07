@@ -175,11 +175,11 @@ final class ToolRegistryTests: XCTestCase {
         let advancedTools = getAllBaseTools(tier: .advanced)
         let specialistTools = getAllBaseTools(tier: .specialist)
 
-        // Then: both return empty arrays
+        // Then: advanced returns empty, specialist has registered tools
         XCTAssertTrue(advancedTools.isEmpty,
                        "getAllBaseTools(.advanced) should return empty array")
-        XCTAssertTrue(specialistTools.isEmpty,
-                       "getAllBaseTools(.specialist) should return empty array")
+        XCTAssertTrue(!specialistTools.isEmpty,
+                       "getAllBaseTools(.specialist) should contain registered tools")
     }
 
     // MARK: - AC3: filterTools

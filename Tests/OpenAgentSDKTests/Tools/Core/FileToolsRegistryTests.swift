@@ -104,11 +104,11 @@ final class FileToolsRegistryTests: XCTestCase {
         let advancedTools = getAllBaseTools(tier: .advanced)
         let specialistTools = getAllBaseTools(tier: .specialist)
 
-        // Then: both are still empty (tools added in future stories)
+        // Then: advanced is still empty, specialist has registered tools
         XCTAssertTrue(advancedTools.isEmpty,
                       "Advanced tier should still be empty")
-        XCTAssertTrue(specialistTools.isEmpty,
-                      "Specialist tier should still be empty")
+        XCTAssertTrue(!specialistTools.isEmpty,
+                      "Specialist tier should contain registered tools")
     }
 
     /// AC8 [P1]: Core tools can be converted to API format without errors.
