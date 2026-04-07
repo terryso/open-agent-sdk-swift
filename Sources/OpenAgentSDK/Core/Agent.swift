@@ -90,6 +90,36 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
         self.client = client
     }
 
+    // MARK: - MCP Integration
+
+    /// Assembles the complete tool pool including MCP tools.
+    ///
+    /// If `options.mcpServers` is configured, creates an MCPClientManager,
+    /// connects all servers, and merges their tools with the existing tool pool.
+    ///
+    /// - Returns: A tuple of (assembled tools, MCPClientManager or nil).
+    func assembleFullToolPool() async -> ([ToolProtocol], MCPClientManager?) {
+        let baseTools = options.tools ?? []
+
+        guard let mcpServers = options.mcpServers, !mcpServers.isEmpty else {
+            return (baseTools, nil)
+        }
+
+        let manager = MCPClientManager()
+        await manager.connectAll(servers: mcpServers)
+        let mcpTools = await manager.getMCPTools()
+
+        let pool = assembleToolPool(
+            baseTools: getAllBaseTools(tier: .core) + getAllBaseTools(tier: .specialist),
+            customTools: baseTools,
+            mcpTools: mcpTools,
+            allowed: nil,
+            disallowed: nil
+        )
+
+        return (pool, manager)
+    }
+
     // MARK: - Internal Helpers (Reserved for Story 1.5)
 
     /// Build the system prompt string for API requests.
@@ -126,6 +156,9 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
     public func prompt(_ text: String) async -> QueryResult {
         let startTime = ContinuousClock.now
 
+        // MCP integration: connect MCP servers and merge tools
+        let (mcpTools, mcpManager) = await assembleFullToolPool()
+
         var messages = buildMessages(prompt: text)
         var totalUsage = TokenUsage(inputTokens: 0, outputTokens: 0)
         var totalCostUsd: Double = 0.0
@@ -148,10 +181,10 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                 compactState = newState
             }
 
-            // Build tool definitions for API call
+            // Build tool definitions for API call (use MCP-merged tool pool)
             let apiTools: [[String: Any]]? = {
-                guard let registeredTools = options.tools, !registeredTools.isEmpty else { return nil }
-                return toApiTools(registeredTools)
+                guard !mcpTools.isEmpty else { return nil }
+                return toApiTools(mcpTools)
             }()
 
             let response: [String: Any]
@@ -177,6 +210,10 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                     )
                 }, retryConfig: retryCfg)
             } catch {
+                // Clean up MCP connections on error
+                if let mcpManager {
+                    await mcpManager.shutdown()
+                }
                 return QueryResult(
                     text: lastAssistantText,
                     usage: totalUsage,
@@ -231,7 +268,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                 let toolUseBlocks = ToolExecutor.extractToolUseBlocks(from: contentBlocks)
 
                 if !toolUseBlocks.isEmpty {
-                    let registeredTools = options.tools ?? []
+                    // Use MCP-merged tool pool for execution
+                    let registeredTools = mcpTools
                     // Create agent spawner if AgentTool is registered
                     let spawner: SubAgentSpawner? = {
                         let hasAgentTool = registeredTools.contains { $0.name == "Agent" }
@@ -307,6 +345,11 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
             status = .errorMaxTurns
         }
 
+        // Clean up MCP connections
+        if let mcpManager {
+            await mcpManager.shutdown()
+        }
+
         return QueryResult(
             text: lastAssistantText,
             usage: totalUsage,
@@ -354,6 +397,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
         let capturedPlanStore = options.planStore
         let capturedCronStore = options.cronStore
         let capturedTodoStore = options.todoStore
+        let capturedMcpServers = options.mcpServers
 
         // Build tool definitions for API call
         let capturedApiTools: [[String: Any]]? = {
@@ -379,9 +423,31 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                     return
                 }
                 // Deserialize tools inside the isolated Task context
-                let decodedApiTools: [[String: Any]]? = toolsData.flatMap { data in
+                var decodedApiTools: [[String: Any]]? = toolsData.flatMap { data in
                     try? JSONSerialization.jsonObject(with: data, options: []) as? [[String: Any]]
                 }
+
+                // MCP integration: connect MCP servers and merge tools
+                var allToolProtocols = capturedToolProtocols
+                var mcpManager: MCPClientManager? = nil
+                if let mcpServers = capturedMcpServers, !mcpServers.isEmpty {
+                    let manager = MCPClientManager()
+                    await manager.connectAll(servers: mcpServers)
+                    let mcpTools = await manager.getMCPTools()
+                    if !mcpTools.isEmpty {
+                        allToolProtocols = capturedToolProtocols + mcpTools
+                        let mcpApiTools = toApiTools(mcpTools)
+                        if var existing = decodedApiTools {
+                            existing.append(contentsOf: mcpApiTools)
+                            decodedApiTools = existing
+                        } else {
+                            decodedApiTools = mcpApiTools
+                        }
+                    }
+                    mcpManager = manager
+                }
+                let mcpManagerForCleanup = mcpManager
+
                 var messages = decodedMessages
                 var totalUsage = TokenUsage(inputTokens: 0, outputTokens: 0)
                 var totalCostUsd: Double = 0.0
@@ -629,18 +695,18 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                         if !toolUseBlocks.isEmpty {
                             // Create agent spawner if AgentTool is registered
                             let streamSpawner: SubAgentSpawner? = {
-                                let hasAgentTool = capturedToolProtocols.contains { $0.name == "Agent" }
+                                let hasAgentTool = allToolProtocols.contains { $0.name == "Agent" }
                                 guard hasAgentTool else { return nil }
                                 return DefaultSubAgentSpawner(
                                     apiKey: capturedApiKey,
                                     baseURL: capturedBaseURL,
                                     parentModel: capturedModel,
-                                    parentTools: capturedToolProtocols
+                                    parentTools: allToolProtocols
                                 )
                             }()
                             let toolResults = await ToolExecutor.executeTools(
                                 toolUseBlocks: toolUseBlocks,
-                                tools: capturedToolProtocols,
+                                tools: allToolProtocols,
                                 context: ToolContext(
                                     cwd: capturedCwd,
                                     agentSpawner: streamSpawner,
@@ -726,6 +792,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                     durationMs: durationMs,
                     totalCostUsd: totalCostUsd
                 )))
+                await mcpManagerForCleanup?.shutdown()
                 continuation.finish()
             }
             continuation.onTermination = { @Sendable _ in

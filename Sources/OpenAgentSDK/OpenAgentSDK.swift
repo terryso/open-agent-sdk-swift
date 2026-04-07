@@ -98,6 +98,16 @@
 /// - ``TodoItem`` — Todo item data structure
 /// - ``TodoPriority`` — Todo priority enum
 /// - ``TodoStoreError`` — Todo store error type
+///
+/// ## MCP Integration
+/// - ``MCPClientManager`` — Thread-safe MCP server connection manager actor
+/// - ``MCPManagedConnection`` — Managed MCP server connection info
+/// - ``MCPConnectionStatus`` — MCP connection status enum
+/// - ``MCPToolDefinition`` — MCP tool wrapper conforming to ToolProtocol
+/// - ``MCPClientProtocol`` — Protocol for MCP client communication
+/// - ``MCPStdioTransport`` — Stdio transport for MCP client connections
+/// - ``McpServerConfig`` — MCP server configuration (stdio/sse/http)
+/// - ``McpStdioConfig`` — MCP stdio transport configuration
 
 /// Current SDK version.
 public let SDK_VERSION = "0.1.0"

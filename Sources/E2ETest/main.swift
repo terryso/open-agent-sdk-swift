@@ -60,6 +60,11 @@ ToolRegistryTests.run()
 // ================================================================
 await McpResourceToolTests.run()
 
+// ================================================================
+// MCP Client Manager & Stdio Transport (Story 6-1)
+// ================================================================
+await MCPClientManagerE2ETests.run()
+
 // SECTION 17-20, 24, 26, 28, 30: Store Operations (incl. WorktreeStore, PlanStore, CronStore, TodoStore)
 await StoreTests.run()
 
