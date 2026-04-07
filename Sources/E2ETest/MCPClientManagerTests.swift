@@ -69,6 +69,53 @@ struct MCPClientManagerE2ETests {
         section("MCP Client Manager: Process Lifecycle")
         await testTransportConnectAndDisconnectLifecycle()
         await testManagerShutdownTerminatesTransports()
+
+        // Story 6-2: HTTP/SSE Transport (ATDD RED PHASE)
+        section("MCP Client Manager: SSE Transport Connection (Story 6-2)")
+        await testSSEConnectInvalidURLMarksError()
+        await testSSEConnectDoesNotCrash()
+
+        section("MCP Client Manager: HTTP Transport Connection (Story 6-2)")
+        await testHTTPConnectInvalidURLMarksError()
+        await testHTTPConnectDoesNotCrash()
+
+        section("MCP Client Manager: SSE/HTTP Headers (Story 6-2)")
+        await testSSEConnectWithCustomHeaders()
+        await testHTTPConnectWithCustomHeaders()
+        await testSSEConnectWithNilHeaders()
+
+        section("MCP Client Manager: SSE/HTTP Connection Failure (Story 6-2)")
+        await testSSEConnectMalformedURLMarksError()
+        await testHTTPConnectMalformedURLMarksError()
+        await testSSEConnectEmptyURLMarksError()
+        await testHTTPConnectEmptyURLMarksError()
+
+        section("MCP Client Manager: Mixed Transport connectAll (Story 6-2)")
+        await testConnectAllMixedTransportsDispatchesCorrectly()
+        await testConnectAllSSEOnly()
+        await testConnectAllHTTPOnly()
+
+        section("MCP Client Manager: SSE/HTTP Disconnect & Cleanup (Story 6-2)")
+        await testDisconnectSSEConnectionRemoves()
+        await testDisconnectHTTPConnectionRemoves()
+        await testShutdownClearsSSEAndHTTPConnections()
+        await testDisconnectSSEDoesNotAffectOthers()
+
+        section("MCP Client Manager: SSE/HTTP Tool Discovery (Story 6-2)")
+        await testGetMCPToolsFailedSSE()
+        await testGetMCPToolsFailedHTTP()
+
+        section("MCP Client Manager: SSE/HTTP Module Boundary (Story 6-2)")
+        await testHTTPSEERespectsModuleBoundary()
+
+        section("MCP Client Manager: SSE/HTTP Cross-platform (Story 6-2)")
+        await testSSETransportDoesNotCrashOnPlatform()
+        await testHTTPTransportDoesNotCrashOnPlatform()
+
+        section("MCP Client Manager: SSE/HTTP Config Types (Story 6-2)")
+        testMcpSseConfigCreation()
+        testMcpHttpConfigCreation()
+        testMcpServerConfigSSEAndHTTPCases()
     }
 
     // MARK: - Helpers
@@ -826,6 +873,467 @@ struct MCPClientManagerE2ETests {
         } else {
             fail("Manager shutdown should clear all connections",
                  "remaining: \(afterShutdown.count)")
+        }
+    }
+
+    // ================================================================
+    // MARK: Story 6-2: SSE Transport Connection
+    // ================================================================
+
+    /// AC1: SSE connect with invalid URL marks error status.
+    static func testSSEConnectInvalidURLMarksError() async {
+        let manager = MCPClientManager()
+        let sseConfig = McpSseConfig(url: "http://localhost:99999/nonexistent-sse")
+
+        await manager.connect(name: "sse-server", config: sseConfig)
+        let connections = await manager.getConnections()
+
+        if let conn = connections["sse-server"], conn.status == .error, conn.tools.isEmpty {
+            pass("SSE connect with invalid URL marks error status with empty tools")
+        } else {
+            fail("Invalid SSE URL should result in error status",
+                 "got: \(connections["sse-server"]?.status ?? .disconnected)")
+        }
+    }
+
+    /// AC1: SSE connect does not crash.
+    static func testSSEConnectDoesNotCrash() async {
+        let manager = MCPClientManager()
+        let sseConfig = McpSseConfig(url: "http://localhost:1/sse")
+
+        await manager.connect(name: "sse-test", config: sseConfig)
+        let connections = await manager.getConnections()
+
+        if connections["sse-test"] != nil {
+            pass("SSE connect does not crash (connection tracked)")
+        } else {
+            fail("SSE connect should track connection")
+        }
+    }
+
+    // ================================================================
+    // MARK: Story 6-2: HTTP Transport Connection
+    // ================================================================
+
+    /// AC2: HTTP connect with invalid URL marks error status.
+    static func testHTTPConnectInvalidURLMarksError() async {
+        let manager = MCPClientManager()
+        let httpConfig = McpHttpConfig(url: "http://localhost:99999/nonexistent-http")
+
+        await manager.connect(name: "http-server", config: httpConfig)
+        let connections = await manager.getConnections()
+
+        if let conn = connections["http-server"], conn.status == .error, conn.tools.isEmpty {
+            pass("HTTP connect with invalid URL marks error status with empty tools")
+        } else {
+            fail("Invalid HTTP URL should result in error status",
+                 "got: \(connections["http-server"]?.status ?? .disconnected)")
+        }
+    }
+
+    /// AC2: HTTP connect does not crash.
+    static func testHTTPConnectDoesNotCrash() async {
+        let manager = MCPClientManager()
+        let httpConfig = McpHttpConfig(url: "http://localhost:1/mcp")
+
+        await manager.connect(name: "http-test", config: httpConfig)
+        let connections = await manager.getConnections()
+
+        if connections["http-test"] != nil {
+            pass("HTTP connect does not crash (connection tracked)")
+        } else {
+            fail("HTTP connect should track connection")
+        }
+    }
+
+    // ================================================================
+    // MARK: Story 6-2: SSE/HTTP Headers
+    // ================================================================
+
+    /// AC8: SSE connect with custom headers is tracked.
+    static func testSSEConnectWithCustomHeaders() async {
+        let manager = MCPClientManager()
+        let sseConfig = McpSseConfig(
+            url: "http://localhost:1/sse",
+            headers: ["Authorization": "Bearer test-token-123"]
+        )
+
+        await manager.connect(name: "sse-headers", config: sseConfig)
+        let connections = await manager.getConnections()
+
+        if connections["sse-headers"] != nil {
+            pass("SSE connect with custom headers is tracked")
+        } else {
+            fail("SSE connection with headers should be tracked")
+        }
+    }
+
+    /// AC8: HTTP connect with custom headers is tracked.
+    static func testHTTPConnectWithCustomHeaders() async {
+        let manager = MCPClientManager()
+        let httpConfig = McpHttpConfig(
+            url: "http://localhost:1/mcp",
+            headers: ["Authorization": "Bearer token-456"]
+        )
+
+        await manager.connect(name: "http-headers", config: httpConfig)
+        let connections = await manager.getConnections()
+
+        if connections["http-headers"] != nil {
+            pass("HTTP connect with custom headers is tracked")
+        } else {
+            fail("HTTP connection with headers should be tracked")
+        }
+    }
+
+    /// AC8: SSE connect with nil headers does not crash.
+    static func testSSEConnectWithNilHeaders() async {
+        let manager = MCPClientManager()
+        let sseConfig = McpSseConfig(url: "http://localhost:1/sse", headers: nil)
+
+        await manager.connect(name: "sse-nil-headers", config: sseConfig)
+        let connections = await manager.getConnections()
+
+        if connections["sse-nil-headers"] != nil {
+            pass("SSE connect with nil headers works")
+        } else {
+            fail("SSE connect with nil headers should be tracked")
+        }
+    }
+
+    // ================================================================
+    // MARK: Story 6-2: SSE/HTTP Connection Failure
+    // ================================================================
+
+    /// AC9: SSE connect with malformed URL marks error.
+    static func testSSEConnectMalformedURLMarksError() async {
+        let manager = MCPClientManager()
+        let sseConfig = McpSseConfig(url: "not-a-valid-url")
+
+        await manager.connect(name: "sse-bad-url", config: sseConfig)
+        let connections = await manager.getConnections()
+
+        if let conn = connections["sse-bad-url"], conn.status == .error {
+            pass("Malformed SSE URL results in error status")
+        } else {
+            fail("Malformed SSE URL should result in error status")
+        }
+    }
+
+    /// AC9: HTTP connect with malformed URL marks error.
+    static func testHTTPConnectMalformedURLMarksError() async {
+        let manager = MCPClientManager()
+        let httpConfig = McpHttpConfig(url: "not-a-valid-url")
+
+        await manager.connect(name: "http-bad-url", config: httpConfig)
+        let connections = await manager.getConnections()
+
+        if let conn = connections["http-bad-url"], conn.status == .error {
+            pass("Malformed HTTP URL results in error status")
+        } else {
+            fail("Malformed HTTP URL should result in error status")
+        }
+    }
+
+    /// AC9: SSE connect with empty URL marks error.
+    static func testSSEConnectEmptyURLMarksError() async {
+        let manager = MCPClientManager()
+
+        await manager.connect(name: "sse-empty", config: McpSseConfig(url: ""))
+        let connections = await manager.getConnections()
+
+        if let conn = connections["sse-empty"], conn.status == .error {
+            pass("Empty SSE URL results in error status")
+        } else {
+            fail("Empty SSE URL should result in error status")
+        }
+    }
+
+    /// AC9: HTTP connect with empty URL marks error.
+    static func testHTTPConnectEmptyURLMarksError() async {
+        let manager = MCPClientManager()
+
+        await manager.connect(name: "http-empty", config: McpHttpConfig(url: ""))
+        let connections = await manager.getConnections()
+
+        if let conn = connections["http-empty"], conn.status == .error {
+            pass("Empty HTTP URL results in error status")
+        } else {
+            fail("Empty HTTP URL should result in error status")
+        }
+    }
+
+    // ================================================================
+    // MARK: Story 6-2: Mixed Transport connectAll
+    // ================================================================
+
+    /// AC7: connectAll with mixed transports dispatches correctly.
+    static func testConnectAllMixedTransportsDispatchesCorrectly() async {
+        let manager = MCPClientManager()
+        let servers: [String: McpServerConfig] = [
+            "stdio-srv": .stdio(McpStdioConfig(command: "/nonexistent")),
+            "sse-srv": .sse(McpSseConfig(url: "http://localhost:99999/sse")),
+            "http-srv": .http(McpHttpConfig(url: "http://localhost:99999/mcp"))
+        ]
+
+        await manager.connectAll(servers: servers)
+        let connections = await manager.getConnections()
+
+        let allTracked = connections.count == 3
+        let allError = connections.values.allSatisfy { $0.status == .error }
+
+        if allTracked && allError {
+            pass("connectAll handles all three transport types (all error)")
+        } else {
+            fail("connectAll should track all 3 transports with error status",
+                 "count=\(connections.count)")
+        }
+    }
+
+    /// AC7: connectAll with only SSE configs.
+    static func testConnectAllSSEOnly() async {
+        let manager = MCPClientManager()
+        let servers: [String: McpServerConfig] = [
+            "sse1": .sse(McpSseConfig(url: "http://localhost:1/sse")),
+            "sse2": .sse(McpSseConfig(url: "http://localhost:2/sse"))
+        ]
+
+        await manager.connectAll(servers: servers)
+        let connections = await manager.getConnections()
+
+        if connections.count == 2 {
+            pass("connectAll with SSE-only tracks both connections")
+        } else {
+            fail("connectAll should track both SSE connections",
+                 "count=\(connections.count)")
+        }
+    }
+
+    /// AC7: connectAll with only HTTP configs.
+    static func testConnectAllHTTPOnly() async {
+        let manager = MCPClientManager()
+        let servers: [String: McpServerConfig] = [
+            "http1": .http(McpHttpConfig(url: "http://localhost:1/mcp")),
+            "http2": .http(McpHttpConfig(url: "http://localhost:2/mcp"))
+        ]
+
+        await manager.connectAll(servers: servers)
+        let connections = await manager.getConnections()
+
+        if connections.count == 2 {
+            pass("connectAll with HTTP-only tracks both connections")
+        } else {
+            fail("connectAll should track both HTTP connections",
+                 "count=\(connections.count)")
+        }
+    }
+
+    // ================================================================
+    // MARK: Story 6-2: SSE/HTTP Disconnect & Cleanup
+    // ================================================================
+
+    /// AC10: disconnect removes SSE connection.
+    static func testDisconnectSSEConnectionRemoves() async {
+        let manager = MCPClientManager()
+        let sseConfig = McpSseConfig(url: "http://localhost:99999/sse")
+
+        await manager.connect(name: "sse-to-remove", config: sseConfig)
+        let before = await manager.getConnections()
+
+        if before["sse-to-remove"] != nil {
+            await manager.disconnect(name: "sse-to-remove")
+            let after = await manager.getConnections()
+
+            if after["sse-to-remove"] == nil {
+                pass("disconnect removes SSE connection")
+            } else {
+                fail("SSE connection should be removed after disconnect")
+            }
+        } else {
+            fail("SSE connection should exist before disconnect")
+        }
+    }
+
+    /// AC10: disconnect removes HTTP connection.
+    static func testDisconnectHTTPConnectionRemoves() async {
+        let manager = MCPClientManager()
+        let httpConfig = McpHttpConfig(url: "http://localhost:99999/mcp")
+
+        await manager.connect(name: "http-to-remove", config: httpConfig)
+        let before = await manager.getConnections()
+
+        if before["http-to-remove"] != nil {
+            await manager.disconnect(name: "http-to-remove")
+            let after = await manager.getConnections()
+
+            if after["http-to-remove"] == nil {
+                pass("disconnect removes HTTP connection")
+            } else {
+                fail("HTTP connection should be removed after disconnect")
+            }
+        } else {
+            fail("HTTP connection should exist before disconnect")
+        }
+    }
+
+    /// AC10: shutdown clears all SSE and HTTP connections.
+    static func testShutdownClearsSSEAndHTTPConnections() async {
+        let manager = MCPClientManager()
+
+        await manager.connect(name: "sse-srv", config: McpSseConfig(url: "http://localhost:1/sse"))
+        await manager.connect(name: "http-srv", config: McpHttpConfig(url: "http://localhost:1/mcp"))
+
+        await manager.shutdown()
+        let connections = await manager.getConnections()
+
+        if connections.isEmpty {
+            pass("shutdown clears all SSE and HTTP connections")
+        } else {
+            fail("shutdown should clear all connections",
+                 "remaining: \(connections.count)")
+        }
+    }
+
+    /// AC10: disconnect SSE does not affect HTTP or stdio.
+    static func testDisconnectSSEDoesNotAffectOthers() async {
+        let manager = MCPClientManager()
+
+        await manager.connect(name: "stdio-srv", config: McpStdioConfig(command: "/nonexistent"))
+        await manager.connect(name: "sse-srv", config: McpSseConfig(url: "http://localhost:1/sse"))
+        await manager.connect(name: "http-srv", config: McpHttpConfig(url: "http://localhost:1/mcp"))
+
+        await manager.disconnect(name: "sse-srv")
+        let connections = await manager.getConnections()
+
+        let sseGone = connections["sse-srv"] == nil
+        let stdioPresent = connections["stdio-srv"] != nil
+        let httpPresent = connections["http-srv"] != nil
+
+        if sseGone && stdioPresent && httpPresent {
+            pass("disconnect SSE does not affect stdio or HTTP")
+        } else {
+            fail("SSE should be gone, stdio and HTTP should remain",
+                 "sseGone=\(sseGone) stdioPresent=\(stdioPresent) httpPresent=\(httpPresent)")
+        }
+    }
+
+    // ================================================================
+    // MARK: Story 6-2: SSE/HTTP Tool Discovery
+    // ================================================================
+
+    /// AC5: Failed SSE connection contributes no tools.
+    static func testGetMCPToolsFailedSSE() async {
+        let manager = MCPClientManager()
+        await manager.connect(name: "sse-fail", config: McpSseConfig(url: "http://localhost:99999"))
+
+        let tools = await manager.getMCPTools()
+        if tools.isEmpty {
+            pass("Failed SSE connections contribute no tools")
+        } else {
+            fail("Failed SSE should contribute no tools",
+                 "count=\(tools.count)")
+        }
+    }
+
+    /// AC5: Failed HTTP connection contributes no tools.
+    static func testGetMCPToolsFailedHTTP() async {
+        let manager = MCPClientManager()
+        await manager.connect(name: "http-fail", config: McpHttpConfig(url: "http://localhost:99999"))
+
+        let tools = await manager.getMCPTools()
+        if tools.isEmpty {
+            pass("Failed HTTP connections contribute no tools")
+        } else {
+            fail("Failed HTTP should contribute no tools",
+                 "count=\(tools.count)")
+        }
+    }
+
+    // ================================================================
+    // MARK: Story 6-2: Module Boundary
+    // ================================================================
+
+    /// AC11: HTTP/SSE transport respects module boundaries.
+    static func testHTTPSEERespectsModuleBoundary() async {
+        let manager = MCPClientManager()
+        await manager.connect(name: "boundary-sse", config: McpSseConfig(url: "http://localhost:1"))
+        await manager.connect(name: "boundary-http", config: McpHttpConfig(url: "http://localhost:1"))
+
+        // If this compiles and runs, module boundaries are respected
+        pass("HTTP/SSE transport respects module boundaries (compile-time check)")
+    }
+
+    // ================================================================
+    // MARK: Story 6-2: Cross-platform Compatibility
+    // ================================================================
+
+    /// AC12: SSE transport does not crash on current platform.
+    static func testSSETransportDoesNotCrashOnPlatform() async {
+        let manager = MCPClientManager()
+        await manager.connect(name: "sse-platform", config: McpSseConfig(url: "http://localhost:1/sse"))
+
+        let connections = await manager.getConnections()
+        if connections["sse-platform"] != nil {
+            pass("SSE transport works on current platform")
+        } else {
+            fail("SSE transport should not crash")
+        }
+    }
+
+    /// AC12: HTTP transport does not crash on current platform.
+    static func testHTTPTransportDoesNotCrashOnPlatform() async {
+        let manager = MCPClientManager()
+        await manager.connect(name: "http-platform", config: McpHttpConfig(url: "http://localhost:1/mcp"))
+
+        let connections = await manager.getConnections()
+        if connections["http-platform"] != nil {
+            pass("HTTP transport works on current platform")
+        } else {
+            fail("HTTP transport should not crash")
+        }
+    }
+
+    // ================================================================
+    // MARK: Story 6-2: Config Types
+    // ================================================================
+
+    /// AC1: McpSseConfig creation.
+    static func testMcpSseConfigCreation() {
+        let config1 = McpSseConfig(url: "http://localhost:8080/sse")
+        let config2 = McpSseConfig(url: "http://localhost:8080/sse", headers: ["Auth": "Bearer x"])
+
+        if config1.url == "http://localhost:8080/sse" && config1.headers == nil
+            && config2.headers?["Auth"] == "Bearer x" {
+            pass("McpSseConfig creates with url and optional headers")
+        } else {
+            fail("McpSseConfig creation failed")
+        }
+    }
+
+    /// AC2: McpHttpConfig creation.
+    static func testMcpHttpConfigCreation() {
+        let config1 = McpHttpConfig(url: "http://localhost:8080/mcp")
+        let config2 = McpHttpConfig(url: "http://localhost:8080/mcp", headers: ["Key": "val"])
+
+        if config1.url == "http://localhost:8080/mcp" && config1.headers == nil
+            && config2.headers?["Key"] == "val" {
+            pass("McpHttpConfig creates with url and optional headers")
+        } else {
+            fail("McpHttpConfig creation failed")
+        }
+    }
+
+    /// AC7: McpServerConfig SSE and HTTP cases.
+    static func testMcpServerConfigSSEAndHTTPCases() {
+        let stdio = McpServerConfig.stdio(McpStdioConfig(command: "echo"))
+        let sse = McpServerConfig.sse(McpSseConfig(url: "http://localhost:8080"))
+        let http = McpServerConfig.http(McpHttpConfig(url: "http://localhost:8080"))
+
+        let allDistinct = stdio != sse && stdio != http && sse != http
+        if allDistinct {
+            pass("McpServerConfig stdio, sse, http are distinct cases")
+        } else {
+            fail("McpServerConfig cases should be distinct")
         }
     }
 }

@@ -1,5 +1,5 @@
 # generated: 2026-04-04
-# last_updated: 2026-04-08 (6-1-mcp-client-manager-stdio → ready-for-dev)
+# last_updated: 2026-04-08 (6-2-mcp-http-sse-transport → done)
 # updated: 5-4-todo-store-tools → review
 # updated: 5-3-cron-store-tools → review
 # updated: 5-1-worktree-store-tools → review
@@ -67,8 +67,8 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-04-04
-last_updated: 2026-04-08
-# updated: 5-7-mcp-resource-tools → done
+last_updated: 2026-04-08 (6-2-mcp-http-sse-transport → done)
+# updated: 6-2-mcp-http-sse-transport → ready-for-dev
 # updated: 4-7-notebook-edit-tool → review
 # updated: 4-7-notebook-edit-tool → ready-for-dev
 # updated: 4-4-send-message-tool → done
@@ -158,7 +158,7 @@ development_status:
   # Epic 6: MCP 协议集成
   epic-6: in-progress
   6-1-mcp-client-manager-stdio: done
-  6-2-mcp-http-sse-transport: backlog
+  6-2-mcp-http-sse-transport: done
   6-3-in-process-mcp-server: backlog
   6-4-mcp-tool-agent-integration: backlog
   epic-6-retrospective: optional

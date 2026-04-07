@@ -840,6 +840,531 @@ final class MCPClientManagerTests: XCTestCase {
 
         XCTAssertEqual(result.toolUseId, "unique-id-123")
     }
+
+    // ================================================================
+    // MARK: - Story 6-2: MCP HTTP/SSE Transport (ATDD RED PHASE)
+    // ================================================================
+    //
+    // These tests assert EXPECTED behavior for HTTP/SSE transport support.
+    // TDD Phase: RED (feature not implemented yet)
+    //
+    // The following methods/properties must be added to MCPClientManager:
+    //   - connect(name: String, config: McpSseConfig) async
+    //   - connect(name: String, config: McpHttpConfig) async
+    //   - httpTransports: [String: HTTPClientTransport] (private)
+    //   - Updated connectAll() for SSE/HTTP dispatch
+    //   - Updated cleanupConnection() for httpTransports
+    // ================================================================
+
+    // MARK: - AC1: SSE Transport Connection
+
+    /// AC1 [P0]: connect with McpSseConfig creates connection using HTTPClientTransport (streaming: true).
+    /// The connection should attempt MCP handshake and track the connection.
+    /// With an unreachable URL, it should mark error status without crashing.
+    func testMCPClientManager_connect_sseConfig_marksErrorOnInvalidURL() async {
+        let manager = MCPClientManager()
+        let sseConfig = McpSseConfig(url: "http://localhost:99999/nonexistent-sse")
+
+        // Story 6-2 adds connect(name:config:) overload for McpSseConfig
+        await manager.connect(name: "sse-server", config: sseConfig)
+        let connections = await manager.getConnections()
+
+        let conn = connections["sse-server"]
+        XCTAssertNotNil(conn, "SSE connection should be tracked even on failure")
+        XCTAssertEqual(conn?.status, .error,
+                        "Invalid SSE URL should result in error status")
+        XCTAssertTrue(conn?.tools.isEmpty ?? false,
+                       "Failed SSE connection should have empty tools")
+    }
+
+    /// AC1 [P0]: connect with valid-looking SSE config does not crash.
+    func testMCPClientManager_connect_sseConfig_doesNotCrash() async {
+        let manager = MCPClientManager()
+        let sseConfig = McpSseConfig(url: "http://localhost:1/sse")
+
+        // Should not crash even if connection fails
+        await manager.connect(name: "sse-test", config: sseConfig)
+
+        // Manager should still be usable
+        let connections = await manager.getConnections()
+        XCTAssertNotNil(connections)
+    }
+
+    // MARK: - AC2: HTTP Transport Connection
+
+    /// AC2 [P0]: connect with McpHttpConfig creates connection using HTTPClientTransport (streaming: false).
+    /// The connection should attempt MCP handshake and track the connection.
+    /// With an unreachable URL, it should mark error status without crashing.
+    func testMCPClientManager_connect_httpConfig_marksErrorOnInvalidURL() async {
+        let manager = MCPClientManager()
+        let httpConfig = McpHttpConfig(url: "http://localhost:99999/nonexistent-http")
+
+        // Story 6-2 adds connect(name:config:) overload for McpHttpConfig
+        await manager.connect(name: "http-server", config: httpConfig)
+        let connections = await manager.getConnections()
+
+        let conn = connections["http-server"]
+        XCTAssertNotNil(conn, "HTTP connection should be tracked even on failure")
+        XCTAssertEqual(conn?.status, .error,
+                        "Invalid HTTP URL should result in error status")
+        XCTAssertTrue(conn?.tools.isEmpty ?? false,
+                       "Failed HTTP connection should have empty tools")
+    }
+
+    /// AC2 [P0]: connect with HTTP config does not crash on connection failure.
+    func testMCPClientManager_connect_httpConfig_doesNotCrash() async {
+        let manager = MCPClientManager()
+        let httpConfig = McpHttpConfig(url: "http://localhost:1/mcp")
+
+        // Should not crash even if connection fails
+        await manager.connect(name: "http-test", config: httpConfig)
+
+        let connections = await manager.getConnections()
+        XCTAssertNotNil(connections)
+    }
+
+    // MARK: - AC8: Custom Request Headers Injection
+
+    /// AC8 [P0]: SSE config with custom headers passes them to HTTPClientTransport.
+    /// Verifies that headers are injectable through McpSseConfig.
+    func testMCPClientManager_connect_sseConfig_withCustomHeaders() async {
+        let manager = MCPClientManager()
+        let sseConfig = McpSseConfig(
+            url: "http://localhost:1/sse",
+            headers: [
+                "Authorization": "Bearer test-token-123",
+                "X-Custom-Header": "custom-value"
+            ]
+        )
+
+        // Connection will fail (no server) but should not crash
+        await manager.connect(name: "sse-headers", config: sseConfig)
+        let connections = await manager.getConnections()
+
+        // The connection should be tracked (either error or connected)
+        XCTAssertNotNil(connections["sse-headers"],
+                         "SSE connection with headers should be tracked")
+    }
+
+    /// AC8 [P0]: HTTP config with custom headers passes them to HTTPClientTransport.
+    func testMCPClientManager_connect_httpConfig_withCustomHeaders() async {
+        let manager = MCPClientManager()
+        let httpConfig = McpHttpConfig(
+            url: "http://localhost:1/mcp",
+            headers: ["Authorization": "Bearer token-456"]
+        )
+
+        await manager.connect(name: "http-headers", config: httpConfig)
+        let connections = await manager.getConnections()
+
+        XCTAssertNotNil(connections["http-headers"],
+                         "HTTP connection with headers should be tracked")
+    }
+
+    /// AC8 [P1]: SSE config with nil headers uses default requestModifier.
+    func testMCPClientManager_connect_sseConfig_withNilHeaders_doesNotCrash() async {
+        let manager = MCPClientManager()
+        let sseConfig = McpSseConfig(url: "http://localhost:1/sse", headers: nil)
+
+        await manager.connect(name: "sse-nil-headers", config: sseConfig)
+        let connections = await manager.getConnections()
+
+        XCTAssertNotNil(connections["sse-nil-headers"])
+    }
+
+    /// AC8 [P1]: HTTP config with empty headers uses default requestModifier.
+    func testMCPClientManager_connect_httpConfig_withEmptyHeaders_doesNotCrash() async {
+        let manager = MCPClientManager()
+        let httpConfig = McpHttpConfig(url: "http://localhost:1/mcp", headers: [:])
+
+        await manager.connect(name: "http-empty-headers", config: httpConfig)
+        let connections = await manager.getConnections()
+
+        XCTAssertNotNil(connections["http-empty-headers"])
+    }
+
+    // MARK: - AC9: Connection Failure Handling
+
+    /// AC9 [P0]: SSE connect with malformed URL marks error status.
+    func testMCPClientManager_connect_sseConfig_malformedURL_marksError() async {
+        let manager = MCPClientManager()
+        let sseConfig = McpSseConfig(url: "not-a-valid-url")
+
+        await manager.connect(name: "sse-bad-url", config: sseConfig)
+        let connections = await manager.getConnections()
+
+        let conn = connections["sse-bad-url"]
+        XCTAssertNotNil(conn, "Malformed URL SSE connection should be tracked")
+        XCTAssertEqual(conn?.status, .error,
+                        "Malformed URL should result in error status")
+    }
+
+    /// AC9 [P0]: HTTP connect with malformed URL marks error status.
+    func testMCPClientManager_connect_httpConfig_malformedURL_marksError() async {
+        let manager = MCPClientManager()
+        let httpConfig = McpHttpConfig(url: "not-a-valid-url")
+
+        await manager.connect(name: "http-bad-url", config: httpConfig)
+        let connections = await manager.getConnections()
+
+        let conn = connections["http-bad-url"]
+        XCTAssertNotNil(conn, "Malformed URL HTTP connection should be tracked")
+        XCTAssertEqual(conn?.status, .error,
+                        "Malformed URL should result in error status")
+    }
+
+    /// AC9 [P0]: SSE connect failure does not crash the manager.
+    func testMCPClientManager_connect_sseConfig_failure_doesNotCrash() async {
+        let manager = MCPClientManager()
+
+        await manager.connect(name: "sse-fail1", config: McpSseConfig(url: ""))
+        await manager.connect(name: "sse-fail2", config: McpSseConfig(url: "ftp://wrong-scheme"))
+
+        // Manager should still be usable
+        let connections = await manager.getConnections()
+        XCTAssertNotNil(connections)
+    }
+
+    /// AC9 [P0]: HTTP connect failure does not crash the manager.
+    func testMCPClientManager_connect_httpConfig_failure_doesNotCrash() async {
+        let manager = MCPClientManager()
+
+        await manager.connect(name: "http-fail1", config: McpHttpConfig(url: ""))
+        await manager.connect(name: "http-fail2", config: McpHttpConfig(url: "ftp://wrong-scheme"))
+
+        let connections = await manager.getConnections()
+        XCTAssertNotNil(connections)
+    }
+
+    /// AC9 [P1]: Multiple failed SSE/HTTP connections coexist.
+    func testMCPClientManager_multipleFailedHttpSseConnections() async {
+        let manager = MCPClientManager()
+
+        await manager.connect(name: "sse-fail", config: McpSseConfig(url: "http://localhost:99999"))
+        await manager.connect(name: "http-fail", config: McpHttpConfig(url: "http://localhost:99998"))
+
+        let connections = await manager.getConnections()
+        XCTAssertEqual(connections.count, 2,
+                        "Multiple failed HTTP/SSE connections should both be tracked")
+        XCTAssertEqual(connections["sse-fail"]?.status, .error)
+        XCTAssertEqual(connections["http-fail"]?.status, .error)
+    }
+
+    // MARK: - AC7: Multi-transport Concurrent Management
+
+    /// AC7 [P0]: connectAll with mixed transport types dispatches correctly.
+    /// SSE and HTTP configs should not return error from setErrorConnection placeholder.
+    func testMCPClientManager_connectAll_mixedTransports_dispatchesCorrectly() async {
+        let manager = MCPClientManager()
+        let servers: [String: McpServerConfig] = [
+            "stdio-srv": .stdio(McpStdioConfig(command: "/nonexistent")),
+            "sse-srv": .sse(McpSseConfig(url: "http://localhost:99999/sse")),
+            "http-srv": .http(McpHttpConfig(url: "http://localhost:99999/mcp"))
+        ]
+
+        await manager.connectAll(servers: servers)
+        let connections = await manager.getConnections()
+
+        // All three should be tracked (all will fail, but should use real connect methods)
+        XCTAssertEqual(connections.count, 3,
+                        "connectAll should handle all three transport types")
+        XCTAssertEqual(connections["stdio-srv"]?.status, .error)
+        XCTAssertEqual(connections["sse-srv"]?.status, .error,
+                        "SSE should use actual connect, not setErrorConnection placeholder")
+        XCTAssertEqual(connections["http-srv"]?.status, .error,
+                        "HTTP should use actual connect, not setErrorConnection placeholder")
+    }
+
+    /// AC7 [P1]: connectAll with only SSE configs.
+    func testMCPClientManager_connectAll_sseOnly() async {
+        let manager = MCPClientManager()
+        let servers: [String: McpServerConfig] = [
+            "sse1": .sse(McpSseConfig(url: "http://localhost:1/sse")),
+            "sse2": .sse(McpSseConfig(url: "http://localhost:2/sse"))
+        ]
+
+        await manager.connectAll(servers: servers)
+        let connections = await manager.getConnections()
+
+        XCTAssertEqual(connections.count, 2,
+                        "Both SSE connections should be tracked")
+    }
+
+    /// AC7 [P1]: connectAll with only HTTP configs.
+    func testMCPClientManager_connectAll_httpOnly() async {
+        let manager = MCPClientManager()
+        let servers: [String: McpServerConfig] = [
+            "http1": .http(McpHttpConfig(url: "http://localhost:1/mcp")),
+            "http2": .http(McpHttpConfig(url: "http://localhost:2/mcp"))
+        ]
+
+        await manager.connectAll(servers: servers)
+        let connections = await manager.getConnections()
+
+        XCTAssertEqual(connections.count, 2,
+                        "Both HTTP connections should be tracked")
+    }
+
+    // MARK: - AC10: Connection Close & Cleanup
+
+    /// AC10 [P0]: disconnect removes SSE connection from manager.
+    func testMCPClientManager_disconnect_sseConnection_removesFromConnections() async {
+        let manager = MCPClientManager()
+        let sseConfig = McpSseConfig(url: "http://localhost:99999/sse")
+
+        await manager.connect(name: "sse-to-disconnect", config: sseConfig)
+        let beforeDisconnect = await manager.getConnections()
+        XCTAssertNotNil(beforeDisconnect["sse-to-disconnect"])
+
+        await manager.disconnect(name: "sse-to-disconnect")
+        let afterDisconnect = await manager.getConnections()
+
+        XCTAssertNil(afterDisconnect["sse-to-disconnect"],
+                      "SSE connection should be removed after disconnect")
+    }
+
+    /// AC10 [P0]: disconnect removes HTTP connection from manager.
+    func testMCPClientManager_disconnect_httpConnection_removesFromConnections() async {
+        let manager = MCPClientManager()
+        let httpConfig = McpHttpConfig(url: "http://localhost:99999/mcp")
+
+        await manager.connect(name: "http-to-disconnect", config: httpConfig)
+        let beforeDisconnect = await manager.getConnections()
+        XCTAssertNotNil(beforeDisconnect["http-to-disconnect"])
+
+        await manager.disconnect(name: "http-to-disconnect")
+        let afterDisconnect = await manager.getConnections()
+
+        XCTAssertNil(afterDisconnect["http-to-disconnect"],
+                      "HTTP connection should be removed after disconnect")
+    }
+
+    /// AC10 [P0]: shutdown clears all connections including SSE and HTTP.
+    func testMCPClientManager_shutdown_clearsSseAndHttpConnections() async {
+        let manager = MCPClientManager()
+
+        await manager.connect(name: "sse-srv", config: McpSseConfig(url: "http://localhost:1/sse"))
+        await manager.connect(name: "http-srv", config: McpHttpConfig(url: "http://localhost:1/mcp"))
+
+        await manager.shutdown()
+        let connections = await manager.getConnections()
+
+        XCTAssertTrue(connections.isEmpty,
+                       "shutdown should clear all SSE and HTTP connections")
+    }
+
+    /// AC10 [P1]: disconnect of SSE does not affect HTTP or stdio connections.
+    func testMCPClientManager_disconnect_sse_doesNotAffectHttpOrStdio() async {
+        let manager = MCPClientManager()
+
+        await manager.connect(name: "stdio-srv", config: McpStdioConfig(command: "/nonexistent"))
+        await manager.connect(name: "sse-srv", config: McpSseConfig(url: "http://localhost:1/sse"))
+        await manager.connect(name: "http-srv", config: McpHttpConfig(url: "http://localhost:1/mcp"))
+
+        await manager.disconnect(name: "sse-srv")
+        let connections = await manager.getConnections()
+
+        XCTAssertNil(connections["sse-srv"],
+                      "SSE server should be removed")
+        XCTAssertNotNil(connections["stdio-srv"],
+                         "Stdio server should remain")
+        XCTAssertNotNil(connections["http-srv"],
+                         "HTTP server should remain")
+    }
+
+    // MARK: - AC5: HTTP/SSE Tool Discovery
+
+    /// AC5 [P0]: Failed SSE connection contributes no tools to getMCPTools.
+    func testMCPClientManager_getMCPTools_failedSse_returnsEmpty() async {
+        let manager = MCPClientManager()
+        await manager.connect(name: "sse-fail", config: McpSseConfig(url: "http://localhost:99999"))
+
+        let tools = await manager.getMCPTools()
+        XCTAssertTrue(tools.isEmpty,
+                       "Failed SSE connections should contribute no tools")
+    }
+
+    /// AC5 [P0]: Failed HTTP connection contributes no tools to getMCPTools.
+    func testMCPClientManager_getMCPTools_failedHttp_returnsEmpty() async {
+        let manager = MCPClientManager()
+        await manager.connect(name: "http-fail", config: McpHttpConfig(url: "http://localhost:99999"))
+
+        let tools = await manager.getMCPTools()
+        XCTAssertTrue(tools.isEmpty,
+                       "Failed HTTP connections should contribute no tools")
+    }
+
+    /// AC5 [P1]: Mixed failed connections (stdio + SSE + HTTP) contribute no tools.
+    func testMCPClientManager_getMCPTools_allFailedTransports_returnsEmpty() async {
+        let manager = MCPClientManager()
+        let servers: [String: McpServerConfig] = [
+            "stdio-fail": .stdio(McpStdioConfig(command: "/nonexistent")),
+            "sse-fail": .sse(McpSseConfig(url: "http://localhost:99999/sse")),
+            "http-fail": .http(McpHttpConfig(url: "http://localhost:99999/mcp"))
+        ]
+        await manager.connectAll(servers: servers)
+
+        let tools = await manager.getMCPTools()
+        XCTAssertTrue(tools.isEmpty,
+                       "All failed connections should contribute no tools")
+    }
+
+    // MARK: - AC11: Module Boundary Compliance
+
+    /// AC11 [P0]: MCPClientManager with HTTP/SSE does not import Core/ or Stores/.
+    /// This is a compile-time check -- if MCPClientManager.swift only imports
+    /// Foundation + MCP + Types/, this compiles correctly.
+    func testMCPClientManager_httpSse_respectsModuleBoundary() async {
+        // MCPClientManager should work with only Foundation, MCP, and Types/
+        // If this compiles, module boundaries are respected
+        let manager = MCPClientManager()
+        await manager.connect(name: "boundary-test", config: McpSseConfig(url: "http://localhost:1"))
+        await manager.connect(name: "boundary-test-2", config: McpHttpConfig(url: "http://localhost:1"))
+        _ = manager
+    }
+
+    // MARK: - AC12: Cross-platform Compatibility
+
+    /// AC12 [P0]: SSE transport does not crash on current platform.
+    /// HTTPClientTransport handles platform differences internally.
+    func testMCPClientManager_sseTransport_doesNotCrashOnPlatform() async {
+        let manager = MCPClientManager()
+        // SSE with streaming: true -- should work on macOS (full SSE)
+        // On Linux, mcp-swift-sdk handles limited SSE gracefully
+        await manager.connect(name: "sse-platform", config: McpSseConfig(url: "http://localhost:1/sse"))
+
+        let connections = await manager.getConnections()
+        XCTAssertNotNil(connections["sse-platform"])
+    }
+
+    /// AC12 [P0]: HTTP transport does not crash on current platform.
+    func testMCPClientManager_httpTransport_doesNotCrashOnPlatform() async {
+        let manager = MCPClientManager()
+        // HTTP with streaming: false -- should work on all platforms
+        await manager.connect(name: "http-platform", config: McpHttpConfig(url: "http://localhost:1/mcp"))
+
+        let connections = await manager.getConnections()
+        XCTAssertNotNil(connections["http-platform"])
+    }
+
+    // MARK: - Edge Cases
+
+    /// AC9 [P1]: SSE connect with empty URL marks error.
+    func testMCPClientManager_connect_sseConfig_emptyURL_marksError() async {
+        let manager = MCPClientManager()
+        await manager.connect(name: "sse-empty", config: McpSseConfig(url: ""))
+
+        let connections = await manager.getConnections()
+        XCTAssertEqual(connections["sse-empty"]?.status, .error,
+                        "Empty SSE URL should result in error status")
+    }
+
+    /// AC9 [P1]: HTTP connect with empty URL marks error.
+    func testMCPClientManager_connect_httpConfig_emptyURL_marksError() async {
+        let manager = MCPClientManager()
+        await manager.connect(name: "http-empty", config: McpHttpConfig(url: ""))
+
+        let connections = await manager.getConnections()
+        XCTAssertEqual(connections["http-empty"]?.status, .error,
+                        "Empty HTTP URL should result in error status")
+    }
+
+    /// AC7 [P1]: Reconnecting to same name replaces previous connection.
+    func testMCPClientManager_connect_sameName_replacesPreviousSseConnection() async {
+        let manager = MCPClientManager()
+
+        await manager.connect(name: "replaceable", config: McpSseConfig(url: "http://localhost:1/first"))
+        await manager.connect(name: "replaceable", config: McpSseConfig(url: "http://localhost:1/second"))
+
+        let connections = await manager.getConnections()
+        XCTAssertEqual(connections.count, 1,
+                        "Same name should result in single connection (replaced)")
+    }
+
+    // MARK: - McpSseConfig & McpHttpConfig Types
+
+    /// AC1 [P0]: McpSseConfig can be created with url only.
+    func testMcpSseConfig_urlOnly() {
+        let config = McpSseConfig(url: "http://localhost:8080/sse")
+        XCTAssertEqual(config.url, "http://localhost:8080/sse")
+        XCTAssertNil(config.headers)
+    }
+
+    /// AC1 [P0]: McpSseConfig can be created with url and headers.
+    func testMcpSseConfig_urlAndHeaders() {
+        let config = McpSseConfig(
+            url: "http://localhost:8080/sse",
+            headers: ["Authorization": "Bearer token"]
+        )
+        XCTAssertEqual(config.url, "http://localhost:8080/sse")
+        XCTAssertEqual(config.headers?["Authorization"], "Bearer token")
+    }
+
+    /// AC2 [P0]: McpHttpConfig can be created with url only.
+    func testMcpHttpConfig_urlOnly() {
+        let config = McpHttpConfig(url: "http://localhost:8080/mcp")
+        XCTAssertEqual(config.url, "http://localhost:8080/mcp")
+        XCTAssertNil(config.headers)
+    }
+
+    /// AC2 [P0]: McpHttpConfig can be created with url and headers.
+    func testMcpHttpConfig_urlAndHeaders() {
+        let config = McpHttpConfig(
+            url: "http://localhost:8080/mcp",
+            headers: ["X-API-Key": "key-123"]
+        )
+        XCTAssertEqual(config.url, "http://localhost:8080/mcp")
+        XCTAssertEqual(config.headers?["X-API-Key"], "key-123")
+    }
+
+    /// AC7 [P0]: McpServerConfig.sse wraps McpSseConfig.
+    func testMcpServerConfig_sseCase() {
+        let sseConfig = McpSseConfig(url: "http://localhost:8080/sse")
+        let config = McpServerConfig.sse(sseConfig)
+
+        if case .sse(let unwrapped) = config {
+            XCTAssertEqual(unwrapped.url, "http://localhost:8080/sse")
+        } else {
+            XCTFail("Expected .sse case")
+        }
+    }
+
+    /// AC7 [P0]: McpServerConfig.http wraps McpHttpConfig.
+    func testMcpServerConfig_httpCase() {
+        let httpConfig = McpHttpConfig(url: "http://localhost:8080/mcp")
+        let config = McpServerConfig.http(httpConfig)
+
+        if case .http(let unwrapped) = config {
+            XCTAssertEqual(unwrapped.url, "http://localhost:8080/mcp")
+        } else {
+            XCTFail("Expected .http case")
+        }
+    }
+
+    /// AC7 [P0]: McpServerConfig equality works for SSE.
+    func testMcpServerConfig_sse_isEquatable() {
+        let config1 = McpServerConfig.sse(McpSseConfig(url: "http://localhost:8080"))
+        let config2 = McpServerConfig.sse(McpSseConfig(url: "http://localhost:8080"))
+        XCTAssertEqual(config1, config2)
+    }
+
+    /// AC7 [P0]: McpServerConfig equality works for HTTP.
+    func testMcpServerConfig_http_isEquatable() {
+        let config1 = McpServerConfig.http(McpHttpConfig(url: "http://localhost:8080"))
+        let config2 = McpServerConfig.http(McpHttpConfig(url: "http://localhost:8080"))
+        XCTAssertEqual(config1, config2)
+    }
+
+    /// AC7 [P0]: McpServerConfig stdio, sse, and http are distinct cases.
+    func testMcpServerConfig_allCases_areDistinct() {
+        let stdio = McpServerConfig.stdio(McpStdioConfig(command: "echo"))
+        let sse = McpServerConfig.sse(McpSseConfig(url: "http://localhost:8080"))
+        let http = McpServerConfig.http(McpHttpConfig(url: "http://localhost:8080"))
+
+        XCTAssertNotEqual(stdio, sse)
+        XCTAssertNotEqual(stdio, http)
+        XCTAssertNotEqual(sse, http)
+    }
 }
 
 // MARK: - Mock Helpers

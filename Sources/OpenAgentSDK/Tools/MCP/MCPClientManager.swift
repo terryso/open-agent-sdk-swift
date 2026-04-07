@@ -25,6 +25,9 @@ public actor MCPClientManager {
     /// Transport instances for process termination, indexed by server name.
     private var transports: [String: MCPStdioTransport] = [:]
 
+    /// HTTPClientTransport instances for SSE/HTTP connections, indexed by server name.
+    private var httpTransports: [String: HTTPClientTransport] = [:]
+
     // MARK: - Initialization
 
     /// Creates a new MCPClientManager with no connections.
@@ -113,6 +116,135 @@ public actor MCPClientManager {
         }
     }
 
+    // MARK: - SSE Connection
+
+    /// Connects to an MCP server using the given SSE configuration.
+    ///
+    /// Uses mcp-swift-sdk's `HTTPClientTransport` with `streaming: true` for SSE support.
+    /// Performs the full MCP lifecycle:
+    /// 1. Validates the URL and creates HTTPClientTransport
+    /// 2. Creates an MCPClient and performs MCP handshake (initialize)
+    /// 3. Discovers tools via `listTools()`
+    /// 4. Wraps discovered tools as `MCPToolDefinition`
+    ///
+    /// If any step fails, the connection is tracked with `error` status and empty tools.
+    /// The manager does not crash.
+    ///
+    /// - Parameters:
+    ///   - name: The server name for identification and tool namespacing.
+    ///   - config: The SSE configuration for the server.
+    public func connect(name: String, config: McpSseConfig) async {
+        await connectHTTP(
+            name: name,
+            urlString: config.url,
+            headers: config.headers,
+            streaming: true
+        )
+    }
+
+    // MARK: - HTTP Connection
+
+    /// Connects to an MCP server using the given HTTP configuration.
+    ///
+    /// Uses mcp-swift-sdk's `HTTPClientTransport` with `streaming: false` for plain HTTP.
+    /// Performs the full MCP lifecycle:
+    /// 1. Validates the URL and creates HTTPClientTransport
+    /// 2. Creates an MCPClient and performs MCP handshake (initialize)
+    /// 3. Discovers tools via `listTools()`
+    /// 4. Wraps discovered tools as `MCPToolDefinition`
+    ///
+    /// If any step fails, the connection is tracked with `error` status and empty tools.
+    /// The manager does not crash.
+    ///
+    /// - Parameters:
+    ///   - name: The server name for identification and tool namespacing.
+    ///   - config: The HTTP configuration for the server.
+    public func connect(name: String, config: McpHttpConfig) async {
+        await connectHTTP(
+            name: name,
+            urlString: config.url,
+            headers: config.headers,
+            streaming: false
+        )
+    }
+
+    /// Shared HTTP/SSE connection implementation.
+    ///
+    /// - Parameters:
+    ///   - name: The server name for identification and tool namespacing.
+    ///   - urlString: The URL string to connect to.
+    ///   - headers: Optional custom headers to inject into requests.
+    ///   - streaming: Whether to use SSE streaming mode (true for SSE, false for HTTP).
+    private func connectHTTP(
+        name: String,
+        urlString: String,
+        headers: [String: String]?,
+        streaming: Bool
+    ) async {
+        // Validate URL (only http/https schemes are valid for MCP transport)
+        guard !urlString.isEmpty,
+              let url = URL(string: urlString),
+              let scheme = url.scheme,
+              !scheme.isEmpty,
+              scheme == "http" || scheme == "https" else {
+            connections[name] = MCPManagedConnection(
+                name: name,
+                status: .error,
+                tools: []
+            )
+            return
+        }
+
+        do {
+            // 1. Create HTTPClientTransport with request modifier for custom headers
+            let requestModifier = makeRequestModifier(headers: headers)
+            let transport = HTTPClientTransport(
+                endpoint: url,
+                streaming: streaming,
+                requestModifier: requestModifier
+            )
+            self.httpTransports[name] = transport
+
+            // 2. Create MCPClient and connect
+            let mcpClient = MCPClient(
+                name: "OpenAgentSDK",
+                version: "1.0.0"
+            )
+
+            try await mcpClient.connect {
+                transport
+            }
+            self.clients[name] = mcpClient
+
+            // 3. Discover tools via listTools()
+            let toolsResult = try await mcpClient.listTools()
+            let mcpTools: [ToolProtocol] = toolsResult.tools.map { tool in
+                MCPToolDefinition(
+                    serverName: name,
+                    mcpToolName: tool.name,
+                    toolDescription: tool.description ?? "",
+                    schema: mcpValueToSchema(tool.inputSchema),
+                    mcpClient: MCPClientWrapper(client: mcpClient)
+                )
+            }
+
+            // 4. Store connection with discovered tools
+            connections[name] = MCPManagedConnection(
+                name: name,
+                status: .connected,
+                tools: mcpTools
+            )
+        } catch {
+            // Connection failed -- clean up and mark as error
+            await cleanupConnection(name: name)
+            connections[name] = MCPManagedConnection(
+                name: name,
+                status: .error,
+                tools: []
+            )
+        }
+    }
+
     /// Connects to all configured MCP servers concurrently.
     ///
     /// For stdio servers, launches the process and performs full MCP handshake.
@@ -127,9 +259,10 @@ public actor MCPClientManager {
                     switch config {
                     case .stdio(let stdioConfig):
                         await self.connect(name: name, config: stdioConfig)
-                    case .sse, .http:
-                        // SSE/HTTP transports are handled in Story 6-2
-                        await self.setErrorConnection(name: name)
+                    case .sse(let sseConfig):
+                        await self.connect(name: name, config: sseConfig)
+                    case .http(let httpConfig):
+                        await self.connect(name: name, config: httpConfig)
                     }
                 }
             }
@@ -187,15 +320,26 @@ public actor MCPClientManager {
         if let transport = transports.removeValue(forKey: name) {
             await transport.disconnect()
         }
+        if let httpTransport = httpTransports.removeValue(forKey: name) {
+            await httpTransport.disconnect()
+        }
     }
 
-    /// Sets a connection to error status (for unsupported transport types).
-    private func setErrorConnection(name: String) async {
-        connections[name] = MCPManagedConnection(
-            name: name,
-            status: .error,
-            tools: []
-        )
+    /// Creates a request modifier closure that injects custom headers into HTTP requests.
+    ///
+    /// - Parameter headers: Optional dictionary of headers to inject.
+    /// - Returns: A closure that adds the headers to each URLRequest.
+    private func makeRequestModifier(headers: [String: String]?) -> @Sendable (URLRequest) -> URLRequest {
+        guard let headers, !headers.isEmpty else {
+            return { $0 }
+        }
+        return { request in
+            var modified = request
+            for (key, value) in headers {
+                modified.addValue(value, forHTTPHeaderField: key)
+            }
+            return modified
+        }
     }
 
     /// Converts an MCP `Value` to a `ToolInputSchema` dictionary.
