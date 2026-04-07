@@ -70,12 +70,18 @@
 /// - ``createNotebookEditTool()`` — Factory for the NotebookEdit tool
 /// - ``createEnterWorktreeTool()`` — Factory for the EnterWorktree tool
 /// - ``createExitWorktreeTool()`` — Factory for the ExitWorktree tool
+/// - ``createEnterPlanModeTool()`` — Factory for the EnterPlanMode tool
+/// - ``createExitPlanModeTool()`` — Factory for the ExitPlanMode tool
 ///
 /// ## Specialist Stores
 /// - ``WorktreeStore`` — Thread-safe worktree management actor
 /// - ``WorktreeEntry`` — Worktree data structure
 /// - ``WorktreeStatus`` — Worktree status enum
 /// - ``WorktreeStoreError`` — Worktree store error type
+/// - ``PlanStore`` — Thread-safe plan management actor
+/// - ``PlanEntry`` — Plan data structure
+/// - ``PlanStatus`` — Plan status enum
+/// - ``PlanStoreError`` — Plan store error type
 
 /// Current SDK version.
 public let SDK_VERSION = "0.1.0"

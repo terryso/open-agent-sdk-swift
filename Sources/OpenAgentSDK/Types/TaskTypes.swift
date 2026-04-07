@@ -286,3 +286,60 @@ public enum WorktreeStoreError: Error, Equatable, LocalizedError, Sendable {
         }
     }
 }
+
+// MARK: - PlanStatus
+
+/// Status of a plan entry.
+public enum PlanStatus: String, Sendable, Equatable, Codable {
+    case active
+    case completed
+    case discarded
+}
+
+// MARK: - PlanEntry
+
+/// A plan entry tracked by the PlanStore.
+public struct PlanEntry: Sendable, Equatable, Codable {
+    public let id: String
+    public var content: String?
+    public var approved: Bool
+    public var status: PlanStatus
+    public let createdAt: String
+    public var updatedAt: String
+
+    public init(
+        id: String,
+        content: String? = nil,
+        approved: Bool = false,
+        status: PlanStatus = .active,
+        createdAt: String,
+        updatedAt: String
+    ) {
+        self.id = id
+        self.content = content
+        self.approved = approved
+        self.status = status
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
+}
+
+// MARK: - PlanStoreError
+
+/// Errors thrown by PlanStore operations.
+public enum PlanStoreError: Error, Equatable, LocalizedError, Sendable {
+    case planNotFound(id: String)
+    case noActivePlan
+    case alreadyInPlanMode
+
+    public var errorDescription: String? {
+        switch self {
+        case .planNotFound(let id):
+            return "Plan not found: \(id)"
+        case .noActivePlan:
+            return "No active plan. Enter plan mode first."
+        case .alreadyInPlanMode:
+            return "Already in plan mode."
+        }
+    }
+}

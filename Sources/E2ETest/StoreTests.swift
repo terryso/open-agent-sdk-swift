@@ -19,6 +19,9 @@ struct StoreTests {
 
         section("24. WorktreeStore Operations")
         await testWorktreeStoreOperations()
+
+        section("26. PlanStore Operations")
+        await testPlanStoreOperations()
     }
 
     // MARK: Test 17
@@ -433,5 +436,126 @@ struct StoreTests {
 
         // Cleanup
         try? FileManager.default.removeItem(at: tmpDir)
+    }
+
+    // MARK: Test 26
+
+    static func testPlanStoreOperations() async {
+        let store = PlanStore()
+
+        // Initially not active
+        let initialActive = await store.isActive()
+        let initialPlan = await store.getCurrentPlan()
+        if !initialActive && initialPlan == nil {
+            pass("PlanStore: initially not active and no current plan")
+        } else {
+            fail("PlanStore: initially not active and no current plan", "active=\(initialActive) plan=\(String(describing: initialPlan))")
+        }
+
+        // Enter plan mode
+        let entry: PlanEntry
+        do {
+            entry = try await store.enterPlanMode()
+            if entry.id.hasPrefix("plan_") && entry.status == .active && !entry.approved && entry.content == nil {
+                pass("PlanStore: enterPlanMode creates active plan entry")
+            } else {
+                fail("PlanStore: enterPlanMode creates active plan entry", "id=\(entry.id) status=\(entry.status)")
+            }
+        } catch {
+            fail("PlanStore: enterPlanMode creates active plan entry", "threw: \(error)")
+            return
+        }
+
+        // isActive and getCurrentPlan
+        let active = await store.isActive()
+        let currentPlan = await store.getCurrentPlan()
+        if active && currentPlan?.id == entry.id {
+            pass("PlanStore: isActive returns true after enter, getCurrentPlan returns entry")
+        } else {
+            fail("PlanStore: isActive returns true after enter, getCurrentPlan returns entry")
+        }
+
+        // Duplicate enter throws
+        do {
+            _ = try await store.enterPlanMode()
+            fail("PlanStore: duplicate enterPlanMode throws alreadyInPlanMode")
+        } catch let error as PlanStoreError {
+            if case .alreadyInPlanMode = error {
+                pass("PlanStore: duplicate enterPlanMode throws alreadyInPlanMode")
+            } else {
+                fail("PlanStore: duplicate enterPlanMode throws alreadyInPlanMode", "wrong error: \(error)")
+            }
+        } catch {
+            fail("PlanStore: duplicate enterPlanMode throws alreadyInPlanMode", "threw: \(error)")
+        }
+
+        // Exit plan mode with plan content and approved flag
+        do {
+            let exited = try await store.exitPlanMode(plan: "1. Step A\n2. Step B", approved: true)
+            if exited.content == "1. Step A\n2. Step B" && exited.approved && exited.status == .completed {
+                pass("PlanStore: exitPlanMode finalizes plan with content and approval")
+            } else {
+                fail("PlanStore: exitPlanMode finalizes plan with content and approval", "content=\(String(describing: exited.content)) approved=\(exited.approved) status=\(exited.status)")
+            }
+        } catch {
+            fail("PlanStore: exitPlanMode finalizes plan with content and approval", "threw: \(error)")
+        }
+
+        // After exit, not active
+        let afterExit = await store.isActive()
+        let afterExitPlan = await store.getCurrentPlan()
+        if !afterExit && afterExitPlan == nil {
+            pass("PlanStore: not active after exit")
+        } else {
+            fail("PlanStore: not active after exit", "active=\(afterExit)")
+        }
+
+        // Exit without active plan throws
+        do {
+            _ = try await store.exitPlanMode(plan: nil, approved: nil)
+            fail("PlanStore: exitPlanMode without active plan throws noActivePlan")
+        } catch let error as PlanStoreError {
+            if case .noActivePlan = error {
+                pass("PlanStore: exitPlanMode without active plan throws noActivePlan")
+            } else {
+                fail("PlanStore: exitPlanMode without active plan throws noActivePlan", "wrong error: \(error)")
+            }
+        } catch {
+            fail("PlanStore: exitPlanMode without active plan throws noActivePlan", "threw: \(error)")
+        }
+
+        // List contains the completed plan
+        let list = await store.list()
+        if list.count == 1 && list[0].status == .completed {
+            pass("PlanStore: list returns completed plan")
+        } else {
+            fail("PlanStore: list returns completed plan", "count: \(list.count)")
+        }
+
+        // Get by ID
+        let retrieved = await store.get(id: entry.id)
+        if retrieved?.id == entry.id && retrieved?.status == .completed {
+            pass("PlanStore: get retrieves completed plan by ID")
+        } else {
+            fail("PlanStore: get retrieves completed plan by ID")
+        }
+
+        // Get nonexistent returns nil
+        let notFound = await store.get(id: "plan_999")
+        if notFound == nil {
+            pass("PlanStore: get returns nil for nonexistent ID")
+        } else {
+            fail("PlanStore: get returns nil for nonexistent ID")
+        }
+
+        // Clear
+        await store.clear()
+        let afterClear = await store.list()
+        let activeAfterClear = await store.isActive()
+        if afterClear.isEmpty && !activeAfterClear {
+            pass("PlanStore: clear resets all state")
+        } else {
+            fail("PlanStore: clear resets all state", "count: \(afterClear.count) active=\(activeAfterClear)")
+        }
     }
 }

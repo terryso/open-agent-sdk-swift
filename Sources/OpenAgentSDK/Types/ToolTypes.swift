@@ -61,6 +61,9 @@ public struct ToolContext: Sendable {
     /// Optional worktree store for worktree management tools (e.g., EnterWorktree, ExitWorktree).
     /// Injected by Core/ when the tool set includes worktree management tools.
     public let worktreeStore: WorktreeStore?
+    /// Optional plan store for plan management tools (e.g., EnterPlanMode, ExitPlanMode).
+    /// Injected by Core/ when the tool set includes plan management tools.
+    public let planStore: PlanStore?
 
     public init(
         cwd: String,
@@ -70,7 +73,8 @@ public struct ToolContext: Sendable {
         teamStore: TeamStore? = nil,
         senderName: String? = nil,
         taskStore: TaskStore? = nil,
-        worktreeStore: WorktreeStore? = nil
+        worktreeStore: WorktreeStore? = nil,
+        planStore: PlanStore? = nil
     ) {
         self.cwd = cwd
         self.toolUseId = toolUseId
@@ -80,5 +84,6 @@ public struct ToolContext: Sendable {
         self.senderName = senderName
         self.taskStore = taskStore
         self.worktreeStore = worktreeStore
+        self.planStore = planStore
     }
 }

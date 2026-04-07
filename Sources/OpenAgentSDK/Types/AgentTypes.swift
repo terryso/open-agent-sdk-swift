@@ -38,6 +38,9 @@ public struct AgentOptions: Sendable {
     /// Optional worktree store for worktree management tools.
     /// Injected into ToolContext for use by worktree tools (EnterWorktree, ExitWorktree).
     public var worktreeStore: WorktreeStore?
+    /// Optional plan store for plan management tools.
+    /// Injected into ToolContext for use by plan tools (EnterPlanMode, ExitPlanMode).
+    public var planStore: PlanStore?
 
     public init(
         apiKey: String? = nil,
@@ -59,7 +62,8 @@ public struct AgentOptions: Sendable {
         mailboxStore: MailboxStore? = nil,
         teamStore: TeamStore? = nil,
         taskStore: TaskStore? = nil,
-        worktreeStore: WorktreeStore? = nil
+        worktreeStore: WorktreeStore? = nil,
+        planStore: PlanStore? = nil
     ) {
         self.apiKey = apiKey
         self.model = model
@@ -81,6 +85,7 @@ public struct AgentOptions: Sendable {
         self.teamStore = teamStore
         self.taskStore = taskStore
         self.worktreeStore = worktreeStore
+        self.planStore = planStore
     }
 
     /// Create AgentOptions from an SDKConfiguration, using its resolved values
@@ -109,6 +114,7 @@ public struct AgentOptions: Sendable {
         self.teamStore = nil
         self.taskStore = nil
         self.worktreeStore = nil
+        self.planStore = nil
     }
 }
 public enum QueryStatus: String, Sendable, Equatable {
