@@ -65,6 +65,8 @@
 /// - ``createTaskGetTool()`` — Factory for the TaskGet tool
 /// - ``createTaskStopTool()`` — Factory for the TaskStop tool
 /// - ``createTaskOutputTool()`` — Factory for the TaskOutput tool
+/// - ``createTeamCreateTool()`` — Factory for the TeamCreate tool
+/// - ``createTeamDeleteTool()`` — Factory for the TeamDelete tool
 
 /// Current SDK version.
 public let SDK_VERSION = "0.1.0"

@@ -67,7 +67,6 @@ public actor TeamStore {
         }
         team.status = .disbanded
         teams[id] = team
-        teams.removeValue(forKey: id)
         return true
     }
 
