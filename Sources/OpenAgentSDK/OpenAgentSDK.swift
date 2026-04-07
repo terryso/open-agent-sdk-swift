@@ -76,6 +76,7 @@
 /// - ``createCronDeleteTool()`` — Factory for the CronDelete tool
 /// - ``createCronListTool()`` — Factory for the CronList tool
 /// - ``createTodoWriteTool()`` — Factory for the TodoWrite tool
+/// - ``createLSPTool()`` — Factory for the LSP tool
 ///
 /// ## Specialist Stores
 /// - ``WorktreeStore`` — Thread-safe worktree management actor

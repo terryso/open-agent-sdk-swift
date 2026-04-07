@@ -25,6 +25,9 @@ struct IntegrationTests {
 
         section("33. TodoWrite Tool Direct Handler Tests")
         await testTodoWriteToolDirectHandler()
+
+        section("34. LSP Tool Direct Handler Tests")
+        await testLSPToolDirectHandler()
     }
 
     static func testAgentWithTaskStore(apiKey: String, model: String, baseURL: String) async {
@@ -510,5 +513,93 @@ struct IntegrationTests {
         } else {
             fail("TodoWrite direct: list shows checkbox formatting", "content=\(checkList.content)")
         }
+    }
+
+    // MARK: Test 34
+
+    static func testLSPToolDirectHandler() async {
+        let tool = createLSPTool()
+        let context = ToolContext(cwd: "/tmp")
+
+        // Test: tool metadata
+        if tool.name == "LSP" {
+            pass("LSP direct: tool name is LSP")
+        } else {
+            fail("LSP direct: tool name is LSP", "got \(tool.name)")
+        }
+        if tool.isReadOnly {
+            pass("LSP direct: isReadOnly returns true")
+        } else {
+            fail("LSP direct: isReadOnly returns true")
+        }
+
+        // Test: hover returns hint message
+        let hoverResult = await tool.call(input: ["operation": "hover"] as [String: Any], context: context)
+        if hoverResult.isError == false && hoverResult.content.lowercased().contains("language server") {
+            pass("LSP direct: hover returns language server hint")
+        } else {
+            fail("LSP direct: hover returns language server hint", "content=\(hoverResult.content)")
+        }
+
+        // Test: documentSymbol with temp file
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "e2e-lsp-\(UUID().uuidString)", isDirectory: true
+        )
+        try? FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+
+        let fileContent = """
+        public struct MyTestStruct {
+            func hello() -> String { return "hi" }
+        }
+        """
+        let filePath = tempDir.appendingPathComponent("Test.swift").path
+        try? fileContent.write(toFile: filePath, atomically: true, encoding: .utf8)
+
+        let symbolContext = ToolContext(cwd: tempDir.path)
+        let symbolResult = await tool.call(
+            input: ["operation": "documentSymbol", "file_path": filePath] as [String: Any],
+            context: symbolContext
+        )
+        if symbolResult.isError == false && (symbolResult.content.contains("MyTestStruct") || symbolResult.content.contains("hello")) {
+            pass("LSP direct: documentSymbol finds symbols in file")
+        } else {
+            fail("LSP direct: documentSymbol finds symbols in file", "content=\(symbolResult.content)")
+        }
+
+        // Test: workspaceSymbol
+        let wsResult = await tool.call(
+            input: ["operation": "workspaceSymbol", "query": "MyTestStruct"] as [String: Any],
+            context: symbolContext
+        )
+        if wsResult.isError == false && wsResult.content.contains("MyTestStruct") {
+            pass("LSP direct: workspaceSymbol finds matching symbols")
+        } else {
+            fail("LSP direct: workspaceSymbol finds matching symbols", "content=\(wsResult.content)")
+        }
+
+        // Test: unknown operation returns language server hint
+        let unknownResult = await tool.call(
+            input: ["operation": "prepareCallHierarchy"] as [String: Any],
+            context: context
+        )
+        if unknownResult.isError == false && unknownResult.content.contains("requires a running language server") {
+            pass("LSP direct: unknown operation returns language server hint")
+        } else {
+            fail("LSP direct: unknown operation returns language server hint", "content=\(unknownResult.content)")
+        }
+
+        // Test: missing parameters return error
+        let missingParams = await tool.call(
+            input: ["operation": "documentSymbol"] as [String: Any],
+            context: context
+        )
+        if missingParams.isError == true {
+            pass("LSP direct: missing file_path returns error")
+        } else {
+            fail("LSP direct: missing file_path returns error", "content=\(missingParams.content)")
+        }
+
+        // Cleanup
+        try? FileManager.default.removeItem(at: tempDir)
     }
 }
