@@ -28,6 +28,12 @@ struct IntegrationTests {
 
         section("34. LSP Tool Direct Handler Tests")
         await testLSPToolDirectHandler()
+
+        section("35. Config Tool Direct Handler Tests")
+        await testConfigToolDirectHandler()
+
+        section("36. RemoteTrigger Tool Direct Handler Tests")
+        await testRemoteTriggerToolDirectHandler()
     }
 
     static func testAgentWithTaskStore(apiKey: String, model: String, baseURL: String) async {
@@ -601,5 +607,120 @@ struct IntegrationTests {
 
         // Cleanup
         try? FileManager.default.removeItem(at: tempDir)
+    }
+
+    // MARK: Test 35
+
+    static func testConfigToolDirectHandler() async {
+        let tool = createConfigTool()
+        let context = ToolContext(cwd: "/tmp", toolUseId: "e2e-config-test")
+
+        // Test: tool metadata
+        if tool.name == "Config" {
+            pass("Config direct: tool name is Config")
+        } else {
+            fail("Config direct: tool name is Config", "got \(tool.name)")
+        }
+        if !tool.isReadOnly {
+            pass("Config direct: isReadOnly returns false")
+        } else {
+            fail("Config direct: isReadOnly returns false")
+        }
+
+        // Test: list initially empty
+        let listEmpty = await tool.call(input: ["action": "list"] as [String: Any], context: context)
+        if listEmpty.isError == false && listEmpty.content.contains("No config values set") {
+            pass("Config direct: list empty returns 'No config values set'")
+        } else {
+            fail("Config direct: list empty returns 'No config values set'", "content=\(listEmpty.content)")
+        }
+
+        // Test: set a value
+        let setResult = await tool.call(input: ["action": "set", "key": "theme", "value": "dark"] as [String: Any], context: context)
+        if setResult.isError == false && setResult.content.contains("theme") {
+            pass("Config direct: set stores value")
+        } else {
+            fail("Config direct: set stores value", "content=\(setResult.content)")
+        }
+
+        // Test: get the value back
+        let getResult = await tool.call(input: ["action": "get", "key": "theme"] as [String: Any], context: context)
+        if getResult.isError == false && getResult.content.contains("dark") {
+            pass("Config direct: get retrieves stored value")
+        } else {
+            fail("Config direct: get retrieves stored value", "content=\(getResult.content)")
+        }
+
+        // Test: list shows the entry
+        let listResult = await tool.call(input: ["action": "list"] as [String: Any], context: context)
+        if listResult.isError == false && listResult.content.contains("theme") {
+            pass("Config direct: list shows stored entry")
+        } else {
+            fail("Config direct: list shows stored entry", "content=\(listResult.content)")
+        }
+
+        // Test: get non-existent key
+        let getNotFound = await tool.call(input: ["action": "get", "key": "nonexistent"] as [String: Any], context: context)
+        if getNotFound.isError == false && getNotFound.content.contains("not found") {
+            pass("Config direct: get non-existent key returns 'not found'")
+        } else {
+            fail("Config direct: get non-existent key returns 'not found'", "content=\(getNotFound.content)")
+        }
+
+        // Test: set without key returns error
+        let setNoKey = await tool.call(input: ["action": "set", "value": "x"] as [String: Any], context: context)
+        if setNoKey.isError == true {
+            pass("Config direct: set without key returns error")
+        } else {
+            fail("Config direct: set without key returns error", "content=\(setNoKey.content)")
+        }
+
+        // Test: get without key returns error
+        let getNoKey = await tool.call(input: ["action": "get"] as [String: Any], context: context)
+        if getNoKey.isError == true {
+            pass("Config direct: get without key returns error")
+        } else {
+            fail("Config direct: get without key returns error", "content=\(getNoKey.content)")
+        }
+
+        // Test: unknown action returns error
+        let unknownAction = await tool.call(input: ["action": "delete"] as [String: Any], context: context)
+        if unknownAction.isError == true && unknownAction.content.contains("Unknown action") {
+            pass("Config direct: unknown action returns error")
+        } else {
+            fail("Config direct: unknown action returns error", "content=\(unknownAction.content)")
+        }
+    }
+
+    // MARK: Test 36
+
+    static func testRemoteTriggerToolDirectHandler() async {
+        let tool = createRemoteTriggerTool()
+        let context = ToolContext(cwd: "/tmp", toolUseId: "e2e-remote-trigger-test")
+
+        // Test: tool metadata
+        if tool.name == "RemoteTrigger" {
+            pass("RemoteTrigger direct: tool name is RemoteTrigger")
+        } else {
+            fail("RemoteTrigger direct: tool name is RemoteTrigger", "got \(tool.name)")
+        }
+        if !tool.isReadOnly {
+            pass("RemoteTrigger direct: isReadOnly returns false")
+        } else {
+            fail("RemoteTrigger direct: isReadOnly returns false")
+        }
+
+        // Test: all actions return stub message
+        let actions = ["list", "get", "create", "update", "run"]
+        for action in actions {
+            let input: [String: Any] = ["action": action, "id": "trigger-1"]
+            let result = await tool.call(input: input, context: context)
+            let expected = "RemoteTrigger \(action)"
+            if result.isError == false && result.content.contains(expected) && result.content.contains("remote backend") {
+                pass("RemoteTrigger direct: \(action) returns stub message")
+            } else {
+                fail("RemoteTrigger direct: \(action) returns stub message", "content=\(result.content)")
+            }
+        }
     }
 }

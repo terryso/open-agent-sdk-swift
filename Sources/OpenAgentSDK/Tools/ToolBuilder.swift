@@ -103,6 +103,85 @@ public func defineTool(
     )
 }
 
+// MARK: - RawInputTool (Internal Implementation — Raw Dictionary Input)
+
+/// Internal implementation of `ToolProtocol` for closures that receive raw `[String: Any]` input.
+///
+/// Unlike `CodableTool`, this implementation skips Codable decoding and passes the raw
+/// dictionary directly to the execute closure. This is needed for tools whose input schema
+/// contains fields of arbitrary type (e.g., `value` in ConfigTool that can be any JSON type).
+private struct RawInputTool: ToolProtocol, @unchecked Sendable {
+    let name: String
+    let description: String
+    let inputSchema: ToolInputSchema
+    let isReadOnly: Bool
+
+    private let executeClosure: @Sendable ([String: Any], ToolContext) async -> ToolExecuteResult
+
+    init(
+        name: String,
+        description: String,
+        inputSchema: ToolInputSchema,
+        isReadOnly: Bool,
+        execute: @Sendable @escaping ([String: Any], ToolContext) async -> ToolExecuteResult
+    ) {
+        self.name = name
+        self.description = description
+        self.inputSchema = inputSchema
+        self.isReadOnly = isReadOnly
+        self.executeClosure = execute
+    }
+
+    func call(input: Any, context: ToolContext) async -> ToolResult {
+        guard let dict = input as? [String: Any] else {
+            return ToolResult(
+                toolUseId: context.toolUseId,
+                content: "Error: Expected dictionary input, got \(type(of: input))",
+                isError: true
+            )
+        }
+
+        let result = await executeClosure(dict, context)
+        return ToolResult(
+            toolUseId: context.toolUseId,
+            content: result.content,
+            isError: result.isError
+        )
+    }
+}
+
+// MARK: - defineTool Factory Function (Raw Dictionary Input)
+
+/// Creates a `ToolProtocol` from a closure that receives raw `[String: Any]` input.
+///
+/// This overload skips Codable decoding and passes the raw dictionary directly to the
+/// execute closure. Use this for tools whose input schema contains fields of arbitrary
+/// type (e.g., `value` in ConfigTool that can be string, number, boolean, array, object, or null).
+///
+/// - Parameters:
+///   - name: The tool's unique name identifier.
+///   - description: A human-readable description of the tool.
+///   - inputSchema: The JSON Schema describing the tool's input format.
+///   - isReadOnly: Whether the tool only reads data without side effects. Defaults to `false`.
+///   - execute: A closure that takes a raw `[String: Any]` dictionary and a `ToolContext`,
+///     returning a ``ToolExecuteResult`` with content and isError fields.
+/// - Returns: A `ToolProtocol` instance that passes raw input to the closure.
+public func defineTool(
+    name: String,
+    description: String,
+    inputSchema: ToolInputSchema,
+    isReadOnly: Bool = false,
+    execute: @Sendable @escaping ([String: Any], ToolContext) async -> ToolExecuteResult
+) -> ToolProtocol {
+    return RawInputTool(
+        name: name,
+        description: description,
+        inputSchema: inputSchema,
+        isReadOnly: isReadOnly,
+        execute: execute
+    )
+}
+
 // MARK: - CodableTool (Internal Implementation — String return)
 
 /// Internal implementation of `ToolProtocol` that bridges raw JSON to Codable types.

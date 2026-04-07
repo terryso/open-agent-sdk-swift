@@ -77,6 +77,8 @@
 /// - ``createCronListTool()`` — Factory for the CronList tool
 /// - ``createTodoWriteTool()`` — Factory for the TodoWrite tool
 /// - ``createLSPTool()`` — Factory for the LSP tool
+/// - ``createConfigTool()`` — Factory for the Config tool
+/// - ``createRemoteTriggerTool()`` — Factory for the RemoteTrigger tool
 ///
 /// ## Specialist Stores
 /// - ``WorktreeStore`` — Thread-safe worktree management actor

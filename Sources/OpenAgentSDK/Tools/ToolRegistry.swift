@@ -77,6 +77,8 @@ public func getAllBaseTools(tier: ToolTier) -> [ToolProtocol] {
             createCronListTool(),
             createTodoWriteTool(),
             createLSPTool(),
+            createConfigTool(),
+            createRemoteTriggerTool(),
         ]
     }
 }
