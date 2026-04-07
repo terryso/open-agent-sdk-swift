@@ -250,59 +250,103 @@ struct IntegrationTests {
     static func testLLMDrivenTodoWriteTool(apiKey: String, model: String, baseURL: String) async {
         let todoStore = TodoStore()
 
-        // Pre-populate a todo so the agent can list and toggle it
-        _ = await todoStore.add(text: "Review PR", priority: .high)
-
         let todoTool = createTodoWriteTool()
 
-        let agent = createAgent(options: AgentOptions(
+        // --- Sub-test A: LLM adds a todo item ---
+        let addAgent = createAgent(options: AgentOptions(
             apiKey: apiKey, model: model, baseURL: baseURL,
-            provider: .openai, maxTurns: 5,
+            provider: .openai, maxTurns: 3,
             tools: [todoTool],
             todoStore: todoStore
         ))
 
-        // Ask LLM to use the TodoWrite tool to add a new item
-        let result = await agent.prompt(
-            "Use the TodoWrite tool to add a new todo with text 'Deploy to staging' and priority high. " +
-            "Then list all todos."
+        let addResult = await addAgent.prompt(
+            "Use the TodoWrite tool with action \"add\" to create a todo with text \"Deploy to staging\" and priority \"high\"."
         )
 
-        if result.status == .success {
-            pass("LLM+TodoWrite: agent returns success")
+        if addResult.status == .success {
+            pass("LLM+TodoWrite: add agent returns success")
         } else {
-            fail("LLM+TodoWrite: agent returns success", "got \(result.status)")
+            fail("LLM+TodoWrite: add agent returns success", "got \(addResult.status)")
         }
 
-        // The LLM should have used at least 2 turns (tool call + response)
-        if result.numTurns >= 2 {
-            pass("LLM+TodoWrite: agent uses multiple turns")
-        } else {
-            fail("LLM+TodoWrite: agent uses multiple turns", "numTurns=\(result.numTurns)")
-        }
-
-        // Verify the store now has at least the pre-existing + new item
+        // Verify at least one item was added by the LLM
         let items = await todoStore.list()
-        if items.count >= 2 {
-            pass("LLM+TodoWrite: store has items after LLM tool call")
+        if items.count >= 1 {
+            pass("LLM+TodoWrite: store has item after LLM add call")
         } else {
-            fail("LLM+TodoWrite: store has items after LLM tool call", "count=\(items.count)")
+            fail("LLM+TodoWrite: store has item after LLM add call", "count=\(items.count)")
         }
 
-        // Verify the new item exists (LLM added "Deploy to staging")
-        let deployItem = items.first(where: { $0.text.lowercased().contains("deploy") })
-        if deployItem != nil {
-            pass("LLM+TodoWrite: LLM-added item found in store")
+        // Verify the item text contains "deploy" (case-insensitive, LLM may rephrase)
+        let addedItem = items.first(where: { $0.text.lowercased().contains("deploy") })
+        if addedItem != nil {
+            pass("LLM+TodoWrite: LLM-added item contains 'deploy'")
         } else {
-            fail("LLM+TodoWrite: LLM-added item found in store", "items: \(items.map { $0.text })")
+            fail("LLM+TodoWrite: LLM-added item contains 'deploy'", "items: \(items.map { $0.text })")
         }
 
-        // Verify the pre-existing item is still there
-        let reviewItem = items.first(where: { $0.text == "Review PR" })
-        if reviewItem != nil && reviewItem?.priority == .high {
-            pass("LLM+TodoWrite: pre-existing item preserved")
+        // --- Sub-test B: LLM lists todos ---
+        // Pre-add an item to guarantee the list has content
+        _ = await todoStore.add(text: "Review PR", priority: .high)
+
+        let listAgent = createAgent(options: AgentOptions(
+            apiKey: apiKey, model: model, baseURL: baseURL,
+            provider: .openai, maxTurns: 3,
+            tools: [todoTool],
+            todoStore: todoStore
+        ))
+
+        let listResult = await listAgent.prompt(
+            "Use the TodoWrite tool with action \"list\" to show all current todos."
+        )
+
+        if listResult.status == .success {
+            pass("LLM+TodoWrite: list agent returns success")
         } else {
-            fail("LLM+TodoWrite: pre-existing item preserved")
+            fail("LLM+TodoWrite: list agent returns success", "got \(listResult.status)")
+        }
+
+        if listResult.numTurns >= 2 {
+            pass("LLM+TodoWrite: list uses multiple turns (tool call + response)")
+        } else {
+            fail("LLM+TodoWrite: list uses multiple turns", "numTurns=\(listResult.numTurns)")
+        }
+
+        // The response text should mention the pre-existing item
+        let respLower = listResult.text.lowercased()
+        if respLower.contains("review pr") || respLower.contains("review") {
+            pass("LLM+TodoWrite: list response mentions existing todo")
+        } else {
+            fail("LLM+TodoWrite: list response mentions existing todo", "text: \(listResult.text.prefix(200))")
+        }
+
+        // --- Sub-test C: LLM toggles a todo ---
+        let itemId = items.first(where: { $0.text.lowercased().contains("deploy") })?.id ?? 1
+
+        let toggleAgent = createAgent(options: AgentOptions(
+            apiKey: apiKey, model: model, baseURL: baseURL,
+            provider: .openai, maxTurns: 3,
+            tools: [todoTool],
+            todoStore: todoStore
+        ))
+
+        let toggleResult = await toggleAgent.prompt(
+            "Use the TodoWrite tool with action \"toggle\" and id \(itemId) to mark that todo as completed."
+        )
+
+        if toggleResult.status == .success {
+            pass("LLM+TodoWrite: toggle agent returns success")
+        } else {
+            fail("LLM+TodoWrite: toggle agent returns success", "got \(toggleResult.status)")
+        }
+
+        // Verify the item was toggled
+        let toggledItem = await todoStore.get(id: itemId)
+        if toggledItem?.done == true {
+            pass("LLM+TodoWrite: item toggled to done")
+        } else {
+            fail("LLM+TodoWrite: item toggled to done", "done=\(String(describing: toggledItem?.done))")
         }
     }
 
