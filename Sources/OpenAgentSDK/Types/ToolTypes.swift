@@ -67,6 +67,9 @@ public struct ToolContext: Sendable {
     /// Optional cron store for cron management tools (e.g., CronCreate, CronDelete, CronList).
     /// Injected by Core/ when the tool set includes cron management tools.
     public let cronStore: CronStore?
+    /// Optional todo store for todo management tools (e.g., TodoWrite).
+    /// Injected by Core/ when the tool set includes todo management tools.
+    public let todoStore: TodoStore?
 
     public init(
         cwd: String,
@@ -78,7 +81,8 @@ public struct ToolContext: Sendable {
         taskStore: TaskStore? = nil,
         worktreeStore: WorktreeStore? = nil,
         planStore: PlanStore? = nil,
-        cronStore: CronStore? = nil
+        cronStore: CronStore? = nil,
+        todoStore: TodoStore? = nil
     ) {
         self.cwd = cwd
         self.toolUseId = toolUseId
@@ -90,5 +94,6 @@ public struct ToolContext: Sendable {
         self.worktreeStore = worktreeStore
         self.planStore = planStore
         self.cronStore = cronStore
+        self.todoStore = todoStore
     }
 }

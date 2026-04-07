@@ -75,6 +75,7 @@
 /// - ``createCronCreateTool()`` — Factory for the CronCreate tool
 /// - ``createCronDeleteTool()`` — Factory for the CronDelete tool
 /// - ``createCronListTool()`` — Factory for the CronList tool
+/// - ``createTodoWriteTool()`` — Factory for the TodoWrite tool
 ///
 /// ## Specialist Stores
 /// - ``WorktreeStore`` — Thread-safe worktree management actor
@@ -88,6 +89,10 @@
 /// - ``CronStore`` — Thread-safe cron job management actor
 /// - ``CronJob`` — Cron job data structure
 /// - ``CronStoreError`` — Cron store error type
+/// - ``TodoStore`` — Thread-safe todo management actor
+/// - ``TodoItem`` — Todo item data structure
+/// - ``TodoPriority`` — Todo priority enum
+/// - ``TodoStoreError`` — Todo store error type
 
 /// Current SDK version.
 public let SDK_VERSION = "0.1.0"

@@ -255,7 +255,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                             taskStore: options.taskStore,
                             worktreeStore: options.worktreeStore,
                             planStore: options.planStore,
-                            cronStore: options.cronStore
+                            cronStore: options.cronStore,
+                            todoStore: options.todoStore
                         )
                     )
 
@@ -352,6 +353,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
         let capturedWorktreeStore = options.worktreeStore
         let capturedPlanStore = options.planStore
         let capturedCronStore = options.cronStore
+        let capturedTodoStore = options.todoStore
 
         // Build tool definitions for API call
         let capturedApiTools: [[String: Any]]? = {
@@ -648,7 +650,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                                     taskStore: capturedTaskStore,
                                     worktreeStore: capturedWorktreeStore,
                                     planStore: capturedPlanStore,
-                                    cronStore: capturedCronStore
+                                    cronStore: capturedCronStore,
+                                    todoStore: capturedTodoStore
                                 )
                             )
 

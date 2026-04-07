@@ -44,6 +44,9 @@ public struct AgentOptions: Sendable {
     /// Optional cron store for cron management tools.
     /// Injected into ToolContext for use by cron tools (CronCreate, CronDelete, CronList).
     public var cronStore: CronStore?
+    /// Optional todo store for todo management tools.
+    /// Injected into ToolContext for use by todo tools (TodoWrite).
+    public var todoStore: TodoStore?
 
     public init(
         apiKey: String? = nil,
@@ -67,7 +70,8 @@ public struct AgentOptions: Sendable {
         taskStore: TaskStore? = nil,
         worktreeStore: WorktreeStore? = nil,
         planStore: PlanStore? = nil,
-        cronStore: CronStore? = nil
+        cronStore: CronStore? = nil,
+        todoStore: TodoStore? = nil
     ) {
         self.apiKey = apiKey
         self.model = model
@@ -91,6 +95,7 @@ public struct AgentOptions: Sendable {
         self.worktreeStore = worktreeStore
         self.planStore = planStore
         self.cronStore = cronStore
+        self.todoStore = todoStore
     }
 
     /// Create AgentOptions from an SDKConfiguration, using its resolved values
@@ -121,6 +126,7 @@ public struct AgentOptions: Sendable {
         self.worktreeStore = nil
         self.planStore = nil
         self.cronStore = nil
+        self.todoStore = nil
     }
 }
 public enum QueryStatus: String, Sendable, Equatable {

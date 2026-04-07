@@ -55,13 +55,11 @@ await TrackingTests.run(apiKey: apiKey, model: model, baseURL: baseURL)
 // ================================================================
 ToolRegistryTests.run()
 
-// ================================================================
-// SECTION 17-20, 24, 26, 28: Store Operations (incl. WorktreeStore, PlanStore, CronStore)
-// ================================================================
+// SECTION 17-20, 24, 26, 28, 30: Store Operations (incl. WorktreeStore, PlanStore, CronStore, TodoStore)
 await StoreTests.run()
 
 // ================================================================
-// SECTION 21: SDKMessage Types
+// SECTION 23, 25, 27, 29, 31, 32, 33: Agent with Stores Integration (incl. LLM-driven TodoWrite, direct handler tests)
 // ================================================================
 await SDKMessageTests.run(apiKey: apiKey, model: model, baseURL: baseURL)
 
@@ -71,7 +69,7 @@ await SDKMessageTests.run(apiKey: apiKey, model: model, baseURL: baseURL)
 await NoInputToolTests.run(apiKey: apiKey, model: model, baseURL: baseURL)
 
 // ================================================================
-// SECTION 23, 25, 27, 29: Agent with Stores Integration (incl. WorktreeStore, PlanStore, CronStore)
+// SECTION 23, 25, 27, 29, 31, 32, 33: Agent with Stores Integration (incl. LLM-driven TodoWrite, direct handler tests)
 // ================================================================
 await IntegrationTests.run(apiKey: apiKey, model: model, baseURL: baseURL)
 

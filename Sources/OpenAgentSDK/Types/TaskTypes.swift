@@ -391,3 +391,48 @@ public enum CronStoreError: Error, Equatable, LocalizedError, Sendable {
         }
     }
 }
+
+// MARK: - TodoPriority
+
+/// Priority level for a todo item.
+public enum TodoPriority: String, Sendable, Equatable, Codable, CaseIterable {
+    case high
+    case medium
+    case low
+}
+
+// MARK: - TodoItem
+
+/// A todo item tracked by the TodoStore.
+public struct TodoItem: Sendable, Equatable, Codable {
+    public let id: Int
+    public let text: String
+    public var done: Bool
+    public var priority: TodoPriority?
+
+    public init(
+        id: Int,
+        text: String,
+        done: Bool = false,
+        priority: TodoPriority? = nil
+    ) {
+        self.id = id
+        self.text = text
+        self.done = done
+        self.priority = priority
+    }
+}
+
+// MARK: - TodoStoreError
+
+/// Errors thrown by TodoStore operations.
+public enum TodoStoreError: Error, Equatable, LocalizedError, Sendable {
+    case todoNotFound(id: Int)
+
+    public var errorDescription: String? {
+        switch self {
+        case .todoNotFound(let id):
+            return "Todo #\(id) not found"
+        }
+    }
+}

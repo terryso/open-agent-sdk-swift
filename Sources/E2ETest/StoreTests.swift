@@ -25,6 +25,9 @@ struct StoreTests {
 
         section("28. CronStore Operations")
         await testCronStoreOperations()
+
+        section("30. TodoStore Operations")
+        await testTodoStoreOperations()
     }
 
     // MARK: Test 17
@@ -672,6 +675,149 @@ struct StoreTests {
             pass("CronStore: clear resets ID counter")
         } else {
             fail("CronStore: clear resets ID counter", "id: \(afterReset.id)")
+        }
+    }
+
+    // MARK: Test 30
+
+    static func testTodoStoreOperations() async {
+        let store = TodoStore()
+
+        // Add a todo item
+        let item = await store.add(text: "Buy groceries")
+        if item.id == 1 && item.text == "Buy groceries" && item.done == false && item.priority == nil {
+            pass("TodoStore: add returns item with id, text, done=false, priority=nil")
+        } else {
+            fail("TodoStore: add returns item with id, text, done=false, priority=nil", "id=\(item.id) text=\(item.text) done=\(item.done)")
+        }
+
+        // Add with priority
+        let urgentItem = await store.add(text: "Urgent task", priority: .high)
+        if urgentItem.id == 2 && urgentItem.priority == .high {
+            pass("TodoStore: add with priority stores priority correctly")
+        } else {
+            fail("TodoStore: add with priority stores priority correctly", "id=\(urgentItem.id) priority=\(String(describing: urgentItem.priority))")
+        }
+
+        // Sequential IDs
+        let item3 = await store.add(text: "Third item")
+        if item.id == 1 && urgentItem.id == 2 && item3.id == 3 {
+            pass("TodoStore: sequential ID generation (1, 2, 3)")
+        } else {
+            fail("TodoStore: sequential ID generation", "id1=\(item.id) id2=\(urgentItem.id) id3=\(item3.id)")
+        }
+
+        // Get by ID
+        let retrieved = await store.get(id: 1)
+        if retrieved?.id == 1 && retrieved?.text == "Buy groceries" {
+            pass("TodoStore: get retrieves created item")
+        } else {
+            fail("TodoStore: get retrieves created item")
+        }
+
+        // Get nonexistent returns nil
+        let notFound = await store.get(id: 999)
+        if notFound == nil {
+            pass("TodoStore: get returns nil for nonexistent ID")
+        } else {
+            fail("TodoStore: get returns nil for nonexistent ID")
+        }
+
+        // Toggle
+        do {
+            let toggled = try await store.toggle(id: 1)
+            if toggled.done == true {
+                pass("TodoStore: toggle flips done to true")
+            } else {
+                fail("TodoStore: toggle flips done to true", "done=\(toggled.done)")
+            }
+        } catch {
+            fail("TodoStore: toggle flips done to true", "threw: \(error)")
+        }
+
+        // Toggle back
+        do {
+            let toggledBack = try await store.toggle(id: 1)
+            if toggledBack.done == false {
+                pass("TodoStore: toggle flips done back to false")
+            } else {
+                fail("TodoStore: toggle flips done back to false", "done=\(toggledBack.done)")
+            }
+        } catch {
+            fail("TodoStore: toggle flips done back to false", "threw: \(error)")
+        }
+
+        // Toggle nonexistent throws
+        do {
+            _ = try await store.toggle(id: 999)
+            fail("TodoStore: toggle nonexistent throws todoNotFound")
+        } catch let error as TodoStoreError {
+            if case .todoNotFound(let id) = error, id == 999 {
+                pass("TodoStore: toggle nonexistent throws todoNotFound")
+            } else {
+                fail("TodoStore: toggle nonexistent throws todoNotFound", "wrong error: \(error)")
+            }
+        } catch {
+            fail("TodoStore: toggle nonexistent throws todoNotFound", "threw: \(error)")
+        }
+
+        // List
+        let list = await store.list()
+        if list.count == 3 {
+            pass("TodoStore: list returns all items")
+        } else {
+            fail("TodoStore: list returns all items", "count: \(list.count)")
+        }
+
+        // Remove
+        do {
+            let removed = try await store.remove(id: 2)
+            if removed.id == 2 && removed.text == "Urgent task" {
+                pass("TodoStore: remove returns removed item")
+            } else {
+                fail("TodoStore: remove returns removed item")
+            }
+        } catch {
+            fail("TodoStore: remove returns removed item", "threw: \(error)")
+        }
+
+        // Get returns nil after remove
+        let afterRemove = await store.get(id: 2)
+        if afterRemove == nil {
+            pass("TodoStore: get returns nil after remove")
+        } else {
+            fail("TodoStore: get returns nil after remove")
+        }
+
+        // Remove nonexistent throws
+        do {
+            _ = try await store.remove(id: 999)
+            fail("TodoStore: remove nonexistent throws todoNotFound")
+        } catch let error as TodoStoreError {
+            if case .todoNotFound(let id) = error, id == 999 {
+                pass("TodoStore: remove nonexistent throws todoNotFound")
+            } else {
+                fail("TodoStore: remove nonexistent throws todoNotFound", "wrong error: \(error)")
+            }
+        } catch {
+            fail("TodoStore: remove nonexistent throws todoNotFound", "threw: \(error)")
+        }
+
+        // Clear
+        await store.clear()
+        let afterClear = await store.list()
+        if afterClear.isEmpty {
+            pass("TodoStore: clear removes all items")
+        } else {
+            fail("TodoStore: clear removes all items", "count: \(afterClear.count)")
+        }
+
+        // Verify counter reset: next ID should be 1
+        let afterResetItem = await store.add(text: "After clear")
+        if afterResetItem.id == 1 {
+            pass("TodoStore: clear resets ID counter")
+        } else {
+            fail("TodoStore: clear resets ID counter", "id: \(afterResetItem.id)")
         }
     }
 }
