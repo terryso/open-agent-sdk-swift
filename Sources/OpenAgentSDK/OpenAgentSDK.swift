@@ -68,6 +68,14 @@
 /// - ``createTeamCreateTool()`` — Factory for the TeamCreate tool
 /// - ``createTeamDeleteTool()`` — Factory for the TeamDelete tool
 /// - ``createNotebookEditTool()`` — Factory for the NotebookEdit tool
+/// - ``createEnterWorktreeTool()`` — Factory for the EnterWorktree tool
+/// - ``createExitWorktreeTool()`` — Factory for the ExitWorktree tool
+///
+/// ## Specialist Stores
+/// - ``WorktreeStore`` — Thread-safe worktree management actor
+/// - ``WorktreeEntry`` — Worktree data structure
+/// - ``WorktreeStatus`` — Worktree status enum
+/// - ``WorktreeStoreError`` — Worktree store error type
 
 /// Current SDK version.
 public let SDK_VERSION = "0.1.0"

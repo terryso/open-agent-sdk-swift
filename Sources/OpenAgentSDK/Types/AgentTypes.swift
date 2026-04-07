@@ -35,6 +35,9 @@ public struct AgentOptions: Sendable {
     /// Optional task store for task management tools.
     /// Injected into ToolContext for use by task tools (TaskCreate, TaskList, etc.).
     public var taskStore: TaskStore?
+    /// Optional worktree store for worktree management tools.
+    /// Injected into ToolContext for use by worktree tools (EnterWorktree, ExitWorktree).
+    public var worktreeStore: WorktreeStore?
 
     public init(
         apiKey: String? = nil,
@@ -55,7 +58,8 @@ public struct AgentOptions: Sendable {
         agentName: String? = nil,
         mailboxStore: MailboxStore? = nil,
         teamStore: TeamStore? = nil,
-        taskStore: TaskStore? = nil
+        taskStore: TaskStore? = nil,
+        worktreeStore: WorktreeStore? = nil
     ) {
         self.apiKey = apiKey
         self.model = model
@@ -76,6 +80,7 @@ public struct AgentOptions: Sendable {
         self.mailboxStore = mailboxStore
         self.teamStore = teamStore
         self.taskStore = taskStore
+        self.worktreeStore = worktreeStore
     }
 
     /// Create AgentOptions from an SDKConfiguration, using its resolved values
@@ -103,10 +108,9 @@ public struct AgentOptions: Sendable {
         self.mailboxStore = nil
         self.teamStore = nil
         self.taskStore = nil
+        self.worktreeStore = nil
     }
 }
-
-/// Status of a completed agent query.
 public enum QueryStatus: String, Sendable, Equatable {
     /// The query completed successfully (terminated by end_turn or stop_sequence).
     case success

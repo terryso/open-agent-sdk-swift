@@ -58,6 +58,9 @@ public struct ToolContext: Sendable {
     /// Optional task store for task management tools (e.g., TaskCreate, TaskList).
     /// Injected by Core/ when the tool set includes task management tools.
     public let taskStore: TaskStore?
+    /// Optional worktree store for worktree management tools (e.g., EnterWorktree, ExitWorktree).
+    /// Injected by Core/ when the tool set includes worktree management tools.
+    public let worktreeStore: WorktreeStore?
 
     public init(
         cwd: String,
@@ -66,7 +69,8 @@ public struct ToolContext: Sendable {
         mailboxStore: MailboxStore? = nil,
         teamStore: TeamStore? = nil,
         senderName: String? = nil,
-        taskStore: TaskStore? = nil
+        taskStore: TaskStore? = nil,
+        worktreeStore: WorktreeStore? = nil
     ) {
         self.cwd = cwd
         self.toolUseId = toolUseId
@@ -75,5 +79,6 @@ public struct ToolContext: Sendable {
         self.teamStore = teamStore
         self.senderName = senderName
         self.taskStore = taskStore
+        self.worktreeStore = worktreeStore
     }
 }

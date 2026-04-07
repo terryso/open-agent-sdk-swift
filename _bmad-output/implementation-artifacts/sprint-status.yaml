@@ -1,5 +1,6 @@
 # generated: 2026-04-04
 # last_updated: 2026-04-07
+# updated: 5-1-worktree-store-tools → review
 # updated: 4-7-notebook-edit-tool → review
 # updated: 4-7-notebook-edit-tool → ready-for-dev
 # updated: 4-6-team-tools-create-delete → ready-for-dev
@@ -141,8 +142,8 @@ development_status:
   epic-4-retrospective: optional
 
   # Epic 5: 专业工具与管理存储
-  epic-5: backlog
-  5-1-worktree-store-tools: backlog
+  epic-5: in-progress
+  5-1-worktree-store-tools: done
   5-2-plan-store-tools: backlog
   5-3-cron-store-tools: backlog
   5-4-todo-store-tools: backlog

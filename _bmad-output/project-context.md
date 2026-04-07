@@ -5,7 +5,7 @@ date: '2026-04-04'
 sections_completed:
   ['technology_stack', 'language_rules', 'framework_rules', 'testing_rules', 'quality_rules', 'workflow_rules', 'anti_patterns']
 status: 'complete'
-rule_count: 47
+rule_count: 48
 optimized_for_llm: true
 ---
 
@@ -93,33 +93,34 @@ _本文档包含 AI 代理在实现代码时必须遵循的关键规则和模式
 26. **Actor 测试**：使用 `await` 访问 actor 隔离方法
 27. **无 mock 外部 API**：AnthropicClient 测试使用自定义的 mock URL 协议或 URLProtocol 子类
 28. **错误路径测试**：每个 actor 存储和 QueryEngine 必须测试错误传播路径
+29. **故事完成后必须补充 E2E 测试**：每个故事实现完成后，必须在 `Sources/E2ETest/` 中补充对应的 E2E 测试，至少包含 happy path 的验收测试
 
 ### 代码质量规则
 
-29. **import 组织**：顶级公共 API 从 `OpenAgentSDK.swift`（模块入口点）重新导出。内部使用相对导入。
-30. **无循环依赖**：工具永远不直接导入 API 类型。
-31. **Utils/ 扁平结构**：没有嵌套子目录。
-32. **配置默认值**：显式默认 — `maxTurns: 10`、`maxTokens: 16384`、`model: "claude-sonnet-4-6"`。
-33. **环境变量**：通过 `ProcessInfo.processInfo`（或 Linux 上 `getenv`）解析，可为空时返回 nil。
+30. **import 组织**：顶级公共 API 从 `OpenAgentSDK.swift`（模块入口点）重新导出。内部使用相对导入。
+31. **无循环依赖**：工具永远不直接导入 API 类型。
+32. **Utils/ 扁平结构**：没有嵌套子目录。
+33. **配置默认值**：显式默认 — `maxTurns: 10`、`maxTokens: 16384`、`model: "claude-sonnet-4-6"`。
+34. **环境变量**：通过 `ProcessInfo.processInfo`（或 Linux 上 `getenv`）解析，可为空时返回 nil。
 
 ### 开发工作流规则
 
-34. **项目结构**：`Sources/OpenAgentSDK/` 为主源码目录，子目录为 Types/、API/、Core/、Tools/、Stores/、Hooks/、Utils/、MCP/
-35. **不使用 Apple 专属框架**：代码必须同时在 macOS 和 Linux 上运行。使用 Foundation 和 POSIX API。
-36. **POSIX shell 执行**：使用 `Process`（macOS Foundation）/ `posix_spawn`（Linux）执行 shell 钩子，通过 stdin JSON 输入、stdout JSON 输出。
-37. **会话存储路径**：`~/.open-agent-sdk/sessions/{sessionId}/transcript.json`
+35. **项目结构**：`Sources/OpenAgentSDK/` 为主源码目录，子目录为 Types/、API/、Core/、Tools/、Stores/、Hooks/、Utils/、MCP/
+36. **不使用 Apple 专属框架**：代码必须同时在 macOS 和 Linux 上运行。使用 Foundation 和 POSIX API。
+37. **POSIX shell 执行**：使用 `Process`（macOS Foundation）/ `posix_spawn`（Linux）执行 shell 钩子，通过 stdin JSON 输入、stdout JSON 输出。
+38. **会话存储路径**：`~/.open-agent-sdk/sessions/{sessionId}/transcript.json`
 
 ### 关键反模式和禁忌
 
-38. **不要**从工具处理程序内部 throw 错误 — 在 ToolResult 中捕获返回
-39. **不要**使用 force-unwrap (`!`) — 使用 guard let / if let
-40. **不要**在 Tools/ 中导入 Core/ — 违反模块边界
-41. **不要**将 Codable 用于 LLM API 通信 — 使用原始 `[String: Any]` 字典
-42. **不要**使用社区 Anthropic SDK — 使用自定义 AnthropicClient actor
-43. **不要**使用 Apple 专属框架（UIKit, AppKit, Combine 等）— 必须跨平台
-44. **不要**对可变共享状态使用 struct/class — 必须是 actor
-45. **不要**将 Set 用于有序集合 — 使用 Array（工具列表、消息历史）
-46. **不要**在工具中使用 async let 或 unstructured Task — 使用 TaskGroup 的结构化并发
+39. **不要**从工具处理程序内部 throw 错误 — 在 ToolResult 中捕获返回
+40. **不要**使用 force-unwrap (`!`) — 使用 guard let / if let
+41. **不要**在 Tools/ 中导入 Core/ — 违反模块边界
+42. **不要**将 Codable 用于 LLM API 通信 — 使用原始 `[String: Any]` 字典
+43. **不要**使用社区 Anthropic SDK — 使用自定义 AnthropicClient actor
+44. **不要**使用 Apple 专属框架（UIKit, AppKit, Combine 等）— 必须跨平台
+45. **不要**对可变共享状态使用 struct/class — 必须是 actor
+46. **不要**将 Set 用于有序集合 — 使用 Array（工具列表、消息历史）
+47. **不要**在工具中使用 async let 或 unstructured Task — 使用 TaskGroup 的结构化并发
 
 ---
 
@@ -140,4 +141,4 @@ _本文档包含 AI 代理在实现代码时必须遵循的关键规则和模式
 - 定期审查过时规则
 - 规则变得显而易见时移除
 
-Last Updated: 2026-04-04
+Last Updated: 2026-04-07

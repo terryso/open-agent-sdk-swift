@@ -233,3 +233,56 @@ public enum AgentRegistryError: Error, Equatable, LocalizedError, Sendable {
         }
     }
 }
+
+// MARK: - WorktreeStatus
+
+/// Status of a worktree entry.
+public enum WorktreeStatus: String, Sendable, Equatable, Codable {
+    case active
+    case removed
+}
+
+// MARK: - WorktreeEntry
+
+/// A worktree entry tracked by the WorktreeStore.
+public struct WorktreeEntry: Sendable, Equatable, Codable {
+    public let id: String
+    public let path: String
+    public let branch: String
+    public let originalCwd: String
+    public let createdAt: String
+    public var status: WorktreeStatus
+
+    public init(
+        id: String,
+        path: String,
+        branch: String,
+        originalCwd: String,
+        createdAt: String,
+        status: WorktreeStatus = .active
+    ) {
+        self.id = id
+        self.path = path
+        self.branch = branch
+        self.originalCwd = originalCwd
+        self.createdAt = createdAt
+        self.status = status
+    }
+}
+
+// MARK: - WorktreeStoreError
+
+/// Errors thrown by WorktreeStore operations.
+public enum WorktreeStoreError: Error, Equatable, LocalizedError, Sendable {
+    case worktreeNotFound(id: String)
+    case gitCommandFailed(message: String)
+
+    public var errorDescription: String? {
+        switch self {
+        case .worktreeNotFound(let id):
+            return "Worktree not found: \(id)"
+        case .gitCommandFailed(let message):
+            return "Git command failed: \(message)"
+        }
+    }
+}

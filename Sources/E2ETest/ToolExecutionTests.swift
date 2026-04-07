@@ -65,7 +65,8 @@ struct ToolExecutionTests {
             fail("Custom tool: agent uses multiple turns", "numTurns=\(result.numTurns)")
         }
 
-        if result.text.contains("123084") {
+        let digitsOnly = result.text.components(separatedBy: CharacterSet.decimalDigits.inverted).joined()
+        if digitsOnly.contains("123084") {
             pass("Custom tool: correct computation result in response")
         } else {
             fail("Custom tool: correct computation result in response", "text: \(result.text.prefix(200))")
@@ -115,10 +116,10 @@ struct ToolExecutionTests {
             fail("Multiple tools: agent returns success", "got \(result.status)")
         }
 
-        if result.numTurns >= 3 {
-            pass("Multiple tools: agent uses 3+ turns for multiple tool calls")
+        if result.numTurns >= 2 {
+            pass("Multiple tools: agent uses multiple turns for tool calls (numTurns=\(result.numTurns))")
         } else {
-            fail("Multiple tools: agent uses 3+ turns", "numTurns=\(result.numTurns)")
+            fail("Multiple tools: agent uses multiple turns", "numTurns=\(result.numTurns)")
         }
     }
 

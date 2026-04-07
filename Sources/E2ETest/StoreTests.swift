@@ -16,6 +16,9 @@ struct StoreTests {
 
         section("20. AgentRegistry Operations")
         await testAgentRegistryOperations()
+
+        section("24. WorktreeStore Operations")
+        await testWorktreeStoreOperations()
     }
 
     // MARK: Test 17
@@ -296,5 +299,139 @@ struct StoreTests {
         } else {
             fail("AgentRegistry: clear removes all agents")
         }
+    }
+
+    // MARK: Test 24
+
+    static func testWorktreeStoreOperations() async {
+        let store = WorktreeStore()
+
+        // Create a temp git repo for worktree operations
+        let tmpDir = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "e2e-worktree-store-\(UUID().uuidString)", isDirectory: true
+        )
+        try? FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
+
+        // Initialize git repo with an initial commit (worktrees need at least one commit)
+        let gitInit = Process()
+        gitInit.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+        gitInit.arguments = ["init"]
+        gitInit.currentDirectoryURL = tmpDir
+        try? gitInit.run()
+        gitInit.waitUntilExit()
+
+        let gitConfig = Process()
+        gitConfig.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+        gitConfig.arguments = ["config", "user.email", "e2e@test.com"]
+        gitConfig.currentDirectoryURL = tmpDir
+        try? gitConfig.run()
+        gitConfig.waitUntilExit()
+
+        let gitConfigName = Process()
+        gitConfigName.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+        gitConfigName.arguments = ["config", "user.name", "E2E Test"]
+        gitConfigName.currentDirectoryURL = tmpDir
+        try? gitConfigName.run()
+        gitConfigName.waitUntilExit()
+
+        let readmePath = tmpDir.appendingPathComponent("README.md")
+        try? "test".write(to: readmePath, atomically: true, encoding: .utf8)
+
+        let gitAdd = Process()
+        gitAdd.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+        gitAdd.arguments = ["add", "."]
+        gitAdd.currentDirectoryURL = tmpDir
+        try? gitAdd.run()
+        gitAdd.waitUntilExit()
+
+        let gitCommit = Process()
+        gitCommit.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+        gitCommit.arguments = ["commit", "-m", "Initial commit"]
+        gitCommit.currentDirectoryURL = tmpDir
+        try? gitCommit.run()
+        gitCommit.waitUntilExit()
+
+        let cwd = tmpDir.path
+
+        // Test create
+        let entry: WorktreeEntry
+        do {
+            entry = try await store.create(name: "test-wt", originalCwd: cwd)
+            if !entry.id.isEmpty && entry.path.contains("test-wt") && entry.branch == "worktree-test-wt" {
+                pass("WorktreeStore: create returns entry with id, path, and branch")
+            } else {
+                fail("WorktreeStore: create returns entry with id, path, and branch", "id=\(entry.id) path=\(entry.path) branch=\(entry.branch)")
+            }
+        } catch {
+            fail("WorktreeStore: create returns entry with id, path, and branch", "threw: \(error)")
+            // Cleanup and return
+            try? FileManager.default.removeItem(at: tmpDir)
+            return
+        }
+
+        // Test get
+        let retrieved = await store.get(id: entry.id)
+        if retrieved?.id == entry.id && retrieved?.status == .active {
+            pass("WorktreeStore: get retrieves created worktree")
+        } else {
+            fail("WorktreeStore: get retrieves created worktree")
+        }
+
+        // Test list
+        let list = await store.list()
+        if list.count == 1 {
+            pass("WorktreeStore: list returns created worktrees")
+        } else {
+            fail("WorktreeStore: list returns created worktrees", "count: \(list.count)")
+        }
+
+        // Test keep (remove tracking only, leave filesystem)
+        do {
+            let kept = try await store.keep(id: entry.id)
+            if kept {
+                pass("WorktreeStore: keep removes tracking")
+            } else {
+                fail("WorktreeStore: keep removes tracking")
+            }
+        } catch {
+            fail("WorktreeStore: keep removes tracking", "threw: \(error)")
+        }
+
+        let afterKeep = await store.get(id: entry.id)
+        if afterKeep == nil {
+            pass("WorktreeStore: get returns nil after keep")
+        } else {
+            fail("WorktreeStore: get returns nil after keep")
+        }
+
+        // Test create + remove (full lifecycle)
+        do {
+            let entry2 = try await store.create(name: "test-wt2", originalCwd: cwd)
+            let removed = try await store.remove(id: entry2.id)
+            if removed {
+                pass("WorktreeStore: remove deletes worktree and tracking")
+            } else {
+                fail("WorktreeStore: remove deletes worktree and tracking")
+            }
+        } catch {
+            fail("WorktreeStore: remove deletes worktree and tracking", "threw: \(error)")
+        }
+
+        // Test clear
+        do {
+            _ = try await store.create(name: "test-wt3", originalCwd: cwd)
+        } catch {
+            fail("WorktreeStore: setup for clear test failed", "threw: \(error)")
+        }
+        await store.clear()
+        let afterClear = await store.list()
+        if afterClear.isEmpty {
+            pass("WorktreeStore: clear removes all entries")
+        } else {
+            fail("WorktreeStore: clear removes all entries", "count: \(afterClear.count)")
+        }
+
+        // Cleanup
+        try? FileManager.default.removeItem(at: tmpDir)
     }
 }
