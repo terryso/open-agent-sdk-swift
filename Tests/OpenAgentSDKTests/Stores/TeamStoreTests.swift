@@ -190,10 +190,11 @@ final class TeamStoreTests: XCTestCase {
         // When: deleting the team
         let result = try await store.delete(id: team.id)
 
-        // Then: returns true and team is gone
+        // Then: returns true and team status is disbanded
         XCTAssertTrue(result)
         let fetched = await store.get(id: team.id)
-        XCTAssertNil(fetched)
+        XCTAssertNotNil(fetched)
+        XCTAssertEqual(fetched?.status, .disbanded)
     }
 
     /// AC1 [P0]: Deleting a non-existent team throws teamNotFound error.
