@@ -1,5 +1,7 @@
 # generated: 2026-04-04
 # last_updated: 2026-04-07
+# updated: 4-7-notebook-edit-tool → review
+# updated: 4-7-notebook-edit-tool → ready-for-dev
 # updated: 4-6-team-tools-create-delete → ready-for-dev
 # updated: 4-5-task-tools-create-list-update-get-stop-output → done
 # updated: 4-6-team-tools-create-delete → review
@@ -63,6 +65,8 @@
 
 generated: 2026-04-04
 last_updated: 2026-04-07
+# updated: 4-7-notebook-edit-tool → review
+# updated: 4-7-notebook-edit-tool → ready-for-dev
 # updated: 4-4-send-message-tool → done
 # updated: 4-6-team-tools-create-delete → ready-for-dev
 # updated: 4-1-task-store-mailbox-store → done
@@ -133,7 +137,7 @@ development_status:
   4-4-send-message-tool: done
   4-5-task-tools-create-list-update-get-stop-output: done
   4-6-team-tools-create-delete: done
-  4-7-notebook-edit-tool: backlog
+  4-7-notebook-edit-tool: done
   epic-4-retrospective: optional
 
   # Epic 5: 专业工具与管理存储

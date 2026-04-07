@@ -67,6 +67,7 @@
 /// - ``createTaskOutputTool()`` — Factory for the TaskOutput tool
 /// - ``createTeamCreateTool()`` — Factory for the TeamCreate tool
 /// - ``createTeamDeleteTool()`` — Factory for the TeamDelete tool
+/// - ``createNotebookEditTool()`` — Factory for the NotebookEdit tool
 
 /// Current SDK version.
 public let SDK_VERSION = "0.1.0"
