@@ -64,8 +64,20 @@ public func getAllBaseTools(tier: ToolTier) -> [ToolProtocol] {
             createWebFetchTool(),
             createWebSearchTool(),
         ]
-    case .advanced, .specialist:
+    case .advanced:
         return []
+    case .specialist:
+        return [
+            createEnterWorktreeTool(),
+            createExitWorktreeTool(),
+            createEnterPlanModeTool(),
+            createExitPlanModeTool(),
+            createCronCreateTool(),
+            createCronDeleteTool(),
+            createCronListTool(),
+            createTodoWriteTool(),
+            createLSPTool(),
+        ]
     }
 }
 
