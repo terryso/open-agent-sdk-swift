@@ -127,7 +127,7 @@ development_status:
   4-2-team-store-agent-registry: done
   4-3-agent-tool-sub-agent-spawn: done
   4-4-send-message-tool: done
-  4-5-task-tools-create-list-update-get-stop-output: backlog
+  4-5-task-tools-create-list-update-get-stop-output: done
   4-6-team-tools-create-delete: backlog
   4-7-notebook-edit-tool: backlog
   epic-4-retrospective: optional

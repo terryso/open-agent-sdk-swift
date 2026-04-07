@@ -32,6 +32,9 @@ public struct AgentOptions: Sendable {
     /// Optional team store for team management.
     /// Injected into ToolContext for use by messaging tools.
     public var teamStore: TeamStore?
+    /// Optional task store for task management tools.
+    /// Injected into ToolContext for use by task tools (TaskCreate, TaskList, etc.).
+    public var taskStore: TaskStore?
 
     public init(
         apiKey: String? = nil,
@@ -51,7 +54,8 @@ public struct AgentOptions: Sendable {
         retryConfig: RetryConfig? = nil,
         agentName: String? = nil,
         mailboxStore: MailboxStore? = nil,
-        teamStore: TeamStore? = nil
+        teamStore: TeamStore? = nil,
+        taskStore: TaskStore? = nil
     ) {
         self.apiKey = apiKey
         self.model = model
@@ -71,6 +75,7 @@ public struct AgentOptions: Sendable {
         self.agentName = agentName
         self.mailboxStore = mailboxStore
         self.teamStore = teamStore
+        self.taskStore = taskStore
     }
 
     /// Create AgentOptions from an SDKConfiguration, using its resolved values
@@ -97,6 +102,7 @@ public struct AgentOptions: Sendable {
         self.agentName = nil
         self.mailboxStore = nil
         self.teamStore = nil
+        self.taskStore = nil
     }
 }
 

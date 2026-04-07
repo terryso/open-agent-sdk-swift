@@ -251,7 +251,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                             agentSpawner: spawner,
                             mailboxStore: options.mailboxStore,
                             teamStore: options.teamStore,
-                            senderName: options.agentName
+                            senderName: options.agentName,
+                            taskStore: options.taskStore
                         )
                     )
 
@@ -344,6 +345,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
         let capturedMailboxStore = options.mailboxStore
         let capturedTeamStore = options.teamStore
         let capturedAgentName = options.agentName
+        let capturedTaskStore = options.taskStore
 
         // Build tool definitions for API call
         let capturedApiTools: [[String: Any]]? = {
@@ -636,7 +638,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                                     agentSpawner: streamSpawner,
                                     mailboxStore: capturedMailboxStore,
                                     teamStore: capturedTeamStore,
-                                    senderName: capturedAgentName
+                                    senderName: capturedAgentName,
+                                    taskStore: capturedTaskStore
                                 )
                             )
 

@@ -55,6 +55,9 @@ public struct ToolContext: Sendable {
     /// Optional sender name identifying the current agent in multi-agent scenarios.
     /// Used by messaging tools to identify the message sender.
     public let senderName: String?
+    /// Optional task store for task management tools (e.g., TaskCreate, TaskList).
+    /// Injected by Core/ when the tool set includes task management tools.
+    public let taskStore: TaskStore?
 
     public init(
         cwd: String,
@@ -62,7 +65,8 @@ public struct ToolContext: Sendable {
         agentSpawner: (any SubAgentSpawner)? = nil,
         mailboxStore: MailboxStore? = nil,
         teamStore: TeamStore? = nil,
-        senderName: String? = nil
+        senderName: String? = nil,
+        taskStore: TaskStore? = nil
     ) {
         self.cwd = cwd
         self.toolUseId = toolUseId
@@ -70,5 +74,6 @@ public struct ToolContext: Sendable {
         self.mailboxStore = mailboxStore
         self.teamStore = teamStore
         self.senderName = senderName
+        self.taskStore = taskStore
     }
 }

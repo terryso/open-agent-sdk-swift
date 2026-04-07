@@ -59,6 +59,12 @@
 /// - ``AgentDefinition`` — Sub-agent configuration with tools and maxTurns
 /// - ``createAgentTool()`` — Factory for the Agent tool
 /// - ``createSendMessageTool()`` — Factory for the SendMessage tool
+/// - ``createTaskCreateTool()`` — Factory for the TaskCreate tool
+/// - ``createTaskListTool()`` — Factory for the TaskList tool
+/// - ``createTaskUpdateTool()`` — Factory for the TaskUpdate tool
+/// - ``createTaskGetTool()`` — Factory for the TaskGet tool
+/// - ``createTaskStopTool()`` — Factory for the TaskStop tool
+/// - ``createTaskOutputTool()`` — Factory for the TaskOutput tool
 
 /// Current SDK version.
 public let SDK_VERSION = "0.1.0"

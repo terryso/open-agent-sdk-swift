@@ -9,6 +9,18 @@ public enum TaskStatus: String, Sendable, Equatable, Codable, CaseIterable {
     case completed
     case failed
     case cancelled
+
+    /// Parse a status string, accepting both camelCase ("inProgress") and snake_case ("in_progress").
+    public static func parse(_ string: String) -> TaskStatus? {
+        if let direct = TaskStatus(rawValue: string) { return direct }
+        // Convert snake_case to camelCase and retry
+        let camel = string
+            .split(separator: "_")
+            .enumerated()
+            .map { $0.offset == 0 ? String($0.element) : String($0.element).capitalized }
+            .joined()
+        return TaskStatus(rawValue: camel)
+    }
 }
 
 // MARK: - Task
