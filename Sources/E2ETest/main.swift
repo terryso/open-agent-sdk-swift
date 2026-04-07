@@ -1,127 +1,90 @@
 import Foundation
 import OpenAgentSDK
 
-// MARK: - .env File Loader
+// MARK: - Entry Point
 
-func loadDotEnv() -> [String: String] {
-    let envPath = FileManager.default.currentDirectoryPath + "/.env"
-    guard let content = try? String(contentsOfFile: envPath, encoding: .utf8) else { return [:] }
-    var env: [String: String] = [:]
-    for line in content.components(separatedBy: "\n") {
-        let trimmed = line.trimmingCharacters(in: .whitespaces)
-        if trimmed.isEmpty || trimmed.hasPrefix("#") { continue }
-        guard let eqRange = trimmed.range(of: "=") else { continue }
-        let key = String(trimmed[..<eqRange.lowerBound]).trimmingCharacters(in: .whitespaces)
-        let value = String(trimmed[eqRange.upperBound...]).trimmingCharacters(in: .whitespaces)
-        env[key] = value
-    }
-    return env
+let dotEnv = loadDotEnv()
+
+print("=== OpenAgentSDK E2E Test Suite ===\n")
+
+guard let apiKey = getEnv("CODEANY_API_KEY", from: dotEnv), !apiKey.isEmpty else {
+    print("ERROR: CODEANY_API_KEY not set")
+    print("Create a .env file or set environment variables:")
+    print("  CODEANY_API_KEY=your-key")
+    print("  CODEANY_BASE_URL=https://your-proxy.com")
+    print("  CODEANY_MODEL=glm-5.1")
+    print("\nThen run: swift run E2ETest")
+    exit(1)
 }
 
-func getEnv(_ key: String, from dotEnv: [String: String]) -> String? {
-    if let value = ProcessInfo.processInfo.environment[key], !value.isEmpty {
-        return value
-    }
-    return dotEnv[key]
+let baseURL = getEnv("CODEANY_BASE_URL", from: dotEnv) ?? "https://api.openai.com"
+let model = getEnv("CODEANY_MODEL", from: dotEnv) ?? "glm-5.1"
+
+print("Config:")
+print("  Model:    \(model)")
+print("  Base URL: \(baseURL)")
+print("  API Key:  \(String(apiKey.prefix(8)))...\n")
+
+// ================================================================
+// SECTION 1-4: Basic Agent Operations
+// ================================================================
+await BasicAgentTests.run(apiKey: apiKey, model: model, baseURL: baseURL)
+
+// ================================================================
+// SECTION 5-8: Tool Execution
+// ================================================================
+await ToolExecutionTests.run(apiKey: apiKey, model: model, baseURL: baseURL)
+
+// ================================================================
+// SECTION 9-10: Budget & Limits
+// ================================================================
+await BudgetAndLimitsTests.run(apiKey: apiKey, model: model, baseURL: baseURL)
+
+// ================================================================
+// SECTION 11-12: Error Handling
+// ================================================================
+await ErrorHandlingTests.run(baseURL: baseURL)
+
+// ================================================================
+// SECTION 13-14: Token & Cost Tracking
+// ================================================================
+await TrackingTests.run(apiKey: apiKey, model: model, baseURL: baseURL)
+
+// ================================================================
+// SECTION 15-16: Tool Registry & Assembly
+// ================================================================
+ToolRegistryTests.run()
+
+// ================================================================
+// SECTION 17-20: Store Operations
+// ================================================================
+await StoreTests.run()
+
+// ================================================================
+// SECTION 21: SDKMessage Types
+// ================================================================
+await SDKMessageTests.run(apiKey: apiKey, model: model, baseURL: baseURL)
+
+// ================================================================
+// SECTION 22: No-Input Tool
+// ================================================================
+await NoInputToolTests.run(apiKey: apiKey, model: model, baseURL: baseURL)
+
+// ================================================================
+// SECTION 23: Agent with Stores Integration
+// ================================================================
+await IntegrationTests.run(apiKey: apiKey, model: model, baseURL: baseURL)
+
+// ================================================================
+// Results Summary
+// ================================================================
+print("\n=== E2E Test Results ===")
+print("  Total:  \(Stats.total)")
+print("  Passed: \(Stats.passed)")
+print("  Failed: \(Stats.failed)")
+if Stats.failed == 0 {
+    print("\n  All tests passed!")
+} else {
+    print("\n  \(Stats.failed) test(s) FAILED")
 }
-
-// MARK: - Main
-
-@main
-struct E2ETestRunner {
-    static func main() async {
-        let dotEnv = loadDotEnv()
-
-        print("=== OpenAgentSDK E2E Test (OpenAI Compatible Client) ===\n")
-
-        guard let apiKey = getEnv("CODEANY_API_KEY", from: dotEnv), !apiKey.isEmpty else {
-            print("ERROR: CODEANY_API_KEY not set")
-            print("Create a .env file or set environment variables:")
-            print("  CODEANY_API_KEY=your-key")
-            print("  CODEANY_BASE_URL=https://your-proxy.com")
-            print("  CODEANY_MODEL=glm-5.1")
-            print("\nThen run: swift run E2ETest")
-            return
-        }
-
-        let baseURL = getEnv("CODEANY_BASE_URL", from: dotEnv) ?? "https://api.openai.com"
-        let model = getEnv("CODEANY_MODEL", from: dotEnv) ?? "glm-5.1"
-
-        print("Config:")
-        print("  Model:    \(model)")
-        print("  Base URL: \(baseURL)")
-        print("  API Key:  \(String(apiKey.prefix(8)))...\n")
-
-        let agent = createAgent(options: AgentOptions(
-            apiKey: apiKey,
-            model: model,
-            baseURL: baseURL,
-            provider: .openai,
-            maxTurns: 1
-        ))
-
-        // Test 1: Non-streaming
-        print("--- Test 1: Non-streaming prompt ---")
-        let result = await agent.prompt("Say exactly: Hello from OpenAgentSDK E2E test!")
-        print("Status:   \(result.status)")
-        print("Response: \(result.text)")
-        print("Usage:    \(result.usage.inputTokens) in / \(result.usage.outputTokens) out")
-        print("Duration: \(result.durationMs)ms, Turns: \(result.numTurns)")
-        if result.status != .success {
-            print("[FAIL] Unexpected status")
-            return
-        }
-        if result.text.isEmpty {
-            print("[FAIL] Empty response")
-            return
-        }
-        print("[PASS]\n")
-
-        // Test 2: Streaming
-        print("--- Test 2: Streaming prompt ---")
-        let agent2 = createAgent(options: AgentOptions(
-            apiKey: apiKey,
-            model: model,
-            baseURL: baseURL,
-            provider: .openai,
-            maxTurns: 1
-        ))
-        var partialCount = 0
-        var fullText = ""
-        for await message in agent2.stream("Count from 1 to 5, one number per line.") {
-            switch message {
-            case .partialMessage(let data):
-                partialCount += 1
-                fullText += data.text
-            case .result(let data):
-                print("Status:   \(data.subtype)")
-                print("Chunks:   \(partialCount)")
-                print("Response: \(data.text)")
-                if let usage = data.usage {
-                    print("Usage:    \(usage.inputTokens) in / \(usage.outputTokens) out")
-                }
-                print("Duration: \(data.durationMs)ms")
-            default:
-                break
-            }
-        }
-        if fullText.isEmpty {
-            print("[FAIL] Empty streaming response")
-            return
-        }
-        print("[PASS]\n")
-
-        // Test 3: AnthropicClient regression
-        print("--- Test 3: AnthropicClient regression ---")
-        let client = AnthropicClient(apiKey: "test-key", baseURL: "https://test.example.com")
-        let desc = String(describing: client)
-        if desc.contains("AnthropicClient") {
-            print("AnthropicClient still works and conforms to LLMClient")
-            print("[PASS]\n")
-        } else {
-            print("[FAIL] AnthropicClient broken")
-        }
-
-        print("=== All E2E Tests Complete ===")
-    }
-}
+print("=== Complete ===")
