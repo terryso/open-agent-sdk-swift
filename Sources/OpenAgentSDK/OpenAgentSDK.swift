@@ -72,6 +72,9 @@
 /// - ``createExitWorktreeTool()`` — Factory for the ExitWorktree tool
 /// - ``createEnterPlanModeTool()`` — Factory for the EnterPlanMode tool
 /// - ``createExitPlanModeTool()`` — Factory for the ExitPlanMode tool
+/// - ``createCronCreateTool()`` — Factory for the CronCreate tool
+/// - ``createCronDeleteTool()`` — Factory for the CronDelete tool
+/// - ``createCronListTool()`` — Factory for the CronList tool
 ///
 /// ## Specialist Stores
 /// - ``WorktreeStore`` — Thread-safe worktree management actor
@@ -82,6 +85,9 @@
 /// - ``PlanEntry`` — Plan data structure
 /// - ``PlanStatus`` — Plan status enum
 /// - ``PlanStoreError`` — Plan store error type
+/// - ``CronStore`` — Thread-safe cron job management actor
+/// - ``CronJob`` — Cron job data structure
+/// - ``CronStoreError`` — Cron store error type
 
 /// Current SDK version.
 public let SDK_VERSION = "0.1.0"

@@ -64,6 +64,9 @@ public struct ToolContext: Sendable {
     /// Optional plan store for plan management tools (e.g., EnterPlanMode, ExitPlanMode).
     /// Injected by Core/ when the tool set includes plan management tools.
     public let planStore: PlanStore?
+    /// Optional cron store for cron management tools (e.g., CronCreate, CronDelete, CronList).
+    /// Injected by Core/ when the tool set includes cron management tools.
+    public let cronStore: CronStore?
 
     public init(
         cwd: String,
@@ -74,7 +77,8 @@ public struct ToolContext: Sendable {
         senderName: String? = nil,
         taskStore: TaskStore? = nil,
         worktreeStore: WorktreeStore? = nil,
-        planStore: PlanStore? = nil
+        planStore: PlanStore? = nil,
+        cronStore: CronStore? = nil
     ) {
         self.cwd = cwd
         self.toolUseId = toolUseId
@@ -85,5 +89,6 @@ public struct ToolContext: Sendable {
         self.taskStore = taskStore
         self.worktreeStore = worktreeStore
         self.planStore = planStore
+        self.cronStore = cronStore
     }
 }

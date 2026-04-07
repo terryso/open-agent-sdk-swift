@@ -13,6 +13,9 @@ struct IntegrationTests {
 
         section("27. Agent with PlanStore Integration")
         await testAgentWithPlanStore(apiKey: apiKey, model: model, baseURL: baseURL)
+
+        section("29. Agent with CronStore Integration")
+        await testAgentWithCronStore(apiKey: apiKey, model: model, baseURL: baseURL)
     }
 
     static func testAgentWithTaskStore(apiKey: String, model: String, baseURL: String) async {
@@ -116,6 +119,53 @@ struct IntegrationTests {
             }
         } catch {
             fail("Agent+PlanStore: plan lifecycle works after agent run", "threw: \(error)")
+        }
+    }
+
+    // MARK: Test 29
+
+    static func testAgentWithCronStore(apiKey: String, model: String, baseURL: String) async {
+        let cronStore = CronStore()
+
+        let agent = createAgent(options: AgentOptions(
+            apiKey: apiKey, model: model, baseURL: baseURL,
+            provider: .openai, maxTurns: 1,
+            cronStore: cronStore
+        ))
+
+        let result = await agent.prompt("Say 'cron store test ok'.")
+
+        if result.status == .success {
+            pass("Agent+CronStore: agent created with cronStore")
+        } else {
+            fail("Agent+CronStore: agent created with cronStore", "got \(result.status)")
+        }
+
+        // Verify store is functional after agent run
+        let list = await cronStore.list()
+        if list.isEmpty {
+            pass("Agent+CronStore: store is functional and empty after agent run")
+        } else {
+            fail("Agent+CronStore: store is functional and empty after agent run", "count: \(list.count)")
+        }
+
+        // Verify cron lifecycle works after agent run
+        let job = await cronStore.create(name: "Post-agent job", schedule: "0 * * * *", command: "echo hello")
+        if job.id == "cron_1" && job.enabled == true {
+            pass("Agent+CronStore: create works after agent run")
+        } else {
+            fail("Agent+CronStore: create works after agent run", "id=\(job.id) enabled=\(job.enabled)")
+        }
+
+        do {
+            let deleted = try await cronStore.delete(id: job.id)
+            if deleted {
+                pass("Agent+CronStore: delete works after agent run")
+            } else {
+                fail("Agent+CronStore: delete works after agent run")
+            }
+        } catch {
+            fail("Agent+CronStore: delete works after agent run", "threw: \(error)")
         }
     }
 }

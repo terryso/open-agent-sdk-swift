@@ -1,6 +1,6 @@
 # generated: 2026-04-04
-# last_updated: 2026-04-07
-# updated: 5-2-plan-store-tools → ready-for-dev
+# last_updated: 2026-04-07 (5-3-cron-store-tools → review)
+# updated: 5-3-cron-store-tools → review
 # updated: 5-1-worktree-store-tools → review
 # updated: 4-7-notebook-edit-tool → review
 # updated: 4-7-notebook-edit-tool → ready-for-dev
@@ -147,7 +147,7 @@ development_status:
   epic-5: in-progress
   5-1-worktree-store-tools: done
   5-2-plan-store-tools: done
-  5-3-cron-store-tools: backlog
+  5-3-cron-store-tools: done
   5-4-todo-store-tools: backlog
   5-5-lsp-tool: backlog
   5-6-config-remote-trigger-tools: backlog

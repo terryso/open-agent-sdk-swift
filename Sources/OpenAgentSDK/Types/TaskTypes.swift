@@ -343,3 +343,51 @@ public enum PlanStoreError: Error, Equatable, LocalizedError, Sendable {
         }
     }
 }
+
+// MARK: - CronJob
+
+/// A cron job tracked by the CronStore.
+public struct CronJob: Sendable, Equatable, Codable {
+    public let id: String
+    public let name: String
+    public let schedule: String
+    public let command: String
+    public var enabled: Bool
+    public let createdAt: String
+    public var lastRunAt: String?
+    public var nextRunAt: String?
+
+    public init(
+        id: String,
+        name: String,
+        schedule: String,
+        command: String,
+        enabled: Bool = true,
+        createdAt: String,
+        lastRunAt: String? = nil,
+        nextRunAt: String? = nil
+    ) {
+        self.id = id
+        self.name = name
+        self.schedule = schedule
+        self.command = command
+        self.enabled = enabled
+        self.createdAt = createdAt
+        self.lastRunAt = lastRunAt
+        self.nextRunAt = nextRunAt
+    }
+}
+
+// MARK: - CronStoreError
+
+/// Errors thrown by CronStore operations.
+public enum CronStoreError: Error, Equatable, LocalizedError, Sendable {
+    case cronJobNotFound(id: String)
+
+    public var errorDescription: String? {
+        switch self {
+        case .cronJobNotFound(let id):
+            return "Cron job not found: \(id)"
+        }
+    }
+}

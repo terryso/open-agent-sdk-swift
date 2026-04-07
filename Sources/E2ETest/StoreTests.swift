@@ -22,6 +22,9 @@ struct StoreTests {
 
         section("26. PlanStore Operations")
         await testPlanStoreOperations()
+
+        section("28. CronStore Operations")
+        await testCronStoreOperations()
     }
 
     // MARK: Test 17
@@ -556,6 +559,119 @@ struct StoreTests {
             pass("PlanStore: clear resets all state")
         } else {
             fail("PlanStore: clear resets all state", "count: \(afterClear.count) active=\(activeAfterClear)")
+        }
+    }
+
+    // MARK: Test 28
+
+    static func testCronStoreOperations() async {
+        let store = CronStore()
+
+        // Create a cron job
+        let job = await store.create(name: "Daily Report", schedule: "0 9 * * *", command: "Generate daily report")
+        if job.id.hasPrefix("cron_") && job.name == "Daily Report" && job.schedule == "0 9 * * *" && job.command == "Generate daily report" && job.enabled == true {
+            pass("CronStore: create returns job with id, fields, and enabled=true")
+        } else {
+            fail("CronStore: create returns job with id, fields, and enabled=true", "id=\(job.id) name=\(job.name) enabled=\(job.enabled)")
+        }
+
+        // createdAt is set
+        if !job.createdAt.isEmpty {
+            pass("CronStore: create sets createdAt timestamp")
+        } else {
+            fail("CronStore: create sets createdAt timestamp")
+        }
+
+        // Sequential IDs
+        let job2 = await store.create(name: "Hourly Check", schedule: "0 * * * *", command: "Check status")
+        if job2.id == "cron_2" && job.id == "cron_1" {
+            pass("CronStore: sequential ID generation (cron_1, cron_2)")
+        } else {
+            fail("CronStore: sequential ID generation", "id1=\(job.id) id2=\(job2.id)")
+        }
+
+        // Get by ID
+        let retrieved = await store.get(id: job.id)
+        if retrieved?.id == job.id && retrieved?.name == "Daily Report" {
+            pass("CronStore: get retrieves created job")
+        } else {
+            fail("CronStore: get retrieves created job")
+        }
+
+        // Get nonexistent returns nil
+        let notFound = await store.get(id: "cron_999")
+        if notFound == nil {
+            pass("CronStore: get returns nil for nonexistent ID")
+        } else {
+            fail("CronStore: get returns nil for nonexistent ID")
+        }
+
+        // List
+        let list = await store.list()
+        if list.count == 2 {
+            pass("CronStore: list returns all jobs")
+        } else {
+            fail("CronStore: list returns all jobs", "count: \(list.count)")
+        }
+
+        // Delete
+        do {
+            let deleted = try await store.delete(id: job.id)
+            if deleted {
+                pass("CronStore: delete removes job")
+            } else {
+                fail("CronStore: delete removes job")
+            }
+        } catch {
+            fail("CronStore: delete removes job", "threw: \(error)")
+        }
+
+        // Get returns nil after delete
+        let afterDelete = await store.get(id: job.id)
+        if afterDelete == nil {
+            pass("CronStore: get returns nil after delete")
+        } else {
+            fail("CronStore: get returns nil after delete")
+        }
+
+        // List count updated after delete
+        let listAfterDelete = await store.list()
+        if listAfterDelete.count == 1 {
+            pass("CronStore: list count updated after delete")
+        } else {
+            fail("CronStore: list count updated after delete", "count: \(listAfterDelete.count)")
+        }
+
+        // Delete nonexistent throws
+        do {
+            _ = try await store.delete(id: "cron_999")
+            fail("CronStore: delete nonexistent throws cronJobNotFound")
+        } catch let error as CronStoreError {
+            if case .cronJobNotFound(let id) = error, id == "cron_999" {
+                pass("CronStore: delete nonexistent throws cronJobNotFound")
+            } else {
+                fail("CronStore: delete nonexistent throws cronJobNotFound", "wrong error: \(error)")
+            }
+        } catch {
+            fail("CronStore: delete nonexistent throws cronJobNotFound", "threw: \(error)")
+        }
+
+        // Clear removes all jobs and resets counter
+        _ = await store.create(name: "Job C", schedule: "* * * * *", command: "echo hi")
+        await store.clear()
+        let afterClear = await store.list()
+        if afterClear.isEmpty {
+            pass("CronStore: clear removes all jobs")
+        } else {
+            fail("CronStore: clear removes all jobs", "count: \(afterClear.count)")
+        }
+
+        // Verify counter reset: next ID should be cron_1
+        let afterReset = await store.create(name: "After Clear", schedule: "0 0 * * *", command: "test")
+        if afterReset.id == "cron_1" {
+            pass("CronStore: clear resets ID counter")
+        } else {
+            fail("CronStore: clear resets ID counter", "id: \(afterReset.id)")
         }
     }
 }

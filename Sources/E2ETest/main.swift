@@ -56,7 +56,7 @@ await TrackingTests.run(apiKey: apiKey, model: model, baseURL: baseURL)
 ToolRegistryTests.run()
 
 // ================================================================
-// SECTION 17-20, 24, 26: Store Operations (incl. WorktreeStore, PlanStore)
+// SECTION 17-20, 24, 26, 28: Store Operations (incl. WorktreeStore, PlanStore, CronStore)
 // ================================================================
 await StoreTests.run()
 
@@ -71,7 +71,7 @@ await SDKMessageTests.run(apiKey: apiKey, model: model, baseURL: baseURL)
 await NoInputToolTests.run(apiKey: apiKey, model: model, baseURL: baseURL)
 
 // ================================================================
-// SECTION 23, 25, 27: Agent with Stores Integration (incl. WorktreeStore, PlanStore)
+// SECTION 23, 25, 27, 29: Agent with Stores Integration (incl. WorktreeStore, PlanStore, CronStore)
 // ================================================================
 await IntegrationTests.run(apiKey: apiKey, model: model, baseURL: baseURL)
 

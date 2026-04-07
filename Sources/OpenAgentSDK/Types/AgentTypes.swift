@@ -41,6 +41,9 @@ public struct AgentOptions: Sendable {
     /// Optional plan store for plan management tools.
     /// Injected into ToolContext for use by plan tools (EnterPlanMode, ExitPlanMode).
     public var planStore: PlanStore?
+    /// Optional cron store for cron management tools.
+    /// Injected into ToolContext for use by cron tools (CronCreate, CronDelete, CronList).
+    public var cronStore: CronStore?
 
     public init(
         apiKey: String? = nil,
@@ -63,7 +66,8 @@ public struct AgentOptions: Sendable {
         teamStore: TeamStore? = nil,
         taskStore: TaskStore? = nil,
         worktreeStore: WorktreeStore? = nil,
-        planStore: PlanStore? = nil
+        planStore: PlanStore? = nil,
+        cronStore: CronStore? = nil
     ) {
         self.apiKey = apiKey
         self.model = model
@@ -86,6 +90,7 @@ public struct AgentOptions: Sendable {
         self.taskStore = taskStore
         self.worktreeStore = worktreeStore
         self.planStore = planStore
+        self.cronStore = cronStore
     }
 
     /// Create AgentOptions from an SDKConfiguration, using its resolved values
@@ -115,6 +120,7 @@ public struct AgentOptions: Sendable {
         self.taskStore = nil
         self.worktreeStore = nil
         self.planStore = nil
+        self.cronStore = nil
     }
 }
 public enum QueryStatus: String, Sendable, Equatable {
