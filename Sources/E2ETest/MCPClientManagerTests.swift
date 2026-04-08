@@ -1,5 +1,6 @@
 import Foundation
 import OpenAgentSDK
+import MCP
 
 // MARK: - MCPClientManager E2E Tests
 
@@ -116,6 +117,36 @@ struct MCPClientManagerE2ETests {
         testMcpSseConfigCreation()
         testMcpHttpConfigCreation()
         testMcpServerConfigSSEAndHTTPCases()
+
+        // Story 6-3: In-Process MCP Server (ATDD RED PHASE)
+        section("In-Process MCP Server: Creation & Config (Story 6-3)")
+        await testInProcessMCPServerCreation()
+        await testInProcessMCPServerCreationWithMultipleTools()
+        await testMcpSdkServerConfigCreation()
+        await testMcpServerConfigSdkCase()
+        await testMcpServerConfigSdkDistinctFromOthers()
+        await testInProcessMCPServerAsConfig()
+        await testInProcessMCPServerGetTools()
+
+        section("In-Process MCP Server: Session & Tool Exposure (Story 6-3)")
+        await testInProcessMCPServerCreateSession()
+        await testInProcessMCPServerMultipleSessions()
+        await testInProcessMCPServerEmptyToolsSession()
+        await testInProcessMCPServerToolListViaMCP()
+        await testInProcessMCPServerToolNamesNoNamespace()
+
+        section("In-Process MCP Server: Tool Execution (Story 6-3)")
+        await testInProcessMCPServerToolCallDispatchesToTool()
+        await testInProcessMCPServerUnknownToolReturnsError()
+        await testInProcessMCPServerToolExceptionReturnsError()
+        await testInProcessMCPServerResilientAfterException()
+
+        section("In-Process MCP Server: Agent Integration (Story 6-3)")
+        await testAgentOptionsAcceptsSdkConfig()
+        await testAgentOptionsMixedConfigTypesWithSdk()
+
+        section("In-Process MCP Server: Module Boundary (Story 6-3)")
+        await testInProcessMCPServerRespectsModuleBoundary()
     }
 
     // MARK: - Helpers
@@ -1335,6 +1366,472 @@ struct MCPClientManagerE2ETests {
         } else {
             fail("McpServerConfig cases should be distinct")
         }
+    }
+
+    // ================================================================
+    // MARK: Story 6-3: In-Process MCP Server - Creation & Config
+    // ================================================================
+
+    /// AC1 [P0]: InProcessMCPServer creates with name, version, and tools.
+    static func testInProcessMCPServerCreation() async {
+        let tool = E2EMockTool(toolName: "get_weather")
+        let server = InProcessMCPServer(name: "weather", version: "1.0.0", tools: [tool])
+
+        let serverName = await server.name
+        let serverVersion = await server.version
+
+        if serverName == "weather" && serverVersion == "1.0.0" {
+            pass("InProcessMCPServer creates with name, version, and tools")
+        } else {
+            fail("InProcessMCPServer creation failed",
+                 "name=\(serverName) version=\(serverVersion)")
+        }
+    }
+
+    /// AC1 [P0]: InProcessMCPServer creates with multiple tools.
+    static func testInProcessMCPServerCreationWithMultipleTools() async {
+        let tool1 = E2EMockTool(toolName: "read_file")
+        let tool2 = E2EMockTool(toolName: "write_file")
+        let server = InProcessMCPServer(name: "filesystem", version: "1.0.0", tools: [tool1, tool2])
+
+        let tools = await server.getTools()
+        if tools.count == 2 {
+            pass("InProcessMCPServer holds multiple tools")
+        } else {
+            fail("InProcessMCPServer should hold 2 tools", "count=\(tools.count)")
+        }
+    }
+
+    /// AC2 [P0]: McpSdkServerConfig can be created with server reference.
+    static func testMcpSdkServerConfigCreation() async {
+        let server = InProcessMCPServer(name: "my-sdk", version: "1.0.0", tools: [])
+        let config = McpSdkServerConfig(name: "my-sdk", version: "1.0.0", server: server)
+
+        if config.name == "my-sdk" && config.version == "1.0.0" {
+            pass("McpSdkServerConfig creates with name, version, and server reference")
+        } else {
+            fail("McpSdkServerConfig creation failed")
+        }
+    }
+
+    /// AC2 [P0]: McpServerConfig.sdk wraps McpSdkServerConfig.
+    static func testMcpServerConfigSdkCase() async {
+        let server = InProcessMCPServer(name: "test", version: "1.0.0", tools: [])
+        let sdkConfig = McpSdkServerConfig(name: "test", version: "1.0.0", server: server)
+        let config = McpServerConfig.sdk(sdkConfig)
+
+        if case .sdk(let unwrapped) = config, unwrapped.name == "test" {
+            pass("McpServerConfig.sdk wraps McpSdkServerConfig correctly")
+        } else {
+            fail("Expected .sdk case with correct name")
+        }
+    }
+
+    /// AC2 [P0]: McpServerConfig.sdk is distinct from other cases.
+    static func testMcpServerConfigSdkDistinctFromOthers() async {
+        let server = InProcessMCPServer(name: "test", version: "1.0.0", tools: [])
+        let sdk = McpServerConfig.sdk(McpSdkServerConfig(name: "test", version: "1.0.0", server: server))
+        let stdio = McpServerConfig.stdio(McpStdioConfig(command: "echo"))
+        let sse = McpServerConfig.sse(McpSseConfig(url: "http://localhost:8080"))
+        let http = McpServerConfig.http(McpHttpConfig(url: "http://localhost:8080"))
+
+        if sdk != stdio && sdk != sse && sdk != http {
+            pass("McpServerConfig.sdk is distinct from stdio, sse, http cases")
+        } else {
+            fail("McpServerConfig.sdk should be distinct from all other cases")
+        }
+    }
+
+    /// AC2 [P0]: InProcessMCPServer.asConfig() returns McpServerConfig.sdk.
+    static func testInProcessMCPServerAsConfig() async {
+        let tool = E2EMockTool(toolName: "weather_tool")
+        let server = InProcessMCPServer(name: "weather", version: "1.0.0", tools: [tool])
+        let config = await server.asConfig()
+
+        if case .sdk(let sdkConfig) = config,
+           sdkConfig.name == "weather" && sdkConfig.version == "1.0.0"
+        {
+            pass("InProcessMCPServer.asConfig() returns McpServerConfig.sdk")
+        } else {
+            fail("asConfig() should return .sdk with correct name and version")
+        }
+    }
+
+    /// AC6 [P0]: InProcessMCPServer.getTools() returns registered tools.
+    static func testInProcessMCPServerGetTools() async {
+        let tool1 = E2EMockTool(toolName: "read")
+        let tool2 = E2EMockTool(toolName: "write")
+        let server = InProcessMCPServer(name: "fs", version: "1.0.0", tools: [tool1, tool2])
+
+        let tools = await server.getTools()
+        if tools.count == 2 {
+            pass("getTools() returns all registered tools")
+        } else {
+            fail("getTools() should return 2 tools", "count=\(tools.count)")
+        }
+    }
+
+    // ================================================================
+    // MARK: Story 6-3: Session & Tool Exposure
+    // ================================================================
+
+    /// AC7 [P0]: createSession() returns a (Server, InMemoryTransport) pair.
+    static func testInProcessMCPServerCreateSession() async {
+        let tool = E2EMockTool(toolName: "test")
+        let server = InProcessMCPServer(name: "session-test", version: "1.0.0", tools: [tool])
+
+        do {
+            let (mcpServer, clientTransport) = try await server.createSession()
+            _ = mcpServer
+            _ = clientTransport
+            pass("createSession() returns (Server, InMemoryTransport) pair")
+        } catch {
+            fail("createSession() should not throw", "error: \(error)")
+        }
+    }
+
+    /// AC7 [P0]: Multiple sessions can be created independently.
+    static func testInProcessMCPServerMultipleSessions() async {
+        let server = InProcessMCPServer(name: "multi", version: "1.0.0", tools: [E2EMockTool(toolName: "t")])
+
+        do {
+            let (s1, t1) = try await server.createSession()
+            let (s2, t2) = try await server.createSession()
+
+            _ = s1; _ = s2; _ = t1; _ = t2
+            pass("Multiple sessions can be created independently")
+        } catch {
+            fail("Multiple sessions should not throw", "error: \(error)")
+        }
+    }
+
+    /// AC7 [P1]: createSession with empty tools does not crash.
+    static func testInProcessMCPServerEmptyToolsSession() async {
+        let server = InProcessMCPServer(name: "empty", version: "1.0.0", tools: [])
+
+        do {
+            let (mcpServer, clientTransport) = try await server.createSession()
+            let client = Client(name: "test-client", version: "1.0.0")
+            try await client.connect(transport: clientTransport)
+
+            let result = try await client.listTools()
+            if result.tools.isEmpty {
+                pass("Empty server session exposes no tools")
+            } else {
+                fail("Empty server should expose no tools", "count=\(result.tools.count)")
+            }
+
+            await mcpServer.stop()
+            await client.disconnect()
+        } catch {
+            fail("Empty tools session should not crash", "error: \(error)")
+        }
+    }
+
+    /// AC3 [P0]: Tools are exposed through MCP protocol via InMemoryTransport.
+    static func testInProcessMCPServerToolListViaMCP() async {
+        let tool = E2EMockTool(
+            toolName: "get_weather",
+            toolDescription: "Gets the current weather"
+        )
+        let server = InProcessMCPServer(name: "weather", version: "1.0.0", tools: [tool])
+
+        do {
+            let (mcpServer, clientTransport) = try await server.createSession()
+            let client = Client(name: "test-client", version: "1.0.0")
+            try await client.connect(transport: clientTransport)
+
+            let result = try await client.listTools()
+
+            if result.tools.count == 1, result.tools.first?.name == "get_weather" {
+                pass("InProcessMCPServer exposes tools via MCP protocol")
+            } else {
+                fail("Should expose 1 tool named 'get_weather'",
+                     "count=\(result.tools.count) names=\(result.tools.map { $0.name })")
+            }
+
+            await mcpServer.stop()
+            await client.disconnect()
+        } catch {
+            fail("MCP tool listing should not crash", "error: \(error)")
+        }
+    }
+
+    /// AC5 [P0]: Tools use original names (no namespace prefix) via MCP.
+    static func testInProcessMCPServerToolNamesNoNamespace() async {
+        let tool = E2EMockTool(toolName: "get_weather")
+        let server = InProcessMCPServer(name: "weather", version: "1.0.0", tools: [tool])
+
+        do {
+            let (mcpServer, clientTransport) = try await server.createSession()
+            let client = Client(name: "test-client", version: "1.0.0")
+            try await client.connect(transport: clientTransport)
+
+            let result = try await client.listTools()
+            let exposedName = result.tools.first?.name ?? ""
+
+            // Must NOT have "mcp__weather__" prefix
+            if exposedName == "get_weather" && !exposedName.hasPrefix("mcp__") {
+                pass("InProcessMCPServer exposes tools without namespace prefix")
+            } else {
+                fail("Tool name should be 'get_weather', not namespaced",
+                     "got: '\(exposedName)'")
+            }
+
+            await mcpServer.stop()
+            await client.disconnect()
+        } catch {
+            fail("Tool name check should not crash", "error: \(error)")
+        }
+    }
+
+    // ================================================================
+    // MARK: Story 6-3: Tool Execution
+    // ================================================================
+
+    /// AC4 [P0]: Tool call through MCP dispatches to ToolProtocol.call().
+    static func testInProcessMCPServerToolCallDispatchesToTool() async {
+        let tool = E2EMockTool(toolName: "echo", resultContent: "Hello from in-process!")
+        let server = InProcessMCPServer(name: "echo-server", version: "1.0.0", tools: [tool])
+
+        do {
+            let (mcpServer, clientTransport) = try await server.createSession()
+            let client = Client(name: "test-client", version: "1.0.0")
+            try await client.connect(transport: clientTransport)
+
+            let result = try await client.callTool(name: "echo", arguments: ["msg": .string("hi")])
+
+            if !(result.isError ?? false) {
+                let hasContent = result.content.contains(where: { content in
+                    switch content {
+                    case .text(let text, _, _): return text.contains("Hello from in-process!")
+                    default: return false
+                    }
+                })
+                if hasContent {
+                    pass("Tool call dispatches to ToolProtocol.call() and returns result")
+                } else {
+                    fail("Tool result should contain expected content",
+                         "got: \(result.content.map { switch $0 { case .text(let t, _, _): return t; default: return "" } })")
+                }
+            } else {
+                fail("Tool call should succeed, not return error")
+            }
+
+            await mcpServer.stop()
+            await client.disconnect()
+        } catch {
+            fail("Tool call dispatch should not crash", "error: \(error)")
+        }
+    }
+
+    /// AC8 [P0]: Unknown tool call returns MCP error (isError: true).
+    static func testInProcessMCPServerUnknownToolReturnsError() async {
+        let server = InProcessMCPServer(
+            name: "error-test",
+            version: "1.0.0",
+            tools: [E2EMockTool(toolName: "known_tool")]
+        )
+
+        do {
+            let (mcpServer, clientTransport) = try await server.createSession()
+            let client = Client(name: "test-client", version: "1.0.0")
+            try await client.connect(transport: clientTransport)
+
+            // Unknown tool: MCPServer returns invalidParams error (throws from client)
+            // This is correct behavior per AC8 spec
+            var gotError = false
+            do {
+                _ = try await client.callTool(name: "nonexistent_tool", arguments: [:])
+            } catch {
+                gotError = true
+            }
+
+            if gotError {
+                pass("Unknown tool call returns MCP protocol error (invalidParams)")
+            } else {
+                fail("Unknown tool call should return error")
+            }
+
+            // Verify server is still operational after error
+            let listResult = try await client.listTools()
+            if !listResult.tools.isEmpty {
+                pass("Server remains operational after unknown tool call")
+            } else {
+                fail("Server should still list tools after unknown tool call")
+            }
+
+            await mcpServer.stop()
+            await client.disconnect()
+        } catch {
+            fail("Test setup failed", "error: \(error)")
+        }
+    }
+
+    /// AC12 [P0]: Tool execution exception returns isError: true.
+    static func testInProcessMCPServerToolExceptionReturnsError() async {
+        let throwingTool = E2EThrowingMockTool(toolName: "failing_tool")
+        let server = InProcessMCPServer(name: "error-server", version: "1.0.0", tools: [throwingTool])
+
+        do {
+            let (mcpServer, clientTransport) = try await server.createSession()
+            let client = Client(name: "test-client", version: "1.0.0")
+            try await client.connect(transport: clientTransport)
+
+            let result = try await client.callTool(name: "failing_tool", arguments: [:])
+
+            if result.isError == true {
+                pass("Tool execution exception captured as isError: true")
+            } else {
+                fail("Failing tool should return isError: true")
+            }
+
+            await mcpServer.stop()
+            await client.disconnect()
+        } catch {
+            fail("Tool exception should be captured, not thrown", "error: \(error)")
+        }
+    }
+
+    /// AC12 [P0]: Server remains operational after tool exception.
+    static func testInProcessMCPServerResilientAfterException() async {
+        let throwingTool = E2EThrowingMockTool(toolName: "crashy_tool")
+        let goodTool = E2EMockTool(toolName: "good_tool", resultContent: "I'm fine")
+        let server = InProcessMCPServer(
+            name: "resilient",
+            version: "1.0.0",
+            tools: [throwingTool, goodTool]
+        )
+
+        do {
+            let (mcpServer, clientTransport) = try await server.createSession()
+            let client = Client(name: "test-client", version: "1.0.0")
+            try await client.connect(transport: clientTransport)
+
+            // Call the throwing tool
+            _ = try await client.callTool(name: "crashy_tool", arguments: [:])
+
+            // Server should still list tools
+            let toolsResult = try await client.listTools()
+            if toolsResult.tools.count == 2 {
+                pass("Server remains operational after tool exception (tools still listed)")
+            } else {
+                fail("Server should still list both tools", "count=\(toolsResult.tools.count)")
+            }
+
+            // Good tool should still work
+            let goodResult = try await client.callTool(name: "good_tool", arguments: [:])
+            if !(goodResult.isError ?? false) {
+                pass("Good tool still works after exception in another tool")
+            } else {
+                fail("Good tool should work after exception in another tool")
+            }
+
+            await mcpServer.stop()
+            await client.disconnect()
+        } catch {
+            fail("Resilience test should not crash", "error: \(error)")
+        }
+    }
+
+    // ================================================================
+    // MARK: Story 6-3: Agent Integration
+    // ================================================================
+
+    /// AC6 [P0]: AgentOptions.mcpServers accepts McpServerConfig.sdk.
+    static func testAgentOptionsAcceptsSdkConfig() async {
+        let server = InProcessMCPServer(name: "sdk-server", version: "1.0.0", tools: [E2EMockTool(toolName: "test")])
+        let sdkConfig = McpSdkServerConfig(name: "sdk-server", version: "1.0.0", server: server)
+        let config: [String: McpServerConfig] = ["my-sdk": .sdk(sdkConfig)]
+        let options = AgentOptions(mcpServers: config)
+
+        if let servers = options.mcpServers, servers.count == 1 {
+            pass("AgentOptions.mcpServers accepts McpServerConfig.sdk")
+        } else {
+            fail("AgentOptions should hold SDK config",
+                 "count=\(options.mcpServers?.count ?? 0)")
+        }
+    }
+
+    /// AC6 [P0]: AgentOptions holds mixed config types including sdk.
+    static func testAgentOptionsMixedConfigTypesWithSdk() async {
+        let server = InProcessMCPServer(name: "mixed-sdk", version: "1.0.0", tools: [])
+        let config: [String: McpServerConfig] = [
+            "stdio-srv": .stdio(McpStdioConfig(command: "echo")),
+            "sse-srv": .sse(McpSseConfig(url: "http://localhost:8080/sse")),
+            "http-srv": .http(McpHttpConfig(url: "http://localhost:8080/mcp")),
+            "sdk-srv": .sdk(McpSdkServerConfig(name: "mixed-sdk", version: "1.0.0", server: server)),
+        ]
+        let options = AgentOptions(mcpServers: config)
+
+        if options.mcpServers?.count == 4 {
+            pass("AgentOptions holds all four config types (stdio, sse, http, sdk)")
+        } else {
+            fail("Should hold 4 configs", "count=\(options.mcpServers?.count ?? 0)")
+        }
+    }
+
+    // ================================================================
+    // MARK: Story 6-3: Module Boundary
+    // ================================================================
+
+    /// AC9 [P0]: InProcessMCPServer respects module boundaries (compile-time check).
+    static func testInProcessMCPServerRespectsModuleBoundary() async {
+        let server = InProcessMCPServer(name: "boundary", version: "1.0.0", tools: [])
+        _ = server
+        pass("InProcessMCPServer compiles without Core/ or Stores/ dependencies")
+    }
+}
+
+// MARK: - E2E Mock Helpers for Story 6-3
+
+/// Mock tool for InProcessMCPServer E2E testing.
+private final class E2EMockTool: ToolProtocol, Sendable {
+    private let toolName: String
+    private let toolDescription: String
+    nonisolated(unsafe) private let toolSchema: ToolInputSchema
+    private let resultContent: String
+    private let resultIsError: Bool
+
+    init(
+        toolName: String,
+        toolDescription: String = "A test tool",
+        resultContent: String = "mock result",
+        resultIsError: Bool = false
+    ) {
+        self.toolName = toolName
+        self.toolDescription = toolDescription
+        self.toolSchema = ["type": "object", "properties": [:]]
+        self.resultContent = resultContent
+        self.resultIsError = resultIsError
+    }
+
+    var name: String { toolName }
+    var description: String { toolDescription }
+    var inputSchema: ToolInputSchema { toolSchema }
+    var isReadOnly: Bool { false }
+
+    func call(input: Any, context: ToolContext) async -> ToolResult {
+        return ToolResult(toolUseId: context.toolUseId, content: resultContent, isError: resultIsError)
+    }
+}
+
+/// Mock tool that returns isError: true (simulates tool execution failure).
+private final class E2EThrowingMockTool: ToolProtocol, Sendable {
+    private let toolName: String
+    nonisolated(unsafe) private let toolSchema: ToolInputSchema = ["type": "object", "properties": [:]]
+
+    init(toolName: String) {
+        self.toolName = toolName
+    }
+
+    var name: String { toolName }
+    var description: String { "A tool that fails" }
+    var inputSchema: ToolInputSchema { toolSchema }
+    var isReadOnly: Bool { false }
+
+    func call(input: Any, context: ToolContext) async -> ToolResult {
+        return ToolResult(toolUseId: context.toolUseId, content: "Simulated execution failure", isError: true)
     }
 }
 

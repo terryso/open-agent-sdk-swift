@@ -263,6 +263,9 @@ public actor MCPClientManager {
                         await self.connect(name: name, config: sseConfig)
                     case .http(let httpConfig):
                         await self.connect(name: name, config: httpConfig)
+                    case .sdk:
+                        // SDK servers are handled directly by Agent, not via MCPClientManager
+                        break
                     }
                 }
             }

@@ -34,7 +34,9 @@ let package = Package(
         ),
         .executableTarget(
             name: "E2ETest",
-            dependencies: ["OpenAgentSDK"],
+            dependencies: ["OpenAgentSDK",
+                .product(name: "MCP", package: "mcp-swift-sdk"),
+            ],
             path: "Sources/E2ETest"
         ),
     ]

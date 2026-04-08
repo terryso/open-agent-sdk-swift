@@ -1,5 +1,5 @@
 # generated: 2026-04-04
-# last_updated: 2026-04-08 (6-2-mcp-http-sse-transport → done)
+# last_updated: 2026-04-08 (6-3-in-process-mcp-server → done)
 # updated: 5-4-todo-store-tools → review
 # updated: 5-3-cron-store-tools → review
 # updated: 5-1-worktree-store-tools → review
@@ -159,7 +159,7 @@ development_status:
   epic-6: in-progress
   6-1-mcp-client-manager-stdio: done
   6-2-mcp-http-sse-transport: done
-  6-3-in-process-mcp-server: backlog
+  6-3-in-process-mcp-server: done
   6-4-mcp-tool-agent-integration: backlog
   epic-6-retrospective: optional
 

@@ -5,6 +5,7 @@ public enum McpServerConfig: Sendable, Equatable {
     case stdio(McpStdioConfig)
     case sse(McpSseConfig)
     case http(McpHttpConfig)
+    case sdk(McpSdkServerConfig)
 }
 
 /// Configuration for MCP stdio transport.
@@ -39,5 +40,32 @@ public struct McpHttpConfig: Sendable, Equatable {
     public init(url: String, headers: [String: String]? = nil) {
         self.url = url
         self.headers = headers
+    }
+}
+
+/// Configuration for in-process SDK MCP server.
+///
+/// Holds a reference to an `InProcessMCPServer` actor, allowing the Agent
+/// to directly extract tools from it without MCP protocol overhead.
+/// `Equatable` is implemented via `ObjectIdentifier` comparison since
+/// `InProcessMCPServer` is an actor (reference type).
+public struct McpSdkServerConfig: Sendable, Equatable {
+    /// Server name.
+    public let name: String
+    /// Server version.
+    public let version: String
+    /// Reference to the in-process MCP server.
+    public let server: InProcessMCPServer
+
+    public init(name: String, version: String, server: InProcessMCPServer) {
+        self.name = name
+        self.version = version
+        self.server = server
+    }
+
+    public static func == (lhs: McpSdkServerConfig, rhs: McpSdkServerConfig) -> Bool {
+        ObjectIdentifier(lhs.server) == ObjectIdentifier(rhs.server)
+            && lhs.name == rhs.name
+            && lhs.version == rhs.version
     }
 }

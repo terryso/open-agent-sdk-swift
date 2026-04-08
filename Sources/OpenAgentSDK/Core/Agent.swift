@@ -96,6 +96,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
     ///
     /// If `options.mcpServers` is configured, creates an MCPClientManager,
     /// connects all servers, and merges their tools with the existing tool pool.
+    /// For `.sdk` config types, tools are extracted directly without MCP protocol overhead.
     ///
     /// - Returns: A tuple of (assembled tools, MCPClientManager or nil).
     func assembleFullToolPool() async -> ([ToolProtocol], MCPClientManager?) {
@@ -105,14 +106,25 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
             return (baseTools, nil)
         }
 
-        let manager = MCPClientManager()
-        await manager.connectAll(servers: mcpServers)
-        let mcpTools = await manager.getMCPTools()
+        let (sdkTools, externalServers) = await Self.processMcpConfigs(mcpServers)
+
+        // Connect external MCP servers (stdio, sse, http)
+        var externalTools: [ToolProtocol] = []
+        var manager: MCPClientManager? = nil
+
+        if !externalServers.isEmpty {
+            let mcpManager = MCPClientManager()
+            await mcpManager.connectAll(servers: externalServers)
+            externalTools = await mcpManager.getMCPTools()
+            manager = mcpManager
+        }
+
+        let allMCPTools = sdkTools + externalTools
 
         let pool = assembleToolPool(
             baseTools: getAllBaseTools(tier: .core) + getAllBaseTools(tier: .specialist),
             customTools: baseTools,
-            mcpTools: mcpTools,
+            mcpTools: allMCPTools,
             allowed: nil,
             disallowed: nil
         )
@@ -431,9 +443,17 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                 var allToolProtocols = capturedToolProtocols
                 var mcpManager: MCPClientManager? = nil
                 if let mcpServers = capturedMcpServers, !mcpServers.isEmpty {
-                    let manager = MCPClientManager()
-                    await manager.connectAll(servers: mcpServers)
-                    let mcpTools = await manager.getMCPTools()
+                    let (sdkTools, externalServers) = await Self.processMcpConfigs(mcpServers)
+
+                    var externalTools: [ToolProtocol] = []
+                    if !externalServers.isEmpty {
+                        let manager = MCPClientManager()
+                        await manager.connectAll(servers: externalServers)
+                        externalTools = await manager.getMCPTools()
+                        mcpManager = manager
+                    }
+
+                    let mcpTools = sdkTools + externalTools
                     if !mcpTools.isEmpty {
                         allToolProtocols = capturedToolProtocols + mcpTools
                         let mcpApiTools = toApiTools(mcpTools)
@@ -444,7 +464,6 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                             decodedApiTools = mcpApiTools
                         }
                     }
-                    mcpManager = manager
                 }
                 let mcpManagerForCleanup = mcpManager
 
@@ -960,4 +979,58 @@ public func createAgent(options: AgentOptions? = nil) -> Agent {
         resolved = AgentOptions(from: config)
     }
     return Agent(options: resolved)
+}
+
+// MARK: - SdkToolWrapper
+
+/// Wraps a `ToolProtocol` to add the MCP namespace prefix for SDK internal tools.
+///
+/// Unlike `MCPToolDefinition` which wraps external MCP tools (going through MCP protocol),
+/// this wrapper directly delegates to the underlying tool with zero overhead -- no
+/// serialization, no MCP protocol, no error double-wrapping.
+private struct SdkToolWrapper: ToolProtocol, Sendable {
+    let serverName: String
+    let innerTool: ToolProtocol
+
+    var name: String { "mcp__\(serverName)__\(innerTool.name)" }
+    var description: String { innerTool.description }
+    var inputSchema: ToolInputSchema { innerTool.inputSchema }
+    var isReadOnly: Bool { innerTool.isReadOnly }
+
+    func call(input: Any, context: ToolContext) async -> ToolResult {
+        return await innerTool.call(input: input, context: context)
+    }
+}
+
+// MARK: - MCP Config Processing Helper
+
+extension Agent {
+    /// Separates SDK configs from external (stdio/sse/http) configs and extracts SDK tools.
+    ///
+    /// SDK tools are wrapped in `SdkToolWrapper` for namespace prefixing and bypass
+    /// MCP protocol entirely. External configs are collected for MCPClientManager.
+    ///
+    /// - Parameter mcpServers: The full MCP server config dictionary.
+    /// - Returns: A tuple of (namespaced SDK tools, external server configs).
+    private static func processMcpConfigs(
+        _ mcpServers: [String: McpServerConfig]
+    ) async -> (sdkTools: [ToolProtocol], externalServers: [String: McpServerConfig]) {
+        var externalServers: [String: McpServerConfig] = [:]
+        var sdkTools: [ToolProtocol] = []
+
+        for (serverName, config) in mcpServers {
+            switch config {
+            case .sdk(let sdkConfig):
+                let tools = await sdkConfig.server.getTools()
+                let namespacedTools: [ToolProtocol] = tools.map { tool in
+                    SdkToolWrapper(serverName: sdkConfig.name, innerTool: tool)
+                }
+                sdkTools.append(contentsOf: namespacedTools)
+            default:
+                externalServers[serverName] = config
+            }
+        }
+
+        return (sdkTools, externalServers)
+    }
 }
