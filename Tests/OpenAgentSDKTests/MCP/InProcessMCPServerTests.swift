@@ -30,8 +30,8 @@ final class InProcessMCPServerTests: XCTestCase {
         schema: ToolInputSchema = ["type": "object", "properties": [:]],
         resultContent: String = "tool result",
         resultIsError: Bool = false
-    ) -> MockTool {
-        return MockTool(
+    ) -> InProcessMockTool {
+        return InProcessMockTool(
             toolName: name,
             toolDescription: description,
             toolSchema: schema,
@@ -44,8 +44,8 @@ final class InProcessMCPServerTests: XCTestCase {
     private func makeThrowingTool(
         name: String = "throwing_tool",
         error: Error = ToolTestError.executionFailed
-    ) -> MockThrowingTool {
-        return MockThrowingTool(toolName: name, error: error)
+    ) -> InProcessMockThrowingTool {
+        return InProcessMockThrowingTool(toolName: name, error: error)
     }
 
     // ================================================================
@@ -183,7 +183,7 @@ final class InProcessMCPServerTests: XCTestCase {
     // ================================================================
 
     /// AC3 [P0]: InProcessMCPServer exposes tools through MCP protocol via InMemoryTransport.
-    func testInProcessMCPServer_toolList_viaInMemoryTransport() async {
+    func testInProcessMCPServer_toolList_viaInMemoryTransport() async throws {
         let tool = makeMockTool(
             name: "get_weather",
             description: "Gets the current weather",
@@ -221,7 +221,7 @@ final class InProcessMCPServerTests: XCTestCase {
     }
 
     /// AC3 [P0]: InProcessMCPServer exposes multiple tools through MCP protocol.
-    func testInProcessMCPServer_multipleTools_viaInMemoryTransport() async {
+    func testInProcessMCPServer_multipleTools_viaInMemoryTransport() async throws {
         let tool1 = makeMockTool(name: "read_file", description: "Reads a file")
         let tool2 = makeMockTool(name: "write_file", description: "Writes a file")
         let server = InProcessMCPServer(
@@ -248,7 +248,7 @@ final class InProcessMCPServerTests: XCTestCase {
     }
 
     /// AC3 [P1]: Exposed tool includes inputSchema with correct structure.
-    func testInProcessMCPServer_toolList_includesInputSchema() async {
+    func testInProcessMCPServer_toolList_includesInputSchema() async throws {
         let schema: ToolInputSchema = [
             "type": "object",
             "properties": [
@@ -285,7 +285,7 @@ final class InProcessMCPServerTests: XCTestCase {
     // ================================================================
 
     /// AC4 [P0]: Tool call through MCP protocol dispatches to ToolProtocol.call().
-    func testInProcessMCPServer_toolCall_dispatchesToTool() async {
+    func testInProcessMCPServer_toolCall_dispatchesToTool() async throws {
         let tool = makeMockTool(
             name: "echo",
             description: "Echoes input",
@@ -318,7 +318,7 @@ final class InProcessMCPServerTests: XCTestCase {
     }
 
     /// AC4 [P0]: Tool call result is returned through MCP protocol.
-    func testInProcessMCPServer_toolCall_returnsMCPResult() async {
+    func testInProcessMCPServer_toolCall_returnsMCPResult() async throws {
         let tool = makeMockTool(
             name: "calculator",
             description: "Performs calculations",
@@ -349,7 +349,7 @@ final class InProcessMCPServerTests: XCTestCase {
     // ================================================================
 
     /// AC5 [P0]: Tools exposed via MCP protocol use original names (no namespace prefix).
-    func testInProcessMCPServer_toolName_noNamespacePrefix() async {
+    func testInProcessMCPServer_toolName_noNamespacePrefix() async throws {
         let tool = makeMockTool(name: "get_weather")
         let server = InProcessMCPServer(
             name: "weather",
@@ -434,7 +434,7 @@ final class InProcessMCPServerTests: XCTestCase {
     // ================================================================
 
     /// AC7 [P0]: createSession() returns a (Server, InMemoryTransport) pair.
-    func testInProcessMCPServer_createSession_returnsPair() async {
+    func testInProcessMCPServer_createSession_returnsPair() async throws {
         let server = InProcessMCPServer(
             name: "session-test",
             version: "1.0.0",
@@ -449,7 +449,7 @@ final class InProcessMCPServerTests: XCTestCase {
     }
 
     /// AC7 [P0]: Multiple sessions can be created (each client gets independent session).
-    func testInProcessMCPServer_createSession_multipleSessions() async {
+    func testInProcessMCPServer_createSession_multipleSessions() async throws {
         let server = InProcessMCPServer(
             name: "multi-session",
             version: "1.0.0",
@@ -467,7 +467,7 @@ final class InProcessMCPServerTests: XCTestCase {
     }
 
     /// AC7 [P1]: Each session operates independently.
-    func testInProcessMCPServer_sessions_operateIndependently() async {
+    func testInProcessMCPServer_sessions_operateIndependently() async throws {
         let tool = makeMockTool(name: "test")
         let server = InProcessMCPServer(
             name: "independent-sessions",
@@ -502,7 +502,7 @@ final class InProcessMCPServerTests: XCTestCase {
     // ================================================================
 
     /// AC8 [P0]: Calling an unknown tool returns MCP protocol error (invalidParams).
-    func testInProcessMCPServer_unknownTool_returnsError() async {
+    func testInProcessMCPServer_unknownTool_returnsError() async throws {
         let tool = makeMockTool(name: "known_tool")
         let server = InProcessMCPServer(
             name: "error-test",
@@ -532,7 +532,7 @@ final class InProcessMCPServerTests: XCTestCase {
     }
 
     /// AC8 [P0]: Unknown tool error does not crash the server.
-    func testInProcessMCPServer_unknownTool_doesNotCrashServer() async {
+    func testInProcessMCPServer_unknownTool_doesNotCrashServer() async throws {
         let server = InProcessMCPServer(
             name: "crash-test",
             version: "1.0.0",
@@ -544,8 +544,12 @@ final class InProcessMCPServerTests: XCTestCase {
         let client = Client(name: "test-client", version: "1.0.0")
         try await client.connect(transport: clientTransport)
 
-        // Call nonexistent tool -- should not crash
-        _ = try await client.callTool(name: "ghost_tool", arguments: [:])
+        // Call nonexistent tool -- MCP SDK throws an error for unknown tools
+        do {
+            _ = try await client.callTool(name: "ghost_tool", arguments: [:])
+        } catch {
+            // Expected: MCP protocol returns error for unknown tool
+        }
 
         // Server should still be operational
         let listResult = try await client.listTools()
@@ -595,7 +599,7 @@ final class InProcessMCPServerTests: XCTestCase {
     // ================================================================
 
     /// AC12 [P0]: Tool execution exception is captured as isError: true, server does not crash.
-    func testInProcessMCPServer_toolExecutionException_returnsError() async {
+    func testInProcessMCPServer_toolExecutionException_returnsError() async throws {
         let throwingTool = makeThrowingTool(name: "failing_tool")
         let server = InProcessMCPServer(
             name: "error-server",
@@ -618,7 +622,7 @@ final class InProcessMCPServerTests: XCTestCase {
     }
 
     /// AC12 [P0]: Server remains operational after tool execution exception.
-    func testInProcessMCPServer_toolExecutionException_serverRemainsOperational() async {
+    func testInProcessMCPServer_toolExecutionException_serverRemainsOperational() async throws {
         let throwingTool = makeThrowingTool(name: "crashy_tool")
         let goodTool = makeMockTool(name: "good_tool", resultContent: "I'm fine")
         let server = InProcessMCPServer(
@@ -666,7 +670,7 @@ final class InProcessMCPServerTests: XCTestCase {
     }
 
     /// AC7 [P1]: createSession with empty tools list does not crash.
-    func testInProcessMCPServer_createSession_emptyTools() async {
+    func testInProcessMCPServer_createSession_emptyTools() async throws {
         let server = InProcessMCPServer(
             name: "empty-session",
             version: "1.0.0",
@@ -687,7 +691,7 @@ final class InProcessMCPServerTests: XCTestCase {
     }
 
     /// AC5 [P1]: Tool with underscore in name works correctly via MCP.
-    func testInProcessMCPServer_toolWithUnderscoreName() async {
+    func testInProcessMCPServer_toolWithUnderscoreName() async throws {
         let tool = makeMockTool(name: "get_current_weather")
         let server = InProcessMCPServer(
             name: "weather",
@@ -740,11 +744,12 @@ final class InProcessMCPServerTests: XCTestCase {
             disallowed: nil
         )
 
-        // SDK tools should be in the pool (with MCP namespace wrapping)
+        // SDK tools should be in the pool without namespace wrapping
+        // (namespace is added by MCPClientManager when listing tools from external servers)
         XCTAssertTrue(pool.count >= 1,
                        "Pool should contain at least the SDK tool")
-        XCTAssertEqual(pool.first?.name, "mcp__sdk-pool__search",
-                       "SDK tool should have mcp__{serverName}__{toolName} namespace prefix")
+        XCTAssertEqual(pool.first?.name, "search",
+                       "SDK tool should retain its original name in the pool")
     }
 }
 
@@ -752,7 +757,7 @@ final class InProcessMCPServerTests: XCTestCase {
 
 /// Mock tool for testing InProcessMCPServer without real tool implementations.
 /// Conforms to ToolProtocol for injection into InProcessMCPServer.
-final class MockTool: ToolProtocol, Sendable {
+private final class InProcessMockTool: ToolProtocol, Sendable {
     let toolName: String
     let toolDescription: String
     nonisolated(unsafe) let toolSchema: ToolInputSchema
@@ -788,7 +793,7 @@ final class MockTool: ToolProtocol, Sendable {
 }
 
 /// Mock tool that throws an error during execution, for testing error handling.
-final class MockThrowingTool: ToolProtocol, Sendable {
+private final class InProcessMockThrowingTool: ToolProtocol, Sendable {
     let toolName: String
     let error: Error
     nonisolated(unsafe) let toolSchema: ToolInputSchema = ["type": "object", "properties": [:]]
