@@ -58,6 +58,7 @@ public struct McpSdkServerConfig: Sendable, Equatable {
     public let server: InProcessMCPServer
 
     public init(name: String, version: String, server: InProcessMCPServer) {
+        precondition(!name.contains("__"), "MCP server name '\(name)' contains '__', which would create ambiguous namespaced tool names. Use a single-segment name without double underscores.")
         self.name = name
         self.version = version
         self.server = server

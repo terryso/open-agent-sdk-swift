@@ -81,6 +81,7 @@ public struct MCPToolDefinition: ToolProtocol, Sendable {
         schema: ToolInputSchema,
         mcpClient: (any MCPClientProtocol)?
     ) {
+        precondition(!serverName.contains("__"), "MCP server name '\(serverName)' contains '__', which would create ambiguous namespaced tool names (mcp__\(serverName)__\(mcpToolName)). Use a single-segment name without double underscores.")
         self.serverName = serverName
         self.mcpToolName = mcpToolName
         self.toolDescription = toolDescription

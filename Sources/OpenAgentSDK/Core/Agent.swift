@@ -467,6 +467,18 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                 }
                 let mcpManagerForCleanup = mcpManager
 
+                // Ensure MCP connections are always cleaned up, regardless of exit path.
+                // defer cannot be async, so fire-and-forget Task is used as a safety net
+                // for early returns. The primary cleanup is done synchronously via await
+                // after the main loop exits (before continuation.finish()).
+                defer {
+                    if let mcpManagerForCleanup {
+                        _Concurrency.Task {
+                            await mcpManagerForCleanup.shutdown()
+                        }
+                    }
+                }
+
                 var messages = decodedMessages
                 var totalUsage = TokenUsage(inputTokens: 0, outputTokens: 0)
                 var totalCostUsd: Double = 0.0
@@ -811,7 +823,12 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                     durationMs: durationMs,
                     totalCostUsd: totalCostUsd
                 )))
-                await mcpManagerForCleanup?.shutdown()
+                // MCP cleanup handled by defer block above
+                // Primary MCP cleanup — synchronous await on the main exit path.
+                // The defer above acts as a safety net for early returns only.
+                if let mcpManagerForCleanup {
+                    await mcpManagerForCleanup.shutdown()
+                }
                 continuation.finish()
             }
             continuation.onTermination = { @Sendable _ in

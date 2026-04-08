@@ -126,10 +126,10 @@ public actor InProcessMCPServer {
                         Self.mcpValueToAny(value)
                     }
 
-                    // Build ToolContext with cwd and request ID as toolUseId
+                    // Build ToolContext with cwd and a generated toolUseId for tracing
                     let toolContext = ToolContext(
                         cwd: capturedCwd,
-                        toolUseId: ""
+                        toolUseId: UUID().uuidString
                     )
 
                     // Call the tool (never throws per rule #38)

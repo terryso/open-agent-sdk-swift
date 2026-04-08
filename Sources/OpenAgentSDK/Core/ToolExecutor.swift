@@ -157,7 +157,7 @@ enum ToolExecutor {
                         await executeSingleTool(
                             block: item.block,
                             tool: item.tool,
-                            context: ToolContext(cwd: context.cwd, toolUseId: item.block.id, agentSpawner: context.agentSpawner)
+                            context: context.withToolUseId(item.block.id)
                         )
                     }
                 }

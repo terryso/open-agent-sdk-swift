@@ -96,4 +96,19 @@ public struct ToolContext: Sendable {
         self.cronStore = cronStore
         self.todoStore = todoStore
     }
+
+    /// Returns a copy of this context with the toolUseId replaced.
+    ///
+    /// Used by ToolExecutor to preserve all injected stores while updating
+    /// the per-call tool use ID.
+    public func withToolUseId(_ id: String) -> ToolContext {
+        ToolContext(
+            cwd: cwd, toolUseId: id,
+            agentSpawner: agentSpawner, mailboxStore: mailboxStore,
+            teamStore: teamStore, senderName: senderName,
+            taskStore: taskStore, worktreeStore: worktreeStore,
+            planStore: planStore, cronStore: cronStore,
+            todoStore: todoStore
+        )
+    }
 }

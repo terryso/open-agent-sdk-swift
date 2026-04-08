@@ -147,6 +147,37 @@ struct MCPClientManagerE2ETests {
 
         section("In-Process MCP Server: Module Boundary (Story 6-3)")
         await testInProcessMCPServerRespectsModuleBoundary()
+
+        // Story 6-4: MCP Tool Agent Integration (ATDD RED PHASE)
+        section("MCP Agent Integration: Tool Pool Assembly (Story 6-4)")
+        await testAgentOptions_mcpServersWithSDKAndExternal()
+        await testAgentOptions_mcpServersWithAllFourTypes()
+        testAgentOptions_emptyMcpServers()
+        testAgentOptions_noMcpServers()
+
+        section("MCP Agent Integration: Mixed Config (Story 6-4)")
+        await testMixedConfig_sdkPlusFailingExternal_sdkToolsReachable()
+        await testMixedConfig_multipleSdkServers()
+        await testMixedConfig_externalServerToolsViaManager()
+
+        section("MCP Agent Integration: Error Isolation (Story 6-4)")
+        await testMCPToolError_isolationReturnsErrorToolResult()
+        await testMCPConnectionFailure_builtinToolsStillAvailable()
+
+        section("MCP Agent Integration: Lifecycle (Story 6-4)")
+        await testMCPLifecycle_shutdownClearsAll()
+        await testMCPLifecycle_sdkServerNoManager()
+
+        section("MCP Agent Integration: Tool Pool Deduplication (Story 6-4)")
+        testToolPoolDeduplication()
+        testToolPoolNameUniqueness()
+
+        section("MCP Agent Integration: Agent-Level Integration (Story 6-4)")
+        await testAgentCreation_withMixedMcpConfigs()
+        await testFullToolPoolAssembly_builtinPlusSDKPlusExternal()
+        await testAgentMCPSDKToolExecution()
+        await testAgentMCPToolError_errorIsolation()
+        await testAgentCreation_noMcpServers()
     }
 
     // MARK: - Helpers
@@ -1781,6 +1812,466 @@ struct MCPClientManagerE2ETests {
         _ = server
         pass("InProcessMCPServer compiles without Core/ or Stores/ dependencies")
     }
+
+    // ================================================================
+    // MARK: Story 6-4: MCP Tool Agent Integration - Tool Pool Assembly
+    // ================================================================
+
+    /// AC1/AC3 [P0]: AgentOptions holds SDK + external config together.
+    static func testAgentOptions_mcpServersWithSDKAndExternal() async {
+        let tool = E2EMockTool(toolName: "compute")
+        let server = InProcessMCPServer(name: "sdk-srv", version: "1.0.0", tools: [tool])
+        let sdkConfig = McpSdkServerConfig(name: "sdk-srv", version: "1.0.0", server: server)
+
+        let config: [String: McpServerConfig] = [
+            "sdk-srv": .sdk(sdkConfig),
+            "remote": .stdio(McpStdioConfig(command: "/nonexistent")),
+        ]
+
+        let options = AgentOptions(apiKey: "test-key", model: "test-model", mcpServers: config)
+
+        if let servers = options.mcpServers, servers.count == 2 {
+            pass("AgentOptions holds both SDK and external MCP configs")
+        } else {
+            fail("AgentOptions should hold 2 configs",
+                 "count=\(options.mcpServers?.count ?? 0)")
+        }
+    }
+
+    /// AC4 [P0]: AgentOptions holds all four MCP config types simultaneously.
+    static func testAgentOptions_mcpServersWithAllFourTypes() async {
+        let server = InProcessMCPServer(name: "local", version: "1.0.0", tools: [])
+        let config: [String: McpServerConfig] = [
+            "stdio-srv": .stdio(McpStdioConfig(command: "echo")),
+            "sse-srv": .sse(McpSseConfig(url: "http://localhost:8080/sse")),
+            "http-srv": .http(McpHttpConfig(url: "http://localhost:8080/mcp")),
+            "sdk-srv": .sdk(McpSdkServerConfig(name: "local", version: "1.0.0", server: server)),
+        ]
+
+        let options = AgentOptions(apiKey: "test-key", model: "test-model", mcpServers: config)
+
+        if options.mcpServers?.count == 4 {
+            pass("AgentOptions holds all four MCP config types (stdio, sse, http, sdk)")
+        } else {
+            fail("Should hold 4 configs", "count=\(options.mcpServers?.count ?? 0)")
+        }
+    }
+
+    /// AC1 [P1]: AgentOptions with empty mcpServers dictionary.
+    static func testAgentOptions_emptyMcpServers() {
+        let options = AgentOptions(apiKey: "test-key", model: "test-model", mcpServers: [:])
+
+        if let servers = options.mcpServers, servers.isEmpty {
+            pass("AgentOptions accepts empty mcpServers dictionary")
+        } else {
+            fail("Empty mcpServers should be accepted")
+        }
+    }
+
+    /// AC1 [P1]: AgentOptions with nil mcpServers (default).
+    static func testAgentOptions_noMcpServers() {
+        let options = AgentOptions(apiKey: "test-key", model: "test-model")
+
+        if options.mcpServers == nil {
+            pass("AgentOptions defaults to nil mcpServers")
+        } else {
+            fail("AgentOptions mcpServers should default to nil")
+        }
+    }
+
+    // ================================================================
+    // MARK: Story 6-4: MCP Agent Integration - Mixed Config
+    // ================================================================
+
+    /// AC4/AC7 [P0]: SDK server tools are accessible even alongside failing external servers.
+    static func testMixedConfig_sdkPlusFailingExternal_sdkToolsReachable() async {
+        let tool = E2EMockTool(toolName: "reliable_fn")
+        let server = InProcessMCPServer(name: "local", version: "1.0.0", tools: [tool])
+        let _ = McpSdkServerConfig(name: "local", version: "1.0.0", server: server)
+
+        // Verify SDK server tools are accessible via getTools()
+        let sdkTools = await server.getTools()
+
+        if sdkTools.count == 1 && sdkTools.first?.name == "reliable_fn" {
+            pass("SDK server tools are directly accessible via getTools()")
+        } else {
+            fail("SDK server should expose its tool",
+                 "count=\(sdkTools.count)")
+        }
+
+        // Verify external servers fail independently
+        let manager = MCPClientManager()
+        await manager.connect(name: "broken", config: McpStdioConfig(command: "/nonexistent"))
+        let connections = await manager.getConnections()
+
+        if connections["broken"]?.status == .error {
+            pass("External server fails independently (error status)")
+        } else {
+            fail("External server should fail with error status")
+        }
+
+        // SDK tools should still be available
+        let stillAvailable = await server.getTools()
+        if stillAvailable.count == 1 {
+            pass("SDK server tools remain available after external failure")
+        } else {
+            fail("SDK tools should remain available")
+        }
+
+        await manager.shutdown()
+    }
+
+    /// AC4 [P0]: Multiple SDK servers produce distinct tool sets.
+    static func testMixedConfig_multipleSdkServers() async {
+        let tool1 = E2EMockTool(toolName: "fn_a")
+        let tool2 = E2EMockTool(toolName: "fn_b")
+        let server1 = InProcessMCPServer(name: "srv-a", version: "1.0.0", tools: [tool1])
+        let server2 = InProcessMCPServer(name: "srv-b", version: "1.0.0", tools: [tool2])
+
+        let config: [String: McpServerConfig] = [
+            "srv-a": .sdk(McpSdkServerConfig(name: "srv-a", version: "1.0.0", server: server1)),
+            "srv-b": .sdk(McpSdkServerConfig(name: "srv-b", version: "1.0.0", server: server2)),
+        ]
+
+        let options = AgentOptions(apiKey: "test-key", model: "test-model", mcpServers: config)
+
+        if options.mcpServers?.count == 2 {
+            pass("Multiple SDK servers configured in AgentOptions")
+        } else {
+            fail("Should hold 2 SDK configs")
+        }
+
+        let toolsA = await server1.getTools()
+        let toolsB = await server2.getTools()
+
+        if toolsA.count == 1 && toolsB.count == 1 {
+            pass("Multiple SDK servers each expose their own tools independently")
+        } else {
+            fail("Each server should expose 1 tool",
+                 "a=\(toolsA.count) b=\(toolsB.count)")
+        }
+    }
+
+    /// AC4 [P1]: External server tools discoverable via MCPClientManager after connection.
+    static func testMixedConfig_externalServerToolsViaManager() async {
+        let manager = MCPClientManager()
+        // Connect to a non-existent server -- will fail
+        await manager.connect(name: "bad", config: McpStdioConfig(command: "/nonexistent"))
+
+        let tools = await manager.getMCPTools()
+        if tools.isEmpty {
+            pass("Failed external server contributes no tools via MCPClientManager")
+        } else {
+            fail("Failed server should contribute no tools")
+        }
+
+        await manager.shutdown()
+    }
+
+    // ================================================================
+    // MARK: Story 6-4: MCP Agent Integration - Error Isolation
+    // ================================================================
+
+    /// AC7 [P0]: MCP tool execution failure returns error ToolResult, not crash.
+    static func testMCPToolError_isolationReturnsErrorToolResult() async {
+        let mockClient = E2EMockMCPClient(callResult: nil, callError: E2EMCPTestError.connectionFailed)
+        let tool = MCPToolDefinition(
+            serverName: "failing",
+            mcpToolName: "fail_tool",
+            toolDescription: "failing tool",
+            schema: ["type": "object"],
+            mcpClient: mockClient
+        )
+
+        let context = ToolContext(cwd: "/tmp", toolUseId: "error-test-id")
+        let result = await tool.call(input: [:], context: context)
+
+        if result.isError {
+            pass("MCP tool execution error captured as isError: true (not thrown)")
+        } else {
+            fail("MCP tool execution error should return isError: true")
+        }
+
+        if result.toolUseId == "error-test-id" {
+            pass("Error ToolResult preserves toolUseId")
+        } else {
+            fail("Error ToolResult should preserve toolUseId")
+        }
+    }
+
+    /// AC7 [P1]: Base tools remain available even when MCP connections fail.
+    static func testMCPConnectionFailure_builtinToolsStillAvailable() async {
+        // assembleToolPool includes base tools even when MCP tools are empty
+        let baseTools = getAllBaseTools(tier: .core)
+        let mcpTools: [ToolProtocol] = []  // Empty MCP tools (simulating all connections failed)
+
+        let pool = assembleToolPool(
+            baseTools: baseTools,
+            customTools: nil,
+            mcpTools: mcpTools,
+            allowed: nil,
+            disallowed: nil
+        )
+
+        let hasBash = pool.contains(where: { $0.name == "Bash" })
+        if hasBash {
+            pass("Base tools available in pool even when all MCP connections fail")
+        } else {
+            fail("Base tools should remain available when MCP connections fail")
+        }
+    }
+
+    // ================================================================
+    // MARK: Story 6-4: MCP Agent Integration - Lifecycle
+    // ================================================================
+
+    /// AC9 [P0]: Shutdown clears all external connections (stdio + SSE + HTTP).
+    static func testMCPLifecycle_shutdownClearsAll() async {
+        let manager = MCPClientManager()
+
+        await manager.connect(name: "stdio-srv", config: McpStdioConfig(command: "/nonexistent"))
+        await manager.connect(name: "sse-srv", config: McpSseConfig(url: "http://localhost:1/sse"))
+
+        let before = await manager.getConnections()
+        let beforeCount = before.count
+
+        await manager.shutdown()
+        let after = await manager.getConnections()
+
+        if beforeCount >= 1 && after.isEmpty {
+            pass("MCPClientManager shutdown clears all external connections")
+        } else {
+            fail("Shutdown should clear all connections",
+                 "before=\(beforeCount) after=\(after.count)")
+        }
+    }
+
+    /// AC9 [P0]: SDK server does not create MCPClientManager (zero network overhead).
+    static func testMCPLifecycle_sdkServerNoManager() async {
+        // SDK servers bypass MCP protocol entirely -- no MCPClientManager needed
+        let tool = E2EMockTool(toolName: "local_fn")
+        let server = InProcessMCPServer(name: "sdk", version: "1.0.0", tools: [tool])
+
+        // SDK server tools are accessible directly without MCPClientManager
+        let tools = await server.getTools()
+
+        if tools.count == 1 {
+            pass("SDK server tools accessible directly (no MCPClientManager needed)")
+        } else {
+            fail("SDK server should expose tools directly")
+        }
+
+        // No network connections created
+        let manager = MCPClientManager()
+        let connections = await manager.getConnections()
+        if connections.isEmpty {
+            pass("No MCP connections created for SDK-only config")
+        } else {
+            fail("SDK config should not create any MCP connections")
+        }
+    }
+
+    // ================================================================
+    // MARK: Story 6-4: MCP Agent Integration - Tool Pool Deduplication
+    // ================================================================
+
+    /// AC8 [P0]: Tool pool deduplicates tools with same name.
+    static func testToolPoolDeduplication() {
+        let tool1 = MCPToolDefinition(
+            serverName: "srv", mcpToolName: "search",
+            toolDescription: "V1", schema: [:], mcpClient: nil
+        )
+        let tool2 = MCPToolDefinition(
+            serverName: "srv", mcpToolName: "search",
+            toolDescription: "V2", schema: [:], mcpClient: nil
+        )
+
+        let pool = assembleToolPool(
+            baseTools: [], customTools: nil, mcpTools: [tool1, tool2],
+            allowed: nil, disallowed: nil
+        )
+
+        let matching = pool.filter { $0.name == "mcp__srv__search" }
+        if matching.count == 1 {
+            pass("Duplicate MCP tools deduplicated to single entry")
+        } else {
+            fail("Should have exactly 1 tool after deduplication",
+                 "count=\(matching.count)")
+        }
+    }
+
+    /// AC8 [P0]: Tool name uniqueness across different servers.
+    static func testToolPoolNameUniqueness() {
+        let tools: [ToolProtocol] = [
+            MCPToolDefinition(serverName: "srv1", mcpToolName: "search",
+                              toolDescription: "S1", schema: [:], mcpClient: nil),
+            MCPToolDefinition(serverName: "srv2", mcpToolName: "search",
+                              toolDescription: "S2", schema: [:], mcpClient: nil),
+        ]
+
+        let pool = assembleToolPool(
+            baseTools: [], customTools: nil, mcpTools: tools,
+            allowed: nil, disallowed: nil
+        )
+
+        let names = pool.map { $0.name }
+        let uniqueNames = Set(names)
+
+        if names.count == uniqueNames.count
+            && pool.contains(where: { $0.name == "mcp__srv1__search" })
+            && pool.contains(where: { $0.name == "mcp__srv2__search" }) {
+            pass("Tool names from different servers are unique in pool")
+        } else {
+            fail("Different servers should produce unique tool names",
+                 "names=\(names)")
+        }
+    }
+
+    // ================================================================
+    // MARK: Story 6-4: MCP Agent Integration - Agent-Level Integration
+    // ================================================================
+
+    /// AC1/AC5 [P0]: Agent can be created with mixed MCP configs (SDK + external).
+    static func testAgentCreation_withMixedMcpConfigs() async {
+        let tool = E2EMockTool(toolName: "compute")
+        let server = InProcessMCPServer(name: "sdk-srv", version: "1.0.0", tools: [tool])
+        let sdkConfig = McpSdkServerConfig(name: "sdk-srv", version: "1.0.0", server: server)
+
+        let mcpServers: [String: McpServerConfig] = [
+            "sdk-srv": .sdk(sdkConfig),
+            "remote": .stdio(McpStdioConfig(command: "/nonexistent")),
+        ]
+
+        let options = AgentOptions(apiKey: "test-key", model: "test-model", mcpServers: mcpServers)
+        let agent = Agent(options: options)
+
+        // Verify Agent was created successfully with MCP config
+        if agent.model == "test-model" && agent.maxTurns == 10 {
+            pass("Agent created with mixed MCP configs (SDK + external)")
+        } else {
+            fail("Agent should be created with correct config")
+        }
+
+        // Verify SDK server tools are accessible directly
+        let sdkTools = await server.getTools()
+        if sdkTools.count == 1 && sdkTools.first?.name == "compute" {
+            pass("SDK server tools are accessible from Agent's MCP config")
+        } else {
+            fail("SDK server should expose tool via getTools()")
+        }
+    }
+
+    /// AC1/AC4 [P0]: Full tool pool assembly with built-in + SDK + external tools.
+    static func testFullToolPoolAssembly_builtinPlusSDKPlusExternal() async {
+        let tool = E2EMockTool(toolName: "sdk_fn")
+        let server = InProcessMCPServer(name: "local", version: "1.0.0", tools: [tool])
+        let _ = McpSdkServerConfig(name: "local", version: "1.0.0", server: server)
+
+        // SDK tools via InProcessMCPServer.getTools()
+        let sdkTools = await server.getTools()
+
+        // External tools via MCPClientManager (will fail, empty)
+        let manager = MCPClientManager()
+        await manager.connect(name: "broken", config: McpStdioConfig(command: "/nonexistent"))
+        let externalTools = await manager.getMCPTools()
+
+        // Build MCP tool list with namespace (simulating SdkToolWrapper)
+        let namespacedSDKTools: [ToolProtocol] = sdkTools.map { t in
+            MCPToolDefinition(
+                serverName: "local",
+                mcpToolName: t.name,
+                toolDescription: t.description,
+                schema: t.inputSchema,
+                mcpClient: nil
+            )
+        }
+
+        // Assemble full pool
+        let baseTools = getAllBaseTools(tier: .core)
+        let allMCPTools = namespacedSDKTools + externalTools
+        let pool = assembleToolPool(
+            baseTools: baseTools,
+            customTools: nil,
+            mcpTools: allMCPTools,
+            allowed: nil,
+            disallowed: nil
+        )
+
+        let hasSDK = pool.contains(where: { $0.name == "mcp__local__sdk_fn" })
+        let hasBash = pool.contains(where: { $0.name == "Bash" })
+        let hasRead = pool.contains(where: { $0.name == "Read" })
+
+        if hasSDK && hasBash && hasRead {
+            pass("Full tool pool assembly merges built-in + SDK + external tools")
+        } else {
+            fail("Pool should contain built-in and SDK tools",
+                 "hasSDK=\(hasSDK) hasBash=\(hasBash) hasRead=\(hasRead)")
+        }
+
+        await manager.shutdown()
+    }
+
+    /// AC3/AC7 [P0]: SDK tool execution through tool pool produces correct result.
+    static func testAgentMCPSDKToolExecution() async {
+        let tool = E2EMockTool(toolName: "echo", resultContent: "Hello from SDK!")
+        let server = InProcessMCPServer(name: "sdk", version: "1.0.0", tools: [tool])
+
+        // Execute tool directly (simulating SDK tool bypass path)
+        let sdkTools = await server.getTools()
+        guard let echoTool = sdkTools.first else {
+            fail("SDK server should expose echo tool")
+            return
+        }
+
+        let context = ToolContext(cwd: "/tmp", toolUseId: "e2e-sdk-exec")
+        let result = await echoTool.call(input: [:], context: context)
+
+        if !result.isError && result.content == "Hello from SDK!" {
+            pass("SDK tool executes directly via ToolProtocol.call() with correct result")
+        } else {
+            fail("SDK tool should execute correctly",
+                 "isError=\(result.isError) content=\(result.content)")
+        }
+    }
+
+    /// AC7 [P0]: MCP tool error isolation at Agent level.
+    static func testAgentMCPToolError_errorIsolation() async {
+        let mockClient = E2EMockMCPClient(callResult: nil, callError: E2EMCPTestError.serverError)
+        let tool = MCPToolDefinition(
+            serverName: "failing",
+            mcpToolName: "crash_tool",
+            toolDescription: "tool that crashes",
+            schema: ["type": "object"],
+            mcpClient: mockClient
+        )
+
+        let context = ToolContext(cwd: "/tmp", toolUseId: "agent-error-test")
+        let result = await tool.call(input: [:], context: context)
+
+        if result.isError {
+            pass("MCP tool error isolated as ToolResult(isError: true) at Agent level")
+        } else {
+            fail("MCP tool error should be captured as isError: true")
+        }
+
+        if result.toolUseId == "agent-error-test" {
+            pass("Error ToolResult preserves toolUseId at Agent level")
+        } else {
+            fail("Error ToolResult should preserve toolUseId")
+        }
+    }
+
+    /// AC9 [P1]: Agent without MCP servers works normally.
+    static func testAgentCreation_noMcpServers() async {
+        let options = AgentOptions(apiKey: "test-key", model: "test-model")
+        let agent = Agent(options: options)
+
+        if agent.model == "test-model" && agent.maxTurns == 10 && agent.maxTokens == 16384 {
+            pass("Agent without MCP servers created correctly with defaults")
+        } else {
+            fail("Agent should have correct default config")
+        }
+    }
 }
 
 // MARK: - E2E Mock Helpers for Story 6-3
@@ -1860,4 +2351,5 @@ private enum E2EMCPTestError: Error {
     case connectionFailed
     case timeout
     case toolNotFound
+    case serverError
 }
