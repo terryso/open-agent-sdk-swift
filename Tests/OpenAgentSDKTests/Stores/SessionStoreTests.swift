@@ -142,7 +142,7 @@ final class SessionStoreTests: XCTestCase {
     }
 
     /// AC3 [P0]: load() returns nil for non-existent session.
-    func testLoad_nonexistentSession_returnsNil() async {
+    func testLoad_nonexistentSession_returnsNil() async throws {
         // Given: a SessionStore
         let store = SessionStore(sessionsDir: tempDir)
 
@@ -176,7 +176,7 @@ final class SessionStoreTests: XCTestCase {
     }
 
     /// AC4 [P0]: delete() returns false for non-existent session.
-    func testDelete_nonexistentSession_returnsFalse() async {
+    func testDelete_nonexistentSession_returnsFalse() async throws {
         // Given: a SessionStore
         let store = SessionStore(sessionsDir: tempDir)
 
@@ -195,7 +195,7 @@ final class SessionStoreTests: XCTestCase {
         let store = SessionStore(sessionsDir: tempDir)
 
         // When: saving multiple sessions concurrently
-        try await withTaskGroup(of: Void.self) { group in
+        try await withThrowingTaskGroup(of: Void.self) { group in
             for i in 1...20 {
                 group.addTask {
                     let sessionId = "concurrent-\(i)-\(UUID().uuidString)"
@@ -210,6 +210,7 @@ final class SessionStoreTests: XCTestCase {
                     try await store.save(sessionId: sessionId, messages: messages, metadata: metadata)
                 }
             }
+            try await group.waitForAll()
         }
 
         // Then: all sessions were saved without crash or data loss
@@ -350,7 +351,7 @@ final class SessionStoreTests: XCTestCase {
         let elapsed = ContinuousClock.now - start
 
         // Then: save completes under 200ms
-        let elapsedMs = elapsed.components.seconds * 1000
+        let elapsedMs = Int(elapsed.components.seconds) * 1000
             + Int(elapsed.components.attoseconds / 1_000_000_000_000_000)
         XCTAssertLessThan(elapsedMs, 200, "Save of 500 messages should complete under 200ms (got \(elapsedMs)ms)")
     }
@@ -432,7 +433,7 @@ final class SessionStoreTests: XCTestCase {
         let originalCreatedAt = firstLoad?.metadata.createdAt
 
         // Small delay to ensure timestamps differ if bug exists
-        try await Task.sleep(nanoseconds: 100_000_000) // 100ms
+        try await _Concurrency.Task.sleep(nanoseconds: 100_000_000) // 100ms
 
         // Re-save with new messages
         let messages2: [[String: Any]] = [["role": "user", "content": "first"], ["role": "assistant", "content": "second"]]

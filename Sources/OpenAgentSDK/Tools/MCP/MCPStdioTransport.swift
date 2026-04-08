@@ -91,7 +91,8 @@ public actor MCPStdioTransport: Transport {
         guard !isConnected else { return }
 
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: config.command)
+        let resolvedURL = resolveExecutable(config.command)
+        process.executableURL = resolvedURL
         if let args = config.args {
             process.arguments = args
         }
@@ -115,10 +116,9 @@ public actor MCPStdioTransport: Transport {
         isConnected = true
         logger.debug("MCP stdio transport connected")
 
-        // Start background message reading loop
-        _Concurrency.Task {
-            await readLoop()
-        }
+        // Start background read loop in a detached task so blocking I/O
+        // does not hold actor isolation (preventing disconnect() from running)
+        startReadLoop()
     }
 
     /// Terminates the child process and cleans up resources.
@@ -189,55 +189,64 @@ public actor MCPStdioTransport: Transport {
 
     // MARK: - Message Reading Loop
 
-    /// Continuously reads from the child process stdout, parses newline-delimited
-    /// JSON-RPC messages, and yields them to the message stream.
-    private func readLoop() async {
-        let bufferSize = 4096
-        var buffer = [UInt8](repeating: 0, count: bufferSize)
-        var pendingData = Data()
+    /// Starts the read loop in a detached task so blocking I/O does not hold actor isolation.
+    ///
+    /// Captures the file descriptor and continuation before spawning the detached task,
+    /// ensuring the actor remains responsive to `disconnect()` calls.
+    private func startReadLoop() {
+        guard let inputFd else { return }
+        let rawFd = inputFd.rawValue
+        let continuation = messageContinuation
+        let log = logger
 
-        while isConnected, !_Concurrency.Task.isCancelled {
-            guard let inputFd else { break }
+        _Concurrency.Task.detached {
+            let bufferSize = 4096
+            var buffer = [UInt8](repeating: 0, count: bufferSize)
+            var pendingData = Data()
 
-            do {
-                let bytesRead = try buffer.withUnsafeMutableBufferPointer { pointer in
-                    try inputFd.read(into: UnsafeMutableRawBufferPointer(pointer))
-                }
+            while true {
+                do {
+                    let bytesRead = try buffer.withUnsafeMutableBufferPointer { pointer in
+                        try FileDescriptor(rawValue: rawFd).read(
+                            into: UnsafeMutableRawBufferPointer(pointer)
+                        )
+                    }
 
-                if bytesRead == 0 {
-                    logger.debug("EOF received from MCP server")
+                    if bytesRead == 0 {
+                        log.debug("EOF received from MCP server")
+                        break
+                    }
+
+                    pendingData.append(Data(buffer[..<bytesRead]))
+
+                    // Process complete messages (newline-delimited)
+                    while let newlineIndex = pendingData.firstIndex(of: UInt8(ascii: "\n")) {
+                        var messageData = pendingData[..<newlineIndex]
+                        pendingData = pendingData[(newlineIndex + 1)...]
+
+                        // Strip trailing carriage return for CRLF line endings
+                        if messageData.last == UInt8(ascii: "\r") {
+                            messageData = messageData.dropLast()
+                        }
+
+                        if !messageData.isEmpty {
+                            log.trace("Message received", metadata: ["size": "\(messageData.count)"])
+                            continuation.yield(TransportMessage(data: Data(messageData)))
+                        }
+                    }
+                } catch let error where MCPError.isResourceTemporarilyUnavailable(error) {
+                    try? await _Concurrency.Task.sleep(for: Duration.milliseconds(10))
+                    continue
+                } catch {
+                    if !_Concurrency.Task.isCancelled {
+                        log.error("Read error", metadata: ["error": .string("\(error)")])
+                    }
                     break
                 }
-
-                pendingData.append(Data(buffer[..<bytesRead]))
-
-                // Process complete messages (newline-delimited)
-                while let newlineIndex = pendingData.firstIndex(of: UInt8(ascii: "\n")) {
-                    var messageData = pendingData[..<newlineIndex]
-                    pendingData = pendingData[(newlineIndex + 1)...]
-
-                    // Strip trailing carriage return for CRLF line endings
-                    if messageData.last == UInt8(ascii: "\r") {
-                        messageData = messageData.dropLast()
-                    }
-
-                    if !messageData.isEmpty {
-                        logger.trace("Message received", metadata: ["size": "\(messageData.count)"])
-                        messageContinuation.yield(TransportMessage(data: Data(messageData)))
-                    }
-                }
-            } catch let error where MCPError.isResourceTemporarilyUnavailable(error) {
-                try? await _Concurrency.Task.sleep(for: Duration.milliseconds(10))
-                continue
-            } catch {
-                if !_Concurrency.Task.isCancelled {
-                    logger.error("Read error", metadata: ["error": "\(error)"])
-                }
-                break
             }
-        }
 
-        messageContinuation.finish()
+            continuation.finish()
+        }
     }
 
     // MARK: - Environment Management
@@ -262,6 +271,44 @@ public actor MCPStdioTransport: Transport {
     /// Returns whether the child process is currently running.
     public var isRunning: Bool {
         process?.isRunning ?? false
+    }
+
+    // MARK: - Executable Resolution
+
+    /// Resolves a command string to an executable URL.
+    ///
+    /// If the command looks like an absolute path, it is used directly.
+    /// Otherwise, it is searched for on the user's PATH using `which`.
+    /// Falls back to treating the command as a file path if lookup fails.
+    private func resolveExecutable(_ command: String) -> URL {
+        // Absolute path — use as-is
+        if command.hasPrefix("/") {
+            return URL(fileURLWithPath: command)
+        }
+
+        // Try to resolve via PATH
+        let which = Process()
+        which.executableURL = URL(fileURLWithPath: "/usr/bin/which")
+        which.arguments = [command]
+        let pipe = Pipe()
+        which.standardOutput = pipe
+        which.standardError = FileHandle.nullDevice
+        do {
+            try which.run()
+            which.waitUntilExit()
+            if which.terminationStatus == 0 {
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                let path = String(data: data, encoding: .utf8)?
+                    .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                if !path.isEmpty {
+                    return URL(fileURLWithPath: path)
+                }
+            }
+        } catch {
+            logger.debug("which lookup failed, falling back to file path", metadata: ["command": .string(command)])
+        }
+
+        return URL(fileURLWithPath: command)
     }
 }
 
