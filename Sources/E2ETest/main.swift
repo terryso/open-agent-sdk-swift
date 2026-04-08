@@ -69,6 +69,11 @@ await MCPClientManagerE2ETests.run()
 await StoreTests.run()
 
 // ================================================================
+// SECTION 34: SessionStore JSON Persistence (Story 7-1)
+// ================================================================
+await SessionStoreE2ETests.run()
+
+// ================================================================
 // SECTION 23, 25, 27, 29, 31, 32, 33: Agent with Stores Integration (incl. LLM-driven TodoWrite, direct handler tests)
 // ================================================================
 await SDKMessageTests.run(apiKey: apiKey, model: model, baseURL: baseURL)

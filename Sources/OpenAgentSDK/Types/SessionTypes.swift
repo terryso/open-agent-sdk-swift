@@ -41,3 +41,17 @@ public struct SessionData: @unchecked Sendable {
         self.messages = messages
     }
 }
+
+/// Input metadata for saving a session (subset of SessionMetadata fields).
+/// Used by SessionStore.save() to capture session context without requiring full metadata.
+public struct PartialSessionMetadata: Sendable {
+    public let cwd: String
+    public let model: String
+    public let summary: String?
+
+    public init(cwd: String, model: String, summary: String? = nil) {
+        self.cwd = cwd
+        self.model = model
+        self.summary = summary
+    }
+}

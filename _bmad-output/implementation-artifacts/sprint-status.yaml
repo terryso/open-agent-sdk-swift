@@ -1,5 +1,5 @@
 # generated: 2026-04-04
-# last_updated: 2026-04-08 (6-4-mcp-tool-agent-integration → in-progress)
+# last_updated: 2026-04-08 (7-1-session-store-json-persistence → done)
 # updated: 5-4-todo-store-tools → review
 # updated: 5-3-cron-store-tools → review
 # updated: 5-1-worktree-store-tools → review
@@ -67,7 +67,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-04-04
-last_updated: 2026-04-08 (6-4-mcp-tool-agent-integration → done)
+last_updated: 2026-04-08 (7-1-session-store-json-persistence → done)
 # updated: 6-2-mcp-http-sse-transport → ready-for-dev
 # updated: 4-7-notebook-edit-tool → review
 # updated: 4-7-notebook-edit-tool → ready-for-dev
@@ -156,7 +156,7 @@ development_status:
   epic-5-retrospective: optional
 
   # Epic 6: MCP 协议集成
-  epic-6: in-progress
+  epic-6: done
   6-1-mcp-client-manager-stdio: done
   6-2-mcp-http-sse-transport: done
   6-3-in-process-mcp-server: done
@@ -164,8 +164,8 @@ development_status:
   epic-6-retrospective: optional
 
   # Epic 7: 会话持久化
-  epic-7: backlog
-  7-1-session-store-json-persistence: backlog
+  epic-7: in-progress
+  7-1-session-store-json-persistence: done
   7-2-session-load-restore: backlog
   7-3-session-fork: backlog
   7-4-session-management-list-rename-tag-delete: backlog
