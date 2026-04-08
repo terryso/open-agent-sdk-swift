@@ -1,0 +1,24 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:open-agent-sdk-swift}",
+            "name": "Debug E2ETest",
+            "target": "E2ETest",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug E2ETest"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:open-agent-sdk-swift}",
+            "name": "Release E2ETest",
+            "target": "E2ETest",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release E2ETest"
+        }
+    ]
+}
