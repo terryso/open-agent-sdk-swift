@@ -54,6 +54,9 @@ public actor SessionStore {
         if let summary = metadata.summary {
             metadataDict["summary"] = summary
         }
+        if let tag = metadata.tag {
+            metadataDict["tag"] = tag
+        }
 
         let sessionDict: [String: Any] = [
             "metadata": metadataDict,
@@ -129,6 +132,7 @@ public actor SessionStore {
         }
 
         let summary = metadataDict["summary"] as? String
+        let tag = metadataDict["tag"] as? String
 
         let metadata = SessionMetadata(
             id: id,
@@ -137,7 +141,8 @@ public actor SessionStore {
             createdAt: createdAt,
             updatedAt: updatedAt,
             messageCount: messageCount,
-            summary: summary
+            summary: summary,
+            tag: tag
         )
 
         return SessionData(metadata: metadata, messages: messagesArray)
@@ -209,6 +214,70 @@ public actor SessionStore {
         try save(sessionId: forkId, messages: forkMessages, metadata: metadata)
 
         return forkId
+    }
+
+    /// List all sessions, returning metadata sorted by `updatedAt` descending (most recent first).
+    /// Invalid or corrupt sessions are silently skipped.
+    /// - Returns: Array of `SessionMetadata` for all valid sessions.
+    public func list() throws -> [SessionMetadata] {
+        let sessionsDir = getSessionsDir()
+
+        let entries: [String]
+        do {
+            entries = try FileManager.default.contentsOfDirectory(atPath: sessionsDir)
+        } catch {
+            // Directory doesn't exist or is unreadable — return empty
+            return []
+        }
+
+        var sessions: [SessionMetadata] = []
+        for entry in entries {
+            // Use load() to validate and extract metadata; skip on failure
+            if let data = try? load(sessionId: entry) {
+                sessions.append(data.metadata)
+            }
+        }
+
+        // Sort by updatedAt descending (most recently updated first)
+        sessions.sort { $0.updatedAt > $1.updatedAt }
+        return sessions
+    }
+
+    /// Rename a session by updating its summary/title.
+    /// If the session does not exist, this is a silent no-op (no error thrown).
+    /// - Parameters:
+    ///   - sessionId: The session identifier to rename.
+    ///   - newTitle: The new title for the session.
+    public func rename(sessionId: String, newTitle: String) throws {
+        try validateSessionId(sessionId)
+        guard let data = try load(sessionId: sessionId) else { return }
+
+        let metadata = PartialSessionMetadata(
+            cwd: data.metadata.cwd,
+            model: data.metadata.model,
+            summary: newTitle,
+            tag: data.metadata.tag
+        )
+        try save(sessionId: sessionId, messages: data.messages, metadata: metadata)
+    }
+
+    /// Tag (or untag) a session.
+    /// Pass `nil` for `tag` to remove an existing tag.
+    /// If the session does not exist, this is a silent no-op (no error thrown).
+    /// - Parameters:
+    ///   - sessionId: The session identifier to tag.
+    ///   - tag: The tag string, or `nil` to clear the tag.
+    public func tag(sessionId: String, tag: String?) throws {
+        try validateSessionId(sessionId)
+        guard let data = try load(sessionId: sessionId) else { return }
+
+        let metadata = PartialSessionMetadata(
+            cwd: data.metadata.cwd,
+            model: data.metadata.model,
+            summary: data.metadata.summary,
+            tag: tag
+        )
+        try save(sessionId: sessionId, messages: data.messages, metadata: metadata)
     }
 
     // MARK: - Private

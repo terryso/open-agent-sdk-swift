@@ -9,6 +9,7 @@ public struct SessionMetadata: Sendable, Equatable {
     public let updatedAt: String
     public let messageCount: Int
     public let summary: String?
+    public let tag: String?
 
     public init(
         id: String,
@@ -17,7 +18,8 @@ public struct SessionMetadata: Sendable, Equatable {
         createdAt: String,
         updatedAt: String,
         messageCount: Int,
-        summary: String? = nil
+        summary: String? = nil,
+        tag: String? = nil
     ) {
         self.id = id
         self.cwd = cwd
@@ -26,6 +28,7 @@ public struct SessionMetadata: Sendable, Equatable {
         self.updatedAt = updatedAt
         self.messageCount = messageCount
         self.summary = summary
+        self.tag = tag
     }
 }
 
@@ -48,10 +51,12 @@ public struct PartialSessionMetadata: Sendable {
     public let cwd: String
     public let model: String
     public let summary: String?
+    public let tag: String?
 
-    public init(cwd: String, model: String, summary: String? = nil) {
+    public init(cwd: String, model: String, summary: String? = nil, tag: String? = nil) {
         self.cwd = cwd
         self.model = model
         self.summary = summary
+        self.tag = tag
     }
 }

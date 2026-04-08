@@ -1,5 +1,5 @@
 # generated: 2026-04-04
-# last_updated: 2026-04-08 (7-3-session-fork → done)
+# last_updated: 2026-04-09 (7-4-session-management-list-rename-tag-delete → review)
 # updated: 5-4-todo-store-tools → review
 # updated: 5-3-cron-store-tools → review
 # updated: 5-1-worktree-store-tools → review
@@ -67,7 +67,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-04-04
-last_updated: 2026-04-08 (7-3-session-fork → review)
+last_updated: 2026-04-09 (7-4-session-management-list-rename-tag-delete → review)
 # updated: 6-2-mcp-http-sse-transport → ready-for-dev
 # updated: 4-7-notebook-edit-tool → review
 # updated: 4-7-notebook-edit-tool → ready-for-dev
@@ -168,7 +168,7 @@ development_status:
   7-1-session-store-json-persistence: done
   7-2-session-load-restore: done
   7-3-session-fork: done
-  7-4-session-management-list-rename-tag-delete: backlog
+  7-4-session-management-list-rename-tag-delete: done
   epic-7-retrospective: optional
 
   # Epic 8: 钩子系统与权限控制
