@@ -162,6 +162,55 @@ public actor SessionStore {
         }
     }
 
+    /// Fork a session — create a copy with a new ID, optionally truncated to a specific message index.
+    /// - Parameters:
+    ///   - sourceSessionId: The session to fork from.
+    ///   - newSessionId: Optional new session ID. Auto-generated UUID if nil.
+    ///   - upToMessageIndex: Optional message index to truncate at (inclusive, 0-based).
+    ///     When nil, all messages are copied.
+    /// - Returns: The new session ID, or nil if source doesn't exist.
+    /// - Throws: ``SDKError/sessionError`` if `upToMessageIndex` is out of range or `newSessionId` is invalid.
+    public func fork(
+        sourceSessionId: String,
+        newSessionId: String? = nil,
+        upToMessageIndex: Int? = nil
+    ) throws -> String? {
+        // Load source session
+        guard let sourceData = try load(sessionId: sourceSessionId) else {
+            return nil
+        }
+
+        // Determine messages to copy
+        var forkMessages = sourceData.messages
+        if let upToIndex = upToMessageIndex {
+            guard upToIndex >= 0 else {
+                throw SDKError.sessionError(message: "upToMessageIndex \(upToIndex) is negative")
+            }
+            guard upToIndex < sourceData.messages.count else {
+                throw SDKError.sessionError(
+                    message: "upToMessageIndex \(upToIndex) out of range (0..<\(sourceData.messages.count))"
+                )
+            }
+            forkMessages = Array(sourceData.messages[0...upToIndex])
+        }
+
+        // Generate or use provided ID
+        let forkId = newSessionId ?? UUID().uuidString
+
+        // Validate the new session ID
+        try validateSessionId(forkId)
+
+        // Save the forked session
+        let metadata = PartialSessionMetadata(
+            cwd: sourceData.metadata.cwd,
+            model: sourceData.metadata.model,
+            summary: "Forked from session \(sourceSessionId)"
+        )
+        try save(sessionId: forkId, messages: forkMessages, metadata: metadata)
+
+        return forkId
+    }
+
     // MARK: - Private
 
     /// Resolve the sessions directory path.
