@@ -74,6 +74,11 @@ await StoreTests.run()
 await SessionStoreE2ETests.run()
 
 // ================================================================
+// SECTION 35: Session Load & Restore (Story 7-2)
+// ================================================================
+await SessionRestoreE2ETests.run(apiKey: apiKey, model: model, baseURL: baseURL)
+
+// ================================================================
 // SECTION 23, 25, 27, 29, 31, 32, 33: Agent with Stores Integration (incl. LLM-driven TodoWrite, direct handler tests)
 // ================================================================
 await SDKMessageTests.run(apiKey: apiKey, model: model, baseURL: baseURL)

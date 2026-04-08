@@ -171,7 +171,20 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
         // MCP integration: connect MCP servers and merge tools
         let (mcpTools, mcpManager) = await assembleFullToolPool()
 
-        var messages = buildMessages(prompt: text)
+        // Session restore: load history if sessionStore and sessionId are configured
+        var messages: [[String: Any]]
+        if let sessionStore = options.sessionStore, let sessionId = options.sessionId {
+            if let sessionData = try? await sessionStore.load(sessionId: sessionId) {
+                messages = sessionData.messages
+            } else {
+                messages = []
+            }
+            // Append new user message to restored (or empty) history
+            messages.append(["role": "user", "content": text])
+        } else {
+            messages = buildMessages(prompt: text)
+        }
+
         var totalUsage = TokenUsage(inputTokens: 0, outputTokens: 0)
         var totalCostUsd: Double = 0.0
         var turnCount = 0
@@ -225,6 +238,18 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                 // Clean up MCP connections on error
                 if let mcpManager {
                     await mcpManager.shutdown()
+                }
+                // Session auto-save on error: persist whatever messages we have so far
+                if let sessionStore = options.sessionStore, let sessionId = options.sessionId {
+                    let metadata = PartialSessionMetadata(
+                        cwd: options.cwd ?? "",
+                        model: model,
+                        summary: nil
+                    )
+                    if let messagesData = try? JSONSerialization.data(withJSONObject: messages, options: []),
+                       let deserializedMessages = try? JSONSerialization.jsonObject(with: messagesData, options: []) as? [[String: Any]] {
+                        try? await sessionStore.save(sessionId: sessionId, messages: deserializedMessages, metadata: metadata)
+                    }
                 }
                 return QueryResult(
                     text: lastAssistantText,
@@ -362,6 +387,20 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
             await mcpManager.shutdown()
         }
 
+        // Session auto-save: persist updated messages if sessionStore is configured
+        if let sessionStore = options.sessionStore, let sessionId = options.sessionId {
+            let metadata = PartialSessionMetadata(
+                cwd: options.cwd ?? "",
+                model: model,
+                summary: nil
+            )
+            // Serialize messages to Data for Sendable compliance when crossing actor boundary
+            if let messagesData = try? JSONSerialization.data(withJSONObject: messages, options: []),
+               let deserializedMessages = try? JSONSerialization.jsonObject(with: messagesData, options: []) as? [[String: Any]] {
+                try? await sessionStore.save(sessionId: sessionId, messages: deserializedMessages, metadata: metadata)
+            }
+        }
+
         return QueryResult(
             text: lastAssistantText,
             usage: totalUsage,
@@ -410,6 +449,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
         let capturedCronStore = options.cronStore
         let capturedTodoStore = options.todoStore
         let capturedMcpServers = options.mcpServers
+        let capturedSessionStore = options.sessionStore
+        let capturedSessionId = options.sessionId
 
         // Build tool definitions for API call
         let capturedApiTools: [[String: Any]]? = {
@@ -480,6 +521,18 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                 }
 
                 var messages = decodedMessages
+
+                // Session restore: load history if sessionStore and sessionId are configured
+                if let sessionStore = capturedSessionStore, let sessionId = capturedSessionId {
+                    if let sessionData = try? await sessionStore.load(sessionId: sessionId) {
+                        messages = sessionData.messages
+                    } else {
+                        messages = []
+                    }
+                    // Append new user message to restored (or empty) history
+                    messages.append(["role": "user", "content": text])
+                }
+
                 var totalUsage = TokenUsage(inputTokens: 0, outputTokens: 0)
                 var totalCostUsd: Double = 0.0
                 var turnCount = 0
@@ -828,6 +881,19 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                 // The defer above acts as a safety net for early returns only.
                 if let mcpManagerForCleanup {
                     await mcpManagerForCleanup.shutdown()
+                }
+                // Session auto-save: persist updated messages if sessionStore is configured
+                if let sessionStore = capturedSessionStore, let sessionId = capturedSessionId {
+                    let metadata = PartialSessionMetadata(
+                        cwd: capturedCwd,
+                        model: capturedModel,
+                        summary: nil
+                    )
+                    // Serialize messages to Data for Sendable compliance when crossing actor boundary
+                    if let messagesData = try? JSONSerialization.data(withJSONObject: messages, options: []),
+                       let deserializedMessages = try? JSONSerialization.jsonObject(with: messagesData, options: []) as? [[String: Any]] {
+                        try? await sessionStore.save(sessionId: sessionId, messages: deserializedMessages, metadata: metadata)
+                    }
                 }
                 continuation.finish()
             }

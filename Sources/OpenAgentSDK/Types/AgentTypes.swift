@@ -47,6 +47,13 @@ public struct AgentOptions: Sendable {
     /// Optional todo store for todo management tools.
     /// Injected into ToolContext for use by todo tools (TodoWrite).
     public var todoStore: TodoStore?
+    /// Optional session store for session persistence (save/load/restore).
+    /// When provided with `sessionId`, Agent will auto-restore and auto-save sessions.
+    public var sessionStore: SessionStore?
+    /// Optional session ID for restoring a previously saved session.
+    /// When provided with `sessionStore`, Agent restores history before prompt/stream
+    /// and auto-saves updated messages after completion.
+    public var sessionId: String?
 
     public init(
         apiKey: String? = nil,
@@ -71,7 +78,9 @@ public struct AgentOptions: Sendable {
         worktreeStore: WorktreeStore? = nil,
         planStore: PlanStore? = nil,
         cronStore: CronStore? = nil,
-        todoStore: TodoStore? = nil
+        todoStore: TodoStore? = nil,
+        sessionStore: SessionStore? = nil,
+        sessionId: String? = nil
     ) {
         self.apiKey = apiKey
         self.model = model
@@ -96,6 +105,8 @@ public struct AgentOptions: Sendable {
         self.planStore = planStore
         self.cronStore = cronStore
         self.todoStore = todoStore
+        self.sessionStore = sessionStore
+        self.sessionId = sessionId
     }
 
     /// Create AgentOptions from an SDKConfiguration, using its resolved values
@@ -127,8 +138,11 @@ public struct AgentOptions: Sendable {
         self.planStore = nil
         self.cronStore = nil
         self.todoStore = nil
+        self.sessionStore = nil
+        self.sessionId = nil
     }
 }
+
 public enum QueryStatus: String, Sendable, Equatable {
     /// The query completed successfully (terminated by end_turn or stop_sequence).
     case success
