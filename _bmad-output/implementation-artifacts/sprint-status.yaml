@@ -123,7 +123,7 @@ development_status:
   epic-2-retrospective: optional
 
   # Epic 3: 工具系统与核心工具
-  epic-3: in-progress
+  epic-3: done
   3-1-tool-protocol-registry: done
   3-2-custom-tool-define-tool: done
   3-3-tool-executor-concurrent-serial: done
@@ -134,7 +134,7 @@ development_status:
   epic-3-retrospective: optional
 
   # Epic 4: 多 Agent 编排
-  epic-4: in-progress
+  epic-4: done
   4-1-task-store-mailbox-store: done
   4-2-team-store-agent-registry: done
   4-3-agent-tool-sub-agent-spawn: done
@@ -164,7 +164,7 @@ development_status:
   epic-6-retrospective: optional
 
   # Epic 7: 会话持久化
-  epic-7: in-progress
+  epic-7: done
   7-1-session-store-json-persistence: done
   7-2-session-load-restore: done
   7-3-session-fork: done
