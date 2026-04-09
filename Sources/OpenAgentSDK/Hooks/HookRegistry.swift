@@ -144,3 +144,22 @@ public actor HookRegistry {
         hooks.removeAll()
     }
 }
+
+// MARK: - Factory Function
+
+/// Create a hook registry with optional configuration.
+///
+/// This is a convenience factory function aligned with the TypeScript SDK's
+/// `createHookRegistry()` API. When a config dictionary is provided, hooks
+/// are registered for all valid event name keys.
+///
+/// - Parameter config: Optional dictionary mapping event name strings to arrays
+///   of hook definitions. Invalid event names are silently skipped.
+/// - Returns: A configured `HookRegistry` instance.
+public func createHookRegistry(config: [String: [HookDefinition]]? = nil) async -> HookRegistry {
+    let registry = HookRegistry()
+    if let config {
+        await registry.registerFromConfig(config)
+    }
+    return registry
+}

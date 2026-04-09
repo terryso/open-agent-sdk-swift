@@ -228,15 +228,45 @@ enum ToolExecutor {
             )
         }
 
-        // TODO: Epic 8 — Permission check insertion point
-        // if let canUseTool = canUseTool { ... }
-
-        // TODO: Epic 8 — PreToolUse hook insertion point
+        // PreToolUse hook: if hookRegistry is set, trigger preToolUse hooks.
+        // If any hook returns block: true, return an error result without executing the tool.
+        if let hookRegistry = context.hookRegistry {
+            let hookInput = HookInput(
+                event: .preToolUse,
+                toolName: block.name,
+                toolInput: block.input,
+                toolUseId: block.id,
+                cwd: context.cwd
+            )
+            let hookResults = await hookRegistry.execute(.preToolUse, input: hookInput)
+            if hookResults.contains(where: { $0.block }) {
+                let blockMessage = hookResults.compactMap { $0.message }.first ?? "Tool execution blocked by hook"
+                return ToolResult(
+                    toolUseId: block.id,
+                    content: "Error: \(blockMessage)",
+                    isError: true
+                )
+            }
+        }
 
         // Execute tool — errors are captured in ToolResult, not thrown
         let result = await tool.call(input: block.input, context: context)
 
-        // TODO: Epic 8 — PostToolUse / PostToolUseFailure hook insertion point
+        // PostToolUse / PostToolUseFailure hook: trigger after tool execution.
+        // Success triggers postToolUse, failure triggers postToolUseFailure.
+        if let hookRegistry = context.hookRegistry {
+            let hookEvent: HookEvent = result.isError ? .postToolUseFailure : .postToolUse
+            let hookInput = HookInput(
+                event: hookEvent,
+                toolName: block.name,
+                toolInput: block.input,
+                toolOutput: result.content,
+                toolUseId: block.id,
+                cwd: context.cwd,
+                error: result.isError ? result.content : nil
+            )
+            _ = await hookRegistry.execute(hookEvent, input: hookInput)
+        }
 
         return ToolResult(
             toolUseId: block.id,

@@ -109,6 +109,11 @@ await IntegrationTests.run(apiKey: apiKey, model: model, baseURL: baseURL)
 await HookRegistryE2ETests.run()
 
 // ================================================================
+// SECTION 39: Hook Integration (Story 8-2)
+// ================================================================
+await HookIntegrationE2ETests.run(apiKey: apiKey, model: model, baseURL: baseURL)
+
+// ================================================================
 // Results Summary
 // ================================================================
 print("\n=== E2E Test Results ===")

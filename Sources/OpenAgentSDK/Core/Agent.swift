@@ -168,6 +168,12 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
     public func prompt(_ text: String) async -> QueryResult {
         let startTime = ContinuousClock.now
 
+        // Hook: sessionStart — trigger before any agent work begins
+        if let hookRegistry = options.hookRegistry {
+            let hookInput = HookInput(event: .sessionStart, cwd: options.cwd)
+            await hookRegistry.execute(.sessionStart, input: hookInput)
+        }
+
         // MCP integration: connect MCP servers and merge tools
         let (mcpTools, mcpManager) = await assembleFullToolPool()
 
@@ -251,6 +257,16 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                         try? await sessionStore.save(sessionId: sessionId, messages: deserializedMessages, metadata: metadata)
                     }
                 }
+                // Hook: stop — trigger on error path (loop terminated by exception)
+                if let hookRegistry = options.hookRegistry {
+                    let stopInput = HookInput(event: .stop, cwd: options.cwd)
+                    await hookRegistry.execute(.stop, input: stopInput)
+                }
+                // Hook: sessionEnd — trigger even on error path
+                if let hookRegistry = options.hookRegistry {
+                    let endInput = HookInput(event: .sessionEnd, cwd: options.cwd)
+                    await hookRegistry.execute(.sessionEnd, input: endInput)
+                }
                 return QueryResult(
                     text: lastAssistantText,
                     usage: totalUsage,
@@ -331,7 +347,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                             worktreeStore: options.worktreeStore,
                             planStore: options.planStore,
                             cronStore: options.cronStore,
-                            todoStore: options.todoStore
+                            todoStore: options.todoStore,
+                            hookRegistry: options.hookRegistry
                         )
                     )
 
@@ -382,6 +399,12 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
             status = .errorMaxTurns
         }
 
+        // Hook: stop — trigger when agent loop terminates
+        if let hookRegistry = options.hookRegistry {
+            let stopInput = HookInput(event: .stop, cwd: options.cwd)
+            await hookRegistry.execute(.stop, input: stopInput)
+        }
+
         // Clean up MCP connections
         if let mcpManager {
             await mcpManager.shutdown()
@@ -399,6 +422,12 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                let deserializedMessages = try? JSONSerialization.jsonObject(with: messagesData, options: []) as? [[String: Any]] {
                 try? await sessionStore.save(sessionId: sessionId, messages: deserializedMessages, metadata: metadata)
             }
+        }
+
+        // Hook: sessionEnd — trigger before returning the result
+        if let hookRegistry = options.hookRegistry {
+            let endInput = HookInput(event: .sessionEnd, cwd: options.cwd)
+            await hookRegistry.execute(.sessionEnd, input: endInput)
         }
 
         return QueryResult(
@@ -451,6 +480,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
         let capturedMcpServers = options.mcpServers
         let capturedSessionStore = options.sessionStore
         let capturedSessionId = options.sessionId
+        let capturedHookRegistry = options.hookRegistry
 
         // Build tool definitions for API call
         let capturedApiTools: [[String: Any]]? = {
@@ -533,6 +563,12 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                     messages.append(["role": "user", "content": text])
                 }
 
+                // Hook: sessionStart — trigger before any agent work begins
+                if let hookRegistry = capturedHookRegistry {
+                    let hookInput = HookInput(event: .sessionStart, cwd: capturedCwd)
+                    await hookRegistry.execute(.sessionStart, input: hookInput)
+                }
+
                 var totalUsage = TokenUsage(inputTokens: 0, outputTokens: 0)
                 var totalCostUsd: Double = 0.0
                 var turnCount = 0
@@ -581,7 +617,13 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                             )
                         }, retryConfig: retryCfg)
                     } catch {
-                        // API connection error — yield error result and terminate
+                        // API connection error — fire hooks before yielding error
+                        if let hookRegistry = capturedHookRegistry {
+                            let stopInput = HookInput(event: .stop, cwd: capturedCwd)
+                            await hookRegistry.execute(.stop, input: stopInput)
+                            let endInput = HookInput(event: .sessionEnd, cwd: capturedCwd)
+                            await hookRegistry.execute(.sessionEnd, input: endInput)
+                        }
                         Self.yieldStreamError(
                             continuation: continuation, text: "",
                             usage: totalUsage, turnCount: turnCount, startTime: startTime,
@@ -626,6 +668,14 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                                             .compactMap { $0["text"] as? String }
                                             .joined()
                                     }.joined(separator: " ")
+
+                                    // Fire hooks before yielding budget error
+                                    if let hookRegistry = capturedHookRegistry {
+                                        let stopInput = HookInput(event: .stop, cwd: capturedCwd)
+                                        await hookRegistry.execute(.stop, input: stopInput)
+                                        let endInput = HookInput(event: .sessionEnd, cwd: capturedCwd)
+                                        await hookRegistry.execute(.sessionEnd, input: endInput)
+                                    }
 
                                     continuation.yield(.result(SDKMessage.ResultData(
                                         subtype: .errorMaxBudgetUsd,
@@ -702,6 +752,14 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                                     }.joined(separator: " ")
                                     let finalText = previousText.isEmpty ? accumulatedText : "\(previousText) \(accumulatedText)"
 
+                                    // Fire hooks before yielding budget error
+                                    if let hookRegistry = capturedHookRegistry {
+                                        let stopInput = HookInput(event: .stop, cwd: capturedCwd)
+                                        await hookRegistry.execute(.stop, input: stopInput)
+                                        let endInput = HookInput(event: .sessionEnd, cwd: capturedCwd)
+                                        await hookRegistry.execute(.sessionEnd, input: endInput)
+                                    }
+
                                     continuation.yield(.result(SDKMessage.ResultData(
                                         subtype: .errorMaxBudgetUsd,
                                         text: finalText,
@@ -741,7 +799,13 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                                 ])
 
                             case .error:
-                                // SSE error event — yield error result and terminate
+                                // SSE error event — fire hooks before yielding error
+                                if let hookRegistry = capturedHookRegistry {
+                                    let stopInput = HookInput(event: .stop, cwd: capturedCwd)
+                                    await hookRegistry.execute(.stop, input: stopInput)
+                                    let endInput = HookInput(event: .sessionEnd, cwd: capturedCwd)
+                                    await hookRegistry.execute(.sessionEnd, input: endInput)
+                                }
                                 Self.yieldStreamError(
                                     continuation: continuation, text: accumulatedText,
                                     usage: totalUsage, turnCount: turnCount, startTime: startTime,
@@ -754,7 +818,13 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                             }
                         }
                     } catch {
-                        // Stream iteration error — yield error result and terminate
+                        // Stream iteration error — fire hooks before yielding error
+                        if let hookRegistry = capturedHookRegistry {
+                            let stopInput = HookInput(event: .stop, cwd: capturedCwd)
+                            await hookRegistry.execute(.stop, input: stopInput)
+                            let endInput = HookInput(event: .sessionEnd, cwd: capturedCwd)
+                            await hookRegistry.execute(.sessionEnd, input: endInput)
+                        }
                         Self.yieldStreamError(
                             continuation: continuation, text: accumulatedText,
                             usage: totalUsage, turnCount: turnCount, startTime: startTime,
@@ -801,7 +871,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                                     worktreeStore: capturedWorktreeStore,
                                     planStore: capturedPlanStore,
                                     cronStore: capturedCronStore,
-                                    todoStore: capturedTodoStore
+                                    todoStore: capturedTodoStore,
+                                    hookRegistry: capturedHookRegistry
                                 )
                             )
 
@@ -859,6 +930,12 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                 let subtype: SDKMessage.ResultData.Subtype =
                     (!loopExitedCleanly && turnCount >= capturedMaxTurns) ? .errorMaxTurns : .success
 
+                // Hook: stop — trigger when agent loop terminates
+                if let hookRegistry = capturedHookRegistry {
+                    let stopInput = HookInput(event: .stop, cwd: capturedCwd)
+                    await hookRegistry.execute(.stop, input: stopInput)
+                }
+
                 // Collect all assistant text from conversation history
                 let finalText = messages.compactMap { msg -> String? in
                     guard let content = msg["content"] as? [[String: Any]] else { return nil }
@@ -894,6 +971,11 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                        let deserializedMessages = try? JSONSerialization.jsonObject(with: messagesData, options: []) as? [[String: Any]] {
                         try? await sessionStore.save(sessionId: sessionId, messages: deserializedMessages, metadata: metadata)
                     }
+                }
+                // Hook: sessionEnd — trigger before finishing the stream
+                if let hookRegistry = capturedHookRegistry {
+                    let endInput = HookInput(event: .sessionEnd, cwd: capturedCwd)
+                    await hookRegistry.execute(.sessionEnd, input: endInput)
                 }
                 continuation.finish()
             }

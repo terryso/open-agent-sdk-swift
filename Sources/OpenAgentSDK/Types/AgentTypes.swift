@@ -54,6 +54,9 @@ public struct AgentOptions: Sendable {
     /// When provided with `sessionStore`, Agent restores history before prompt/stream
     /// and auto-saves updated messages after completion.
     public var sessionId: String?
+    /// Optional hook registry for lifecycle event hooks.
+    /// When set, hooks are triggered during Agent execution (FR28).
+    public var hookRegistry: HookRegistry?
 
     public init(
         apiKey: String? = nil,
@@ -80,7 +83,8 @@ public struct AgentOptions: Sendable {
         cronStore: CronStore? = nil,
         todoStore: TodoStore? = nil,
         sessionStore: SessionStore? = nil,
-        sessionId: String? = nil
+        sessionId: String? = nil,
+        hookRegistry: HookRegistry? = nil
     ) {
         self.apiKey = apiKey
         self.model = model
@@ -107,6 +111,7 @@ public struct AgentOptions: Sendable {
         self.todoStore = todoStore
         self.sessionStore = sessionStore
         self.sessionId = sessionId
+        self.hookRegistry = hookRegistry
     }
 
     /// Create AgentOptions from an SDKConfiguration, using its resolved values
@@ -140,6 +145,7 @@ public struct AgentOptions: Sendable {
         self.todoStore = nil
         self.sessionStore = nil
         self.sessionId = nil
+        self.hookRegistry = nil
     }
 }
 
