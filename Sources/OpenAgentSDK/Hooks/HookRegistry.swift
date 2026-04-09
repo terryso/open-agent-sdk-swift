@@ -97,32 +97,42 @@ public actor HookRegistry {
                 }
             }
 
-            // Execute handler if present (command execution deferred to Story 8-3)
-            guard let handler = def.handler else { continue }
+            // Execute handler if present, otherwise try shell command
+            if let handler = def.handler {
+                do {
+                    let timeoutMs = def.timeout ?? 30_000
+                    let timeoutNanos = UInt64(clamping: Int64(timeoutMs) * 1_000_000)
+                    let output = try await withThrowingTaskGroup(of: HookOutput?.self) { group in
+                        group.addTask {
+                            await handler(input)
+                        }
+                        group.addTask {
+                            try await _Concurrency.Task.sleep(nanoseconds: timeoutNanos)
+                            throw HookExecutionError.timeout
+                        }
 
-            do {
-                let timeoutMs = def.timeout ?? 30_000
-                let timeoutNanos = UInt64(clamping: Int64(timeoutMs) * 1_000_000)
-                let output = try await withThrowingTaskGroup(of: HookOutput?.self) { group in
-                    group.addTask {
-                        await handler(input)
-                    }
-                    group.addTask {
-                        try await _Concurrency.Task.sleep(nanoseconds: timeoutNanos)
-                        throw HookExecutionError.timeout
-                    }
-
-                    guard let first = try await group.next() else {
+                        guard let first = try await group.next() else {
+                            group.cancelAll()
+                            return nil as HookOutput?
+                        }
                         group.cancelAll()
-                        return nil as HookOutput?
+                        return first
                     }
-                    group.cancelAll()
-                    return first
+                    if let output { results.append(output) }
+                } catch {
+                    // Hook failed (including timeout) — log and continue
+                    // Matches TS SDK behavior: errors are caught, not propagated
                 }
-                if let output { results.append(output) }
-            } catch {
-                // Hook failed (including timeout) — log and continue
-                // Matches TS SDK behavior: errors are caught, not propagated
+            } else if let command = def.command {
+                // Shell command hook (Story 8-3)
+                let timeoutMs = def.timeout ?? 30_000
+                if let output = await ShellHookExecutor.execute(
+                    command: command,
+                    input: input,
+                    timeoutMs: timeoutMs
+                ) {
+                    results.append(output)
+                }
             }
         }
 

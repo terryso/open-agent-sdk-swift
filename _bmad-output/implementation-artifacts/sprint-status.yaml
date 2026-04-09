@@ -1,5 +1,5 @@
 # generated: 2026-04-04
-# last_updated: 2026-04-09 (8-2-function-hook-registration-execution → done)
+# last_updated: 2026-04-09 (8-3-shell-hook-execution → done)
 # updated: 5-4-todo-store-tools → review
 # updated: 5-3-cron-store-tools → review
 # updated: 5-1-worktree-store-tools → review
@@ -67,7 +67,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-04-04
-last_updated: 2026-04-09 (8-2-function-hook-registration-execution → ready-for-dev)
+last_updated: 2026-04-09 (8-3-shell-hook-execution → in-progress)
 # updated: 6-2-mcp-http-sse-transport → ready-for-dev
 # updated: 4-7-notebook-edit-tool → review
 # updated: 4-7-notebook-edit-tool → ready-for-dev
@@ -175,7 +175,7 @@ development_status:
   epic-8: in-progress
   8-1-hook-event-types-registry: done
   8-2-function-hook-registration-execution: done
-  8-3-shell-hook-execution: backlog
+  8-3-shell-hook-execution: done
   8-4-permission-modes: backlog
   8-5-custom-authorization-callback: backlog
   epic-8-retrospective: optional

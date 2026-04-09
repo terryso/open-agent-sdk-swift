@@ -114,6 +114,11 @@ await HookRegistryE2ETests.run()
 await HookIntegrationE2ETests.run(apiKey: apiKey, model: model, baseURL: baseURL)
 
 // ================================================================
+// SECTION 40: Shell Hook Execution (Story 8-3)
+// ================================================================
+await ShellHookExecutionE2ETests.run()
+
+// ================================================================
 // Results Summary
 // ================================================================
 print("\n=== E2E Test Results ===")
