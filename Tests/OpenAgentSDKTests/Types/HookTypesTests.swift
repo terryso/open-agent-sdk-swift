@@ -155,6 +155,7 @@ final class HookTypesTests: XCTestCase {
     func testHookDefinition_defaults() {
         let def = HookDefinition()
         XCTAssertNil(def.command)
+        XCTAssertNil(def.handler)
         XCTAssertNil(def.matcher)
         XCTAssertNil(def.timeout)
     }

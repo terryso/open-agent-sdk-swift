@@ -29,3 +29,8 @@
 
 - **load() silently swallows JSON corruption** — If transcript.json is truncated or corrupted, load() returns nil with no diagnostic. Matches TypeScript SDK `catch { return null }` behavior. Future enhancement: add optional logging [SessionStore.swift:101-143]
 - **E2E tests missing concurrent/delete coverage** — AC10 minimum coverage met (round-trip, permissions, auto-creation). Missing E2E tests for concurrent saves and delete. Future enhancement [SessionStoreE2ETests.swift]
+
+## Deferred from: code review of 8-1-hook-event-types-registry (2026-04-09)
+
+- **Silent error swallowing in execute() catch block** — All hook errors (including timeout) are silently caught with no logging. Matches TS SDK `console.error` pattern but Swift has no logging infrastructure. Future enhancement when logging is added [HookRegistry.swift:122-125]
+- **HookOutput lacks Equatable conformance** — Cannot perform full structural equality assertions in tests. Low priority since all fields are individually Equatable [HookTypes.swift:62]

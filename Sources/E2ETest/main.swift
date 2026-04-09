@@ -104,6 +104,11 @@ await NoInputToolTests.run(apiKey: apiKey, model: model, baseURL: baseURL)
 await IntegrationTests.run(apiKey: apiKey, model: model, baseURL: baseURL)
 
 // ================================================================
+// SECTION 38: HookRegistry (Story 8-1)
+// ================================================================
+await HookRegistryE2ETests.run()
+
+// ================================================================
 // Results Summary
 // ================================================================
 print("\n=== E2E Test Results ===")

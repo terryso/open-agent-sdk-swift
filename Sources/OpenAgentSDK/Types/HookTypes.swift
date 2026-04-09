@@ -105,11 +105,18 @@ public struct HookNotification: Sendable, Equatable {
 /// Definition of a hook handler.
 public struct HookDefinition: @unchecked Sendable {
     public let command: String?
+    public let handler: (@Sendable (HookInput) async -> HookOutput?)?
     public let matcher: String?
     public let timeout: Int?
 
-    public init(command: String? = nil, matcher: String? = nil, timeout: Int? = nil) {
+    public init(
+        command: String? = nil,
+        handler: (@Sendable (HookInput) async -> HookOutput?)? = nil,
+        matcher: String? = nil,
+        timeout: Int? = nil
+    ) {
         self.command = command
+        self.handler = handler
         self.matcher = matcher
         self.timeout = timeout
     }
