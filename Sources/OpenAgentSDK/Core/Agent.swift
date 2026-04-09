@@ -348,7 +348,9 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                             planStore: options.planStore,
                             cronStore: options.cronStore,
                             todoStore: options.todoStore,
-                            hookRegistry: options.hookRegistry
+                            hookRegistry: options.hookRegistry,
+                            permissionMode: options.permissionMode,
+                            canUseTool: options.canUseTool
                         )
                     )
 
@@ -478,6 +480,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
         let capturedCronStore = options.cronStore
         let capturedTodoStore = options.todoStore
         let capturedMcpServers = options.mcpServers
+        let capturedPermissionMode = options.permissionMode
+        let capturedCanUseTool = options.canUseTool
         let capturedSessionStore = options.sessionStore
         let capturedSessionId = options.sessionId
         let capturedHookRegistry = options.hookRegistry
@@ -872,7 +876,9 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                                     planStore: capturedPlanStore,
                                     cronStore: capturedCronStore,
                                     todoStore: capturedTodoStore,
-                                    hookRegistry: capturedHookRegistry
+                                    hookRegistry: capturedHookRegistry,
+                                    permissionMode: capturedPermissionMode,
+                                    canUseTool: capturedCanUseTool
                                 )
                             )
 

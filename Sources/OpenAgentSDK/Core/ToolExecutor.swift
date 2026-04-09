@@ -47,6 +47,74 @@ enum ToolExecutor {
     /// Maximum number of read-only tools to execute concurrently.
     static let maxConcurrency = 10
 
+    // MARK: - Permission Decision
+
+    /// Permission decision for tool execution.
+    enum PermissionDecision: Sendable, Equatable {
+        case allow
+        case block(String)   // Blocked -- requires authorization prompt
+        case deny(String)    // Denied -- outright rejection
+    }
+
+    // MARK: - Permission Check
+
+    /// Determines whether a tool should be blocked based on the permission mode.
+    ///
+    /// Read-only tools are always allowed regardless of mode.
+    ///
+    /// - Parameters:
+    ///   - permissionMode: The active permission mode.
+    ///   - tool: The tool being checked.
+    /// - Returns: A permission decision.
+    static func shouldBlockTool(permissionMode: PermissionMode, tool: ToolProtocol) -> PermissionDecision {
+        // Read-only tools are always allowed in all modes
+        if tool.isReadOnly { return .allow }
+
+        switch permissionMode {
+        case .bypassPermissions, .auto:
+            return .allow
+        case .default:
+            return .block("Permission required for tool \"\(tool.name)\" in default mode")
+        case .acceptEdits:
+            // Write/Edit are allowed, other mutations are blocked
+            if tool.name == "Write" || tool.name == "Edit" {
+                return .allow
+            }
+            return .block("Permission required for tool \"\(tool.name)\" in acceptEdits mode")
+        case .plan:
+            return .block("Tool \"\(tool.name)\" blocked in plan mode (read-only)")
+        case .dontAsk:
+            return .deny("Tool \"\(tool.name)\" denied in dontAsk mode")
+        }
+    }
+
+    // MARK: - Post-Tool Hook Helper
+
+    /// Fires the appropriate PostToolUse or PostToolUseFailure hook after tool execution.
+    ///
+    /// Shared by both the canUseTool allow path and the normal execution path
+    /// to avoid duplicating hook logic.
+    static func firePostToolHook(
+        hookRegistry: HookRegistry?,
+        block: ToolUseBlock,
+        toolInput: Any,
+        result: ToolResult,
+        context: ToolContext
+    ) async {
+        guard let hookRegistry = hookRegistry else { return }
+        let hookEvent: HookEvent = result.isError ? .postToolUseFailure : .postToolUse
+        let hookInput = HookInput(
+            event: hookEvent,
+            toolName: block.name,
+            toolInput: toolInput,
+            toolOutput: result.content,
+            toolUseId: block.id,
+            cwd: context.cwd,
+            error: result.isError ? result.content : nil
+        )
+        _ = await hookRegistry.execute(hookEvent, input: hookInput)
+    }
+
     // MARK: - Extract tool_use Blocks
 
     /// Extracts `tool_use` content blocks from an Anthropic API response content array.
@@ -249,24 +317,71 @@ enum ToolExecutor {
             }
         }
 
+        // === Permission Check ===
+        // Step 1: Try canUseTool callback (takes priority over permissionMode)
+        if let canUseTool = context.canUseTool {
+            if let result = await canUseTool(tool, block.input, context) {
+                if result.behavior == "deny" {
+                    return ToolResult(
+                        toolUseId: block.id,
+                        content: result.message ?? "Permission denied for tool \"\(block.name)\"",
+                        isError: true
+                    )
+                }
+                // allow — may have updatedInput
+                let effectiveInput = result.updatedInput ?? block.input
+                let execResult = await tool.call(input: effectiveInput, context: context)
+
+                // PostToolUse / PostToolUseFailure hook
+                await firePostToolHook(
+                    hookRegistry: context.hookRegistry,
+                    block: block,
+                    toolInput: effectiveInput,
+                    result: execResult,
+                    context: context
+                )
+
+                return ToolResult(
+                    toolUseId: block.id,
+                    content: execResult.content,
+                    isError: execResult.isError
+                )
+            }
+            // canUseTool returned nil → fall back to permissionMode
+        }
+
+        // Step 2: Permission mode-based check
+        if let mode = context.permissionMode {
+            let decision = shouldBlockTool(permissionMode: mode, tool: tool)
+            switch decision {
+            case .allow:
+                break // Continue to execute
+            case .block(let message):
+                return ToolResult(
+                    toolUseId: block.id,
+                    content: message,
+                    isError: true
+                )
+            case .deny(let message):
+                return ToolResult(
+                    toolUseId: block.id,
+                    content: message,
+                    isError: true
+                )
+            }
+        }
+
         // Execute tool — errors are captured in ToolResult, not thrown
         let result = await tool.call(input: block.input, context: context)
 
-        // PostToolUse / PostToolUseFailure hook: trigger after tool execution.
-        // Success triggers postToolUse, failure triggers postToolUseFailure.
-        if let hookRegistry = context.hookRegistry {
-            let hookEvent: HookEvent = result.isError ? .postToolUseFailure : .postToolUse
-            let hookInput = HookInput(
-                event: hookEvent,
-                toolName: block.name,
-                toolInput: block.input,
-                toolOutput: result.content,
-                toolUseId: block.id,
-                cwd: context.cwd,
-                error: result.isError ? result.content : nil
-            )
-            _ = await hookRegistry.execute(hookEvent, input: hookInput)
-        }
+        // PostToolUse / PostToolUseFailure hook
+        await firePostToolHook(
+            hookRegistry: context.hookRegistry,
+            block: block,
+            toolInput: block.input,
+            result: result,
+            context: context
+        )
 
         return ToolResult(
             toolUseId: block.id,

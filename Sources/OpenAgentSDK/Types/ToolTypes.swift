@@ -73,6 +73,12 @@ public struct ToolContext: Sendable {
     /// Optional hook registry for lifecycle event hooks.
     /// Injected by Core/ from AgentOptions.hookRegistry for use in ToolExecutor.
     public let hookRegistry: HookRegistry?
+    /// Optional permission mode controlling tool execution behavior.
+    /// Injected by Core/ from AgentOptions.permissionMode.
+    public let permissionMode: PermissionMode?
+    /// Optional permission check callback for custom authorization.
+    /// Injected by Core/ from AgentOptions.canUseTool.
+    public let canUseTool: CanUseToolFn?
 
     public init(
         cwd: String,
@@ -86,7 +92,9 @@ public struct ToolContext: Sendable {
         planStore: PlanStore? = nil,
         cronStore: CronStore? = nil,
         todoStore: TodoStore? = nil,
-        hookRegistry: HookRegistry? = nil
+        hookRegistry: HookRegistry? = nil,
+        permissionMode: PermissionMode? = nil,
+        canUseTool: CanUseToolFn? = nil
     ) {
         self.cwd = cwd
         self.toolUseId = toolUseId
@@ -100,6 +108,8 @@ public struct ToolContext: Sendable {
         self.cronStore = cronStore
         self.todoStore = todoStore
         self.hookRegistry = hookRegistry
+        self.permissionMode = permissionMode
+        self.canUseTool = canUseTool
     }
 
     /// Returns a copy of this context with the toolUseId replaced.
@@ -114,7 +124,9 @@ public struct ToolContext: Sendable {
             taskStore: taskStore, worktreeStore: worktreeStore,
             planStore: planStore, cronStore: cronStore,
             todoStore: todoStore,
-            hookRegistry: hookRegistry
+            hookRegistry: hookRegistry,
+            permissionMode: permissionMode,
+            canUseTool: canUseTool
         )
     }
 }

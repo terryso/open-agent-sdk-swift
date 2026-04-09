@@ -119,6 +119,11 @@ await HookIntegrationE2ETests.run(apiKey: apiKey, model: model, baseURL: baseURL
 await ShellHookExecutionE2ETests.run()
 
 // ================================================================
+// SECTION 41: Permission Modes (Story 8-4)
+// ================================================================
+await PermissionModeE2ETests.run(apiKey: apiKey, model: model, baseURL: baseURL)
+
+// ================================================================
 // Results Summary
 // ================================================================
 print("\n=== E2E Test Results ===")
