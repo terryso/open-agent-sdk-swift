@@ -19,6 +19,106 @@
             "target": "E2ETest",
             "configuration": "release",
             "preLaunchTask": "swift: Build Release E2ETest"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:open-agent-sdk-swift}",
+            "name": "Debug StreamingAgent",
+            "target": "StreamingAgent",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug StreamingAgent"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:open-agent-sdk-swift}",
+            "name": "Release StreamingAgent",
+            "target": "StreamingAgent",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release StreamingAgent"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:open-agent-sdk-swift}",
+            "name": "Debug SessionsAndHooks",
+            "target": "SessionsAndHooks",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug SessionsAndHooks"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:open-agent-sdk-swift}",
+            "name": "Release SessionsAndHooks",
+            "target": "SessionsAndHooks",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release SessionsAndHooks"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:open-agent-sdk-swift}",
+            "name": "Debug MCPIntegration",
+            "target": "MCPIntegration",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug MCPIntegration"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:open-agent-sdk-swift}",
+            "name": "Release MCPIntegration",
+            "target": "MCPIntegration",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release MCPIntegration"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:open-agent-sdk-swift}",
+            "name": "Debug CustomTools",
+            "target": "CustomTools",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug CustomTools"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:open-agent-sdk-swift}",
+            "name": "Release CustomTools",
+            "target": "CustomTools",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release CustomTools"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:open-agent-sdk-swift}",
+            "name": "Debug BasicAgent",
+            "target": "BasicAgent",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug BasicAgent"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:open-agent-sdk-swift}",
+            "name": "Release BasicAgent",
+            "target": "BasicAgent",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release BasicAgent"
         }
     ]
 }

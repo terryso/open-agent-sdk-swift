@@ -43,5 +43,32 @@ let package = Package(
             ],
             path: "Sources/E2ETest"
         ),
+        .executableTarget(
+            name: "BasicAgent",
+            dependencies: ["OpenAgentSDK"],
+            path: "Examples/BasicAgent"
+        ),
+        .executableTarget(
+            name: "StreamingAgent",
+            dependencies: ["OpenAgentSDK"],
+            path: "Examples/StreamingAgent"
+        ),
+        .executableTarget(
+            name: "CustomTools",
+            dependencies: ["OpenAgentSDK"],
+            path: "Examples/CustomTools"
+        ),
+        .executableTarget(
+            name: "MCPIntegration",
+            dependencies: ["OpenAgentSDK",
+                .product(name: "MCP", package: "mcp-swift-sdk"),
+            ],
+            path: "Examples/MCPIntegration"
+        ),
+        .executableTarget(
+            name: "SessionsAndHooks",
+            dependencies: ["OpenAgentSDK"],
+            path: "Examples/SessionsAndHooks"
+        ),
     ]
 )
