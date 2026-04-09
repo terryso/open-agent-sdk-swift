@@ -32,7 +32,7 @@ public actor WorktreeStore {
     ///   - name: The name for the worktree (used for branch and directory name).
     ///   - originalCwd: The current working directory (must be inside a git repository).
     /// - Returns: The created ``WorktreeEntry`` with auto-generated ID and timestamps.
-    /// - Throws: ``WorktreeStoreError/gitCommandFailed`` if the git command fails.
+    /// - Throws: ``WorktreeStoreError/gitCommandFailed(message:)`` if the git command fails.
     public func create(name: String, originalCwd: String) throws -> WorktreeEntry {
         worktreeCounter += 1
         let id = "worktree_\(worktreeCounter)"
@@ -83,8 +83,8 @@ public actor WorktreeStore {
     ///   - id: The worktree ID to remove.
     ///   - force: Whether to force removal. Defaults to `true`.
     /// - Returns: `true` on success.
-    /// - Throws: ``WorktreeStoreError/worktreeNotFound`` if the worktree ID is not tracked.
-    /// - Throws: ``WorktreeStoreError/gitCommandFailed`` if `git worktree remove` fails.
+    /// - Throws: ``WorktreeStoreError/worktreeNotFound(id:)`` if the worktree ID is not tracked.
+    /// - Throws: ``WorktreeStoreError/gitCommandFailed(message:)`` if `git worktree remove` fails.
     public func remove(id: String, force: Bool = true) throws -> Bool {
         guard let entry = worktrees[id] else {
             throw WorktreeStoreError.worktreeNotFound(id: id)
@@ -109,7 +109,7 @@ public actor WorktreeStore {
     ///
     /// - Parameter id: The worktree ID to untrack.
     /// - Returns: `true` on success.
-    /// - Throws: ``WorktreeStoreError/worktreeNotFound`` if the worktree ID is not tracked.
+    /// - Throws: ``WorktreeStoreError/worktreeNotFound(id:)`` if the worktree ID is not tracked.
     public func keep(id: String) throws -> Bool {
         guard worktrees[id] != nil else {
             throw WorktreeStoreError.worktreeNotFound(id: id)

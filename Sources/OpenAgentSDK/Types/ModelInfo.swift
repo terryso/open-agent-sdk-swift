@@ -1,10 +1,16 @@
 import Foundation
 
 /// Model information and metadata.
+///
+/// Describes a model's identifier, display name, description, and capabilities.
 public struct ModelInfo: Sendable, Equatable {
+    /// The model identifier string (e.g., "claude-sonnet-4-6").
     public let value: String
+    /// A human-readable display name.
     public let displayName: String
+    /// A description of the model's capabilities.
     public let description: String
+    /// Whether the model supports the effort parameter for controlling response quality.
     public let supportsEffort: Bool
 
     public init(value: String, displayName: String, description: String, supportsEffort: Bool = false) {
@@ -15,9 +21,13 @@ public struct ModelInfo: Sendable, Equatable {
     }
 }
 
-/// Per-token pricing for a model.
+/// Per-token pricing for a model (in USD).
+///
+/// Prices are per million tokens. Use ``MODEL_PRICING`` to look up pricing by model ID.
 public struct ModelPricing: Sendable, Equatable {
+    /// Price per million input tokens.
     public let input: Double
+    /// Price per million output tokens.
     public let output: Double
 
     public init(input: Double, output: Double) {

@@ -63,8 +63,8 @@ public actor TaskStore {
     }
 
     /// Update a task's fields.
-    /// - Throws: ``TaskStoreError/taskNotFound`` if the task does not exist.
-    /// - Throws: ``TaskStoreError/invalidStatusTransition`` if the status transition is invalid.
+    /// - Throws: ``TaskStoreError/taskNotFound(id:)`` if the task does not exist.
+    /// - Throws: ``TaskStoreError/invalidStatusTransition(from:to:)`` if the status transition is invalid.
     public func update(
         id: String,
         status: TaskStatus? = nil,

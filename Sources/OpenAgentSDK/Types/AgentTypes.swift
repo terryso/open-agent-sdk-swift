@@ -1,27 +1,61 @@
 import Foundation
 
 /// LLM provider selection for the agent.
+///
+/// Determines which API client implementation is used for communication.
+/// The default provider is ``LLMProvider/anthropic``.
 public enum LLMProvider: String, Sendable, Equatable {
+    /// Anthropic API (Claude models).
     case anthropic
+    /// OpenAI-compatible API.
     case openai
 }
 
 /// Configuration options for creating an agent.
+///
+/// `AgentOptions` controls all aspects of agent behavior including model selection,
+/// tool registration, session persistence, multi-agent coordination, and permission enforcement.
+///
+/// ```swift
+/// let options = AgentOptions(
+///     apiKey: "sk-...",
+///     model: "claude-sonnet-4-6",
+///     systemPrompt: "You are a helpful assistant.",
+///     maxTurns: 20,
+///     tools: getAllBaseTools(tier: .core)
+/// )
+/// let agent = createAgent(options: options)
+/// ```
 public struct AgentOptions: Sendable {
+    /// API key for authenticating with the LLM provider.
     public var apiKey: String?
+    /// Model identifier to use for requests. Defaults to `"claude-sonnet-4-6"`.
     public var model: String
+    /// Base URL for the LLM API endpoint. `nil` uses the provider default.
     public var baseURL: String?
+    /// LLM provider to use. Defaults to ``LLMProvider/anthropic``.
     public var provider: LLMProvider
+    /// System prompt for the agent. `nil` means no system prompt.
     public var systemPrompt: String?
+    /// Maximum number of agent loop turns. Defaults to `10`.
     public var maxTurns: Int
+    /// Maximum number of tokens per request. Defaults to `16384`.
     public var maxTokens: Int
+    /// Optional budget limit in USD. When exceeded, the agent loop terminates.
     public var maxBudgetUsd: Double?
+    /// Optional thinking/reasoning configuration for the model.
     public var thinking: ThinkingConfig?
+    /// Permission mode controlling tool execution behavior. Defaults to ``PermissionMode/default``.
     public var permissionMode: PermissionMode
+    /// Optional custom authorization callback for tool execution. Takes priority over `permissionMode`.
     public var canUseTool: CanUseToolFn?
+    /// Working directory for tool execution context. Defaults to `nil`.
     public var cwd: String?
+    /// Custom tools to register with the agent. `nil` means no custom tools.
     public var tools: [ToolProtocol]?
+    /// MCP server configurations for external tool integration.
     public var mcpServers: [String: McpServerConfig]?
+    /// Retry configuration for API calls.
     public var retryConfig: RetryConfig?
     /// Optional agent name for identifying this agent in multi-agent scenarios.
     /// Used by messaging tools (e.g., SendMessage) to identify the sender.
@@ -149,6 +183,7 @@ public struct AgentOptions: Sendable {
     }
 }
 
+/// Status of a completed agent query.
 public enum QueryStatus: String, Sendable, Equatable {
     /// The query completed successfully (terminated by end_turn or stop_sequence).
     case success
@@ -161,13 +196,23 @@ public enum QueryStatus: String, Sendable, Equatable {
 }
 
 /// Result of a completed agent query.
+///
+/// Contains the final response text, token usage statistics, timing information,
+/// all messages collected during the query, and the termination status.
 public struct QueryResult: Sendable {
+    /// The assistant's response text.
     public let text: String
+    /// Token usage statistics for the query.
     public let usage: TokenUsage
+    /// Number of agent loop turns completed.
     public let numTurns: Int
+    /// Total query duration in milliseconds.
     public let durationMs: Int
+    /// Messages collected during the query.
     public let messages: [SDKMessage]
+    /// Status indicating how the query terminated.
     public let status: QueryStatus
+    /// Total cost in USD for this query.
     public let totalCostUsd: Double
 
     public init(text: String, usage: TokenUsage, numTurns: Int, durationMs: Int, messages: [SDKMessage], status: QueryStatus = .success, totalCostUsd: Double = 0.0) {
@@ -229,8 +274,8 @@ public struct SubAgentResult: Sendable, Equatable {
 /// Protocol for spawning sub-agents, defined in Types/ to allow
 /// Tools/ to use it without importing Core/.
 ///
-/// Core/ provides the concrete ``DefaultSubAgentSpawner`` implementation.
-/// Tools/ accesses the spawner through ``ToolContext/agentSpawner``.
+/// Core/ provides a concrete implementation. Tools/ accesses the spawner
+/// through ``ToolContext/agentSpawner``.
 public protocol SubAgentSpawner: Sendable {
     func spawn(
         prompt: String,

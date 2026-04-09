@@ -18,6 +18,10 @@ let package = Package(
             url: "https://github.com/DePasqualeOrg/mcp-swift-sdk.git",
             from: "0.1.0"
         ),
+        .package(
+            url: "https://github.com/swiftlang/swift-docc-plugin",
+            from: "1.0.0"
+        ),
     ],
     targets: [
         .target(

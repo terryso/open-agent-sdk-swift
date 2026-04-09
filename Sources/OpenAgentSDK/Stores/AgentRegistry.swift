@@ -20,7 +20,7 @@ public actor AgentRegistry {
     // MARK: - Public API
 
     /// Register a new agent. Throws if name is already taken.
-    /// - Throws: ``AgentRegistryError/duplicateAgentName`` if an agent with the same name exists.
+    /// - Throws: ``AgentRegistryError/duplicateAgentName(name:)`` if an agent with the same name exists.
     public func register(
         agentId: String,
         name: String,

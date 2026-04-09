@@ -56,8 +56,8 @@ public actor TeamStore {
     }
 
     /// Delete (disband) a team by ID.
-    /// - Throws: ``TeamStoreError/teamNotFound`` if the team does not exist.
-    /// - Throws: ``TeamStoreError/teamAlreadyDisbanded`` if the team is already disbanded.
+    /// - Throws: ``TeamStoreError/teamNotFound(id:)`` if the team does not exist.
+    /// - Throws: ``TeamStoreError/teamAlreadyDisbanded(id:)`` if the team is already disbanded.
     public func delete(id: String) throws -> Bool {
         guard var team = teams[id] else {
             throw TeamStoreError.teamNotFound(id: id)
@@ -71,8 +71,8 @@ public actor TeamStore {
     }
 
     /// Add a member to an active team.
-    /// - Throws: ``TeamStoreError/teamNotFound`` if the team does not exist.
-    /// - Throws: ``TeamStoreError/teamAlreadyDisbanded`` if the team is disbanded.
+    /// - Throws: ``TeamStoreError/teamNotFound(id:)`` if the team does not exist.
+    /// - Throws: ``TeamStoreError/teamAlreadyDisbanded(id:)`` if the team is disbanded.
     public func addMember(teamId: String, member: TeamMember) throws -> Team {
         guard var team = teams[teamId] else {
             throw TeamStoreError.teamNotFound(id: teamId)
@@ -86,8 +86,8 @@ public actor TeamStore {
     }
 
     /// Remove a member from a team by name.
-    /// - Throws: ``TeamStoreError/teamNotFound`` if the team does not exist.
-    /// - Throws: ``TeamStoreError/memberNotFound`` if the member is not in the team.
+    /// - Throws: ``TeamStoreError/teamNotFound(id:)`` if the team does not exist.
+    /// - Throws: ``TeamStoreError/memberNotFound(teamId:memberName:)`` if the member is not in the team.
     public func removeMember(teamId: String, agentName: String) throws -> Team {
         guard var team = teams[teamId] else {
             throw TeamStoreError.teamNotFound(id: teamId)

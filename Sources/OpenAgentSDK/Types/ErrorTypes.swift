@@ -1,14 +1,40 @@
 import Foundation
 
 /// Unified error type for the OpenAgentSDK.
+///
+/// `SDKError` uses associated values to carry context about each error type.
+/// Convenience computed properties provide typed access to associated values.
+///
+/// ```swift
+/// do {
+///     let result = try await someOperation()
+/// } catch let error as SDKError {
+///     switch error {
+///     case .apiError(let statusCode, let message):
+///         print("API error \(statusCode): \(message)")
+///     case .budgetExceeded(let cost, let turns):
+///         print("Budget exceeded: $\(cost) after \(turns) turns")
+///     default:
+///         print(error.localizedDescription)
+///     }
+/// }
+/// ```
 public enum SDKError: Error, Equatable, LocalizedError, Sendable {
+    /// An HTTP API error with status code and message.
     case apiError(statusCode: Int, message: String)
+    /// A tool execution error.
     case toolExecutionError(toolName: String, message: String)
+    /// Budget limit exceeded with the cost and turns used.
     case budgetExceeded(cost: Double, turnsUsed: Int)
+    /// Maximum turns limit exceeded.
     case maxTurnsExceeded(turnsUsed: Int)
+    /// A session persistence error.
     case sessionError(message: String)
+    /// An MCP server connection error.
     case mcpConnectionError(serverName: String, message: String)
+    /// A tool execution was denied by the permission system.
     case permissionDenied(tool: String, reason: String)
+    /// The operation was aborted.
     case abortError
 
     // MARK: - Computed Properties for Associated Value Access

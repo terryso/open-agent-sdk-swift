@@ -4,8 +4,11 @@ import Foundation
 
 /// Represents the connection status of an MCP server.
 public enum MCPConnectionStatus: String, Sendable, Equatable {
+    /// The server is connected and tools are available.
     case connected
+    /// The server is disconnected.
     case disconnected
+    /// The connection encountered an error.
     case error
 }
 

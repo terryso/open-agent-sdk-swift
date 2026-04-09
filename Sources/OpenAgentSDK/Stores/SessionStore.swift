@@ -29,7 +29,7 @@ public actor SessionStore {
     ///   - sessionId: Unique identifier for the session.
     ///   - messages: Conversation messages as `[String: Any]` dictionaries.
     ///   - metadata: Partial metadata for the session (cwd, model, summary).
-    /// - Throws: ``SDKError/sessionError`` if directory creation, serialization, or file writing fails.
+    /// - Throws: ``SDKError/sessionError(message:)`` if directory creation, serialization, or file writing fails.
     public func save(
         sessionId: String,
         messages: [[String: Any]],
@@ -174,7 +174,7 @@ public actor SessionStore {
     ///   - upToMessageIndex: Optional message index to truncate at (inclusive, 0-based).
     ///     When nil, all messages are copied.
     /// - Returns: The new session ID, or nil if source doesn't exist.
-    /// - Throws: ``SDKError/sessionError`` if `upToMessageIndex` is out of range or `newSessionId` is invalid.
+    /// - Throws: ``SDKError/sessionError(message:)`` if `upToMessageIndex` is out of range or `newSessionId` is invalid.
     public func fork(
         sourceSessionId: String,
         newSessionId: String? = nil,

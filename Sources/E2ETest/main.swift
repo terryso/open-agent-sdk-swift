@@ -129,6 +129,11 @@ await PermissionModeE2ETests.run(apiKey: apiKey, model: model, baseURL: baseURL)
 await AuthorizationCallbackE2ETests.run(apiKey: apiKey, model: model, baseURL: baseURL)
 
 // ================================================================
+// SECTION 43: DocC Documentation Build (Story 9-1)
+// ================================================================
+await DocCBuildTests.run()
+
+// ================================================================
 // Results Summary
 // ================================================================
 print("\n=== E2E Test Results ===")
