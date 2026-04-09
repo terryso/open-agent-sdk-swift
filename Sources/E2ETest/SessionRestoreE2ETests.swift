@@ -53,6 +53,7 @@ struct SessionRestoreE2ETests {
             apiKey: apiKey,
             model: model,
             baseURL: baseURL,
+            provider: .openai,
             maxTurns: 3,
             sessionStore: store,
             sessionId: sessionId
@@ -132,6 +133,7 @@ struct SessionRestoreE2ETests {
             apiKey: apiKey,
             model: model,
             baseURL: baseURL,
+            provider: .openai,
             maxTurns: 3,
             sessionStore: store,
             sessionId: sessionId

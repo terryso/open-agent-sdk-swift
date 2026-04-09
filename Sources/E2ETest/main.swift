@@ -134,6 +134,31 @@ await AuthorizationCallbackE2ETests.run(apiKey: apiKey, model: model, baseURL: b
 await DocCBuildTests.run()
 
 // ================================================================
+// SECTION 44-48: LLM-Driven Core Tools (Bash, FileWrite/Read, Glob, Grep)
+// ================================================================
+await CoreToolsE2ETests.run(apiKey: apiKey, model: model, baseURL: baseURL)
+
+// ================================================================
+// SECTION 49-51: LLM-Driven Task Tools (Create, List, Update)
+// ================================================================
+await TaskToolsE2ETests.run(apiKey: apiKey, model: model, baseURL: baseURL)
+
+// ================================================================
+// SECTION 52-57: LLM-Driven Specialist Tools (Cron, Plan, Config)
+// ================================================================
+await SpecialistToolsE2ETests.run(apiKey: apiKey, model: model, baseURL: baseURL)
+
+// ================================================================
+// SECTION 58-59: Agent with InProcessMCPServer (LLM-driven MCP tools)
+// ================================================================
+await MCPAgentE2ETests.run(apiKey: apiKey, model: model, baseURL: baseURL)
+
+// ================================================================
+// SECTION 60-61: ThinkingConfig E2E Tests
+// ================================================================
+await ThinkingConfigE2ETests.run(apiKey: apiKey, model: model, baseURL: baseURL)
+
+// ================================================================
 // Results Summary
 // ================================================================
 print("\n=== E2E Test Results ===")

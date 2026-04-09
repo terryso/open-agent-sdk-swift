@@ -265,6 +265,7 @@ struct IntegrationTests {
         let addAgent = createAgent(options: AgentOptions(
             apiKey: apiKey, model: model, baseURL: baseURL,
             provider: .openai, maxTurns: 3,
+            permissionMode: .bypassPermissions,
             tools: [todoTool],
             todoStore: todoStore
         ))
@@ -302,6 +303,7 @@ struct IntegrationTests {
         let listAgent = createAgent(options: AgentOptions(
             apiKey: apiKey, model: model, baseURL: baseURL,
             provider: .openai, maxTurns: 3,
+            permissionMode: .bypassPermissions,
             tools: [todoTool],
             todoStore: todoStore
         ))
@@ -336,6 +338,7 @@ struct IntegrationTests {
         let toggleAgent = createAgent(options: AgentOptions(
             apiKey: apiKey, model: model, baseURL: baseURL,
             provider: .openai, maxTurns: 3,
+            permissionMode: .bypassPermissions,
             tools: [todoTool],
             todoStore: todoStore
         ))

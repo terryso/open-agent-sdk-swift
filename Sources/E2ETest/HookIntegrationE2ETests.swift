@@ -86,24 +86,27 @@ struct HookIntegrationE2ETests {
         let registry = HookRegistry()
         let tracker = E2ECallTracker()
 
-        // Register a blocking PreToolUse hook for "bash" tool
+        // Register a blocking PreToolUse hook for "Bash" tool
         await registry.register(.preToolUse, definition: HookDefinition(
             handler: { input in
                 await tracker.markCalled()
-                if input.toolName == "bash" {
+                if input.toolName == "Bash" {
                     return HookOutput(message: "bash is blocked by policy", block: true)
                 }
                 return nil
             },
-            matcher: "bash"
+            matcher: "Bash"
         ))
 
         // Create agent with hookRegistry and a bash-capable setup
+        let bashTool = createBashTool()
         let options = AgentOptions(
             apiKey: apiKey,
             model: model,
             baseURL: baseURL,
+            provider: .openai,
             maxTurns: 2,
+            tools: [bashTool],
             hookRegistry: registry
         )
         let agent = createAgent(options: options)

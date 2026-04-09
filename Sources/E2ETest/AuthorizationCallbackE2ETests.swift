@@ -50,12 +50,15 @@ struct AuthorizationCallbackE2ETests {
             return result
         }
 
+        let bashTool = createBashTool()
         let options = AgentOptions(
             apiKey: apiKey,
             model: model,
             baseURL: baseURL,
+            provider: .openai,
             maxTurns: 2,
-            canUseTool: trackingFn
+            canUseTool: trackingFn,
+            tools: [bashTool]
         )
         let agent = createAgent(options: options)
 
@@ -102,12 +105,15 @@ struct AuthorizationCallbackE2ETests {
             return result
         }
 
+        let bashTool = createBashTool()
         let options = AgentOptions(
             apiKey: apiKey,
             model: model,
             baseURL: baseURL,
+            provider: .openai,
             maxTurns: 2,
-            canUseTool: trackingFn
+            canUseTool: trackingFn,
+            tools: [bashTool]
         )
         let agent = createAgent(options: options)
 
@@ -147,13 +153,16 @@ struct AuthorizationCallbackE2ETests {
             return CanUseToolResult(behavior: "deny", message: "deny-all policy")
         }
 
+        let bashTool = createBashTool()
         let options = AgentOptions(
             apiKey: apiKey,
             model: model,
             baseURL: baseURL,
+            provider: .openai,
             maxTurns: 2,
             permissionMode: .default,
-            canUseTool: denyAllCallback
+            canUseTool: denyAllCallback,
+            tools: [bashTool]
         )
         let agent = createAgent(options: options)
 

@@ -39,6 +39,7 @@ struct PermissionModeE2ETests {
             apiKey: apiKey,
             model: model,
             baseURL: baseURL,
+            provider: .openai,
             maxTurns: 2,
             permissionMode: .bypassPermissions
         )
@@ -67,6 +68,7 @@ struct PermissionModeE2ETests {
             apiKey: apiKey,
             model: model,
             baseURL: baseURL,
+            provider: .openai,
             maxTurns: 2,
             permissionMode: .default
         )
@@ -111,12 +113,15 @@ struct PermissionModeE2ETests {
             return CanUseToolResult(behavior: "deny", message: "Tool '\(tool.name)' denied by policy")
         }
 
+        let bashTool = createBashTool()
         let options = AgentOptions(
             apiKey: apiKey,
             model: model,
             baseURL: baseURL,
+            provider: .openai,
             maxTurns: 2,
-            canUseTool: canUseTool
+            canUseTool: canUseTool,
+            tools: [bashTool]
         )
         let agent = createAgent(options: options)
 
@@ -154,13 +159,16 @@ struct PermissionModeE2ETests {
             return CanUseToolResult(behavior: "allow")
         }
 
+        let bashTool = createBashTool()
         let options = AgentOptions(
             apiKey: apiKey,
             model: model,
             baseURL: baseURL,
+            provider: .openai,
             maxTurns: 2,
             permissionMode: .default,
-            canUseTool: canUseTool
+            canUseTool: canUseTool,
+            tools: [bashTool]
         )
         let agent = createAgent(options: options)
 

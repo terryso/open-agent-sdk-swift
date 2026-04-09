@@ -89,6 +89,7 @@ struct SessionForkE2ETests {
             apiKey: apiKey,
             model: model,
             baseURL: baseURL,
+            provider: .openai,
             maxTurns: 3,
             sessionStore: store,
             sessionId: unwrappedForkId
@@ -194,6 +195,7 @@ struct SessionForkE2ETests {
             apiKey: apiKey,
             model: model,
             baseURL: baseURL,
+            provider: .openai,
             maxTurns: 3,
             sessionStore: store,
             sessionId: unwrappedForkId
@@ -277,6 +279,7 @@ struct SessionForkE2ETests {
             apiKey: apiKey,
             model: model,
             baseURL: baseURL,
+            provider: .openai,
             maxTurns: 3,
             sessionStore: store,
             sessionId: sourceId
@@ -295,6 +298,7 @@ struct SessionForkE2ETests {
             apiKey: apiKey,
             model: model,
             baseURL: baseURL,
+            provider: .openai,
             maxTurns: 3,
             sessionStore: store,
             sessionId: unwrappedForkId
