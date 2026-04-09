@@ -124,6 +124,11 @@ await ShellHookExecutionE2ETests.run()
 await PermissionModeE2ETests.run(apiKey: apiKey, model: model, baseURL: baseURL)
 
 // ================================================================
+// SECTION 42: Authorization Callback (Story 8-5)
+// ================================================================
+await AuthorizationCallbackE2ETests.run(apiKey: apiKey, model: model, baseURL: baseURL)
+
+// ================================================================
 // Results Summary
 // ================================================================
 print("\n=== E2E Test Results ===")

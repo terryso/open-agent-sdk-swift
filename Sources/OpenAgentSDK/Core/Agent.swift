@@ -34,7 +34,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
     // MARK: - Internal Properties
 
     /// The full agent options (used internally for prompt/stream calls).
-    let options: AgentOptions
+    var options: AgentOptions
 
     /// The LLM API client used for communication.
     let client: any LLMClient
@@ -88,6 +88,29 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
         self.maxTurns = options.maxTurns
         self.maxTokens = options.maxTokens
         self.client = client
+    }
+
+    // MARK: - Dynamic Permission Switching
+
+    /// Changes the permission mode for subsequent tool executions.
+    ///
+    /// This also clears any custom `canUseTool` callback, so the new
+    /// permission mode takes effect immediately.
+    ///
+    /// - Parameter mode: The new permission mode to use.
+    public func setPermissionMode(_ mode: PermissionMode) {
+        options.permissionMode = mode
+        options.canUseTool = nil
+    }
+
+    /// Sets a custom authorization callback for subsequent tool executions.
+    ///
+    /// The callback takes priority over the configured ``AgentOptions/permissionMode``.
+    /// To revert to permission-mode-based behavior, call ``setPermissionMode(_:)``.
+    ///
+    /// - Parameter callback: The authorization callback, or nil to clear it.
+    public func setCanUseTool(_ callback: CanUseToolFn?) {
+        options.canUseTool = callback
     }
 
     // MARK: - MCP Integration

@@ -34,3 +34,7 @@
 
 - **Silent error swallowing in execute() catch block** — All hook errors (including timeout) are silently caught with no logging. Matches TS SDK `console.error` pattern but Swift has no logging infrastructure. Future enhancement when logging is added [HookRegistry.swift:122-125]
 - **HookOutput lacks Equatable conformance** — Cannot perform full structural equality assertions in tests. Low priority since all fields are individually Equatable [HookTypes.swift:62]
+
+## Deferred from: code review of 8-5-custom-authorization-callback (2026-04-09)
+
+- **Stream path ignores dynamic permission changes** — stream() captures permissionMode and canUseTool at stream creation time. Calling setPermissionMode()/setCanUseTool() during an active stream has no effect. This is pre-existing behavior of the stream architecture, not introduced by this story. Future enhancement: re-read options at each tool execution in stream path [Agent.swift:506-507]
