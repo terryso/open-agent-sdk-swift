@@ -1,5 +1,5 @@
 # generated: 2026-04-04
-# last_updated: 2026-04-09 (9-1-swift-docc-api-docs → done)
+# last_updated: 2026-04-09 (9-2-readme-quickstart-guide → done)
 # updated: 5-4-todo-store-tools → review
 # updated: 5-3-cron-store-tools → review
 # updated: 5-1-worktree-store-tools → review
@@ -183,6 +183,6 @@ development_status:
   # Epic 9: 文档与开发者体验
   epic-9: in-progress
   9-1-swift-docc-api-docs: done
-  9-2-readme-quickstart-guide: backlog
+  9-2-readme-quickstart-guide: done
   9-3-runnable-code-examples: backlog
   epic-9-retrospective: optional

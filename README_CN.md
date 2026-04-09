@@ -9,38 +9,27 @@
 
 [English](./README.md)
 
-开源 Swift Agent SDK — 使用原生 Swift 并发在进程内运行完整的 Agent 循环。支持流式响应、10+ 内置工具、子 Agent 支持和多提供商 LLM 集成，快速构建 AI 应用。
+开源 Swift Agent SDK — 使用原生 Swift 并发在进程内运行完整的 Agent 循环。支持流式响应、34 个内置工具、子 Agent 编排、MCP 集成、会话持久化和多提供商 LLM 支持，快速构建 AI 应用。
 
 > **灵感来自** [open-agent-sdk-typescript](https://github.com/codeany-ai/open-agent-sdk-typescript) — 将相同的 Agent 架构引入 Swift 生态。
 
 其他语言版本：**TypeScript**: [open-agent-sdk-typescript](https://github.com/codeany-ai/open-agent-sdk-typescript) | **Go**: [open-agent-sdk-go](https://github.com/codeany-ai/open-agent-sdk-go)
 
-## 项目状态
+## 特性亮点
 
-**已完成：**
-- [x] 类型系统（消息、工具、错误、权限、会话、钩子）
-- [x] SDK 配置（环境变量 + 编程式配置）
-- [x] 多提供商 LLM 支持（Anthropic + OpenAI 兼容 API）
-- [x] Agent 创建与完整的 Agent 循环
-- [x] 流式和阻塞查询 API
-- [x] 10 个内置工具（Bash、Read、Write、Edit、Glob、Grep、WebFetch、WebSearch、AskUser、ToolSearch）
-- [x] 子 Agent 生成（Agent 工具，内置 Explore/Plan 类型）
-- [x] 工具注册表（去重和过滤）
-- [x] 错误处理与重试逻辑
-- [x] CI 流水线（含代码覆盖率）
+- **完整 Agent 循环** — 单个 `await` 调用或流式 `AsyncStream` 即可完成提示、工具执行和响应
+- **34 个内置工具** — Core 文件/搜索/Web 工具、Advanced 任务/团队管理、Specialist cron/plan/worktree 工具
+- **多提供商 LLM** — Anthropic (Claude) 和 OpenAI 兼容 API（GLM、Ollama、OpenRouter 等）
+- **MCP 集成** — 通过 stdio、SSE、HTTP 或进程内 MCP 服务器连接外部工具
+- **会话持久化** — 保存、加载、分叉和管理对话记录为 JSON
+- **钩子系统** — 20+ 生命周期事件，支持函数和 Shell 钩子处理
+- **权限控制** — 6 种权限模式，支持自定义授权回调和策略组合
+- **多 Agent 编排** — 生成子 Agent、管理团队、任务和 Agent 间消息传递
+- **自动压缩** — 长对话自动压缩，保持在上下文窗口限制内
 
-**开发中 / 计划中：**
-- [ ] MCP（Model Context Protocol）集成
-- [ ] 会话持久化
-- [ ] 钩子系统执行（类型已定义）
-- [ ] 预算追踪
-- [ ] 权限系统执行
-- [ ] 自动压缩
-- [ ] NotebookEdit 工具
+## 快速入门（15 分钟）
 
-## 安装
-
-### Swift Package Manager
+### 安装
 
 在 `Package.swift` 中添加依赖：
 
@@ -53,33 +42,17 @@ targets: [
 ]
 ```
 
-### Xcode
-
-File > Add Package Dependencies > 输入仓库地址。
-
-## 快速开始
+或在 Xcode 中：**File > Add Package Dependencies** 输入仓库地址。
 
 ### 配置
 
 通过环境变量设置 API Key：
 
 ```bash
-export CODEANY_API_KEY=your-api-key
+export CODEANY_API_KEY=sk-...
 ```
 
-或编程式配置：
-
-```swift
-import OpenAgentSDK
-
-let config = SDKConfiguration(
-    apiKey: "sk-...",
-    model: "claude-sonnet-4-6",
-    baseURL: nil  // 可选，用于第三方提供商
-)
-```
-
-### 创建 Agent
+### 你的第一个 Agent
 
 ```swift
 import OpenAgentSDK
@@ -91,62 +64,38 @@ let agent = createAgent(options: AgentOptions(
     maxTurns: 10,
     permissionMode: .bypassPermissions
 ))
-```
 
-### 阻塞查询
-
-```swift
-let result = await agent.prompt("读取 Package.swift 并告诉我项目名称。")
+let result = await agent.prompt("用一段话解释 Swift 并发。")
 print(result.text)
 print("使用了 \(result.usage.inputTokens) 输入 + \(result.usage.outputTokens) 输出 token")
 ```
 
-### 流式查询
+### 流式响应
 
 ```swift
-for await message in agent.stream("读取 Package.swift 并告诉我项目名称。") {
+// 使用上面创建的 agent：
+for await message in agent.stream("读取 Package.swift 并总结。") {
     switch message {
-    case .assistant(let data):
-        print(data.text)
+    case .partialMessage(let data):
+        print(data.text, terminator: "")
     case .toolUse(let data):
         print("使用工具: \(data.toolName)")
     case .result(let data):
-        print("完成: \(data.text)")
+        print("\n完成 (\(data.numTurns) 轮, $\(String(format: "%.4f", data.totalCostUsd)))")
     default:
         break
     }
 }
 ```
 
-### 多提供商支持
-
-使用 OpenAI 兼容 API（GLM、Ollama、OpenRouter 等）：
-
-```swift
-let agent = createAgent(options: AgentOptions(
-    provider: .openai,
-    apiKey: "your-openai-key",
-    model: "gpt-4o",
-    baseURL: "https://api.openai.com/v1",
-    systemPrompt: "你是一个有用的助手。"
-))
-```
-
-或通过环境变量：
-
-```bash
-export CODEANY_API_KEY=your-key
-export CODEANY_BASE_URL=https://api.openai.com/v1
-export CODEANY_MODEL=gpt-4o
-# Agent 将从 base URL 自动检测提供商
-```
-
 ### 自定义工具
 
 ```swift
-import OpenAgentSDK
+struct WeatherInput: Codable {
+    let city: String
+}
 
-let myTool = defineTool(
+let weatherTool = defineTool(
     name: "get_weather",
     description: "获取指定城市的当前天气",
     inputSchema: [
@@ -156,29 +105,217 @@ let myTool = defineTool(
         ],
         "required": ["city"]
     ]
-) { input, context in
-    let city = input["city"] as? String ?? "未知"
-    return "\(city) 的天气：22°C，晴朗"
+) { (input: WeatherInput, context: ToolContext) in
+    return "\(input.city) 的天气：22°C，晴朗"
 }
 
 let agent = createAgent(options: AgentOptions(
     apiKey: "sk-...",
-    tools: [myTool]
+    tools: [weatherTool]
 ))
 ```
+
+## 高级功能
+
+### 多提供商支持
+
+使用 OpenAI 兼容 API（GLM、Ollama、OpenRouter 等）：
+
+```swift
+let agent = createAgent(options: AgentOptions(
+    provider: .openai,
+    apiKey: "sk-...",
+    model: "gpt-4o",
+    baseURL: "https://api.openai.com/v1",
+    systemPrompt: "你是一个有用的助手。"
+))
+```
+
+或通过环境变量：
+
+```bash
+export CODEANY_API_KEY=sk-...
+export CODEANY_BASE_URL=https://api.openai.com/v1
+export CODEANY_MODEL=gpt-4o
+```
+
+### 会话持久化
+
+保存和恢复对话历史：
+
+```swift
+let sessionStore = SessionStore()
+
+let agent = createAgent(options: AgentOptions(
+    apiKey: "sk-...",
+    sessionStore: sessionStore,
+    sessionId: "my-session"
+))
+
+// 第一次对话会在 prompt/stream 后自动保存
+let result = await agent.prompt("记住：我最喜欢的颜色是蓝色。")
+
+// 在新进程中恢复 — 历史记录会自动加载
+let agent2 = createAgent(options: AgentOptions(
+    apiKey: "sk-...",
+    sessionStore: sessionStore,
+    sessionId: "my-session"
+))
+let result2 = await agent2.prompt("我最喜欢的颜色是什么？")
+```
+
+### 钩子系统
+
+注册生命周期事件处理器：
+
+```swift
+let hookRegistry = HookRegistry()
+
+await hookRegistry.register(.postToolUse, definition: HookDefinition(
+    handler: { input in
+        if let toolName = input.toolName {
+            print("工具完成: \(toolName)")
+        }
+        return nil
+    }
+))
+
+await hookRegistry.register(.preToolUse, definition: HookDefinition(
+    matcher: "Bash",
+    handler: { input in
+        return HookOutput(message: "Bash 命令已阻止", block: true)
+    }
+))
+
+let agent = createAgent(options: AgentOptions(
+    apiKey: "sk-...",
+    hookRegistry: hookRegistry
+))
+```
+
+### 权限控制
+
+选择 6 种内置权限模式或自定义策略：
+
+```swift
+// 内置模式
+let agent = createAgent(options: AgentOptions(
+    apiKey: "sk-...",
+    permissionMode: .acceptEdits
+))
+
+// 自定义授权回调
+agent.setCanUseTool { tool, input, context in
+    if tool.name == "Bash" { return .deny("Bash 已禁用") }
+    return .allow()
+}
+
+// 策略组合
+let policy = CompositePolicy(policies: [
+    ReadOnlyPolicy(),
+    ToolNameDenylistPolicy(deniedToolNames: ["WebFetch"])
+])
+agent.setCanUseTool(canUseTool(policy: policy))
+```
+
+### MCP 集成
+
+通过 MCP（Model Context Protocol）连接外部工具服务器：
+
+```swift
+let agent = createAgent(options: AgentOptions(
+    apiKey: "sk-...",
+    mcpServers: [
+        "filesystem": .stdio(McpStdioConfig(
+            command: "npx",
+            args: ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"]
+        )),
+        "remote": .sse(McpSseConfig(
+            url: "http://localhost:3001/sse"
+        ))
+    ]
+))
+// MCP 工具会被自动发现并合并到 Agent 的工具池中
+```
+
+### 预算控制
+
+设置成本上限来控制 LLM 开销：
+
+```swift
+let agent = createAgent(options: AgentOptions(
+    apiKey: "sk-...",
+    maxBudgetUsd: 0.10  // 成本超过 $0.10 时停止
+))
+```
+
+## 内置工具
+
+### Core 工具（10 个）
+
+| 工具          | 说明                                    |
+| ------------- | --------------------------------------- |
+| **Bash**      | 执行 Shell 命令，支持超时               |
+| **Read**      | 读取文件内容                            |
+| **Write**     | 创建或覆盖文件                          |
+| **Edit**      | 在文件中查找并替换                      |
+| **Glob**      | 按模式搜索文件                          |
+| **Grep**      | 使用正则表达式搜索文件内容              |
+| **WebFetch**  | 获取并读取网页                          |
+| **WebSearch** | 搜索网络                                |
+| **AskUser**   | 执行过程中向用户请求输入                |
+| **ToolSearch**| 搜索可用工具                            |
+
+### Advanced 工具（11 个）
+
+| 工具              | 说明                                          |
+| ----------------- | --------------------------------------------- |
+| **Agent**         | 生成子 Agent（Explore、Plan 类型）            |
+| **SendMessage**   | 在 Agent 之间发送消息                         |
+| **TaskCreate**    | 创建带描述的任务                              |
+| **TaskList**      | 列出所有任务，支持状态过滤                    |
+| **TaskUpdate**    | 更新任务状态和负责人                          |
+| **TaskGet**       | 按 ID 获取任务详情                            |
+| **TaskStop**      | 停止正在运行的任务                            |
+| **TaskOutput**    | 获取已完成任务的输出                          |
+| **TeamCreate**    | 创建多 Agent 协调团队                         |
+| **TeamDelete**    | 删除团队并清理资源                            |
+| **NotebookEdit**  | 编辑 Jupyter notebook 单元格                  |
+
+### Specialist 工具（13 个）
+
+| 工具                 | 说明                                          |
+| -------------------- | --------------------------------------------- |
+| **WorktreeEnter**    | 进入隔离的工作树工作区                        |
+| **WorktreeExit**     | 退出并可选移除工作树                          |
+| **PlanEnter**        | 进入计划模式进行结构化规划                    |
+| **PlanExit**         | 退出计划模式回到执行模式                      |
+| **CronCreate**       | 创建定时任务                                  |
+| **CronDelete**       | 删除定时任务                                  |
+| **CronList**         | 列出所有定时任务                              |
+| **RemoteTrigger**    | 触发远程 Webhook 或事件                       |
+| **LSP**              | Language Server Protocol 集成                 |
+| **Config**           | 读写 SDK 配置值                               |
+| **TodoWrite**        | 管理待办事项列表，支持优先级                  |
+| **ListMcpResources** | 列出可用的 MCP 服务器资源                     |
+| **ReadMcpResource**  | 读取指定的 MCP 资源                           |
 
 ## 架构
 
 ```mermaid
 graph TD
     A["<b>你的应用</b><br/><i>import OpenAgentSDK</i>"] --> B
-    B["<b>Agent</b><br/>prompt() / stream()<br/><i>会话状态、工具池</i>"] --> C
-    C["<b>Agent 循环</b><br/><i>API 调用 → 工具 → 循环</i>"] --> D
+    B["<b>Agent</b><br/>prompt() / stream()<br/><i>会话、钩子、权限</i>"] --> C
+    C["<b>Agent 循环</b><br/><i>API 调用 &rarr; 工具 &rarr; 循环</i>"] --> D
     C --> E
     C --> F
-    D["<b>LLMClient 协议</b><br/>AnthropicClient · OpenAIClient"]
-    E["<b>10+ 内置工具</b><br/>Bash · Read · Write · Edit · Glob · Grep<br/>WebFetch · WebSearch · AskUser · Agent"]
-    F["<b>MCP 服务器</b><br/><i>stdio / SSE / HTTP（计划中）</i>"]
+    C --> G
+    C --> H
+    D["<b>LLMClient 协议</b><br/>AnthropicClient &middot; OpenAIClient"]
+    E["<b>34 个内置工具</b><br/>Core 10 &middot; Advanced 11 &middot; Specialist 13"]
+    F["<b>MCP 服务器</b><br/>stdio &middot; SSE &middot; HTTP &middot; 进程内"]
+    G["<b>会话存储</b><br/>JSON 持久化 &middot; 分叉 &middot; 恢复"]
+    H["<b>钩子注册表</b><br/>20+ 生命周期事件"]
 
     style A fill:#0277bd,stroke:#01579b,color:#fff,stroke-width:2px
     style B fill:#ef6c00,stroke:#e65100,color:#fff,stroke-width:2px
@@ -186,6 +323,8 @@ graph TD
     style D fill:#2e7d32,stroke:#1b5e20,color:#fff,stroke-width:2px
     style E fill:#b71c1c,stroke:#7f0000,color:#fff,stroke-width:2px
     style F fill:#00695c,stroke:#004d40,color:#fff,stroke-width:2px
+    style G fill:#4a148c,stroke:#4a148c,color:#fff,stroke-width:2px
+    style H fill:#e65100,stroke:#bf360c,color:#fff,stroke-width:2px
 ```
 
 ## 环境变量
@@ -196,21 +335,15 @@ graph TD
 | `CODEANY_MODEL`       | 默认模型（默认：`claude-sonnet-4-6`）         |
 | `CODEANY_BASE_URL`    | 自定义 API 地址，用于第三方提供商              |
 
-## 内置工具
+## 文档
 
-| 工具          | 说明                                    | 状态 |
-| ------------- | --------------------------------------- | ---- |
-| **Bash**      | 执行 Shell 命令，支持超时               | ✅    |
-| **Read**      | 读取文件内容                            | ✅    |
-| **Write**     | 创建或覆盖文件                          | ✅    |
-| **Edit**      | 在文件中查找并替换                      | ✅    |
-| **Glob**      | 按模式搜索文件                          | ✅    |
-| **Grep**      | 使用正则表达式搜索文件内容              | ✅    |
-| **WebFetch**  | 获取并读取网页                          | ✅    |
-| **WebSearch** | 搜索网络                                | ✅    |
-| **AskUser**   | 执行过程中向用户请求输入                | ✅    |
-| **ToolSearch**| 搜索可用工具                            | ✅    |
-| **Agent**     | 生成子 Agent（Explore、Plan 类型）      | ✅    |
+API 文档和指南通过 Swift-DocC 提供：
+
+- [快速入门](Sources/OpenAgentSDK/Documentation.docc/GettingStarted.md) — 15 分钟入门教程
+- [工具系统](Sources/OpenAgentSDK/Documentation.docc/ToolSystem.md) — 工具协议、自定义工具、层级
+- [多 Agent 编排](Sources/OpenAgentSDK/Documentation.docc/MultiAgent.md) — 子 Agent、团队、任务
+- [MCP、会话与钩子](Sources/OpenAgentSDK/Documentation.docc/MCPSessionHooks.md) — MCP 集成、持久化、钩子系统
+- [可运行示例](Examples/) — 完整的可运行代码示例 *（即将推出）*
 
 ## 系统要求
 
