@@ -1,5 +1,5 @@
 # generated: 2026-04-04
-# last_updated: 2026-04-10 (10-2-custom-system-prompt-example → done)
+# last_updated: 2026-04-10 (10-3-prompt-api-example → done)
 # updated: 5-4-todo-store-tools → review
 # updated: 5-3-cron-store-tools → review
 # updated: 5-1-worktree-store-tools → review
@@ -193,7 +193,7 @@ development_status:
   epic-10: in-progress
   10-1-multi-tool-example: done
   10-2-custom-system-prompt-example: done
-  10-3-prompt-api-example: backlog
+  10-3-prompt-api-example: done
   10-4-subagent-example: backlog
   10-5-permissions-example: backlog
   10-6-advanced-mcp-example: backlog

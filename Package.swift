@@ -80,5 +80,10 @@ let package = Package(
             dependencies: ["OpenAgentSDK"],
             path: "Examples/CustomSystemPromptExample"
         ),
+        .executableTarget(
+            name: "PromptAPIExample",
+            dependencies: ["OpenAgentSDK"],
+            path: "Examples/PromptAPIExample"
+        ),
     ]
 )

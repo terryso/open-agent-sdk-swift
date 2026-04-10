@@ -38,3 +38,7 @@
 ## Deferred from: code review of 8-5-custom-authorization-callback (2026-04-09)
 
 - **Stream path ignores dynamic permission changes** — stream() captures permissionMode and canUseTool at stream creation time. Calling setPermissionMode()/setCanUseTool() during an active stream has no effect. This is pre-existing behavior of the stream architecture, not introduced by this story. Future enhancement: re-read options at each tool execution in stream path [Agent.swift:506-507]
+
+## Deferred from: code review of 10-3-prompt-api-example (2026-04-10)
+
+- **No safety warning about destructive tools with bypassPermissions** — PromptAPIExample registers Write/Edit/Bash tools with bypassPermissions. All examples in the project follow this pattern. Pre-existing design choice, not introduced by this story
