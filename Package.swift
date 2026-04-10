@@ -70,5 +70,10 @@ let package = Package(
             dependencies: ["OpenAgentSDK"],
             path: "Examples/SessionsAndHooks"
         ),
+        .executableTarget(
+            name: "MultiToolExample",
+            dependencies: ["OpenAgentSDK"],
+            path: "Examples/MultiToolExample"
+        ),
     ]
 )

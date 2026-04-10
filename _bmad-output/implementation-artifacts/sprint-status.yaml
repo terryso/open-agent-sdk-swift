@@ -1,5 +1,5 @@
 # generated: 2026-04-04
-# last_updated: 2026-04-09 (9-3-runnable-code-examples → done)
+# last_updated: 2026-04-10 (10-1-multi-tool-example → done)
 # updated: 5-4-todo-store-tools → review
 # updated: 5-3-cron-store-tools → review
 # updated: 5-1-worktree-store-tools → review
@@ -67,7 +67,9 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-04-04
-last_updated: 2026-04-09 (9-3-runnable-code-examples → done)
+last_updated: 2026-04-10 (10-1-multi-tool-example → done)
+# updated: epic-10 → in-progress
+# updated: 10-1-multi-tool-example → ready-for-dev
 # updated: 6-2-mcp-http-sse-transport → ready-for-dev
 # updated: 4-7-notebook-edit-tool → review
 # updated: 4-7-notebook-edit-tool → ready-for-dev
@@ -186,3 +188,13 @@ development_status:
   9-2-readme-quickstart-guide: done
   9-3-runnable-code-examples: done
   epic-9-retrospective: optional
+
+  # Epic 10: 扩展代码示例集
+  epic-10: in-progress
+  10-1-multi-tool-example: done
+  10-2-custom-system-prompt-example: backlog
+  10-3-prompt-api-example: backlog
+  10-4-subagent-example: backlog
+  10-5-permissions-example: backlog
+  10-6-advanced-mcp-example: backlog
+  epic-10-retrospective: optional

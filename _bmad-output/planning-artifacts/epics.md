@@ -4,6 +4,9 @@ stepsCompleted:
   - step-02-design-epics
   - step-03-create-stories
   - step-04-final-validation
+  - step-10-epic-design
+  - step-10-story-creation
+  - step-10-final-validation
 inputDocuments:
   - _bmad-output/planning-artifacts/prd.md
   - _bmad-output/planning-artifacts/architecture.md
@@ -172,7 +175,7 @@ FR46: Epic 5 - CronStore
 FR47: Epic 5 - TodoStore
 FR48: Epic 5 - 基于 Actor 的线程安全存储
 FR49: Epic 9 - Swift-DocC API 文档
-FR50: Epic 9 - 所有功能的可运行代码示例
+FR50: Epic 9 + Epic 10 - 所有功能的可运行代码示例（Epic 9 覆盖基础，Epic 10 覆盖高级功能）
 FR51: Epic 9 - 包含快速入门指南的 README
 
 ## Epic 列表
@@ -212,6 +215,10 @@ FR51: Epic 9 - 包含快速入门指南的 README
 ### Epic 9: 文档与开发者体验
 开发者拥有完整的 Swift-DocC 生成的 API 文档（覆盖所有符号）、每个主要功能领域的可运行代码示例，以及一份能在 15 分钟内让开发者从 SPM 依赖到运行 Agent 的 README 快速入门指南。
 **覆盖的 FR：** FR49、FR50、FR51
+
+### Epic 10: 扩展代码示例集
+开发者可以通过 6 个新的可运行示例学习 SDK 的高级功能——多工具编排、自定义系统提示、阻塞式 API、子代理委派、权限控制和高级 MCP 集成。这些示例补充 Epic 9 的 5 个基础示例，实现 FR50 对所有主要功能领域的完整覆盖。
+**覆盖的 FR：** FR50（补充）
 
 ---
 
@@ -1144,3 +1151,122 @@ FR51: Epic 9 - 包含快速入门指南的 README
 - SessionsAndHooks：保存/加载会话、注册钩子
 **当** 开发者运行每个示例
 **则** 每个示例端到端演示其功能领域
+
+---
+
+## Epic 10: 扩展代码示例集
+
+开发者可以通过 6 个新的可运行示例学习 SDK 的高级功能——多工具编排、自定义系统提示、阻塞式 API、子代理委派、权限控制和高级 MCP 集成。
+
+### Story 10.1: 多工具编排示例（MultiToolExample）
+
+作为 Swift 开发者，
+我希望看到一个 Agent 自主组合多个工具（Glob、Bash、Read）完成复杂任务的示例，
+以便我理解 Agent 如何规划和执行多步骤工作流。
+
+**验收标准：**
+
+**给定** Examples/MultiToolExample/ 目录下有一个可执行的 Swift 文件
+**当** 开发者运行 `swift run MultiToolExample`
+**则** Agent 使用 Glob 查找文件、Bash 执行命令、Read 读取内容，自主编排多步骤任务
+**且** 输出实时显示每个工具调用（工具名和输入参数）
+**且** 最终输出任务摘要和 token 使用统计
+**且** 示例使用流式 API（`agent.stream()`）消费事件
+
+**给定** Package.swift 中的 MultiToolExample 可执行目标
+**当** 执行 `swift build` 编译项目
+**则** 编译无错误，无警告
+
+### Story 10.2: 自定义系统提示示例（CustomSystemPromptExample）
+
+作为 Swift 开发者，
+我希望看到使用自定义系统提示创建专业化 Agent 的示例，
+以便我理解如何为特定角色定制 Agent 行为。
+
+**验收标准：**
+
+**给定** Examples/CustomSystemPromptExample/ 目录下有一个可执行的 Swift 文件
+**当** 开发者运行 `swift run CustomSystemPromptExample`
+**则** Agent 使用自定义 systemPrompt（如代码审查专家），以专业化角色回应
+**且** Agent 的回复风格和格式符合系统提示中的指导要求
+**且** 示例使用阻塞式 API（`agent.prompt()`）展示简单用法
+
+**给定** Package.swift 中的 CustomSystemPromptExample 可执行目标
+**当** 执行 `swift build` 编译项目
+**则** 编译无错误，无警告
+
+### Story 10.3: 阻塞式 Prompt API 示例（PromptAPIExample）
+
+作为 Swift 开发者，
+我希望看到一个使用 `agent.prompt()` 阻塞式 API 获取完整响应的示例，
+以便我理解在不需要流式传输时如何用最简单的方式调用 Agent。
+
+**验收标准：**
+
+**给定** Examples/PromptAPIExample/ 目录下有一个可执行的 Swift 文件
+**当** 开发者运行 `swift run PromptAPIExample`
+**则** Agent 通过 `agent.prompt()` 执行查询并返回完整的 QueryResult
+**且** 输出展示 result.text（响应文本）、result.numTurns（轮次数）、result.usage（token 用量）、result.durationMs（耗时）
+**且** 示例展示如何在单次调用中获取 Agent 执行工具后的最终结果
+
+**给定** Package.swift 中的 PromptAPIExample 可执行目标
+**当** 执行 `swift build` 编译项目
+**则** 编译无错误，无警告
+
+### Story 10.4: 子代理委派示例（SubagentExample）
+
+作为 Swift 开发者，
+我希望看到一个主 Agent 委派子代理执行专门任务的示例，
+以便我理解如何构建多 Agent 编排工作流。
+
+**验收标准：**
+
+**给定** Examples/SubagentExample/ 目录下有一个可执行的 Swift 文件
+**当** 开发者运行 `swift run SubagentExample`
+**则** 主 Agent 使用 Agent 工具生成一个带有自定义提示的子代理
+**且** 子代理仅使用受限的工具集（如 Read、Glob、Grep）
+**且** 子代理的结果返回给主 Agent，主代理基于子代理结果生成最终回复
+**且** 示例使用流式 API 展示子代理的实时执行过程
+
+**给定** Package.swift 中的 SubagentExample 可执行目标
+**当** 执行 `swift build` 编译项目
+**则** 编译无错误，无警告
+
+### Story 10.5: 权限与受限 Agent 示例（PermissionsExample）
+
+作为 Swift 开发者，
+我希望看到一个创建受限 Agent 的示例（如只读 Agent），
+以便我理解如何通过权限模式和工具白名单控制 Agent 的执行能力。
+
+**验收标准：**
+
+**给定** Examples/PermissionsExample/ 目录下有一个可执行的 Swift 文件
+**当** 开发者运行 `swift run PermissionsExample`
+**则** 示例创建一个只允许使用 Read、Glob、Grep 工具的受限 Agent
+**且** Agent 可以正常执行被允许的只读操作
+**且** 示例展示 `allowedTools` 配置如何限制 Agent 的工具访问范围
+**且** 示例对比展示 `permissionMode: .bypassPermissions` 模式下的行为差异
+
+**给定** Package.swift 中的 PermissionsExample 可执行目标
+**当** 执行 `swift build` 编译项目
+**则** 编译无错误，无警告
+
+### Story 10.6: 高级 MCP 工具示例（AdvancedMCPExample）
+
+作为 Swift 开发者，
+我希望看到一个使用 `createSdkMcpServer()` 创建进程内 MCP 服务器并注册自定义工具的示例，
+以便我理解如何通过 MCP 协议构建和暴露自定义工具集。
+
+**验收标准：**
+
+**给定** Examples/AdvancedMCPExample/ 目录下有一个可执行的 Swift 文件
+**当** 开发者运行 `swift run AdvancedMCPExample`
+**则** 示例使用 `tool()` 或 `defineTool()` 创建带 Codable 输入的自定义工具（如天气查询、单位转换）
+**且** 示例使用 `createSdkMcpServer()` 将工具打包为进程内 MCP 服务器
+**且** Agent 通过 `mcpServers` 配置连接进程内服务器并使用 MCP 工具
+**且** MCP 工具以 `mcp__{serverName}__{toolName}` 命名空间被调用
+**且** 示例展示工具返回错误时的处理方式
+
+**给定** Package.swift 中的 AdvancedMCPExample 可执行目标
+**当** 执行 `swift build` 编译项目
+**则** 编译无错误，无警告
