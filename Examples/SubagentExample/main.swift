@@ -18,6 +18,7 @@ let apiKey = getEnv("CODEANY_API_KEY", from: dotEnv)
     ?? getEnv("ANTHROPIC_API_KEY", from: dotEnv)
     ?? "sk-..."
 let defaultModel = getEnv("CODEANY_MODEL", from: dotEnv) ?? "claude-sonnet-4-6"
+let useOpenAI = getEnv("CODEANY_API_KEY", from: dotEnv) != nil
 
 // MARK: - 2. 创建主 Agent（协调者）并注册 Agent 工具
 
@@ -37,6 +38,8 @@ Always use the Agent tool for investigation tasks rather than doing it yourself.
 let agent = createAgent(options: AgentOptions(
     apiKey: apiKey,
     model: defaultModel,
+    baseURL: useOpenAI ? (getEnv("CODEANY_BASE_URL", from: dotEnv) ?? "https://open.bigmodel.cn/api/coding/paas/v4") : nil,
+    provider: useOpenAI ? .openai : .anthropic,
     systemPrompt: systemPrompt,
     maxTurns: 10,
     permissionMode: .bypassPermissions,

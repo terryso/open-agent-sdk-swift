@@ -24,6 +24,7 @@ let apiKey = getEnv("CODEANY_API_KEY", from: dotEnv)
     ?? getEnv("ANTHROPIC_API_KEY", from: dotEnv)
     ?? "sk-..."
 let defaultModel = getEnv("CODEANY_MODEL", from: dotEnv) ?? "claude-sonnet-4-6"
+let useOpenAI = getEnv("CODEANY_API_KEY", from: dotEnv) != nil
 
 // MARK: - Part 1: 创建自定义 MCP 工具
 
@@ -172,6 +173,8 @@ print()
 let agent = createAgent(options: AgentOptions(
     apiKey: apiKey,
     model: defaultModel,
+    baseURL: useOpenAI ? (getEnv("CODEANY_BASE_URL", from: dotEnv) ?? "https://open.bigmodel.cn/api/coding/paas/v4") : nil,
+    provider: useOpenAI ? .openai : .anthropic,
     systemPrompt: "You are a helpful assistant with access to weather, unit conversion, and email validation tools via MCP. Use the tools when asked about weather, unit conversions, or email validation.",
     maxTurns: 5,
     permissionMode: .bypassPermissions,

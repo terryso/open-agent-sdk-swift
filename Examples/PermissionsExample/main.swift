@@ -19,6 +19,7 @@ let apiKey = getEnv("CODEANY_API_KEY", from: dotEnv)
     ?? getEnv("ANTHROPIC_API_KEY", from: dotEnv)
     ?? "sk-..."
 let defaultModel = getEnv("CODEANY_MODEL", from: dotEnv) ?? "claude-sonnet-4-6"
+let useOpenAI = getEnv("CODEANY_API_KEY", from: dotEnv) != nil
 
 // 所有 Agent 共用的系统提示，引导 Agent 使用工具分析项目结构
 let systemPrompt = """
@@ -47,6 +48,8 @@ let allowlistCallback = canUseTool(policy: allowlistPolicy)
 let agent = createAgent(options: AgentOptions(
     apiKey: apiKey,
     model: defaultModel,
+    baseURL: useOpenAI ? (getEnv("CODEANY_BASE_URL", from: dotEnv) ?? "https://open.bigmodel.cn/api/coding/paas/v4") : nil,
+    provider: useOpenAI ? .openai : .anthropic,
     systemPrompt: systemPrompt,
     maxTurns: 5,
     permissionMode: .bypassPermissions,
@@ -87,6 +90,8 @@ let readOnlyCallback = canUseTool(policy: readOnlyPolicy)
 let readOnlyAgent = createAgent(options: AgentOptions(
     apiKey: apiKey,
     model: defaultModel,
+    baseURL: useOpenAI ? (getEnv("CODEANY_BASE_URL", from: dotEnv) ?? "https://open.bigmodel.cn/api/coding/paas/v4") : nil,
+    provider: useOpenAI ? .openai : .anthropic,
     systemPrompt: systemPrompt,
     maxTurns: 5,
     permissionMode: .bypassPermissions,
@@ -117,6 +122,8 @@ print()
 let unrestrictedAgent = createAgent(options: AgentOptions(
     apiKey: apiKey,
     model: defaultModel,
+    baseURL: useOpenAI ? (getEnv("CODEANY_BASE_URL", from: dotEnv) ?? "https://open.bigmodel.cn/api/coding/paas/v4") : nil,
+    provider: useOpenAI ? .openai : .anthropic,
     systemPrompt: systemPrompt,
     maxTurns: 5,
     permissionMode: .bypassPermissions,

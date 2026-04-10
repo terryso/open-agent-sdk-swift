@@ -16,6 +16,7 @@ let apiKey = getEnv("CODEANY_API_KEY", from: dotEnv)
     ?? getEnv("ANTHROPIC_API_KEY", from: dotEnv)
     ?? "sk-..."
 let defaultModel = getEnv("CODEANY_MODEL", from: dotEnv) ?? "claude-sonnet-4-6"
+let useOpenAI = getEnv("CODEANY_API_KEY", from: dotEnv) != nil
 
 // MARK: - 1. SessionStore 会话持久化
 
@@ -73,6 +74,8 @@ print()
 let agent = createAgent(options: AgentOptions(
     apiKey: apiKey,
     model: defaultModel,
+    baseURL: useOpenAI ? (getEnv("CODEANY_BASE_URL", from: dotEnv) ?? "https://open.bigmodel.cn/api/coding/paas/v4") : nil,
+    provider: useOpenAI ? .openai : .anthropic,
     systemPrompt: "You are a helpful assistant.",
     permissionMode: .bypassPermissions,
     sessionStore: sessionStore,   // 注入 SessionStore
@@ -131,6 +134,8 @@ print("Session renamed and tagged successfully")
 let resumedAgent = createAgent(options: AgentOptions(
     apiKey: apiKey,
     model: defaultModel,
+    baseURL: useOpenAI ? (getEnv("CODEANY_BASE_URL", from: dotEnv) ?? "https://open.bigmodel.cn/api/coding/paas/v4") : nil,
+    provider: useOpenAI ? .openai : .anthropic,
     permissionMode: .bypassPermissions,
     sessionStore: sessionStore,
     sessionId: "example-session"  // 相同 session ID — 自动恢复
