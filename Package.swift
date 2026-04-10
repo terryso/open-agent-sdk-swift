@@ -95,5 +95,12 @@ let package = Package(
             dependencies: ["OpenAgentSDK"],
             path: "Examples/PermissionsExample"
         ),
+        .executableTarget(
+            name: "AdvancedMCPExample",
+            dependencies: ["OpenAgentSDK",
+                .product(name: "MCP", package: "mcp-swift-sdk"),
+            ],
+            path: "Examples/AdvancedMCPExample"
+        ),
     ]
 )

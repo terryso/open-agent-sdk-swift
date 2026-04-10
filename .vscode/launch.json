@@ -119,6 +119,126 @@
             "target": "BasicAgent",
             "configuration": "release",
             "preLaunchTask": "swift: Build Release BasicAgent"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:open-agent-sdk-swift}",
+            "name": "Debug SubagentExample",
+            "target": "SubagentExample",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug SubagentExample"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:open-agent-sdk-swift}",
+            "name": "Release SubagentExample",
+            "target": "SubagentExample",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release SubagentExample"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:open-agent-sdk-swift}",
+            "name": "Debug PromptAPIExample",
+            "target": "PromptAPIExample",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug PromptAPIExample"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:open-agent-sdk-swift}",
+            "name": "Release PromptAPIExample",
+            "target": "PromptAPIExample",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release PromptAPIExample"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:open-agent-sdk-swift}",
+            "name": "Debug MultiToolExample",
+            "target": "MultiToolExample",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug MultiToolExample"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:open-agent-sdk-swift}",
+            "name": "Release MultiToolExample",
+            "target": "MultiToolExample",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release MultiToolExample"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:open-agent-sdk-swift}",
+            "name": "Debug CustomSystemPromptExample",
+            "target": "CustomSystemPromptExample",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug CustomSystemPromptExample"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:open-agent-sdk-swift}",
+            "name": "Release CustomSystemPromptExample",
+            "target": "CustomSystemPromptExample",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release CustomSystemPromptExample"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:open-agent-sdk-swift}",
+            "name": "Debug PermissionsExample",
+            "target": "PermissionsExample",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug PermissionsExample"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:open-agent-sdk-swift}",
+            "name": "Release PermissionsExample",
+            "target": "PermissionsExample",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release PermissionsExample"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:open-agent-sdk-swift}",
+            "name": "Debug AdvancedMCPExample",
+            "target": "AdvancedMCPExample",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug AdvancedMCPExample"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:open-agent-sdk-swift}",
+            "name": "Release AdvancedMCPExample",
+            "target": "AdvancedMCPExample",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release AdvancedMCPExample"
         }
     ]
 }
