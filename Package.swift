@@ -90,5 +90,10 @@ let package = Package(
             dependencies: ["OpenAgentSDK"],
             path: "Examples/SubagentExample"
         ),
+        .executableTarget(
+            name: "PermissionsExample",
+            dependencies: ["OpenAgentSDK"],
+            path: "Examples/PermissionsExample"
+        ),
     ]
 )

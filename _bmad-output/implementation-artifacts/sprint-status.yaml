@@ -1,5 +1,5 @@
 # generated: 2026-04-04
-# last_updated: 2026-04-10 (10-3-prompt-api-example → done)
+# last_updated: 2026-04-10 (10-5-permissions-example → done)
 # updated: 5-4-todo-store-tools → review
 # updated: 5-3-cron-store-tools → review
 # updated: 5-1-worktree-store-tools → review
@@ -67,7 +67,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-04-04
-last_updated: 2026-04-10 (10-4-subagent-example → ready-for-dev)
+last_updated: 2026-04-10 (10-5-permissions-example → review)
 # updated: epic-10 → in-progress
 # updated: 10-1-multi-tool-example → ready-for-dev
 # updated: 6-2-mcp-http-sse-transport → ready-for-dev
@@ -195,6 +195,6 @@ development_status:
   10-2-custom-system-prompt-example: done
   10-3-prompt-api-example: done
   10-4-subagent-example: done
-  10-5-permissions-example: backlog
+  10-5-permissions-example: done
   10-6-advanced-mcp-example: backlog
   epic-10-retrospective: optional
