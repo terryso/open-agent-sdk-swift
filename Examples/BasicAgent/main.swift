@@ -18,7 +18,7 @@ let defaultModel = getEnv("CODEANY_MODEL", from: dotEnv) ?? "claude-sonnet-4-6"
 
 let anthropicKey = getEnv("ANTHROPIC_API_KEY", from: dotEnv)
 
-if let apiKey = anthropicKey, apiKey.hasPrefix("sk-") {
+if let apiKey = anthropicKey, !apiKey.isEmpty {
     let agent = createAgent(options: AgentOptions(
         apiKey: apiKey,
         model: defaultModel,
@@ -46,7 +46,7 @@ if let apiKey = anthropicKey, apiKey.hasPrefix("sk-") {
     print("  Cost: $\(String(format: "%.6f", result.totalCostUsd))")
 } else {
     print("[SKIP] Anthropic example — ANTHROPIC_API_KEY not set.")
-    print("  To enable: export ANTHROPIC_API_KEY=sk-ant-...")
+    print("  To enable: export ANTHROPIC_API_KEY=sk-...")
 }
 
 // MARK: - 方式 2：使用 OpenAI 兼容 API（GLM、Ollama、OpenRouter 等）
@@ -80,6 +80,6 @@ if anthropicKey != nil || codeanyKey != nil {
 } else {
     print()
     print("[ERROR] No API key configured. Please set one of:")
-    print("  export ANTHROPIC_API_KEY=sk-ant-...")
+    print("  export ANTHROPIC_API_KEY=sk-...")
     print("  export CODEANY_API_KEY=your-key")
 }
