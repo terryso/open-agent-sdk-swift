@@ -16,6 +16,7 @@ let dotEnv = loadDotEnv()
 let apiKey = getEnv("CODEANY_API_KEY", from: dotEnv)
     ?? getEnv("ANTHROPIC_API_KEY", from: dotEnv)
     ?? "sk-..."
+let defaultModel = getEnv("CODEANY_MODEL", from: dotEnv) ?? "claude-sonnet-4-6"
 
 // MARK: - 创建专业化 Agent
 
@@ -23,7 +24,7 @@ let apiKey = getEnv("CODEANY_API_KEY", from: dotEnv)
 // 系统提示明确定义了角色、回复风格和输出格式要求
 let agent = createAgent(options: AgentOptions(
     apiKey: apiKey,
-    model: "claude-sonnet-4-6",
+    model: defaultModel,
     systemPrompt: """
     You are a senior code reviewer with 15 years of experience in Swift and system programming.
 

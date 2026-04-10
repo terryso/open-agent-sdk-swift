@@ -14,6 +14,7 @@ let dotEnv = loadDotEnv()
 let apiKey = getEnv("CODEANY_API_KEY", from: dotEnv)
     ?? getEnv("ANTHROPIC_API_KEY", from: dotEnv)
     ?? "sk-..."
+let defaultModel = getEnv("CODEANY_MODEL", from: dotEnv) ?? "claude-sonnet-4-6"
 
 // MARK: - 工具 1：Codable 输入 + String 返回
 
@@ -97,7 +98,7 @@ let healthCheckTool = defineTool(
 
 let agent = createAgent(options: AgentOptions(
     apiKey: apiKey,
-    model: "claude-sonnet-4-6",
+    model: defaultModel,
     systemPrompt: "You are a helpful assistant with access to weather, calculator, and health check tools.",
     permissionMode: .bypassPermissions,
     tools: [weatherTool, calculatorTool, healthCheckTool]

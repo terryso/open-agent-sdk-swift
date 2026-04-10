@@ -18,6 +18,7 @@ let dotEnv = loadDotEnv()
 let apiKey = getEnv("CODEANY_API_KEY", from: dotEnv)
     ?? getEnv("ANTHROPIC_API_KEY", from: dotEnv)
     ?? "sk-..."
+let defaultModel = getEnv("CODEANY_MODEL", from: dotEnv) ?? "claude-sonnet-4-6"
 
 // 所有 Agent 共用的系统提示，引导 Agent 使用工具分析项目结构
 let systemPrompt = """
@@ -45,7 +46,7 @@ let allowlistCallback = canUseTool(policy: allowlistPolicy)
 // 注意：即使设置了 canUseTool，也应该合理设置 permissionMode 作为后备
 let agent = createAgent(options: AgentOptions(
     apiKey: apiKey,
-    model: "claude-sonnet-4-6",
+    model: defaultModel,
     systemPrompt: systemPrompt,
     maxTurns: 5,
     permissionMode: .bypassPermissions,
@@ -85,7 +86,7 @@ let readOnlyCallback = canUseTool(policy: readOnlyPolicy)
 // 创建受限 Agent 2：使用 ReadOnlyPolicy
 let readOnlyAgent = createAgent(options: AgentOptions(
     apiKey: apiKey,
-    model: "claude-sonnet-4-6",
+    model: defaultModel,
     systemPrompt: systemPrompt,
     maxTurns: 5,
     permissionMode: .bypassPermissions,
@@ -115,7 +116,7 @@ print()
 // bypassPermissions 跳过所有权限检查，Agent 可以自由使用所有注册的工具
 let unrestrictedAgent = createAgent(options: AgentOptions(
     apiKey: apiKey,
-    model: "claude-sonnet-4-6",
+    model: defaultModel,
     systemPrompt: systemPrompt,
     maxTurns: 5,
     permissionMode: .bypassPermissions,

@@ -23,6 +23,7 @@ let dotEnv = loadDotEnv()
 let apiKey = getEnv("CODEANY_API_KEY", from: dotEnv)
     ?? getEnv("ANTHROPIC_API_KEY", from: dotEnv)
     ?? "sk-..."
+let defaultModel = getEnv("CODEANY_MODEL", from: dotEnv) ?? "claude-sonnet-4-6"
 
 // MARK: - Part 1: 创建自定义 MCP 工具
 
@@ -170,7 +171,7 @@ print()
 // Agent 将自动发现并使用 MCP 命名空间工具
 let agent = createAgent(options: AgentOptions(
     apiKey: apiKey,
-    model: "claude-sonnet-4-6",
+    model: defaultModel,
     systemPrompt: "You are a helpful assistant with access to weather, unit conversion, and email validation tools via MCP. Use the tools when asked about weather, unit conversions, or email validation.",
     maxTurns: 5,
     permissionMode: .bypassPermissions,

@@ -15,6 +15,7 @@ let dotEnv = loadDotEnv()
 let apiKey = getEnv("CODEANY_API_KEY", from: dotEnv)
     ?? getEnv("ANTHROPIC_API_KEY", from: dotEnv)
     ?? "sk-..."
+let defaultModel = getEnv("CODEANY_MODEL", from: dotEnv) ?? "claude-sonnet-4-6"
 
 // MARK: - 1. SessionStore 会话持久化
 
@@ -71,7 +72,7 @@ print()
 
 let agent = createAgent(options: AgentOptions(
     apiKey: apiKey,
-    model: "claude-sonnet-4-6",
+    model: defaultModel,
     systemPrompt: "You are a helpful assistant.",
     permissionMode: .bypassPermissions,
     sessionStore: sessionStore,   // 注入 SessionStore
@@ -129,7 +130,7 @@ print("Session renamed and tagged successfully")
 // 创建新 Agent 使用相同的 sessionId — 自动恢复之前的对话历史
 let resumedAgent = createAgent(options: AgentOptions(
     apiKey: apiKey,
-    model: "claude-sonnet-4-6",
+    model: defaultModel,
     permissionMode: .bypassPermissions,
     sessionStore: sessionStore,
     sessionId: "example-session"  // 相同 session ID — 自动恢复

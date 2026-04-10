@@ -15,6 +15,7 @@ let dotEnv = loadDotEnv()
 let apiKey = getEnv("CODEANY_API_KEY", from: dotEnv)
     ?? getEnv("ANTHROPIC_API_KEY", from: dotEnv)
     ?? "sk-..."
+let defaultModel = getEnv("CODEANY_MODEL", from: dotEnv) ?? "claude-sonnet-4-6"
 
 // MARK: - 1. InProcessMCPServer（进程内工具暴露）
 
@@ -71,7 +72,7 @@ print()
 // 使用 InProcessMCPServer（SDK 模式）— 推荐用于自定义工具
 let agent = createAgent(options: AgentOptions(
     apiKey: apiKey,
-    model: "claude-sonnet-4-6",
+    model: defaultModel,
     systemPrompt: "You have access to an echo tool via MCP. Use it when asked to echo something.",
     permissionMode: .bypassPermissions,
     mcpServers: sdkConfig  // 注入 MCP 服务器配置

@@ -17,6 +17,7 @@ let dotEnv = loadDotEnv()
 let apiKey = getEnv("CODEANY_API_KEY", from: dotEnv)
     ?? getEnv("ANTHROPIC_API_KEY", from: dotEnv)
     ?? "sk-..."
+let defaultModel = getEnv("CODEANY_MODEL", from: dotEnv) ?? "claude-sonnet-4-6"
 
 // MARK: - 2. 创建主 Agent（协调者）并注册 Agent 工具
 
@@ -35,7 +36,7 @@ Always use the Agent tool for investigation tasks rather than doing it yourself.
 // 子代理（如 Explore 类型）仅使用受限工具集：Read, Glob, Grep, Bash
 let agent = createAgent(options: AgentOptions(
     apiKey: apiKey,
-    model: "claude-sonnet-4-6",
+    model: defaultModel,
     systemPrompt: systemPrompt,
     maxTurns: 10,
     permissionMode: .bypassPermissions,

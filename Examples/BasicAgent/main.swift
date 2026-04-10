@@ -12,6 +12,7 @@ import OpenAgentSDK
 // MARK: - 加载 .env 文件
 
 let dotEnv = loadDotEnv()
+let defaultModel = getEnv("CODEANY_MODEL", from: dotEnv) ?? "claude-sonnet-4-6"
 
 // MARK: - 方式 1：使用 Anthropic（默认提供商）
 
@@ -20,7 +21,7 @@ let anthropicKey = getEnv("ANTHROPIC_API_KEY", from: dotEnv)
 if let apiKey = anthropicKey, apiKey.hasPrefix("sk-") {
     let agent = createAgent(options: AgentOptions(
         apiKey: apiKey,
-        model: "claude-sonnet-4-6",
+        model: defaultModel,
         systemPrompt: "You are a helpful assistant. Be concise.",
         maxTurns: 10,
         permissionMode: .bypassPermissions
