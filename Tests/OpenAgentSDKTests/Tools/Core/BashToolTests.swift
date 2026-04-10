@@ -92,7 +92,7 @@ final class BashToolTests: XCTestCase {
 
         // When: executing a long-running command with a short timeout (1 second)
         let result = await callTool(tool, input: [
-            "command": "sleep 30",
+            "command": "sleep 5",
             "timeout": 1000  // 1 second in milliseconds
         ])
 

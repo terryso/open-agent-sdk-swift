@@ -144,7 +144,7 @@ final class ShellHookExecutorTests: XCTestCase {
     /// AC4 [P0]: Shell hook that exceeds timeout is terminated and returns nil.
     func testExecute_timeout_terminatesProcess() async {
         // Given: a command that sleeps longer than the timeout
-        let command = "sleep 60"
+        let command = "sleep 5"
         let input = HookInput(event: .preToolUse, toolName: "bash")
 
         // When: executing with a very short timeout (200ms)
@@ -435,7 +435,7 @@ final class ShellHookExecutorTests: XCTestCase {
         let registry = HookRegistry()
 
         await registry.register(.preToolUse, definition: HookDefinition(
-            command: "sleep 60",
+            command: "sleep 5",
             timeout: 200 // 200ms timeout
         ))
 
