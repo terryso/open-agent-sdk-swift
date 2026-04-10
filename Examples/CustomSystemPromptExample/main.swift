@@ -45,7 +45,7 @@ let agent = createAgent(options: AgentOptions(
     Only answer questions related to code, software architecture, or programming.
     If asked about unrelated topics, politely redirect to code review.
     """,
-    maxTurns: 5,
+    maxTurns: 10,
     permissionMode: .bypassPermissions
     // 注意：不传 tools 参数（默认为 nil），本示例不注册任何工具，突出系统提示效果
 ))

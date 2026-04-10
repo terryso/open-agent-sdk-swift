@@ -51,7 +51,7 @@ let agent = createAgent(options: AgentOptions(
     baseURL: useOpenAI ? (getEnv("CODEANY_BASE_URL", from: dotEnv) ?? "https://open.bigmodel.cn/api/coding/paas/v4") : nil,
     provider: useOpenAI ? .openai : .anthropic,
     systemPrompt: systemPrompt,
-    maxTurns: 5,
+    maxTurns: 15,
     permissionMode: .bypassPermissions,
     canUseTool: allowlistCallback,
     tools: getAllBaseTools(tier: .core)
@@ -93,7 +93,7 @@ let readOnlyAgent = createAgent(options: AgentOptions(
     baseURL: useOpenAI ? (getEnv("CODEANY_BASE_URL", from: dotEnv) ?? "https://open.bigmodel.cn/api/coding/paas/v4") : nil,
     provider: useOpenAI ? .openai : .anthropic,
     systemPrompt: systemPrompt,
-    maxTurns: 5,
+    maxTurns: 15,
     permissionMode: .bypassPermissions,
     canUseTool: readOnlyCallback,
     tools: getAllBaseTools(tier: .core)
@@ -125,7 +125,7 @@ let unrestrictedAgent = createAgent(options: AgentOptions(
     baseURL: useOpenAI ? (getEnv("CODEANY_BASE_URL", from: dotEnv) ?? "https://open.bigmodel.cn/api/coding/paas/v4") : nil,
     provider: useOpenAI ? .openai : .anthropic,
     systemPrompt: systemPrompt,
-    maxTurns: 5,
+    maxTurns: 15,
     permissionMode: .bypassPermissions,
     tools: getAllBaseTools(tier: .core)
 ))

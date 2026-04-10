@@ -176,7 +176,7 @@ let agent = createAgent(options: AgentOptions(
     baseURL: useOpenAI ? (getEnv("CODEANY_BASE_URL", from: dotEnv) ?? "https://open.bigmodel.cn/api/coding/paas/v4") : nil,
     provider: useOpenAI ? .openai : .anthropic,
     systemPrompt: "You are a helpful assistant with access to weather, unit conversion, and email validation tools via MCP. Use the tools when asked about weather, unit conversions, or email validation.",
-    maxTurns: 5,
+    maxTurns: 15,
     permissionMode: .bypassPermissions,
     mcpServers: mcpConfig
 ))
