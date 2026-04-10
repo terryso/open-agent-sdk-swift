@@ -5,12 +5,15 @@
 // 还展示预算追踪功能。
 //
 // 运行方式：swift run StreamingAgent
-// 前提条件：设置 ANTHROPIC_API_KEY 环境变量
+// 前提条件：在 .env 文件或环境变量中设置 CODEANY_API_KEY
 
 import Foundation
 import OpenAgentSDK
 
-let apiKey = ProcessInfo.processInfo.environment["ANTHROPIC_API_KEY"] ?? "sk-..."
+let dotEnv = loadDotEnv()
+let apiKey = getEnv("CODEANY_API_KEY", from: dotEnv)
+    ?? getEnv("ANTHROPIC_API_KEY", from: dotEnv)
+    ?? "sk-..."
 
 // 创建带预算限制的 Agent
 let agent = createAgent(options: AgentOptions(

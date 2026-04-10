@@ -7,15 +7,17 @@
 // 与 MultiToolExample 的区别：本示例使用阻塞式 API，一次性获取最终结果。
 //
 // 运行方式：swift run PromptAPIExample
-// 前提条件：设置 ANTHROPIC_API_KEY 环境变量
+// 前提条件：在 .env 文件或环境变量中设置 CODEANY_API_KEY
 
 import Foundation
 import OpenAgentSDK
 
 // MARK: - 配置 API Key
 
-// 从环境变量读取 API key，未设置则使用占位符
-let apiKey = ProcessInfo.processInfo.environment["ANTHROPIC_API_KEY"] ?? "sk-..."
+let dotEnv = loadDotEnv()
+let apiKey = getEnv("CODEANY_API_KEY", from: dotEnv)
+    ?? getEnv("ANTHROPIC_API_KEY", from: dotEnv)
+    ?? "sk-..."
 
 // MARK: - 创建 Agent 并注册核心工具
 

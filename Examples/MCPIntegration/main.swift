@@ -5,13 +5,16 @@
 // 2. InProcessMCPServer — 进程内工具暴露（零 MCP 协议开销）
 //
 // 运行方式：swift run MCPIntegration
-// 前提条件：设置 ANTHROPIC_API_KEY 环境变量
+// 前提条件：在 .env 文件或环境变量中设置 CODEANY_API_KEY
 
 import Foundation
 import OpenAgentSDK
 import MCP
 
-let apiKey = ProcessInfo.processInfo.environment["ANTHROPIC_API_KEY"] ?? "sk-..."
+let dotEnv = loadDotEnv()
+let apiKey = getEnv("CODEANY_API_KEY", from: dotEnv)
+    ?? getEnv("ANTHROPIC_API_KEY", from: dotEnv)
+    ?? "sk-..."
 
 // MARK: - 1. InProcessMCPServer（进程内工具暴露）
 

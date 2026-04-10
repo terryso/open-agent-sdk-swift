@@ -6,16 +6,17 @@
 // 结果返回给主 Agent，主 Agent 基于子代理结果生成最终回复。
 //
 // 运行方式：swift run SubagentExample
-// 前提条件：设置 ANTHROPIC_API_KEY 环境变量
-//           或在代码中将 apiKey 替换为有效的 API 密钥
+// 前提条件：在 .env 文件或环境变量中设置 CODEANY_API_KEY
 
 import Foundation
 import OpenAgentSDK
 
 // MARK: - 1. 配置 API 密钥
 
-// 从环境变量读取 API key，或使用占位符（实际使用时需替换为有效密钥）
-let apiKey = ProcessInfo.processInfo.environment["ANTHROPIC_API_KEY"] ?? "sk-..."
+let dotEnv = loadDotEnv()
+let apiKey = getEnv("CODEANY_API_KEY", from: dotEnv)
+    ?? getEnv("ANTHROPIC_API_KEY", from: dotEnv)
+    ?? "sk-..."
 
 // MARK: - 2. 创建主 Agent（协调者）并注册 Agent 工具
 

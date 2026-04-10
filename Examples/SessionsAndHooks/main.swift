@@ -6,12 +6,15 @@
 // 3. 会话恢复 — 通过 sessionId + sessionStore 自动恢复和保存
 //
 // 运行方式：swift run SessionsAndHooks
-// 前提条件：设置 ANTHROPIC_API_KEY 环境变量
+// 前提条件：在 .env 文件或环境变量中设置 CODEANY_API_KEY
 
 import Foundation
 import OpenAgentSDK
 
-let apiKey = ProcessInfo.processInfo.environment["ANTHROPIC_API_KEY"] ?? "sk-..."
+let dotEnv = loadDotEnv()
+let apiKey = getEnv("CODEANY_API_KEY", from: dotEnv)
+    ?? getEnv("ANTHROPIC_API_KEY", from: dotEnv)
+    ?? "sk-..."
 
 // MARK: - 1. SessionStore 会话持久化
 

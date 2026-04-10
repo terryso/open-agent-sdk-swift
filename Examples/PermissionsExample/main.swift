@@ -7,16 +7,17 @@
 //   3. bypassPermissions — 不受限模式，允许所有工具自由执行（作为对比）
 //
 // 运行方式：swift run PermissionsExample
-// 前提条件：设置 ANTHROPIC_API_KEY 环境变量
-//           或在代码中将 apiKey 替换为有效的 API 密钥
+// 前提条件：在 .env 文件或环境变量中设置 CODEANY_API_KEY
 
 import Foundation
 import OpenAgentSDK
 
 // MARK: - 配置 API Key
 
-// 从环境变量读取 API key，未设置则使用占位符
-let apiKey = ProcessInfo.processInfo.environment["ANTHROPIC_API_KEY"] ?? "sk-..."
+let dotEnv = loadDotEnv()
+let apiKey = getEnv("CODEANY_API_KEY", from: dotEnv)
+    ?? getEnv("ANTHROPIC_API_KEY", from: dotEnv)
+    ?? "sk-..."
 
 // 所有 Agent 共用的系统提示，引导 Agent 使用工具分析项目结构
 let systemPrompt = """

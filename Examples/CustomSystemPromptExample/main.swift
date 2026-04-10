@@ -5,15 +5,17 @@
 // 使用阻塞式 agent.prompt() API，适合简单的一问一答场景。
 //
 // 运行方式：swift run CustomSystemPromptExample
-// 前提条件：设置 ANTHROPIC_API_KEY 环境变量
+// 前提条件：在 .env 文件或环境变量中设置 CODEANY_API_KEY
 
 import Foundation
 import OpenAgentSDK
 
 // MARK: - 配置 API Key
 
-// 从环境变量读取 API key，未设置则使用占位符
-let apiKey = ProcessInfo.processInfo.environment["ANTHROPIC_API_KEY"] ?? "sk-..."
+let dotEnv = loadDotEnv()
+let apiKey = getEnv("CODEANY_API_KEY", from: dotEnv)
+    ?? getEnv("ANTHROPIC_API_KEY", from: dotEnv)
+    ?? "sk-..."
 
 // MARK: - 创建专业化 Agent
 

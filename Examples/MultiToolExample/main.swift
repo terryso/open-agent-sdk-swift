@@ -5,16 +5,17 @@
 // 并在最终输出中包含 token 使用统计和成本信息。
 //
 // 运行方式：swift run MultiToolExample
-// 前提条件：设置 ANTHROPIC_API_KEY 环境变量
-//           或在代码中将 apiKey 替换为有效的 API 密钥
+// 前提条件：在 .env 文件或环境变量中设置 CODEANY_API_KEY
 
 import Foundation
 import OpenAgentSDK
 
 // MARK: - 1. 配置 API 密钥
 
-// 从环境变量读取 API key，或使用占位符（实际使用时需替换为有效密钥）
-let apiKey = ProcessInfo.processInfo.environment["ANTHROPIC_API_KEY"] ?? "sk-..."
+let dotEnv = loadDotEnv()
+let apiKey = getEnv("CODEANY_API_KEY", from: dotEnv)
+    ?? getEnv("ANTHROPIC_API_KEY", from: dotEnv)
+    ?? "sk-..."
 
 // MARK: - 2. 创建 Agent 并注册全部核心工具
 

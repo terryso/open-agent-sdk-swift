@@ -11,7 +11,7 @@
 // - 本示例深入展示多工具注册、错误处理和命名空间验证的高级模式
 //
 // 运行方式：swift run AdvancedMCPExample
-// 前提条件：设置 ANTHROPIC_API_KEY 环境变量
+// 前提条件：在 .env 文件或环境变量中设置 CODEANY_API_KEY
 
 import Foundation
 import OpenAgentSDK
@@ -19,8 +19,10 @@ import MCP
 
 // MARK: - 配置 API Key
 
-// 从环境变量读取 API key，未设置则使用占位符
-let apiKey = ProcessInfo.processInfo.environment["ANTHROPIC_API_KEY"] ?? "sk-..."
+let dotEnv = loadDotEnv()
+let apiKey = getEnv("CODEANY_API_KEY", from: dotEnv)
+    ?? getEnv("ANTHROPIC_API_KEY", from: dotEnv)
+    ?? "sk-..."
 
 // MARK: - Part 1: 创建自定义 MCP 工具
 
