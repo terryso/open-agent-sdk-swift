@@ -1,37 +1,5 @@
 # generated: 2026-04-04
-# last_updated: 2026-04-10 (10-6-advanced-mcp-example → done)
-# updated: 5-4-todo-store-tools → review
-# updated: 5-3-cron-store-tools → review
-# updated: 5-1-worktree-store-tools → review
-# updated: 4-7-notebook-edit-tool → review
-# updated: 4-7-notebook-edit-tool → ready-for-dev
-# updated: 4-6-team-tools-create-delete → ready-for-dev
-# updated: 4-5-task-tools-create-list-update-get-stop-output → done
-# updated: 4-6-team-tools-create-delete → review
-# updated: 4-4-send-message-tool → done
-# updated: 4-3-agent-tool-sub-agent-spawn → done
-# updated: 4-2-team-store-agent-registry → ready-for-dev
-# updated: epic-4 → in-progress
-# updated: 4-2-team-store-agent-registry → review
-# updated: 4-1-task-store-mailbox-store → ready-for-dev
-# updated: 3-7-core-web-tools-web-fetch-web-search → review
-# updated: 3-7-core-web-tools-web-fetch-web-search → ready-for-dev
-# updated: 3-6-core-system-tools-bash-ask-user-tool-search → ready-for-dev
-# updated: 3-7-core-web-tools-web-fetch-web-search → ready-for-dev
-# updated: 3-5-core-search-tools-glob-grep → ready-for-dev
-# updated: 3-4-core-file-tools-read-write-edit → ready-for-dev
-# updated: 3-4-core-file-tools-read-write-edit → done
-# updated: 3-3-tool-executor-concurrent-serial → review
-# updated: 3-3-tool-executor-concurrent-serial → ready-for-dev
-# updated: 3-1-tool-protocol-registry → review
-# updated: 3-1-tool-protocol-registry → in-progress
-# updated: 3-1-tool-protocol-registry → ready-for-dev
-# updated: epic-3 → in-progress
-# updated: 3-1-tool-protocol-registry → ready-for-dev
-# updated: 2-6-tool-result-micro-compaction → ready-for-dev
-# updated: 2-5-auto-conversation-compaction → in-progress
-# updated: 2-5-auto-conversation-compaction → ready-for-dev
-# updated: 2-5-auto-conversation-compaction → done
+# last_updated: 2026-04-11 (story 11-1 created)
 # project: open-agent-sdk-swift
 # project_key: NOKEY
 # tracking_system: file-system
@@ -67,37 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-04-04
-last_updated: 2026-04-10 (10-6-advanced-mcp-example → done)
-# updated: epic-10 → in-progress
-# updated: 10-1-multi-tool-example → ready-for-dev
-# updated: 6-2-mcp-http-sse-transport → ready-for-dev
-# updated: 4-7-notebook-edit-tool → review
-# updated: 4-7-notebook-edit-tool → ready-for-dev
-# updated: 4-4-send-message-tool → done
-# updated: 4-6-team-tools-create-delete → ready-for-dev
-# updated: 4-1-task-store-mailbox-store → done
-# updated: 3-6-core-system-tools-bash-ask-user-tool-search → ready-for-dev
-# updated: 3-4-core-file-tools-read-write-edit → in-progress
-# updated: 3-2-custom-tool-define-tool → review
-# updated: 3-1-tool-protocol-registry → review
-# updated: epic-3 → in-progress
-# updated: 2-6-tool-result-micro-compaction → ready-for-dev
-# updated: 2-4-llm-api-retry-max-tokens-recovery → done
-# updated: 2-5-auto-conversation-compaction → ready-for-dev
-# updated: 2-3-budget-enforcement → ready-for-dev
-# updated: 1-5-agent-loop-blocking-response → in-progress
-# updated: 1-5-agent-loop-blocking-response → review
-# updated: 1-5-agent-loop-blocking-response → done
-# updated: 1-4-agent-creation-config → ready-for-dev
-# updated: 1-3-sdk-config-env-vars → ready-for-dev
-# updated: 1-1-spm-package-core-types → in-progress
-# updated: 1-2-custom-anthropic-api-client → ready-for-dev
-# updated: 1-2-custom-anthropic-api-client → in-progress
-# updated: 1-2-custom-anthropic-api-client → review
-# updated: 1-2-custom-anthropic-api-client → done
-# updated: epic-2 → in-progress
-# updated: 2-1-async-stream-response → ready-for-dev
-# updated: 2-2-token-usage-cost-tracking → ready-for-dev
+last_updated: 2026-04-11 (story 11-1 review)
 project: open-agent-sdk-swift
 project_key: NOKEY
 tracking_system: file-system
@@ -116,7 +54,6 @@ development_status:
   # Epic 2: 流式响应与生产就绪 Agent
   epic-2: done
   2-1-async-stream-response: done
-# updated: 2-1-async-stream-response → done (manual acceptance verified all 7 ACs)
   2-2-token-usage-cost-tracking: done
   2-3-budget-enforcement: done
   2-4-llm-api-retry-max-tokens-recovery: done
@@ -198,3 +135,38 @@ development_status:
   10-5-permissions-example: done
   10-6-advanced-mcp-example: done
   epic-10-retrospective: optional
+
+  # Epic 11: 技能系统
+  epic-11: in-progress
+  11-1-skill-type-definition-skill-registry: done
+  11-2-skill-tool-skill-execution: backlog
+  11-3-built-in-skill-commit: backlog
+  11-4-built-in-skill-review: backlog
+  11-5-built-in-skill-simplify: backlog
+  11-6-built-in-skill-debug: backlog
+  11-7-built-in-skill-test: backlog
+  epic-11-retrospective: optional
+
+  # Epic 12: 文件缓存与上下文注入
+  epic-12: backlog
+  12-1-filecache-lru-cache-implementation: backlog
+  12-2-cache-tool-and-compaction-integration: backlog
+  12-3-git-status-injection: backlog
+  12-4-project-document-discovery: backlog
+  epic-12-retrospective: optional
+
+  # Epic 13: 会话生命周期管理
+  epic-13: backlog
+  13-1-runtime-dynamic-model-switching: backlog
+  13-2-query-level-abort: backlog
+  13-3-session-memory-compression-layer: backlog
+  epic-13-retrospective: optional
+
+  # Epic 14: 运行时防护（日志与沙盒）
+  epic-14: backlog
+  14-1-logger-type-and-injection: backlog
+  14-2-structured-log-output: backlog
+  14-3-sandbox-settings-config-model: backlog
+  14-4-filesystem-sandbox-enforcement: backlog
+  14-5-sandbox-bash-command-filtering: backlog
+  epic-14-retrospective: optional

@@ -1,7 +1,7 @@
 ---
 project_name: 'open-agent-sdk-swift'
 user_name: 'Nick'
-date: '2026-04-04'
+date: '2026-04-11'
 sections_completed:
   ['technology_stack', 'language_rules', 'framework_rules', 'testing_rules', 'quality_rules', 'workflow_rules', 'anti_patterns']
 status: 'complete'
@@ -23,9 +23,9 @@ _本文档包含 AI 代理在实现代码时必须遵循的关键规则和模式
 - **测试框架：** XCTest（Swift 内置）
 - **文档：** Swift-DocC
 - **模块名：** `OpenAgentSDK`（单目标库）
-- **唯一外部依赖：** `mcp-swift-sdk`（DePasqualeOrg/mcp-swift-sdk）— MCP stdio/SSE/HTTP 传输
+- **外部依赖：** `mcp-swift-sdk`（DePasqualeOrg/mcp-swift-sdk）— MCP stdio/SSE/HTTP 传输；`swift-docc-plugin`（swiftlang/swift-docc-plugin）— 开发时 DocC 文档生成
 - **API 客户端：** 自定义 `AnthropicClient`（基于 URLSession），**不使用**社区 Anthropic SDK
-- **参考源码：** TypeScript SDK 位于 `/Users/nick/CascadeProjects/open-agent-sdk-typescript/src/`（~12 个源文件，~3000-4000 行）
+- **参考源码：** TypeScript SDK 位于 `/Users/nick/CascadeProjects/open-agent-sdk-typescript/src/`（~53 个源文件，~7800 行）
 
 ---
 
@@ -93,7 +93,7 @@ _本文档包含 AI 代理在实现代码时必须遵循的关键规则和模式
 26. **Actor 测试**：使用 `await` 访问 actor 隔离方法
 27. **无 mock 外部 API**：AnthropicClient 测试使用自定义的 mock URL 协议或 URLProtocol 子类
 28. **错误路径测试**：每个 actor 存储和 QueryEngine 必须测试错误传播路径
-29. **故事完成后必须补充 E2E 测试**：每个故事实现完成后，必须在 `Sources/E2ETest/` 中补充对应的 E2E 测试，至少包含 happy path 的验收测试
+29. **故事完成后必须补充 E2E 测试**：每个故事实现完成后，必须在 `Sources/E2ETest/`（29 个测试文件）中补充对应的 E2E 测试，至少包含 happy path 的验收测试
 
 ### 代码质量规则
 
@@ -105,7 +105,7 @@ _本文档包含 AI 代理在实现代码时必须遵循的关键规则和模式
 
 ### 开发工作流规则
 
-35. **项目结构**：`Sources/OpenAgentSDK/` 为主源码目录，子目录为 Types/、API/、Core/、Tools/、Stores/、Hooks/、Utils/、MCP/
+35. **项目结构**：`Sources/OpenAgentSDK/` 为主源码目录（75 个 Swift 文件），子目录为 Types/（15 文件）、API/（5 文件）、Core/（3 文件）、Tools/（36 文件，含 Core/、Advanced/、Specialist/、MCP/ 四个子目录）、Stores/（9 文件）、Hooks/（2 文件）、Utils/（4 文件）、MCP/（预留空目录）、Documentation.docc/（DocC 文档）
 36. **不使用 Apple 专属框架**：代码必须同时在 macOS 和 Linux 上运行。使用 Foundation 和 POSIX API。
 37. **POSIX shell 执行**：使用 `Process`（macOS Foundation）/ `posix_spawn`（Linux）执行 shell 钩子，通过 stdin JSON 输入、stdout JSON 输出。
 38. **会话存储路径**：`~/.open-agent-sdk/sessions/{sessionId}/transcript.json`
@@ -141,4 +141,4 @@ _本文档包含 AI 代理在实现代码时必须遵循的关键规则和模式
 - 定期审查过时规则
 - 规则变得显而易见时移除
 
-Last Updated: 2026-04-07
+Last Updated: 2026-04-11

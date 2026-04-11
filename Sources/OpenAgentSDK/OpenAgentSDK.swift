@@ -108,6 +108,12 @@
 /// - ``MCPStdioTransport`` — Stdio transport for MCP client connections
 /// - ``McpServerConfig`` — MCP server configuration (stdio/sse/http)
 /// - ``McpStdioConfig`` — MCP stdio transport configuration
+///
+/// ## Skill System
+/// - ``Skill`` — Reusable prompt template with optional tool restrictions and model overrides
+/// - ``SkillRegistry`` — Thread-safe registry for managing skill definitions
+/// - ``BuiltInSkills`` — Convenience namespace for built-in skill definitions
+/// - ``ToolRestriction`` — Enum of tool names that can be restricted in skill definitions
 
 /// Current SDK version.
 public let SDK_VERSION = "0.1.0"
