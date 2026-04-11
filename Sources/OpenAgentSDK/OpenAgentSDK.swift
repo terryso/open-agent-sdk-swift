@@ -114,6 +114,8 @@
 /// - ``SkillRegistry`` — Thread-safe registry for managing skill definitions
 /// - ``BuiltInSkills`` — Convenience namespace for built-in skill definitions
 /// - ``ToolRestriction`` — Enum of tool names that can be restricted in skill definitions
+/// - ``createSkillTool(registry:)`` — Factory for the Skill tool
+/// - ``ToolRestrictionStack`` — Stack-based tool restriction manager for nested skill execution
 
 /// Current SDK version.
 public let SDK_VERSION = "0.1.0"

@@ -79,6 +79,18 @@ public struct ToolContext: Sendable {
     /// Optional permission check callback for custom authorization.
     /// Injected by Core/ from AgentOptions.canUseTool.
     public let canUseTool: CanUseToolFn?
+    /// Optional skill registry for skill execution tools (SkillTool).
+    /// Injected by Core/ from AgentOptions.skillRegistry.
+    public let skillRegistry: SkillRegistry?
+    /// Optional tool restriction stack for managing tool availability during skill execution.
+    /// Injected by Core/ when the tool set includes the Skill tool.
+    public let restrictionStack: ToolRestrictionStack?
+    /// Current skill nesting depth (incremented on each nested skill call).
+    /// Used by SkillTool to detect recursion depth exceedance.
+    public let skillNestingDepth: Int
+    /// Maximum allowed skill recursion depth. Defaults to 4.
+    /// Configurable via AgentOptions.maxSkillRecursionDepth.
+    public let maxSkillRecursionDepth: Int
 
     public init(
         cwd: String,
@@ -94,7 +106,11 @@ public struct ToolContext: Sendable {
         todoStore: TodoStore? = nil,
         hookRegistry: HookRegistry? = nil,
         permissionMode: PermissionMode? = nil,
-        canUseTool: CanUseToolFn? = nil
+        canUseTool: CanUseToolFn? = nil,
+        skillRegistry: SkillRegistry? = nil,
+        restrictionStack: ToolRestrictionStack? = nil,
+        skillNestingDepth: Int = 0,
+        maxSkillRecursionDepth: Int = 4
     ) {
         self.cwd = cwd
         self.toolUseId = toolUseId
@@ -110,6 +126,10 @@ public struct ToolContext: Sendable {
         self.hookRegistry = hookRegistry
         self.permissionMode = permissionMode
         self.canUseTool = canUseTool
+        self.skillRegistry = skillRegistry
+        self.restrictionStack = restrictionStack
+        self.skillNestingDepth = skillNestingDepth
+        self.maxSkillRecursionDepth = maxSkillRecursionDepth
     }
 
     /// Returns a copy of this context with the toolUseId replaced.
@@ -126,7 +146,35 @@ public struct ToolContext: Sendable {
             todoStore: todoStore,
             hookRegistry: hookRegistry,
             permissionMode: permissionMode,
-            canUseTool: canUseTool
+            canUseTool: canUseTool,
+            skillRegistry: skillRegistry,
+            restrictionStack: restrictionStack,
+            skillNestingDepth: skillNestingDepth,
+            maxSkillRecursionDepth: maxSkillRecursionDepth
+        )
+    }
+
+    /// Returns a copy of this context with an incremented skill nesting depth.
+    ///
+    /// Used by SkillTool to track nested skill calls and detect recursion.
+    ///
+    /// - Parameter depth: The new skill nesting depth value.
+    /// - Returns: A copy of this context with the updated depth.
+    public func withSkillContext(depth: Int) -> ToolContext {
+        ToolContext(
+            cwd: cwd, toolUseId: toolUseId,
+            agentSpawner: agentSpawner, mailboxStore: mailboxStore,
+            teamStore: teamStore, senderName: senderName,
+            taskStore: taskStore, worktreeStore: worktreeStore,
+            planStore: planStore, cronStore: cronStore,
+            todoStore: todoStore,
+            hookRegistry: hookRegistry,
+            permissionMode: permissionMode,
+            canUseTool: canUseTool,
+            skillRegistry: skillRegistry,
+            restrictionStack: restrictionStack,
+            skillNestingDepth: depth,
+            maxSkillRecursionDepth: maxSkillRecursionDepth
         )
     }
 }

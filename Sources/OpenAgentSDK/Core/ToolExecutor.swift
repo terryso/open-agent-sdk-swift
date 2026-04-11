@@ -183,7 +183,15 @@ enum ToolExecutor {
         tools: [ToolProtocol],
         context: ToolContext
     ) async -> [ToolResult] {
-        let (readOnly, mutations) = partitionTools(blocks: toolUseBlocks, tools: tools)
+        // Apply tool restriction stack filtering if active
+        let effectiveTools: [ToolProtocol]
+        if let restrictionStack = context.restrictionStack, !restrictionStack.isEmpty {
+            effectiveTools = restrictionStack.currentAllowedToolNames(baseTools: tools)
+        } else {
+            effectiveTools = tools
+        }
+
+        let (readOnly, mutations) = partitionTools(blocks: toolUseBlocks, tools: effectiveTools)
         var results: [ToolResult] = []
 
         // Execute read-only tools concurrently (batched by maxConcurrency)

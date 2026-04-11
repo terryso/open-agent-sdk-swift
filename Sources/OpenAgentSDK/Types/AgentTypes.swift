@@ -91,6 +91,12 @@ public struct AgentOptions: Sendable {
     /// Optional hook registry for lifecycle event hooks.
     /// When set, hooks are triggered during Agent execution (FR28).
     public var hookRegistry: HookRegistry?
+    /// Optional skill registry for skill execution.
+    /// When set, the Skill tool is registered and skills can be discovered and invoked by the LLM.
+    public var skillRegistry: SkillRegistry?
+    /// Maximum allowed skill recursion depth. Defaults to 4.
+    /// Prevents infinite loops when skills call other skills.
+    public var maxSkillRecursionDepth: Int
 
     public init(
         apiKey: String? = nil,
@@ -118,7 +124,9 @@ public struct AgentOptions: Sendable {
         todoStore: TodoStore? = nil,
         sessionStore: SessionStore? = nil,
         sessionId: String? = nil,
-        hookRegistry: HookRegistry? = nil
+        hookRegistry: HookRegistry? = nil,
+        skillRegistry: SkillRegistry? = nil,
+        maxSkillRecursionDepth: Int = 4
     ) {
         self.apiKey = apiKey
         self.model = model
@@ -146,6 +154,8 @@ public struct AgentOptions: Sendable {
         self.sessionStore = sessionStore
         self.sessionId = sessionId
         self.hookRegistry = hookRegistry
+        self.skillRegistry = skillRegistry
+        self.maxSkillRecursionDepth = maxSkillRecursionDepth
     }
 
     /// Create AgentOptions from an SDKConfiguration, using its resolved values
@@ -180,6 +190,8 @@ public struct AgentOptions: Sendable {
         self.sessionStore = nil
         self.sessionId = nil
         self.hookRegistry = nil
+        self.skillRegistry = nil
+        self.maxSkillRecursionDepth = 4
     }
 }
 

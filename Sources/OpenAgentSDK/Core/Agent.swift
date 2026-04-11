@@ -223,6 +223,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
         var maxTokensRecoveryAttempts = 0
         let MAX_TOKENS_RECOVERY = 3
         var compactState = createAutoCompactState()
+        // Skill system: create restriction stack once before the loop so it persists across turns
+        let restrictionStack = options.skillRegistry != nil ? ToolRestrictionStack() : nil
 
         while turnCount < maxTurns {
             // Auto-compact if context is too large (FR9)
@@ -373,7 +375,11 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                             todoStore: options.todoStore,
                             hookRegistry: options.hookRegistry,
                             permissionMode: options.permissionMode,
-                            canUseTool: options.canUseTool
+                            canUseTool: options.canUseTool,
+                            skillRegistry: options.skillRegistry,
+                            restrictionStack: restrictionStack,
+                            skillNestingDepth: restrictionStack?.nestingDepth ?? 0,
+                            maxSkillRecursionDepth: options.maxSkillRecursionDepth
                         )
                     )
 
@@ -508,6 +514,10 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
         let capturedSessionStore = options.sessionStore
         let capturedSessionId = options.sessionId
         let capturedHookRegistry = options.hookRegistry
+        let capturedSkillRegistry = options.skillRegistry
+        let capturedMaxSkillRecursionDepth = options.maxSkillRecursionDepth
+        // Create restriction stack once so it persists across stream turns
+        let capturedRestrictionStack = options.skillRegistry != nil ? ToolRestrictionStack() : nil
 
         // Build tool definitions for API call
         let capturedApiTools: [[String: Any]]? = {
@@ -901,7 +911,11 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                                     todoStore: capturedTodoStore,
                                     hookRegistry: capturedHookRegistry,
                                     permissionMode: capturedPermissionMode,
-                                    canUseTool: capturedCanUseTool
+                                    canUseTool: capturedCanUseTool,
+                                    skillRegistry: capturedSkillRegistry,
+                                    restrictionStack: capturedRestrictionStack,
+                                    skillNestingDepth: capturedRestrictionStack?.nestingDepth ?? 0,
+                                    maxSkillRecursionDepth: capturedMaxSkillRecursionDepth
                                 )
                             )
 
