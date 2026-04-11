@@ -216,31 +216,42 @@ public enum BuiltInSkills {
         )
     }
 
-    /// Simplify skill: reviews changed code for reuse, quality, and efficiency.
+    /// Simplify skill: reviews changed code for reuse, quality, and efficiency opportunities.
     public static var simplify: Skill {
         Skill(
             name: "simplify",
-            description: "Review changed code for reuse, quality, and efficiency, then fix any issues found.",
+            description: "Review changed code for reuse, quality, and efficiency opportunities, providing before/after comparison examples for each finding.",
             userInvocable: true,
+            toolRestrictions: [.bash, .read, .grep, .glob],
             promptTemplate: """
-            Review the recently changed code for three categories of improvements. Launch 3 parallel Agent sub-tasks:
+            Analyze recently changed code for simplification opportunities across three categories. Follow these steps:
 
-            ## Task 1: Reuse Analysis
+            ## Step 1: Identify changed files using git diff
+
+            Use `git diff` to see unstaged changes and `git diff --cached` to see staged changes. Combine the results to identify all recently changed files that should be reviewed.
+
+            If both `git diff` and `git diff --cached` return empty output (no changes detected), inform the user: "No changes to review for simplification." and stop.
+
+            ## Step 2: Use Read, Grep, and Glob tools to analyze each changed file
+
+            For every changed file, perform a three-category analysis:
+
+            ### Category 1: Reuse Analysis
             Look for:
-            - Duplicated code that could be consolidated
-            - Existing utilities or helpers that could replace new code
-            - Patterns that should be extracted into shared functions
+            - Duplicated code patterns that could be consolidated into shared functions or helpers
+            - Existing utilities or helpers in the codebase that could replace newly written code
+            - Patterns that should be extracted into shared abstractions or helper functions
             - Re-implementations of functionality that already exists elsewhere
 
-            ## Task 2: Code Quality
+            ### Category 2: Quality Analysis
             Look for:
-            - Overly complex logic that could be simplified
+            - Overly complex logic that could be simplified or decomposed
             - Poor naming or unclear intent
             - Missing edge case handling
             - Unnecessary abstractions or over-engineering
             - Dead code or unused imports
 
-            ## Task 3: Efficiency
+            ### Category 3: Efficiency Analysis
             Look for:
             - Unnecessary allocations or copies
             - N+1 query patterns or redundant I/O
@@ -248,7 +259,34 @@ public enum BuiltInSkills {
             - Inefficient data structures for the access pattern
             - Unnecessary re-computation
 
-            After all three analyses complete, fix any issues found. Prioritize by impact.
+            ## Step 3: Report findings with specific file:line references and before/after comparisons
+
+            For each finding, you MUST:
+            1. Reference the exact location using the format `path/to/file.swift:行号` (file name and line number)
+            2. Provide a before and after comparison example showing the current code and the simplified version
+
+            Structure each finding as follows:
+
+            **Finding: [Brief Title]**
+            Location: `path/to/file.swift:行号`
+            Category: Reuse / Quality / Efficiency
+            Before (current code):
+            ```
+            // current implementation
+            ```
+            After (simplified version):
+            ```
+            // simplified implementation
+            ```
+
+            Group findings by category (Reuse, Quality, Efficiency) and prioritize by impact within each category.
+
+            ## Important guidelines
+
+            - This is a read-only analysis skill. Only analyze and report findings — do not modify any files.
+            - Every finding must include both file name and line number in `path/to/file.swift:行号` format.
+            - Each finding must include a before/after comparison example.
+            - If no simplification opportunities are found, report: "No simplification opportunities found in the current changes."
             """
         )
     }
