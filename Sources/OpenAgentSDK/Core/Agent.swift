@@ -271,7 +271,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                 // Session auto-save on error: persist whatever messages we have so far
                 if let sessionStore = options.sessionStore, let sessionId = options.sessionId {
                     let metadata = PartialSessionMetadata(
-                        cwd: options.cwd ?? "",
+                        cwd: options.cwd ?? FileManager.default.currentDirectoryPath,
                         model: model,
                         summary: nil
                     )
@@ -361,7 +361,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                         toolUseBlocks: toolUseBlocks,
                         tools: registeredTools,
                         context: ToolContext(
-                            cwd: options.cwd ?? "",
+                            cwd: options.cwd ?? FileManager.default.currentDirectoryPath,
                             agentSpawner: spawner,
                             mailboxStore: options.mailboxStore,
                             teamStore: options.teamStore,
@@ -490,7 +490,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
         let capturedClient = client
         let capturedMaxBudgetUsd = options.maxBudgetUsd
         let capturedToolProtocols: [ToolProtocol] = options.tools ?? []
-        let capturedCwd = options.cwd ?? ""
+        let capturedCwd = options.cwd ?? FileManager.default.currentDirectoryPath
         let capturedRetryConfig = options.retryConfig ?? RetryConfig.default
         let capturedApiKey = options.apiKey ?? ""
         let capturedBaseURL = options.baseURL
