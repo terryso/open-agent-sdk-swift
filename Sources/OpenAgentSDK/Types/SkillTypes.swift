@@ -291,35 +291,69 @@ public enum BuiltInSkills {
         )
     }
 
-    /// Debug skill: systematic debugging of an issue using structured investigation.
+    /// Debug skill: analyzes errors, identifies root causes, and provides fix suggestions.
     public static var debug: Skill {
         Skill(
             name: "debug",
-            description: "Systematic debugging of an issue using structured investigation.",
+            description: "Analyze errors and investigate issues to identify root causes and provide diagnostic fix suggestions.",
             aliases: ["investigate", "diagnose"],
             userInvocable: true,
+            toolRestrictions: [.read, .grep, .glob, .bash],
             promptTemplate: """
-            Debug the described issue using a systematic approach:
+            Investigate and diagnose the described issue using a systematic approach. Follow these steps:
 
-            1. **Reproduce**: Understand and reproduce the issue
-               - Read relevant error messages or logs
-               - Identify the failing component
+            ## Step 1: Understand the issue
 
-            2. **Investigate**: Trace the root cause
-               - Read the relevant source code
-               - Add logging or use debugging tools if needed
-               - Check recent changes that might have introduced the issue (`git log --oneline -20`)
+            If the user has provided an error message, stack trace, or failure description, read it carefully to understand what went wrong.
 
-            3. **Hypothesize**: Form a theory about the cause
-               - State your hypothesis clearly before attempting a fix
+            If no specific error message or failure description is provided, ask the user to describe the issue or provide relevant error output, logs, or unexpected behavior details. You can also look for recent build outputs or test results to identify what failed.
 
-            4. **Fix**: Implement the minimal fix
-               - Make the smallest change that resolves the issue
-               - Don't refactor unrelated code
+            Identify the type of issue:
+            - **Build failure / compilation error**: The project fails to compile. Focus on compiler error messages, missing imports, type mismatches, and syntax errors.
+            - **Runtime crash / runtime error**: The program crashes or throws an exception at runtime. Focus on stack traces, signal information, and crash logs.
+            - **Logic bug / incorrect behavior**: The program runs but produces wrong results. Focus on the expected vs actual behavior.
 
-            5. **Verify**: Confirm the fix works
-               - Run relevant tests
-               - Check for regressions
+            ## Step 2: Gather information using available tools
+
+            Use the available tools to investigate:
+
+            - Use **Read** to examine relevant source files identified from the error message or stack trace.
+            - Use **Grep** to search for related patterns, function definitions, variable usages, or error strings across the codebase.
+            - Use **Glob** to find files matching patterns mentioned in the error (e.g., file names from a stack trace).
+            - Use **Bash** to run diagnostic commands such as `git log --oneline -20` to check recent changes, build commands to reproduce errors, or test commands to verify behavior.
+
+            ## Step 3: Analyze and identify root cause
+
+            Based on the gathered information, perform root cause analysis:
+
+            - Trace the error from its symptom back to its origin.
+            - Identify the specific code that is incorrect, missing, or misconfigured.
+            - Determine why the error occurs (e.g., wrong logic, missing null check, incorrect assumption).
+
+            **If there are multiple root causes**, list them all, sorted from most likely to least likely. For each possible root cause, explain your reasoning and the evidence that supports it. Order root causes by descending likelihood (most likely first, least likely last).
+
+            Every finding must reference the specific file name and line number using the format: `path/to/file.swift:行号`
+
+            ## Step 4: Report findings with structured output
+
+            Present your findings in three sections:
+
+            ### Root Cause
+            Provide a clear explanation of the root cause (or multiple possible root causes, ordered from most likely to least likely). For each root cause, reference the exact file name and line number where the issue originates using the format `path/to/file.swift:行号`.
+
+            ### Reproduction Steps
+            Describe the steps to reproduce the issue, if applicable. Include any commands, inputs, or conditions needed to trigger the error.
+
+            ### Suggested Fix
+            For each identified root cause, provide a specific fix suggestion explaining what change should be made and why. Reference the file name and line number for each suggested fix. Do not make any code changes — only describe the recommended resolution.
+
+            ## Important guidelines
+
+            - This is a read-only diagnostic skill. Only investigate and report findings — do not modify any files.
+            - Every finding must include both file name and line number in `path/to/file.swift:行号` format.
+            - Handle build failure / compilation error scenarios by focusing on compiler error messages and type checking.
+            - Handle runtime crash scenarios by focusing on stack traces, exception types, and signal information.
+            - When multiple possible root causes exist, always sort them by likelihood from most likely to least likely.
             """
         )
     }
