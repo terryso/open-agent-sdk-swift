@@ -358,17 +358,17 @@ public enum BuiltInSkills {
         )
     }
 
-    /// Test skill: runs tests and analyzes failures.
+    /// Test skill: generates and executes test cases with coverage analysis.
     ///
     /// The `isAvailable` closure checks whether a test framework is present
     /// in the current working directory.
     public static var test: Skill {
         Skill(
             name: "test",
-            description: "Run tests and analyze failures, fixing any issues found.",
+            description: "Generate and execute test cases, analyze test results, and provide coverage suggestions.",
             aliases: ["run-tests"],
             userInvocable: true,
-            toolRestrictions: [.bash, .read, .write, .edit, .glob, .grep],
+            toolRestrictions: [.bash, .read, .write, .glob, .grep],
             isAvailable: {
                 // Check for common test framework indicators in the current directory
                 let cwd = FileManager.default.currentDirectoryPath
@@ -389,23 +389,39 @@ public enum BuiltInSkills {
                 return false
             },
             promptTemplate: """
-            Run the project's test suite and analyze the results:
+            You are a test engineering agent. Your task is to generate test cases, execute them, and report results with coverage suggestions.
 
-            1. **Discover**: Find the test runner configuration
-               - Look for Package.swift, jest.config, vitest.config, pytest.ini, etc.
-               - Identify the appropriate test command
+            ## Workflow
 
-            2. **Execute**: Run the tests
-               - Run the full test suite or specific tests if specified
-               - Capture output including failures and errors
+            Follow these steps in order:
 
-            3. **Analyze**: If tests fail:
-               - Read the failing test to understand what it expects
-               - Read the source code being tested
-               - Identify why the test is failing
-               - Fix the issue (in tests or source as appropriate)
+            1. **Read Source Files**: Use the Read tool to examine the source files you need to test. Understand the public API, function signatures, parameter types, return types, and documented behavior.
 
-            4. **Re-verify**: Run the failing tests again to confirm the fix
+            2. **Find Existing Tests**: Use the Glob tool to locate existing test files (e.g., `Tests/**/*Tests.swift`, `**/*.test.*`). Use Grep to search for existing test coverage of the target code. Analyze what is already covered and identify gaps.
+
+            3. **Generate Test Cases**: Write test cases that comprehensively cover:
+               - **Normal path / happy path**: Verify expected behavior with valid inputs.
+               - **Boundary conditions / edge cases**: Test with empty inputs, maximum values, minimum values, nil/optional values, and other boundary conditions.
+               - **Error handling / error path**: Verify that errors are thrown correctly, error messages are accurate, and error recovery works as expected.
+               Each test case should have a clear name describing the scenario it validates.
+
+            4. **Create/Update Test Files**: Use the Write tool to create new test files or update existing ones with the generated test cases. Follow the project's existing test file naming conventions and directory structure.
+
+            5. **Run Tests**: Use the Bash tool to execute the test suite (e.g., `swift test`, `xcodebuild test`, `npm test`). Capture the full test output including pass/fail status, assertion messages, and any runtime errors.
+
+            6. **Report Results**: Provide a structured output containing:
+               - **Generated test code**: The test cases that were created or updated.
+               - **Test result / execution result**: The complete test execution output showing pass/fail counts, failure details, and timing information.
+               - **Coverage suggestions**: Recommendations for improving test coverage, including specific areas that lack testing and suggested additional test cases.
+
+            ## Output Format
+
+            For every finding and reference, always include the **file name** and **line number** in the format `path/to/file.swift:行号`. Every assertion, finding, or recommendation must reference the specific file names and line numbers where the relevant code resides.
+
+            ## Guidelines
+
+            - If tests fail, analyze the failure, update the test file, and re-run.
+            - Provide coverage analysis at the end, identifying untested paths and suggesting additional tests.
             """
         )
     }
