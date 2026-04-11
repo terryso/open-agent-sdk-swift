@@ -151,13 +151,26 @@ public actor WorktreeStore {
 
         do {
             try process.run()
-            process.waitUntilExit()
         } catch {
             return (exitCode: 1, stdout: "", stderr: "Failed to execute git: \(error.localizedDescription)")
         }
 
-        let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
-        let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+        // Read pipe data using throwing API before waitUntilExit() to avoid
+        // "Bad file descriptor" NSException crash under concurrent load.
+        // readToEnd() blocks until EOF (process exits), so waitUntilExit()
+        // returns immediately afterward.
+        let stdoutData: Data
+        let stderrData: Data
+        do {
+            stdoutData = try stdoutPipe.fileHandleForReading.readToEnd() ?? Data()
+            stderrData = try stderrPipe.fileHandleForReading.readToEnd() ?? Data()
+        } catch {
+            process.waitUntilExit()
+            return (exitCode: process.terminationStatus, stdout: "", stderr: "Pipe read error: \(error)")
+        }
+
+        process.waitUntilExit()
+
         let stdout = String(data: stdoutData, encoding: .utf8) ?? ""
         let stderr = String(data: stderrData, encoding: .utf8) ?? ""
 
