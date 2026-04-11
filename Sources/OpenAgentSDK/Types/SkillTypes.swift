@@ -139,26 +139,30 @@ public struct Skill: Sendable {
 /// registry.register(BuiltInSkills.commit)
 /// ```
 public enum BuiltInSkills {
-    /// Commit skill: creates a git commit with a well-crafted message.
+    /// Commit skill: analyzes changes and suggests a well-crafted commit message.
     public static var commit: Skill {
         Skill(
             name: "commit",
-            description: "Create a git commit with a well-crafted message based on staged changes.",
+            description: "Analyze staged and unstaged changes, then suggest a well-crafted git commit message.",
             aliases: ["ci"],
             userInvocable: true,
             toolRestrictions: [.bash, .read, .glob, .grep],
             promptTemplate: """
-            Create a git commit for the current changes. Follow these steps:
+            Analyze the current changes and suggest a git commit message. Follow these steps:
 
-            1. Run `git status` and `git diff --cached` to understand what's staged
-            2. If nothing is staged, run `git diff` to see unstaged changes and suggest what to stage
-            3. Analyze the changes and draft a concise commit message that:
-               - Uses imperative mood ("Add feature" not "Added feature")
-               - Summarizes the "why" not just the "what"
-               - Keeps the first line under 72 characters
-               - Adds a body with details if the change is complex
-            4. Create the commit
+            1. Run `git status --short` to get a concise overview of changed files.
+            2. Run `git diff --cached` to inspect staged changes.
+            3. If `git diff --cached` is empty (nothing is staged), check for unstaged changes:
+               - Run `git diff` to see unstaged changes.
+               - If unstaged changes exist, inform the user: "No staged changes found. Please run `git add` on the relevant files first." and list the specific unstaged files.
+               - If no changes exist at all (both `git diff --cached` and `git diff` are empty), inform the user: "Nothing to commit — no changes detected." and suggest creating or modifying files first.
+            4. If staged changes exist, analyze them and draft a commit message:
+               - Use imperative mood (e.g., "Add feature" not "Added feature").
+               - Keep the first line (title) under 72 characters.
+               - For complex changes, use a multi-paragraph format: title + blank line + body with details.
+               - Summarize the "why" not just the "what".
 
+            Do NOT actually execute `git commit`. Only output the suggested commit message.
             Do NOT push to remote unless explicitly asked.
             """
         )
