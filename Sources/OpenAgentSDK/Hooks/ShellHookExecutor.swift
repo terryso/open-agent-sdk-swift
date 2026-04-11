@@ -90,7 +90,9 @@ public enum ShellHookExecutor {
 
             // Read stdout incrementally
             stdoutPipe.fileHandleForReading.readabilityHandler = { handler in
-                accumulator.stdoutData.append(handler.availableData)
+                if let data = try? handler.availableData {
+                    accumulator.stdoutData.append(data)
+                }
             }
 
             // Timeout: terminate process if it exceeds the limit
@@ -106,7 +108,9 @@ public enum ShellHookExecutor {
             // Termination handler: process output
             process.terminationHandler = { _ in
                 stdoutPipe.fileHandleForReading.readabilityHandler = nil
-                accumulator.stdoutData.append(stdoutPipe.fileHandleForReading.readDataToEndOfFile())
+                if let remaining = try? stdoutPipe.fileHandleForReading.readDataToEndOfFile() {
+                    accumulator.stdoutData.append(remaining)
+                }
 
                 guard !accumulator.resumed else { return }
                 accumulator.resumed = true
