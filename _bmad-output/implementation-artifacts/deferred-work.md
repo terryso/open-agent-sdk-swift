@@ -42,3 +42,8 @@
 ## Deferred from: code review of 10-3-prompt-api-example (2026-04-10)
 
 - **No safety warning about destructive tools with bypassPermissions** — PromptAPIExample registers Write/Edit/Bash tools with bypassPermissions. All examples in the project follow this pattern. Pre-existing design choice, not introduced by this story
+
+## Deferred from: code review of 11-4-built-in-skill-review (2026-04-11)
+
+- **No guidance for binary/conflict diffs in promptTemplate** — The review promptTemplate does not instruct the agent how to handle `Binary files differ` output or merge conflict markers (`<<<<<<<`). Not in epics skeleton, pre-existing gap. [SkillTypes.swift:182-214]
+- **Missing untracked file handling in three-level strategy** — `git diff`, `git diff --cached`, and `git diff HEAD~1` do not show untracked (new, never-staged) files. The epics skeleton uses the same three-level strategy without untracked file support. [SkillTypes.swift:184-190]

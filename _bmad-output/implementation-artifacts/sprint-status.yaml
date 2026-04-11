@@ -1,5 +1,5 @@
 # generated: 2026-04-04
-# last_updated: 2026-04-11 (story 11-3 pipeline complete)
+# last_updated: 2026-04-11 (story 11-4 review passed)
 # project: open-agent-sdk-swift
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-04-04
-last_updated: 2026-04-11 (story 11-3 review)
+last_updated: 2026-04-11 (story 11-4 review passed)
 project: open-agent-sdk-swift
 project_key: NOKEY
 tracking_system: file-system
@@ -141,7 +141,7 @@ development_status:
   11-1-skill-type-definition-skill-registry: done
   11-2-skill-tool-skill-execution: done
   11-3-built-in-skill-commit: done
-  11-4-built-in-skill-review: backlog
+  11-4-built-in-skill-review: done
   11-5-built-in-skill-simplify: backlog
   11-6-built-in-skill-debug: backlog
   11-7-built-in-skill-test: backlog

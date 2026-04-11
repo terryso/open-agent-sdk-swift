@@ -168,30 +168,50 @@ public enum BuiltInSkills {
         )
     }
 
-    /// Review skill: reviews code changes for issues and improvements.
+    /// Review skill: reviews code changes across five dimensions with severity-ordered output.
     public static var review: Skill {
         Skill(
             name: "review",
-            description: "Review code changes for correctness, security, performance, and style issues.",
+            description: "Review code changes for correctness, security, performance, style, and test coverage issues, with findings ordered by severity.",
             aliases: ["review-pr", "cr"],
             userInvocable: true,
             toolRestrictions: [.bash, .read, .glob, .grep],
             promptTemplate: """
             Review the current code changes for potential issues. Follow these steps:
 
-            1. Run `git diff` to see uncommitted changes, or `git diff main...HEAD` for branch changes
-            2. For each changed file, analyze:
-               - **Correctness**: Logic errors, edge cases, off-by-one errors
-               - **Security**: Injection vulnerabilities, auth issues, data exposure
-               - **Performance**: N+1 queries, unnecessary allocations, blocking I/O
-               - **Style**: Naming, consistency with surrounding code, readability
-               - **Testing**: Are the changes adequately tested?
-            3. Provide a summary with:
-               - Critical issues (must fix)
-               - Suggestions (nice to have)
-               - Questions (need clarification)
+            ## Step 1: Obtain the diff using the three-level change acquisition strategy
 
-            Be specific: reference file names, line numbers, and suggest fixes.
+            Try each level in priority order and use the FIRST one that returns output:
+
+            1. `git diff` — unstaged changes (highest priority)
+            2. `git diff --cached` — staged but uncommitted changes
+            3. `git diff HEAD~1` — changes in the most recent commit
+
+            If all three commands return empty output (no changes to review), inform the user that there are no changes to review and stop.
+
+            ## Step 2: Analyze each changed file across five dimensions
+
+            For every file in the diff, analyze:
+
+            - **Correctness**: Logic errors, edge cases, off-by-one errors, incorrect algorithms, missing null checks
+            - **Security**: Injection vulnerabilities, authentication issues, data exposure, hardcoded secrets, improper input validation
+            - **Performance**: N+1 queries, unnecessary allocations, blocking I/O, inefficient data structures, redundant computation
+            - **Style**: Naming conventions, consistency with surrounding code, readability, Swift idioms, proper access control
+            - **Testing coverage**: Are the changes adequately covered by tests? Are edge cases tested? Are new paths exercised?
+
+            ## Step 3: Report findings ordered by severity
+
+            Present all findings grouped and ordered by severity (highest to lowest):
+
+            1. **Security** — vulnerabilities, auth issues, data exposure
+            2. **Correctness** — logic errors, incorrect behavior
+            3. **Performance** — inefficient patterns, resource waste
+            4. **Style** — readability, naming, consistency
+            5. **Testing** — missing test coverage, untested edge cases
+
+            For each finding, use the exact format: `path/to/file.swift:行号` (file:line) to reference the specific location.
+
+            Be specific: always include the file name and line number for every finding, and suggest concrete fixes.
             """
         )
     }
