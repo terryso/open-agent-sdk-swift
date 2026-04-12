@@ -66,6 +66,12 @@ public struct SDKConfiguration: Sendable, Equatable, CustomStringConvertible,
     /// Defaults to `nil` (auto-discover).
     public var projectRoot: String?
 
+    /// Minimum log level for SDK-internal logging. Defaults to ``LogLevel/none`` (silent).
+    public var logLevel: LogLevel
+
+    /// Output destination for log entries. Defaults to ``LogOutput/console`` (stderr).
+    public var logOutput: LogOutput
+
     /// Default model used when none is specified.
     public static let defaultModel = "claude-sonnet-4-6"
 
@@ -101,7 +107,9 @@ public struct SDKConfiguration: Sendable, Equatable, CustomStringConvertible,
         fileCacheMaxSizeBytes: Int = 25 * 1024 * 1024,
         fileCacheMaxEntrySizeBytes: Int = 5 * 1024 * 1024,
         gitCacheTTL: TimeInterval = 5.0,
-        projectRoot: String? = nil
+        projectRoot: String? = nil,
+        logLevel: LogLevel = .none,
+        logOutput: LogOutput = .console
     ) {
         self.apiKey = Self.sanitizeAPIKey(apiKey)
         self.model = model
@@ -113,6 +121,8 @@ public struct SDKConfiguration: Sendable, Equatable, CustomStringConvertible,
         self.fileCacheMaxEntrySizeBytes = fileCacheMaxEntrySizeBytes
         self.gitCacheTTL = gitCacheTTL
         self.projectRoot = projectRoot
+        self.logLevel = logLevel
+        self.logOutput = logOutput
     }
 
     // MARK: - Environment Variable Parsing
@@ -170,7 +180,9 @@ public struct SDKConfiguration: Sendable, Equatable, CustomStringConvertible,
             fileCacheMaxSizeBytes: overrides.fileCacheMaxSizeBytes,
             fileCacheMaxEntrySizeBytes: overrides.fileCacheMaxEntrySizeBytes,
             gitCacheTTL: overrides.gitCacheTTL,
-            projectRoot: overrides.projectRoot
+            projectRoot: overrides.projectRoot,
+            logLevel: overrides.logLevel,
+            logOutput: overrides.logOutput
         )
     }
 
@@ -185,7 +197,9 @@ public struct SDKConfiguration: Sendable, Equatable, CustomStringConvertible,
             + "fileCacheMaxSizeBytes: \(fileCacheMaxSizeBytes), "
             + "fileCacheMaxEntrySizeBytes: \(fileCacheMaxEntrySizeBytes), "
             + "gitCacheTTL: \(gitCacheTTL), "
-            + "projectRoot: \(projectRoot.map { "\"\($0)\"" } ?? "nil"))"
+            + "projectRoot: \(projectRoot.map { "\"\($0)\"" } ?? "nil"), "
+            + "logLevel: \(logLevel.description), "
+            + "logOutput: \(logOutputDescription))"
     }
 
     /// A debug representation with the API key masked as `"***"`.
@@ -197,7 +211,21 @@ public struct SDKConfiguration: Sendable, Equatable, CustomStringConvertible,
             + "fileCacheMaxSizeBytes: \(fileCacheMaxSizeBytes), "
             + "fileCacheMaxEntrySizeBytes: \(fileCacheMaxEntrySizeBytes), "
             + "gitCacheTTL: \(gitCacheTTL), "
-            + "projectRoot: \(projectRoot.map { "\"\($0)\"" } ?? "nil"))"
+            + "projectRoot: \(projectRoot.map { "\"\($0)\"" } ?? "nil"), "
+            + "logLevel: \(logLevel.description), "
+            + "logOutput: \(logOutputDescription))"
+    }
+
+    /// Description of logOutput for display (masks custom closure).
+    private var logOutputDescription: String {
+        switch logOutput {
+        case .console:
+            return ".console"
+        case .file(let url):
+            return ".file(\(url.path))"
+        case .custom:
+            return ".custom(<closure>)"
+        }
     }
 
     // MARK: - Internal Helpers

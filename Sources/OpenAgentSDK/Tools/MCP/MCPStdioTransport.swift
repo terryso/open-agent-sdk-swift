@@ -31,8 +31,8 @@ public actor MCPStdioTransport: Transport {
 
     // MARK: - Transport Protocol Properties
 
-    /// Logger for transport events.
-    public nonisolated let logger: Logger
+    /// Logger for transport events (SwiftLog, not SDK's Logger).
+    public nonisolated let logger: Logging.Logger
 
     /// Session ID (nil for stdio -- single connection transport).
     public nonisolated let sessionId: String? = nil
@@ -70,9 +70,9 @@ public actor MCPStdioTransport: Transport {
     /// - Parameters:
     ///   - config: The stdio MCP server configuration.
     ///   - logger: Optional logger for transport events.
-    public init(config: McpStdioConfig, logger: Logger? = nil) {
+    public init(config: McpStdioConfig, logger: Logging.Logger? = nil) {
         self.config = config
-        self.logger = logger ?? Logger(
+        self.logger = logger ?? Logging.Logger(
             label: "mcp.transport.stdio.client",
             factory: { _ in SwiftLogNoOpLogHandler() }
         )
@@ -230,7 +230,7 @@ public actor MCPStdioTransport: Transport {
                         }
 
                         if !messageData.isEmpty {
-                            log.trace("Message received", metadata: ["size": "\(messageData.count)"])
+                            log.trace("Message received", metadata: ["size": Logging.Logger.MetadataValue.string("\(messageData.count)")])
                             continuation.yield(TransportMessage(data: Data(messageData)))
                         }
                     }
@@ -239,7 +239,7 @@ public actor MCPStdioTransport: Transport {
                     continue
                 } catch {
                     if !_Concurrency.Task.isCancelled {
-                        log.error("Read error", metadata: ["error": .string("\(error)")])
+                        log.error("Read error", metadata: ["error": Logging.Logger.MetadataValue.string("\(error)")])
                     }
                     break
                 }
@@ -305,7 +305,7 @@ public actor MCPStdioTransport: Transport {
                 }
             }
         } catch {
-            logger.debug("which lookup failed, falling back to file path", metadata: ["command": .string(command)])
+            logger.debug("which lookup failed, falling back to file path", metadata: ["command": Logging.Logger.MetadataValue.string(command)])
         }
 
         return URL(fileURLWithPath: command)

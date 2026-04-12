@@ -80,6 +80,11 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
         self.maxTurns = options.maxTurns
         self.maxTokens = options.maxTokens
 
+        // Configure Logger from agent options if non-default values are provided.
+        if options.logLevel != .none || options.logOutput != .console {
+            Logger.configure(level: options.logLevel, output: options.logOutput)
+        }
+
         // Create the appropriate client based on provider.
         // Empty API key fallback — calls will fail naturally if no key was provided.
         let apiKey = options.apiKey ?? ""

@@ -115,6 +115,12 @@ public struct AgentOptions: Sendable {
     /// Defaults to `nil` (auto-discover).
     public var projectRoot: String?
 
+    /// Minimum log level for SDK-internal logging. Defaults to ``LogLevel/none`` (silent).
+    public var logLevel: LogLevel
+
+    /// Output destination for log entries. Defaults to ``LogOutput/console`` (stderr).
+    public var logOutput: LogOutput
+
     public init(
         apiKey: String? = nil,
         model: String = "claude-sonnet-4-6",
@@ -148,7 +154,9 @@ public struct AgentOptions: Sendable {
         fileCacheMaxSizeBytes: Int = 25 * 1024 * 1024,
         fileCacheMaxEntrySizeBytes: Int = 5 * 1024 * 1024,
         gitCacheTTL: TimeInterval = 5.0,
-        projectRoot: String? = nil
+        projectRoot: String? = nil,
+        logLevel: LogLevel = .none,
+        logOutput: LogOutput = .console
     ) {
         self.apiKey = apiKey
         self.model = model
@@ -183,6 +191,8 @@ public struct AgentOptions: Sendable {
         self.fileCacheMaxEntrySizeBytes = fileCacheMaxEntrySizeBytes
         self.gitCacheTTL = gitCacheTTL
         self.projectRoot = projectRoot
+        self.logLevel = logLevel
+        self.logOutput = logOutput
     }
 
     /// Create AgentOptions from an SDKConfiguration, using its resolved values
@@ -224,6 +234,8 @@ public struct AgentOptions: Sendable {
         self.fileCacheMaxEntrySizeBytes = config.fileCacheMaxEntrySizeBytes
         self.gitCacheTTL = config.gitCacheTTL
         self.projectRoot = config.projectRoot
+        self.logLevel = config.logLevel
+        self.logOutput = config.logOutput
     }
 }
 
