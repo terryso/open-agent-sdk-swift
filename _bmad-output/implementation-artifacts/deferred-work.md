@@ -51,3 +51,7 @@
 ## Deferred from: code review of 12-2-cache-tool-and-compaction-integration (2026-04-12)
 
 - **modifiedPaths grows unboundedly in FileCache** — Evicted entries remain in modifiedPaths dictionary; the dictionary is capped only by clear(). Acceptable for compaction use case (knowing what files were touched), but should be capped in a future optimization pass to prevent unbounded memory growth in very long sessions [FileCache.swift:124]
+
+## Deferred from: code review of 12-4-project-document-discovery (2026-04-12)
+
+- **homeDirectory not controllable from buildSystemPrompt()** — Tests that exercise buildSystemPrompt() directly cannot isolate from the developer's real ~/.claude/CLAUDE.md. Current workaround uses contains assertions instead of equality. Pragmatic for now, but could be improved with a protocol-based injection pattern in a future refactor.

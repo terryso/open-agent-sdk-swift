@@ -43,6 +43,10 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
     /// Per-agent instance; cache lifecycle matches the Agent instance.
     private let gitContextCollector = GitContextCollector()
 
+    /// Project document discovery for injecting project-level instructions into system prompts.
+    /// Per-agent instance; cache lifecycle matches the Agent instance.
+    private let projectDocumentDiscovery = ProjectDocumentDiscovery()
+
     // MARK: - Initialization
 
     /// Create an Agent with the given options.
@@ -174,13 +178,30 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
             ttl: options.gitCacheTTL
         )
 
-        if let basePrompt, let gitContext {
-            return basePrompt + "\n" + gitContext
-        } else if let gitContext {
-            return gitContext
-        } else {
-            return basePrompt
+        let projectContext = projectDocumentDiscovery.collectProjectContext(
+            cwd: cwd,
+            explicitProjectRoot: options.projectRoot
+        )
+
+        // Build parts in order: systemPrompt -> git-context -> global-instructions -> project-instructions
+        var parts: [String] = []
+        if let basePrompt {
+            parts.append(basePrompt)
         }
+        if let gitContext {
+            parts.append(gitContext)
+        }
+        if let globalInstructions = projectContext.globalInstructions {
+            parts.append("<global-instructions>\n\(globalInstructions)\n</global-instructions>")
+        }
+        if let projectInstructions = projectContext.projectInstructions {
+            parts.append("<project-instructions>\n\(projectInstructions)\n</project-instructions>")
+        }
+
+        if parts.isEmpty {
+            return nil
+        }
+        return parts.joined(separator: "\n")
     }
 
     /// Build the messages array for an API request from a user prompt.

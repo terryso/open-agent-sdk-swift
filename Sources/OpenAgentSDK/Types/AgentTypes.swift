@@ -109,6 +109,12 @@ public struct AgentOptions: Sendable {
     /// Set to `0` to disable caching. Defaults to 5.0 seconds.
     public var gitCacheTTL: TimeInterval
 
+    /// Explicit project root directory for instruction file discovery.
+    /// When `nil`, the SDK discovers the project root by traversing upward
+    /// from the current working directory looking for a `.git` directory.
+    /// Defaults to `nil` (auto-discover).
+    public var projectRoot: String?
+
     public init(
         apiKey: String? = nil,
         model: String = "claude-sonnet-4-6",
@@ -141,7 +147,8 @@ public struct AgentOptions: Sendable {
         fileCacheMaxEntries: Int = 100,
         fileCacheMaxSizeBytes: Int = 25 * 1024 * 1024,
         fileCacheMaxEntrySizeBytes: Int = 5 * 1024 * 1024,
-        gitCacheTTL: TimeInterval = 5.0
+        gitCacheTTL: TimeInterval = 5.0,
+        projectRoot: String? = nil
     ) {
         self.apiKey = apiKey
         self.model = model
@@ -175,6 +182,7 @@ public struct AgentOptions: Sendable {
         self.fileCacheMaxSizeBytes = fileCacheMaxSizeBytes
         self.fileCacheMaxEntrySizeBytes = fileCacheMaxEntrySizeBytes
         self.gitCacheTTL = gitCacheTTL
+        self.projectRoot = projectRoot
     }
 
     /// Create AgentOptions from an SDKConfiguration, using its resolved values
@@ -215,6 +223,7 @@ public struct AgentOptions: Sendable {
         self.fileCacheMaxSizeBytes = config.fileCacheMaxSizeBytes
         self.fileCacheMaxEntrySizeBytes = config.fileCacheMaxEntrySizeBytes
         self.gitCacheTTL = config.gitCacheTTL
+        self.projectRoot = config.projectRoot
     }
 }
 

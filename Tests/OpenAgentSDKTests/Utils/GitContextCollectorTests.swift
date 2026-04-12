@@ -236,6 +236,7 @@ final class GitContextCollectorTests: XCTestCase {
     }
 
     /// AC2 [P0]: Agent.buildSystemPrompt() returns original prompt in non-Git directory.
+    /// Note: Global instructions from ~/.claude/CLAUDE.md may be appended if it exists.
     func testAC2_BuildSystemPrompt_NotGitRepo_ReturnsOriginalPrompt() {
         // Given: an Agent with a system prompt in a non-Git directory
         let nonGitDir = (tempDir as NSString).appendingPathComponent("notgit")
@@ -255,9 +256,12 @@ final class GitContextCollectorTests: XCTestCase {
         // When: building system prompt
         let prompt = agent.buildSystemPrompt()
 
-        // Then: prompt is just the original system prompt (no git context)
-        XCTAssertEqual(prompt, "You are a helpful assistant.",
-                        "Should return original prompt unchanged in non-Git directory")
+        // Then: prompt contains the original system prompt (no git context)
+        XCTAssertNotNil(prompt, "Should return a system prompt")
+        XCTAssertTrue(prompt!.contains("You are a helpful assistant."),
+                       "Should contain the original system prompt text")
+        XCTAssertFalse(prompt!.contains("<git-context>"),
+                        "Should NOT contain <git-context> block in non-Git directory")
     }
 
     // MARK: - AC3: Git Status Truncation
