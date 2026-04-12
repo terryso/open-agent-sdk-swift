@@ -225,6 +225,12 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
         var compactState = createAutoCompactState()
         // Skill system: create restriction stack once before the loop so it persists across turns
         let restrictionStack = options.skillRegistry != nil ? ToolRestrictionStack() : nil
+        // File cache: shared across all tool executions in this agent session
+        let fileCache = FileCache(
+            maxEntries: options.fileCacheMaxEntries,
+            maxSizeBytes: options.fileCacheMaxSizeBytes,
+            maxEntrySizeBytes: options.fileCacheMaxEntrySizeBytes
+        )
 
         while turnCount < maxTurns {
             // Auto-compact if context is too large (FR9)
@@ -379,7 +385,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                             skillRegistry: options.skillRegistry,
                             restrictionStack: restrictionStack,
                             skillNestingDepth: restrictionStack?.nestingDepth ?? 0,
-                            maxSkillRecursionDepth: options.maxSkillRecursionDepth
+                            maxSkillRecursionDepth: options.maxSkillRecursionDepth,
+                            fileCache: fileCache
                         )
                     )
 
@@ -518,6 +525,12 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
         let capturedMaxSkillRecursionDepth = options.maxSkillRecursionDepth
         // Create restriction stack once so it persists across stream turns
         let capturedRestrictionStack = options.skillRegistry != nil ? ToolRestrictionStack() : nil
+        // File cache: shared across all tool executions in this stream session
+        let capturedFileCache = FileCache(
+            maxEntries: options.fileCacheMaxEntries,
+            maxSizeBytes: options.fileCacheMaxSizeBytes,
+            maxEntrySizeBytes: options.fileCacheMaxEntrySizeBytes
+        )
 
         // Build tool definitions for API call
         let capturedApiTools: [[String: Any]]? = {
@@ -915,7 +928,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                                     skillRegistry: capturedSkillRegistry,
                                     restrictionStack: capturedRestrictionStack,
                                     skillNestingDepth: capturedRestrictionStack?.nestingDepth ?? 0,
-                                    maxSkillRecursionDepth: capturedMaxSkillRecursionDepth
+                                    maxSkillRecursionDepth: capturedMaxSkillRecursionDepth,
+                                    fileCache: capturedFileCache
                                 )
                             )
 

@@ -84,8 +84,17 @@ public func createReadTool() -> ToolProtocol {
             )
         }
 
-        // Read file content
-        let content = try String(contentsOfFile: resolvedPath, encoding: .utf8)
+        // Check cache first (AC3: cache hit avoids disk I/O)
+        let content: String
+        if let cachedContent = context.fileCache?.get(resolvedPath) {
+            content = cachedContent
+        } else {
+            // Cache miss: read from disk
+            content = try String(contentsOfFile: resolvedPath, encoding: .utf8)
+            // Store in cache (respects maxEntrySizeBytes internally)
+            context.fileCache?.set(resolvedPath, content: content)
+        }
+
         let lines = content.components(separatedBy: "\n")
 
         // Apply pagination

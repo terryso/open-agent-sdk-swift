@@ -46,6 +46,15 @@ public struct SDKConfiguration: Sendable, Equatable, CustomStringConvertible,
     /// Maximum number of tokens per request.
     public var maxTokens: Int
 
+    /// Maximum number of entries in the file cache. Defaults to 100.
+    public var fileCacheMaxEntries: Int
+
+    /// Maximum total size of the file cache in bytes. Defaults to 25 MB.
+    public var fileCacheMaxSizeBytes: Int
+
+    /// Maximum size of a single file cache entry in bytes. Defaults to 5 MB.
+    public var fileCacheMaxEntrySizeBytes: Int
+
     /// Default model used when none is specified.
     public static let defaultModel = "claude-sonnet-4-6"
 
@@ -68,18 +77,27 @@ public struct SDKConfiguration: Sendable, Equatable, CustomStringConvertible,
     ///   - baseURL: Custom API base URL. Defaults to `nil`.
     ///   - maxTurns: Maximum agent loop turns. Defaults to `10`.
     ///   - maxTokens: Maximum tokens per request. Defaults to `16384`.
+    ///   - fileCacheMaxEntries: Maximum cached file entries. Defaults to `100`.
+    ///   - fileCacheMaxSizeBytes: Maximum total cache size in bytes. Defaults to `25 MB`.
+    ///   - fileCacheMaxEntrySizeBytes: Maximum single cache entry size in bytes. Defaults to `5 MB`.
     public init(
         apiKey: String? = nil,
         model: String = "claude-sonnet-4-6",
         baseURL: String? = nil,
         maxTurns: Int = 10,
-        maxTokens: Int = 16384
+        maxTokens: Int = 16384,
+        fileCacheMaxEntries: Int = 100,
+        fileCacheMaxSizeBytes: Int = 25 * 1024 * 1024,
+        fileCacheMaxEntrySizeBytes: Int = 5 * 1024 * 1024
     ) {
         self.apiKey = Self.sanitizeAPIKey(apiKey)
         self.model = model
         self.baseURL = baseURL
         self.maxTurns = maxTurns
         self.maxTokens = maxTokens
+        self.fileCacheMaxEntries = fileCacheMaxEntries
+        self.fileCacheMaxSizeBytes = fileCacheMaxSizeBytes
+        self.fileCacheMaxEntrySizeBytes = fileCacheMaxEntrySizeBytes
     }
 
     // MARK: - Environment Variable Parsing
@@ -132,7 +150,10 @@ public struct SDKConfiguration: Sendable, Equatable, CustomStringConvertible,
             model: overrides.model,
             baseURL: overrides.baseURL ?? env.baseURL,
             maxTurns: overrides.maxTurns,
-            maxTokens: overrides.maxTokens
+            maxTokens: overrides.maxTokens,
+            fileCacheMaxEntries: overrides.fileCacheMaxEntries,
+            fileCacheMaxSizeBytes: overrides.fileCacheMaxSizeBytes,
+            fileCacheMaxEntrySizeBytes: overrides.fileCacheMaxEntrySizeBytes
         )
     }
 
@@ -142,14 +163,20 @@ public struct SDKConfiguration: Sendable, Equatable, CustomStringConvertible,
     public var description: String {
         "SDKConfiguration(apiKey: \(maskedAPIKey), model: \"\(model)\", "
             + "baseURL: \(baseURL.map { "\"\($0)\"" } ?? "nil"), "
-            + "maxTurns: \(maxTurns), maxTokens: \(maxTokens))"
+            + "maxTurns: \(maxTurns), maxTokens: \(maxTokens), "
+            + "fileCacheMaxEntries: \(fileCacheMaxEntries), "
+            + "fileCacheMaxSizeBytes: \(fileCacheMaxSizeBytes), "
+            + "fileCacheMaxEntrySizeBytes: \(fileCacheMaxEntrySizeBytes))"
     }
 
     /// A debug representation with the API key masked as `"***"`.
     public var debugDescription: String {
         "SDKConfiguration(apiKey: \(maskedAPIKey), model: \"\(model)\", "
             + "baseURL: \(baseURL.map { "\"\($0)\"" } ?? "nil"), "
-            + "maxTurns: \(maxTurns), maxTokens: \(maxTokens))"
+            + "maxTurns: \(maxTurns), maxTokens: \(maxTokens), "
+            + "fileCacheMaxEntries: \(fileCacheMaxEntries), "
+            + "fileCacheMaxSizeBytes: \(fileCacheMaxSizeBytes), "
+            + "fileCacheMaxEntrySizeBytes: \(fileCacheMaxEntrySizeBytes))"
     }
 
     // MARK: - Internal Helpers

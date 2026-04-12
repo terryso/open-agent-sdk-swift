@@ -76,6 +76,9 @@ public func createWriteTool() -> ToolProtocol {
             )
         }
 
+        // Invalidate cache entry after successful write (AC5)
+        context.fileCache?.invalidate(resolvedPath)
+
         return ToolExecuteResult(
             content: "Successfully wrote \(input.content.count) characters to \(resolvedPath)",
             isError: false

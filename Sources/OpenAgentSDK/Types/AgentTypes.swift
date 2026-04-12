@@ -97,6 +97,12 @@ public struct AgentOptions: Sendable {
     /// Maximum allowed skill recursion depth. Defaults to 4.
     /// Prevents infinite loops when skills call other skills.
     public var maxSkillRecursionDepth: Int
+    /// Maximum number of entries in the file cache. Defaults to 100.
+    public var fileCacheMaxEntries: Int
+    /// Maximum total size of the file cache in bytes. Defaults to 25 MB.
+    public var fileCacheMaxSizeBytes: Int
+    /// Maximum size of a single file cache entry in bytes. Defaults to 5 MB.
+    public var fileCacheMaxEntrySizeBytes: Int
 
     public init(
         apiKey: String? = nil,
@@ -126,7 +132,10 @@ public struct AgentOptions: Sendable {
         sessionId: String? = nil,
         hookRegistry: HookRegistry? = nil,
         skillRegistry: SkillRegistry? = nil,
-        maxSkillRecursionDepth: Int = 4
+        maxSkillRecursionDepth: Int = 4,
+        fileCacheMaxEntries: Int = 100,
+        fileCacheMaxSizeBytes: Int = 25 * 1024 * 1024,
+        fileCacheMaxEntrySizeBytes: Int = 5 * 1024 * 1024
     ) {
         self.apiKey = apiKey
         self.model = model
@@ -156,6 +165,9 @@ public struct AgentOptions: Sendable {
         self.hookRegistry = hookRegistry
         self.skillRegistry = skillRegistry
         self.maxSkillRecursionDepth = maxSkillRecursionDepth
+        self.fileCacheMaxEntries = fileCacheMaxEntries
+        self.fileCacheMaxSizeBytes = fileCacheMaxSizeBytes
+        self.fileCacheMaxEntrySizeBytes = fileCacheMaxEntrySizeBytes
     }
 
     /// Create AgentOptions from an SDKConfiguration, using its resolved values
@@ -192,6 +204,9 @@ public struct AgentOptions: Sendable {
         self.hookRegistry = nil
         self.skillRegistry = nil
         self.maxSkillRecursionDepth = 4
+        self.fileCacheMaxEntries = config.fileCacheMaxEntries
+        self.fileCacheMaxSizeBytes = config.fileCacheMaxSizeBytes
+        self.fileCacheMaxEntrySizeBytes = config.fileCacheMaxEntrySizeBytes
     }
 }
 

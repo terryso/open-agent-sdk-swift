@@ -119,6 +119,9 @@ public func createEditTool() -> ToolProtocol {
             )
         }
 
+        // Invalidate cache entry after successful edit (AC5)
+        context.fileCache?.invalidate(resolvedPath)
+
         return ToolExecuteResult(
             content: "Successfully edited \(resolvedPath)",
             isError: false

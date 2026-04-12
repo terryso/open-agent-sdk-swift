@@ -91,6 +91,9 @@ public struct ToolContext: Sendable {
     /// Maximum allowed skill recursion depth. Defaults to 4.
     /// Configurable via AgentOptions.maxSkillRecursionDepth.
     public let maxSkillRecursionDepth: Int
+    /// Optional file cache for caching file contents across tool executions.
+    /// Injected by Core/ when the agent is created. Nil when file caching is not enabled.
+    public let fileCache: FileCache?
 
     public init(
         cwd: String,
@@ -110,7 +113,8 @@ public struct ToolContext: Sendable {
         skillRegistry: SkillRegistry? = nil,
         restrictionStack: ToolRestrictionStack? = nil,
         skillNestingDepth: Int = 0,
-        maxSkillRecursionDepth: Int = 4
+        maxSkillRecursionDepth: Int = 4,
+        fileCache: FileCache? = nil
     ) {
         self.cwd = cwd
         self.toolUseId = toolUseId
@@ -130,6 +134,7 @@ public struct ToolContext: Sendable {
         self.restrictionStack = restrictionStack
         self.skillNestingDepth = skillNestingDepth
         self.maxSkillRecursionDepth = maxSkillRecursionDepth
+        self.fileCache = fileCache
     }
 
     /// Returns a copy of this context with the toolUseId replaced.
@@ -150,7 +155,8 @@ public struct ToolContext: Sendable {
             skillRegistry: skillRegistry,
             restrictionStack: restrictionStack,
             skillNestingDepth: skillNestingDepth,
-            maxSkillRecursionDepth: maxSkillRecursionDepth
+            maxSkillRecursionDepth: maxSkillRecursionDepth,
+            fileCache: fileCache
         )
     }
 
@@ -174,7 +180,8 @@ public struct ToolContext: Sendable {
             skillRegistry: skillRegistry,
             restrictionStack: restrictionStack,
             skillNestingDepth: depth,
-            maxSkillRecursionDepth: maxSkillRecursionDepth
+            maxSkillRecursionDepth: maxSkillRecursionDepth,
+            fileCache: fileCache
         )
     }
 }
