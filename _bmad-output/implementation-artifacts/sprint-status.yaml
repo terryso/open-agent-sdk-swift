@@ -1,5 +1,5 @@
 # generated: 2026-04-04
-# last_updated: 2026-04-12 (story 12-1 code review complete)
+# last_updated: 2026-04-12 (story 12-2 code review complete)
 # project: open-agent-sdk-swift
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-04-04
-last_updated: 2026-04-12 (story 12-1 code review complete)
+last_updated: 2026-04-12 (story 12-2 code review complete)
 project: open-agent-sdk-swift
 project_key: NOKEY
 tracking_system: file-system
@@ -150,7 +150,7 @@ development_status:
   # Epic 12: 文件缓存与上下文注入
   epic-12: in-progress
   12-1-filecache-lru-cache-implementation: done
-  12-2-cache-tool-and-compaction-integration: backlog
+  12-2-cache-tool-and-compaction-integration: done
   12-3-git-status-injection: backlog
   12-4-project-document-discovery: backlog
   epic-12-retrospective: optional

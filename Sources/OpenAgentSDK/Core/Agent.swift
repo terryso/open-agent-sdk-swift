@@ -237,7 +237,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
             if shouldAutoCompact(messages: messages, model: model, state: compactState) {
                 let (newMessages, _, newState) = await compactConversation(
                     client: client, model: model,
-                    messages: messages, state: compactState
+                    messages: messages, state: compactState,
+                    fileCache: fileCache
                 )
                 messages = newMessages
                 compactState = newState
@@ -632,7 +633,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                     if shouldAutoCompact(messages: messages, model: capturedModel, state: compactState) {
                         let (newMessages, _, newState) = await compactConversation(
                             client: capturedClient, model: capturedModel,
-                            messages: messages, state: compactState
+                            messages: messages, state: compactState,
+                            fileCache: capturedFileCache
                         )
                         messages = newMessages
                         compactState = newState

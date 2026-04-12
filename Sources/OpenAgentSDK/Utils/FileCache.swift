@@ -119,6 +119,9 @@ public final class FileCache: @unchecked Sendable {
     private var head: ListNode?   // most recently accessed
     private var tail: ListNode?   // least recently accessed
     private var _stats = CacheStats()
+    /// Tracks file paths that have been modified (via set or invalidate) and when.
+    /// Used by compaction to determine which files changed since last compaction.
+    private var modifiedPaths: [String: Date] = [:]
 
     /// Current cache statistics.
     public var stats: CacheStats {
@@ -195,6 +198,9 @@ public final class FileCache: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
 
+        // Record modification time for compaction tracking
+        modifiedPaths[normalized] = Date()
+
         // Check single-entry size limit
         guard sizeBytes <= maxEntrySizeBytes else {
             _stats.oversizedSkipCount += 1
@@ -229,6 +235,10 @@ public final class FileCache: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
 
+        // Record modification time for compaction tracking
+        // (invalidate means the file was written/edited externally)
+        modifiedPaths[normalized] = Date()
+
         guard let node = map[normalized] else {
             return
         }
@@ -244,10 +254,32 @@ public final class FileCache: @unchecked Sendable {
         defer { lock.unlock() }
 
         map.removeAll()
+        modifiedPaths.removeAll()
         head = nil
         tail = nil
         _stats.totalEntries = 0
         _stats.totalSizeBytes = 0
+    }
+
+    /// Record that a disk read occurred.
+    ///
+    /// Called by tools (e.g., FileReadTool) when content is read from disk
+    /// rather than from the cache. Increments `stats.diskReadCount`.
+    public func recordDiskRead() {
+        lock.lock()
+        defer { lock.unlock() }
+        _stats.diskReadCount += 1
+    }
+
+    /// Return file paths that have been modified (via `set()` or `invalidate()`)
+    /// since the given date.
+    ///
+    /// - Parameter since: The cutoff date. Only paths modified after this date are returned.
+    /// - Returns: An array of file paths modified after `since`.
+    public func getModifiedFiles(since: Date) -> [String] {
+        lock.lock()
+        defer { lock.unlock() }
+        return modifiedPaths.filter { $0.value > since }.map { $0.key }
     }
 
     // MARK: - Path Normalization

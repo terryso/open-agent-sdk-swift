@@ -91,6 +91,8 @@ public func createReadTool() -> ToolProtocol {
         } else {
             // Cache miss: read from disk
             content = try String(contentsOfFile: resolvedPath, encoding: .utf8)
+            // Record disk read for stats tracking
+            context.fileCache?.recordDiskRead()
             // Store in cache (respects maxEntrySizeBytes internally)
             context.fileCache?.set(resolvedPath, content: content)
         }

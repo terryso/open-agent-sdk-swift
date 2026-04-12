@@ -47,3 +47,7 @@
 
 - **No guidance for binary/conflict diffs in promptTemplate** — The review promptTemplate does not instruct the agent how to handle `Binary files differ` output or merge conflict markers (`<<<<<<<`). Not in epics skeleton, pre-existing gap. [SkillTypes.swift:182-214]
 - **Missing untracked file handling in three-level strategy** — `git diff`, `git diff --cached`, and `git diff HEAD~1` do not show untracked (new, never-staged) files. The epics skeleton uses the same three-level strategy without untracked file support. [SkillTypes.swift:184-190]
+
+## Deferred from: code review of 12-2-cache-tool-and-compaction-integration (2026-04-12)
+
+- **modifiedPaths grows unboundedly in FileCache** — Evicted entries remain in modifiedPaths dictionary; the dictionary is capped only by clear(). Acceptable for compaction use case (knowing what files were touched), but should be capped in a future optimization pass to prevent unbounded memory growth in very long sessions [FileCache.swift:124]

@@ -5,6 +5,21 @@ struct AutoCompactState: Sendable {
     let compacted: Bool
     let turnCounter: Int
     let consecutiveFailures: Int
+    /// Timestamp of the last successful compaction. Used to determine which files
+    /// have been modified since the previous compaction.
+    let lastCompactTime: Date
+
+    init(
+        compacted: Bool = false,
+        turnCounter: Int = 0,
+        consecutiveFailures: Int = 0,
+        lastCompactTime: Date = Date.distantPast
+    ) {
+        self.compacted = compacted
+        self.turnCounter = turnCounter
+        self.consecutiveFailures = consecutiveFailures
+        self.lastCompactTime = lastCompactTime
+    }
 }
 
 /// Create initial auto-compact state.
@@ -12,7 +27,8 @@ func createAutoCompactState() -> AutoCompactState {
     return AutoCompactState(
         compacted: false,
         turnCounter: 0,
-        consecutiveFailures: 0
+        consecutiveFailures: 0,
+        lastCompactTime: Date.distantPast
     )
 }
 
@@ -64,11 +80,20 @@ func compactConversation(
     client: any LLMClient,
     model: String,
     messages: [[String: Any]],
-    state: AutoCompactState
+    state: AutoCompactState,
+    fileCache: FileCache? = nil
 ) async -> (compactedMessages: [[String: Any]], summary: String, state: AutoCompactState) {
     do {
+        // Get recently modified files from cache (if available)
+        let modifiedFiles: [String]
+        if let cache = fileCache {
+            modifiedFiles = cache.getModifiedFiles(since: state.lastCompactTime)
+        } else {
+            modifiedFiles = []
+        }
+
         // Build compaction prompt
-        let compactionPrompt = buildCompactionPrompt(messages)
+        let compactionPrompt = buildCompactionPrompt(messages, modifiedFiles: modifiedFiles)
 
         let retryModel = model
         let response = try await withRetry {
@@ -113,7 +138,8 @@ func compactConversation(
             state: AutoCompactState(
                 compacted: true,
                 turnCounter: state.turnCounter,
-                consecutiveFailures: 0
+                consecutiveFailures: 0,
+                lastCompactTime: Date()
             )
         )
     } catch {
@@ -124,7 +150,8 @@ func compactConversation(
             state: AutoCompactState(
                 compacted: state.compacted,
                 turnCounter: state.turnCounter,
-                consecutiveFailures: state.consecutiveFailures + 1
+                consecutiveFailures: state.consecutiveFailures + 1,
+                lastCompactTime: state.lastCompactTime
             )
         )
     }
@@ -231,7 +258,12 @@ private func buildMicroCompactPrompt(_ content: String) -> String {
 }
 
 /// Build a compaction prompt from the message array.
-private func buildCompactionPrompt(_ messages: [[String: Any]]) -> String {
+///
+/// - Parameters:
+///   - messages: The conversation messages to summarize.
+///   - modifiedFiles: Optional list of recently modified file paths to include in the prompt.
+/// - Returns: The compaction prompt string.
+private func buildCompactionPrompt(_ messages: [[String: Any]], modifiedFiles: [String] = []) -> String {
     var parts: [String] = ["Please summarize this conversation:\n"]
 
     for msg in messages {
@@ -260,6 +292,12 @@ private func buildCompactionPrompt(_ messages: [[String: Any]]) -> String {
                 parts.append("\(role): \(texts.joined(separator: "\n"))")
             }
         }
+    }
+
+    // Append recently modified files section if available
+    if !modifiedFiles.isEmpty {
+        let fileList = modifiedFiles.joined(separator: ", ")
+        parts.append("Recently modified files since last compaction: [\(fileList)]")
     }
 
     return parts.joined(separator: "\n\n")
