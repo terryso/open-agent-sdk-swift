@@ -123,7 +123,8 @@ extension XCTestCase {
         model: String = "claude-sonnet-4-6",
         systemPrompt: String? = nil,
         maxTurns: Int = 10,
-        maxTokens: Int = 4096
+        maxTokens: Int = 4096,
+        cwd: String? = nil
     ) -> Agent {
         let sessionConfig = URLSessionConfiguration.ephemeral
         sessionConfig.protocolClasses = [AgentLoopMockURLProtocol.self]
@@ -137,6 +138,7 @@ extension XCTestCase {
             systemPrompt: systemPrompt,
             maxTurns: maxTurns,
             maxTokens: maxTokens,
+            cwd: cwd,
             retryConfig: RetryConfig(maxRetries: 3, baseDelayMs: 1, maxDelayMs: 1, retryableStatusCodes: [429, 500, 502, 503, 529])
         )
 
@@ -547,7 +549,14 @@ final class AgentLoopUsageStatsTests: XCTestCase {
 
     /// AC5 [P1]: Duration is measured in milliseconds.
     func testDurationIsMeasuredInMilliseconds() async throws {
-        let sut = makeAgentLoopSUT()
+        // Use a non-Git temp directory to isolate from Git context collection overhead
+        let tempDir = NSTemporaryDirectory()
+            .appending("OpenAgentSDKTests-Duration-\(UUID().uuidString)")
+        try! FileManager.default.createDirectory(
+            atPath: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(atPath: tempDir) }
+
+        let sut = makeAgentLoopSUT(cwd: tempDir)
         let responseDict = makeAgentLoopResponse(stopReason: "end_turn")
         registerAgentLoopMockResponse(body: loopJsonData(from: responseDict))
 
@@ -580,7 +589,14 @@ final class AgentLoopSystemPromptTests: XCTestCase {
     /// the system prompt is included as the `system` parameter in the API request.
     func testSystemPromptIncludedInAPIRequest() async throws {
         let systemPrompt = "You are a Swift concurrency expert. Be concise."
-        let sut = makeAgentLoopSUT(systemPrompt: systemPrompt)
+        // Use a non-Git temp directory to isolate from Git context injection
+        let tempDir = NSTemporaryDirectory()
+            .appending("OpenAgentSDKTests-SystemPrompt-\(UUID().uuidString)")
+        try! FileManager.default.createDirectory(
+            atPath: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(atPath: tempDir) }
+
+        let sut = makeAgentLoopSUT(systemPrompt: systemPrompt, cwd: tempDir)
         let responseDict = makeAgentLoopResponse(stopReason: "end_turn")
         registerAgentLoopMockResponse(body: loopJsonData(from: responseDict))
 
@@ -603,7 +619,14 @@ final class AgentLoopSystemPromptTests: XCTestCase {
     /// AC6 [P1]: Given an Agent with no system prompt, when the Agent calls the LLM API,
     /// the request does NOT include a `system` parameter.
     func testNoSystemPromptExcludesSystemFromRequest() async throws {
-        let sut = makeAgentLoopSUT(systemPrompt: nil)
+        // Use a non-Git temp directory to isolate from Git context injection
+        let tempDir = NSTemporaryDirectory()
+            .appending("OpenAgentSDKTests-NoSystemPrompt-\(UUID().uuidString)")
+        try! FileManager.default.createDirectory(
+            atPath: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(atPath: tempDir) }
+
+        let sut = makeAgentLoopSUT(systemPrompt: nil, cwd: tempDir)
         let responseDict = makeAgentLoopResponse(stopReason: "end_turn")
         registerAgentLoopMockResponse(body: loopJsonData(from: responseDict))
 
@@ -623,7 +646,14 @@ final class AgentLoopSystemPromptTests: XCTestCase {
 
     /// AC6 [P1]: Empty string system prompt is included in request.
     func testEmptySystemPromptIncludedInRequest() async throws {
-        let sut = makeAgentLoopSUT(systemPrompt: "")
+        // Use a non-Git temp directory to isolate from Git context injection
+        let tempDir = NSTemporaryDirectory()
+            .appending("OpenAgentSDKTests-EmptySystemPrompt-\(UUID().uuidString)")
+        try! FileManager.default.createDirectory(
+            atPath: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(atPath: tempDir) }
+
+        let sut = makeAgentLoopSUT(systemPrompt: "", cwd: tempDir)
         let responseDict = makeAgentLoopResponse(stopReason: "end_turn")
         registerAgentLoopMockResponse(body: loopJsonData(from: responseDict))
 

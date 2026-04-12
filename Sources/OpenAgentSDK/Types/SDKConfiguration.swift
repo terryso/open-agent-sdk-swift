@@ -55,6 +55,11 @@ public struct SDKConfiguration: Sendable, Equatable, CustomStringConvertible,
     /// Maximum size of a single file cache entry in bytes. Defaults to 5 MB.
     public var fileCacheMaxEntrySizeBytes: Int
 
+    /// Cache time-to-live for Git context collection, in seconds.
+    /// Within this window, repeated calls reuse the cached Git status.
+    /// Set to `0` to disable caching (every call refreshes). Defaults to 5.0 seconds.
+    public var gitCacheTTL: TimeInterval
+
     /// Default model used when none is specified.
     public static let defaultModel = "claude-sonnet-4-6"
 
@@ -88,7 +93,8 @@ public struct SDKConfiguration: Sendable, Equatable, CustomStringConvertible,
         maxTokens: Int = 16384,
         fileCacheMaxEntries: Int = 100,
         fileCacheMaxSizeBytes: Int = 25 * 1024 * 1024,
-        fileCacheMaxEntrySizeBytes: Int = 5 * 1024 * 1024
+        fileCacheMaxEntrySizeBytes: Int = 5 * 1024 * 1024,
+        gitCacheTTL: TimeInterval = 5.0
     ) {
         self.apiKey = Self.sanitizeAPIKey(apiKey)
         self.model = model
@@ -98,6 +104,7 @@ public struct SDKConfiguration: Sendable, Equatable, CustomStringConvertible,
         self.fileCacheMaxEntries = fileCacheMaxEntries
         self.fileCacheMaxSizeBytes = fileCacheMaxSizeBytes
         self.fileCacheMaxEntrySizeBytes = fileCacheMaxEntrySizeBytes
+        self.gitCacheTTL = gitCacheTTL
     }
 
     // MARK: - Environment Variable Parsing
@@ -153,7 +160,8 @@ public struct SDKConfiguration: Sendable, Equatable, CustomStringConvertible,
             maxTokens: overrides.maxTokens,
             fileCacheMaxEntries: overrides.fileCacheMaxEntries,
             fileCacheMaxSizeBytes: overrides.fileCacheMaxSizeBytes,
-            fileCacheMaxEntrySizeBytes: overrides.fileCacheMaxEntrySizeBytes
+            fileCacheMaxEntrySizeBytes: overrides.fileCacheMaxEntrySizeBytes,
+            gitCacheTTL: overrides.gitCacheTTL
         )
     }
 
@@ -166,7 +174,8 @@ public struct SDKConfiguration: Sendable, Equatable, CustomStringConvertible,
             + "maxTurns: \(maxTurns), maxTokens: \(maxTokens), "
             + "fileCacheMaxEntries: \(fileCacheMaxEntries), "
             + "fileCacheMaxSizeBytes: \(fileCacheMaxSizeBytes), "
-            + "fileCacheMaxEntrySizeBytes: \(fileCacheMaxEntrySizeBytes))"
+            + "fileCacheMaxEntrySizeBytes: \(fileCacheMaxEntrySizeBytes), "
+            + "gitCacheTTL: \(gitCacheTTL))"
     }
 
     /// A debug representation with the API key masked as `"***"`.
@@ -176,7 +185,8 @@ public struct SDKConfiguration: Sendable, Equatable, CustomStringConvertible,
             + "maxTurns: \(maxTurns), maxTokens: \(maxTokens), "
             + "fileCacheMaxEntries: \(fileCacheMaxEntries), "
             + "fileCacheMaxSizeBytes: \(fileCacheMaxSizeBytes), "
-            + "fileCacheMaxEntrySizeBytes: \(fileCacheMaxEntrySizeBytes))"
+            + "fileCacheMaxEntrySizeBytes: \(fileCacheMaxEntrySizeBytes), "
+            + "gitCacheTTL: \(gitCacheTTL))"
     }
 
     // MARK: - Internal Helpers

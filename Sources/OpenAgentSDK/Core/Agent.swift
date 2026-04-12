@@ -39,6 +39,10 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
     /// The LLM API client used for communication.
     let client: any LLMClient
 
+    /// Git context collector for injecting repository status into system prompts.
+    /// Per-agent instance; cache lifecycle matches the Agent instance.
+    private let gitContextCollector = GitContextCollector()
+
     // MARK: - Initialization
 
     /// Create an Agent with the given options.
@@ -159,10 +163,24 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
 
     /// Build the system prompt string for API requests.
     ///
-    /// Returns the configured system prompt, or `nil` if none was set.
-    /// This is an extension point for future SystemPromptBuilder integration.
+    /// Returns the configured system prompt with Git context appended (if available).
+    /// If no system prompt is set but Git context exists, returns the Git context alone.
+    /// If neither is available, returns `nil`.
     func buildSystemPrompt() -> String? {
-        return options.systemPrompt
+        let basePrompt = options.systemPrompt
+        let cwd = options.cwd ?? FileManager.default.currentDirectoryPath
+        let gitContext = gitContextCollector.collectGitContext(
+            cwd: cwd,
+            ttl: options.gitCacheTTL
+        )
+
+        if let basePrompt, let gitContext {
+            return basePrompt + "\n" + gitContext
+        } else if let gitContext {
+            return gitContext
+        } else {
+            return basePrompt
+        }
     }
 
     /// Build the messages array for an API request from a user prompt.
