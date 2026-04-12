@@ -277,7 +277,7 @@ final class HookRegistryTests: XCTestCase {
         await registry.register(.preToolUse, definition: HookDefinition(
             handler: { _ in
                 // Simulate slow execution (10 seconds)
-                try? await _Concurrency.Task.sleep(nanoseconds: 1_000_000_000)
+                try? await _Concurrency.Task.sleep(nanoseconds: 100_000_000)
                 return HookOutput(message: "slow-result")
             },
             timeout: 1 // 1 millisecond timeout
@@ -307,7 +307,7 @@ final class HookRegistryTests: XCTestCase {
         await registry.register(.preToolUse, definition: HookDefinition(
             handler: { _ in
                 // Simulate a hanging handler that will exceed timeout
-                _ = try? await _Concurrency.Task.sleep(nanoseconds: 1_000_000_000)
+                _ = try? await _Concurrency.Task.sleep(nanoseconds: 100_000_000)
                 return HookOutput(message: "timed-out-result")
             },
             timeout: 1

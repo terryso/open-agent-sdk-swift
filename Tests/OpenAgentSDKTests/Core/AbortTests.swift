@@ -301,7 +301,7 @@ final class AbortPromptTests: XCTestCase {
             inputTokens: 20,
             outputTokens: 100
         )
-        AbortMockURLProtocol.responseDelayMs = 100
+        AbortMockURLProtocol.responseDelayMs = 20
         registerAbortMockResponse(body: loopJsonData(from: responseDict))
 
         let queryTask = runPromptInTask(sut, prompt: "Long running query")
@@ -374,7 +374,7 @@ final class AbortPromptTests: XCTestCase {
             inputTokens: 20,
             outputTokens: 100
         )
-        AbortMockURLProtocol.responseDelayMs = 500
+        AbortMockURLProtocol.responseDelayMs = 20
         registerAbortMockResponse(body: loopJsonData(from: responseDict))
 
         let queryTask = runPromptInTask(sut, prompt: "Query to interrupt")
@@ -425,7 +425,7 @@ final class AbortFileWriteTests: XCTestCase {
             toolName: "Write",
             toolInput: ["file_path": newFilePath, "content": "This should not be written"]
         )
-        AbortMockURLProtocol.responseDelayMs = 50
+        AbortMockURLProtocol.responseDelayMs = 20
         registerAbortMockResponse(body: loopJsonData(from: toolUseResponse))
 
         let queryTask = runPromptInTask(sut, prompt: "Write a new file")
@@ -461,7 +461,7 @@ final class AbortFileWriteTests: XCTestCase {
             toolName: "Write",
             toolInput: ["file_path": existingFilePath, "content": "Overwrite content that should not be applied"]
         )
-        AbortMockURLProtocol.responseDelayMs = 50
+        AbortMockURLProtocol.responseDelayMs = 20
         registerAbortMockResponse(body: loopJsonData(from: toolUseResponse))
 
         let queryTask = runPromptInTask(sut, prompt: "Overwrite the file")
@@ -541,7 +541,7 @@ final class AbortFileEditTests: XCTestCase {
                 "new_string": "Universe"
             ]
         )
-        AbortMockURLProtocol.responseDelayMs = 50
+        AbortMockURLProtocol.responseDelayMs = 20
         registerAbortMockResponse(body: loopJsonData(from: toolUseResponse))
 
         let queryTask = runPromptInTask(sut, prompt: "Edit the file")
@@ -580,7 +580,7 @@ final class AbortFileEditTests: XCTestCase {
                 "new_string": "Modified"
             ]
         )
-        AbortMockURLProtocol.responseDelayMs = 200
+        AbortMockURLProtocol.responseDelayMs = 20
         registerAbortMockResponse(body: loopJsonData(from: toolUseResponse))
 
         let queryTask = runPromptInTask(sut, prompt: "Edit the file slowly")
@@ -632,7 +632,7 @@ final class AbortStreamTests: XCTestCase {
             inputTokens: 20,
             outputTokens: 100
         )
-        AbortMockURLProtocol.responseDelayMs = 500
+        AbortMockURLProtocol.responseDelayMs = 20
         registerAbortMockResponse(body: loopJsonData(from: responseDict))
 
         let queryTask = runPromptInTask(sut, prompt: "Query to cancel")
@@ -667,7 +667,7 @@ final class AbortStreamTests: XCTestCase {
             headers: ["content-type": "text/event-stream"],
             body: sseBody
         )
-        AbortMockURLProtocol.responseDelayMs = 100
+        AbortMockURLProtocol.responseDelayMs = 50
 
         let (queryTask, finishBox) = runStreamWithFinishTracking(sut, prompt: "Stream to cancel")
 
@@ -699,7 +699,7 @@ final class AbortStreamTests: XCTestCase {
             headers: ["content-type": "text/event-stream"],
             body: sseBody
         )
-        AbortMockURLProtocol.responseDelayMs = 100
+        AbortMockURLProtocol.responseDelayMs = 50
 
         let (queryTask, messageBox) = runStreamInTask(sut, prompt: "Stream partial")
 

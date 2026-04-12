@@ -343,7 +343,7 @@ final class GitContextCollectorTests: XCTestCase {
         try! "New content".write(toFile: newFile, atomically: true, encoding: .utf8)
 
         // Wait for TTL to expire
-        try await _Concurrency.Task.sleep(nanoseconds: 100_000_000) // 100ms
+        try await _Concurrency.Task.sleep(nanoseconds: 10_000_000) // 10ms
 
         let result2 = collector.collectGitContext(cwd: gitRepoDir, ttl: 0.01)
 
