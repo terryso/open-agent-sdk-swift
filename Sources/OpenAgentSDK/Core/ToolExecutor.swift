@@ -183,6 +183,9 @@ enum ToolExecutor {
         tools: [ToolProtocol],
         context: ToolContext
     ) async -> [ToolResult] {
+        // Cancellation check: skip tool execution if already cancelled (FR60)
+        if _Concurrency.Task.isCancelled { return [] }
+
         // Apply tool restriction stack filtering if active
         let effectiveTools: [ToolProtocol]
         if let restrictionStack = context.restrictionStack, !restrictionStack.isEmpty {
@@ -197,6 +200,9 @@ enum ToolExecutor {
         // Execute read-only tools concurrently (batched by maxConcurrency)
         let readOnlyResults = await executeReadOnlyConcurrent(batch: readOnly, context: context)
         results.append(contentsOf: readOnlyResults)
+
+        // Cancellation check between read-only and mutation batches
+        if _Concurrency.Task.isCancelled { return results }
 
         // Execute mutation tools serially
         let mutationResults = await executeMutationsSerial(items: mutations, context: context)
@@ -267,6 +273,8 @@ enum ToolExecutor {
     ) async -> [ToolResult] {
         var results: [ToolResult] = []
         for item in items {
+            // Cancellation check between serial mutation steps (FR60)
+            if _Concurrency.Task.isCancelled { break }
             let result = await executeSingleTool(
                 block: item.block,
                 tool: item.tool,

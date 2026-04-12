@@ -76,12 +76,18 @@ func shouldAutoCompact(
 }
 
 /// Compact conversation by summarizing with the LLM.
+///
+/// After a successful compaction, if `sessionMemory` is provided, key decisions
+/// and context are extracted from the summary and appended to the session memory
+/// FIFO queue. Short summaries (< 200 characters) are stored directly without an
+/// additional LLM call.
 func compactConversation(
     client: any LLMClient,
     model: String,
     messages: [[String: Any]],
     state: AutoCompactState,
-    fileCache: FileCache? = nil
+    fileCache: FileCache? = nil,
+    sessionMemory: SessionMemory? = nil
 ) async -> (compactedMessages: [[String: Any]], summary: String, state: AutoCompactState) {
     do {
         // Get recently modified files from cache (if available)
@@ -120,6 +126,16 @@ func compactConversation(
                 .joined(separator: "\n")
         }
 
+        // Extract session memory entries from the summary
+        if !summary.isEmpty, let sessionMemory = sessionMemory {
+            await extractSessionMemory(
+                client: client,
+                model: model,
+                summary: summary,
+                into: sessionMemory
+            )
+        }
+
         // Replace messages with compact summary
         let compactedMessages: [[String: Any]] = [
             [
@@ -155,6 +171,150 @@ func compactConversation(
             )
         )
     }
+}
+
+// MARK: - Session Memory Extraction (Story 13.3)
+
+/// Extract key decisions, preferences, and constraints from a compaction summary
+/// and append them to the session memory.
+///
+/// If the summary is short (< 200 characters), it is stored directly as a single
+/// entry without making an additional LLM call. Otherwise, an LLM call extracts
+/// structured JSON entries from the summary.
+///
+/// - Parameters:
+///   - client: The LLM client to use for extraction (if needed).
+///   - model: The model identifier.
+///   - summary: The compaction summary text.
+///   - sessionMemory: The session memory to append entries to.
+func extractSessionMemory(
+    client: any LLMClient,
+    model: String,
+    summary: String,
+    into sessionMemory: SessionMemory
+) async {
+    // Short summary: store directly without LLM extraction call
+    if summary.count < 200 {
+        let entry = SessionMemoryEntry(
+            category: "decision",
+            summary: summary,
+            context: "",
+            timestamp: Date()
+        )
+        sessionMemory.append(entry)
+        return
+    }
+
+    // Long summary: use LLM to extract structured entries
+    let extractionPrompt = buildSessionMemoryExtractionPrompt(summary)
+
+    do {
+        let retryModel = model
+        let response = try await withRetry {
+            try await client.sendMessage(
+                model: retryModel,
+                messages: [
+                    ["role": "user", "content": extractionPrompt]
+                ],
+                maxTokens: 2048,
+                system: "You extract key information from conversation summaries as JSON arrays. Output ONLY valid JSON, no markdown fences.",
+                tools: nil,
+                toolChoice: nil,
+                thinking: nil,
+                temperature: nil
+            )
+        }
+
+        // Extract text from response
+        var responseText = ""
+        if let content = response["content"] as? [[String: Any]] {
+            responseText = content
+                .filter { $0["type"] as? String == "text" }
+                .compactMap { $0["text"] as? String }
+                .joined(separator: "\n")
+        }
+
+        // Strip markdown code fences if present
+        let cleanedJSON = stripMarkdownFences(responseText)
+        guard let data = cleanedJSON.data(using: .utf8),
+              let jsonArray = try? JSONSerialization.jsonObject(with: data, options: []) as? [[String: String]] else {
+            // If parsing fails, store the summary directly as fallback
+            let entry = SessionMemoryEntry(
+                category: "decision",
+                summary: summary,
+                context: "",
+                timestamp: Date()
+            )
+            sessionMemory.append(entry)
+            return
+        }
+
+        for item in jsonArray {
+            let rawCategory = item["category"] ?? "decision"
+            let validCategories: Set<String> = ["decision", "preference", "constraint"]
+            let category = validCategories.contains(rawCategory) ? rawCategory : "decision"
+            let itemSummary = item["summary"] ?? ""
+            let itemContext = item["context"] ?? ""
+
+            guard !itemSummary.isEmpty else { continue }
+
+            let entry = SessionMemoryEntry(
+                category: category,
+                summary: itemSummary,
+                context: itemContext,
+                timestamp: Date()
+            )
+            sessionMemory.append(entry)
+        }
+    } catch {
+        // On extraction failure, store summary directly as fallback
+        let entry = SessionMemoryEntry(
+            category: "decision",
+            summary: summary,
+            context: "",
+            timestamp: Date()
+        )
+        sessionMemory.append(entry)
+    }
+}
+
+/// Build the extraction prompt for session memory.
+///
+/// - Parameter summary: The compaction summary to extract from.
+/// - Returns: The extraction prompt string.
+private func buildSessionMemoryExtractionPrompt(_ summary: String) -> String {
+    return """
+    Analyze the following conversation summary and extract key information as a JSON array.
+
+    Each entry must have:
+    - "category": one of "decision", "preference", "constraint"
+    - "summary": a one-sentence summary
+    - "context": related file path or code snippet (if applicable)
+
+    Rules:
+    - Extract ONLY non-obvious, important information
+    - Ignore generic pleasantries and routine operations
+    - Maximum 5 entries per extraction
+    - Each summary must be under 100 characters
+
+    Conversation summary:
+    \(summary)
+    """
+}
+
+/// Strip markdown code fences from a string (e.g., ```json ... ```).
+private func stripMarkdownFences(_ text: String) -> String {
+    var result = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    if result.hasPrefix("```") {
+        // Remove opening fence (and optional language tag)
+        if let firstNewline = result.firstIndex(of: "\n") {
+            result = String(result[result.index(after: firstNewline)...])
+        }
+    }
+    if result.hasSuffix("```") {
+        result = String(result.dropLast(3))
+    }
+    return result.trimmingCharacters(in: .whitespacesAndNewlines)
 }
 
 // MARK: - Micro Compaction (Story 2.6)

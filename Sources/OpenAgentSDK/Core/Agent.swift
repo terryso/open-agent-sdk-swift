@@ -36,6 +36,16 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
 
     // MARK: - Internal Properties
 
+    /// Whether the current query has been interrupted via ``interrupt()``.
+    /// Checked alongside `_Concurrency.Task.isCancelled` in prompt() and stream() loops.
+    /// Uses `nonisolated(unsafe)` because it's a simple Bool flag set by interrupt()
+    /// and read cooperatively by the running Task — no locking needed.
+    nonisolated(unsafe) private var _interrupted: Bool = false
+
+    /// Reference to stream()'s internal Task for cancellation via interrupt().
+    /// Cleared when the stream completes.
+    private var _streamTask: _Concurrency.Task<Void, Never>?
+
     /// The full agent options (used internally for prompt/stream calls).
     var options: AgentOptions
 
@@ -49,6 +59,10 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
     /// Project document discovery for injecting project-level instructions into system prompts.
     /// Per-agent instance; cache lifecycle matches the Agent instance.
     private let projectDocumentDiscovery = ProjectDocumentDiscovery()
+
+    /// Session memory for retaining key context across queries within the agent's lifetime.
+    /// Populated after auto-compact completes; injected into system prompt on subsequent queries.
+    private let sessionMemory = SessionMemory()
 
     // MARK: - Initialization
 
@@ -145,6 +159,22 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
         self.options.model = trimmed
     }
 
+    // MARK: - Query Cancellation
+
+    /// Interrupts the currently executing query.
+    ///
+    /// This is a convenience method that cancels the internal task reference
+    /// tracking the current ``prompt(_:)`` or ``stream(_:)`` call.
+    /// You can also cancel queries directly using `Task.cancel()` on the task
+    /// wrapping the prompt/stream call -- both mechanisms are equivalent because
+    /// Swift uses cooperative cancellation.
+    ///
+    /// If no query is currently running, this method does nothing.
+    public func interrupt() {
+        _interrupted = true
+        _streamTask?.cancel()
+    }
+
     // MARK: - MCP Integration
 
     /// Assembles the complete tool pool including MCP tools.
@@ -221,6 +251,9 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
         if let projectInstructions = projectContext.projectInstructions {
             parts.append("<project-instructions>\n\(projectInstructions)\n</project-instructions>")
         }
+        if let sessionMemoryBlock = sessionMemory.formatForPrompt() {
+            parts.append(sessionMemoryBlock)
+        }
 
         if parts.isEmpty {
             return nil
@@ -252,6 +285,12 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
     ///   turn count, duration, collected messages, and a ``QueryStatus`` indicating
     ///   how the query terminated.
     public func prompt(_ text: String) async -> QueryResult {
+        _interrupted = false
+        return await promptImpl(text)
+    }
+
+    /// Internal implementation of prompt(), separated for cancellation handler support.
+    private func promptImpl(_ text: String) async -> QueryResult {
         let startTime = ContinuousClock.now
 
         // Hook: sessionStart — trigger before any agent work begins
@@ -297,12 +336,19 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
         )
 
         while turnCount < maxTurns {
+            // Cancellation check (FR60): cooperative cancellation via Task.isCancelled or interrupt()
+            if _Concurrency.Task.isCancelled || _interrupted {
+                status = .cancelled
+                break
+            }
+
             // Auto-compact if context is too large (FR9)
             if shouldAutoCompact(messages: messages, model: model, state: compactState) {
                 let (newMessages, _, newState) = await compactConversation(
                     client: client, model: model,
                     messages: messages, state: compactState,
-                    fileCache: fileCache
+                    fileCache: fileCache,
+                    sessionMemory: sessionMemory
                 )
                 messages = newMessages
                 compactState = newState
@@ -363,15 +409,21 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                     let endInput = HookInput(event: .sessionEnd, cwd: options.cwd)
                     await hookRegistry.execute(.sessionEnd, input: endInput)
                 }
+                let isCancelled = error is CancellationError
+                    || _Concurrency.Task.isCancelled
+                    || _interrupted
+                    || (error as? URLError)?.code == .cancelled
+                let resultStatus: QueryStatus = isCancelled ? .cancelled : .errorDuringExecution
                 return QueryResult(
                     text: lastAssistantText,
                     usage: totalUsage,
                     numTurns: turnCount,
                     durationMs: Self.computeDurationMs(ContinuousClock.now - startTime),
                     messages: [],
-                    status: .errorDuringExecution,
+                    status: resultStatus,
                     totalCostUsd: totalCostUsd,
-                    costBreakdown: Array(costByModel.values)
+                    costBreakdown: Array(costByModel.values),
+                    isCancelled: isCancelled
                 )
             }
 
@@ -555,6 +607,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
             await hookRegistry.execute(.sessionEnd, input: endInput)
         }
 
+        let isCancelled = (status == .cancelled)
         return QueryResult(
             text: lastAssistantText,
             usage: totalUsage,
@@ -563,7 +616,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
             messages: [],
             status: status,
             totalCostUsd: totalCostUsd,
-            costBreakdown: Array(costByModel.values)
+            costBreakdown: Array(costByModel.values),
+            isCancelled: isCancelled
         )
     }
 
@@ -580,6 +634,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
     ///   processes the request.
     public func stream(_ text: String) -> AsyncStream<SDKMessage> {
         let startTime = ContinuousClock.now
+        _interrupted = false
 
         // Capture immutable values before entering the AsyncStream closure
         // to satisfy Swift 6 strict concurrency requirements.
@@ -613,6 +668,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
         let capturedMaxSkillRecursionDepth = options.maxSkillRecursionDepth
         // Create restriction stack once so it persists across stream turns
         let capturedRestrictionStack = options.skillRegistry != nil ? ToolRestrictionStack() : nil
+        // Session memory: shared with agent instance for cross-query retention
+        let capturedSessionMemory = sessionMemory
         // File cache: shared across all tool executions in this stream session
         let capturedFileCache = FileCache(
             maxEntries: options.fileCacheMaxEntries,
@@ -636,7 +693,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
         // Serialize captured tools to Data for Sendable compliance (may be nil)
         let toolsData = capturedApiTools.flatMap { try? JSONSerialization.data(withJSONObject: $0, options: []) }
 
-        return AsyncStream<SDKMessage> { continuation in
+        return AsyncStream<SDKMessage> { [self] continuation in
             let task = _Concurrency.Task {
                 // Deserialize messages inside the isolated Task context
                 guard let decodedMessages = try? JSONSerialization.jsonObject(with: messagesData, options: []) as? [[String: Any]] else {
@@ -717,12 +774,30 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                 var costByModel: [String: CostBreakdownEntry] = [:]
 
                 while turnCount < capturedMaxTurns {
+                    // Cancellation check (FR60): cooperative cancellation via Task.isCancelled
+                    if _Concurrency.Task.isCancelled {
+                        let finalText = Self.extractCollectedText(messages: messages)
+                        await Self.yieldStreamCancelled(
+                            continuation: continuation,
+                            text: finalText,
+                            usage: totalUsage,
+                            turnCount: turnCount,
+                            startTime: startTime,
+                            totalCostUsd: totalCostUsd,
+                            costBreakdown: Array(costByModel.values),
+                            hookRegistry: capturedHookRegistry,
+                            cwd: capturedCwd
+                        )
+                        return
+                    }
+
                     // Auto-compact if context is too large (FR9)
                     if shouldAutoCompact(messages: messages, model: capturedModel, state: compactState) {
                         let (newMessages, _, newState) = await compactConversation(
                             client: capturedClient, model: capturedModel,
                             messages: messages, state: compactState,
-                            fileCache: capturedFileCache
+                            fileCache: capturedFileCache,
+                            sessionMemory: capturedSessionMemory
                         )
                         messages = newMessages
                         compactState = newState
@@ -784,6 +859,9 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
 
                     do {
                         for try await event in eventStream {
+                            // Cancellation check inside SSE event loop (FR60)
+                            if _Concurrency.Task.isCancelled { break }
+
                             switch event {
                             case .messageStart(let message):
                                 currentModel = message["model"] as? String ?? capturedModel
@@ -998,6 +1076,24 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                             }
                         }
                     } catch {
+                        // Check if this is a cancellation (not a real error)
+                        if error is CancellationError || _Concurrency.Task.isCancelled || (error as? URLError)?.code == .cancelled {
+                            let previousText = Self.extractCollectedText(messages: messages)
+                            let finalText = previousText.isEmpty ? accumulatedText : "\(previousText) \(accumulatedText)"
+                            await Self.yieldStreamCancelled(
+                                continuation: continuation,
+                                text: finalText,
+                                usage: totalUsage,
+                                turnCount: turnCount,
+                                startTime: startTime,
+                                totalCostUsd: totalCostUsd,
+                                costBreakdown: Array(costByModel.values),
+                                hookRegistry: capturedHookRegistry,
+                                cwd: capturedCwd
+                            )
+                            return
+                        }
+
                         // Stream iteration error — fire hooks before yielding error
                         if let hookRegistry = capturedHookRegistry {
                             let stopInput = HookInput(event: .stop, cwd: capturedCwd)
@@ -1015,6 +1111,24 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                     }
 
                     // Check termination conditions
+                    // Cancellation check after SSE event stream ends (FR60)
+                    if _Concurrency.Task.isCancelled {
+                        let finalText = Self.extractCollectedText(messages: messages)
+                        let partialText = finalText.isEmpty ? accumulatedText : "\(finalText) \(accumulatedText)"
+                        await Self.yieldStreamCancelled(
+                            continuation: continuation,
+                            text: partialText,
+                            usage: totalUsage,
+                            turnCount: turnCount,
+                            startTime: startTime,
+                            totalCostUsd: totalCostUsd,
+                            costBreakdown: Array(costByModel.values),
+                            hookRegistry: capturedHookRegistry,
+                            cwd: capturedCwd
+                        )
+                        return
+                    }
+
                     if currentStopReason == "end_turn" || currentStopReason == "stop_sequence" {
                         loopExitedCleanly = true
                         break
@@ -1171,6 +1285,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
             continuation.onTermination = { @Sendable _ in
                 task.cancel()
             }
+            // Store Task reference for interrupt() support
+            _streamTask = task
         }
     }
 
@@ -1267,6 +1383,39 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
         continuation.finish()
     }
 
+    /// Yield a cancelled result event to the stream, fire stop+sessionEnd hooks, and finish.
+    /// Used by all 4 cancellation checkpoints in stream() to avoid code duplication (FR60).
+    private static func yieldStreamCancelled(
+        continuation: AsyncStream<SDKMessage>.Continuation,
+        text: String,
+        usage: TokenUsage,
+        turnCount: Int,
+        startTime: ContinuousClock.Instant,
+        totalCostUsd: Double,
+        costBreakdown: [CostBreakdownEntry],
+        hookRegistry: HookRegistry?,
+        cwd: String?
+    ) async {
+        if let hookRegistry = hookRegistry {
+            let stopInput = HookInput(event: .stop, cwd: cwd)
+            await hookRegistry.execute(.stop, input: stopInput)
+        }
+        continuation.yield(.result(SDKMessage.ResultData(
+            subtype: .cancelled,
+            text: text,
+            usage: usage,
+            numTurns: turnCount,
+            durationMs: computeDurationMs(ContinuousClock.now - startTime),
+            totalCostUsd: totalCostUsd,
+            costBreakdown: costBreakdown
+        )))
+        if let hookRegistry = hookRegistry {
+            let endInput = HookInput(event: .sessionEnd, cwd: cwd)
+            await hookRegistry.execute(.sessionEnd, input: endInput)
+        }
+        continuation.finish()
+    }
+
     /// Compute duration in milliseconds from a Swift `Duration` value.
     ///
     /// - Parameter elapsed: The duration to convert.
@@ -1274,6 +1423,17 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
     private static func computeDurationMs(_ elapsed: Duration) -> Int {
         Int(elapsed.components.seconds * 1000)
             + Int(elapsed.components.attoseconds / 1_000_000_000_000)
+    }
+
+    /// Extract all assistant text from the messages array for cancellation result events.
+    private static func extractCollectedText(messages: [[String: Any]]) -> String {
+        messages.compactMap { msg -> String? in
+            guard let content = msg["content"] as? [[String: Any]] else { return nil }
+            return content
+                .filter { $0["type"] as? String == "text" }
+                .compactMap { $0["text"] as? String }
+                .joined()
+        }.joined()
     }
 
     /// Extract plain text from Anthropic API response content blocks.

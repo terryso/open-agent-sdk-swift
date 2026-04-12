@@ -1,5 +1,5 @@
 # generated: 2026-04-04
-# last_updated: 2026-04-12 (story 13-1 code review passed)
+# last_updated: 2026-04-12 (story 13-3 pipeline complete)
 # project: open-agent-sdk-swift
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-04-04
-last_updated: 2026-04-12 (story 13-1 review)
+last_updated: 2026-04-12 (story 13-3 done)
 project: open-agent-sdk-swift
 project_key: NOKEY
 tracking_system: file-system
@@ -158,8 +158,8 @@ development_status:
   # Epic 13: 会话生命周期管理
   epic-13: in-progress
   13-1-runtime-dynamic-model-switching: done
-  13-2-query-level-abort: backlog
-  13-3-session-memory-compression-layer: backlog
+  13-2-query-level-abort: done
+  13-3-session-memory-compression-layer: done
   epic-13-retrospective: optional
 
   # Epic 14: 运行时防护（日志与沙盒）

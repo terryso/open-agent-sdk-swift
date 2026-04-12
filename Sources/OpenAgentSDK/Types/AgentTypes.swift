@@ -237,6 +237,8 @@ public enum QueryStatus: String, Sendable, Equatable {
     case errorDuringExecution
     /// The accumulated cost exceeded the configured maxBudgetUsd limit.
     case errorMaxBudgetUsd
+    /// The query was cancelled by the user (via Task.cancel() or Agent.interrupt()).
+    case cancelled
 }
 
 /// Per-model cost entry for cost breakdown tracking.
@@ -283,8 +285,10 @@ public struct QueryResult: Sendable {
     public let totalCostUsd: Double
     /// Per-model cost breakdown for this query.
     public let costBreakdown: [CostBreakdownEntry]
+    /// Whether the query was cancelled by the user.
+    public let isCancelled: Bool
 
-    public init(text: String, usage: TokenUsage, numTurns: Int, durationMs: Int, messages: [SDKMessage], status: QueryStatus = .success, totalCostUsd: Double = 0.0, costBreakdown: [CostBreakdownEntry] = []) {
+    public init(text: String, usage: TokenUsage, numTurns: Int, durationMs: Int, messages: [SDKMessage], status: QueryStatus = .success, totalCostUsd: Double = 0.0, costBreakdown: [CostBreakdownEntry] = [], isCancelled: Bool = false) {
         self.text = text
         self.usage = usage
         self.numTurns = numTurns
@@ -293,6 +297,7 @@ public struct QueryResult: Sendable {
         self.status = status
         self.totalCostUsd = totalCostUsd
         self.costBreakdown = costBreakdown
+        self.isCancelled = isCancelled
     }
 }
 

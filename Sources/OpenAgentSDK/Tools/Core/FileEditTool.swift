@@ -68,12 +68,21 @@ public func createEditTool() -> ToolProtocol {
         }
 
         // Read file content
-        let content: String
+        // Save original content for potential rollback on cancellation (FR60, AC3)
+        let originalContent: String
         do {
-            content = try String(contentsOfFile: resolvedPath, encoding: .utf8)
+            originalContent = try String(contentsOfFile: resolvedPath, encoding: .utf8)
         } catch {
             return ToolExecuteResult(
                 content: "Error: Failed to read file '\(resolvedPath)': \(error.localizedDescription)",
+                isError: true
+            )
+        }
+
+        // Cancellation check: abort before modifying if already cancelled (FR60)
+        if _Concurrency.Task.isCancelled {
+            return ToolExecuteResult(
+                content: "Error: Edit cancelled before execution",
                 isError: true
             )
         }
@@ -85,7 +94,7 @@ public func createEditTool() -> ToolProtocol {
                 isError: true
             )
         }
-        let occurrences = content.components(separatedBy: input.old_string).count - 1
+        let occurrences = originalContent.components(separatedBy: input.old_string).count - 1
         if occurrences == 0 {
             return ToolExecuteResult(
                 content: "Error: old_string not found in \(resolvedPath)",
@@ -100,12 +109,20 @@ public func createEditTool() -> ToolProtocol {
         }
 
         // Perform replacement
-        let newContent = content.replacingOccurrences(
+        let newContent = originalContent.replacingOccurrences(
             of: input.old_string,
             with: input.new_string
         )
 
         // Write updated content
+        // Cancellation check: skip write-back if cancelled after replacement (FR60)
+        // Since we haven't written yet, no restore is needed.
+        if _Concurrency.Task.isCancelled {
+            return ToolExecuteResult(
+                content: "Error: Edit cancelled before write",
+                isError: true
+            )
+        }
         do {
             try newContent.write(
                 toFile: resolvedPath,

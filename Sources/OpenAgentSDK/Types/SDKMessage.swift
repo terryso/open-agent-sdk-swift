@@ -156,6 +156,8 @@ public enum SDKMessage: Sendable {
             case errorDuringExecution
             /// The accumulated cost exceeded the configured budget limit.
             case errorMaxBudgetUsd
+            /// The query was cancelled by the user.
+            case cancelled
         }
 
         /// How the query terminated.

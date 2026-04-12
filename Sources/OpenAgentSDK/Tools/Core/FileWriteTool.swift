@@ -45,6 +45,14 @@ public func createWriteTool() -> ToolProtocol {
         let resolvedPath = resolvePath(input.file_path, cwd: context.cwd)
         let fileManager = FileManager.default
 
+        // Cancellation check: skip all file operations if task is already cancelled (FR60)
+        if _Concurrency.Task.isCancelled {
+            return ToolExecuteResult(
+                content: "Error: Write cancelled before execution",
+                isError: true
+            )
+        }
+
         // Create parent directories if they do not exist
         let directory = (resolvedPath as NSString).deletingLastPathComponent
         if !fileManager.fileExists(atPath: directory) {
