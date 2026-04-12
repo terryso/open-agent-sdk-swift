@@ -83,6 +83,11 @@ public func createBashTool() -> ToolProtocol {
             BashConstants.maxTimeoutMs
         ))
 
+        // Sandbox: enforce command restrictions before process execution
+        if let sandbox = context.sandbox {
+            try SandboxChecker.checkCommand(input.command, settings: sandbox)
+        }
+
         return await executeBashProcess(
             command: input.command,
             cwd: context.cwd,

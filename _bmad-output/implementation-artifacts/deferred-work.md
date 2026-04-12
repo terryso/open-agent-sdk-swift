@@ -55,3 +55,7 @@
 ## Deferred from: code review of 12-4-project-document-discovery (2026-04-12)
 
 - **homeDirectory not controllable from buildSystemPrompt()** — Tests that exercise buildSystemPrompt() directly cannot isolate from the developer's real ~/.claude/CLAUDE.md. Current workaround uses contains assertions instead of equality. Pragmatic for now, but could be improved with a protocol-based injection pattern in a future refactor.
+
+## Deferred from: code review of 14-5-sandbox-bash-command-filtering (2026-04-13)
+
+- ~~**Single `$(...)`/backtick pair checked**~~ — **FIXED** in checkpoint review: `extractCommandSubstitution` now returns all substitution pairs instead of just the first

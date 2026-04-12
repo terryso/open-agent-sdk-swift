@@ -20,6 +20,19 @@ import Foundation
 /// }
 /// ```
 ///
+/// ## Known Limitations (Command Filtering)
+///
+/// Blocklist mode (``SandboxSettings/deniedCommands``) is best-effort.
+/// The following bypass vectors are **not** covered:
+/// - **Pipe attacks**: `echo payload | bash`
+/// - **Interpreter escape**: `python -c "..."`, `node -e "..."`
+/// - **exec built-in**: `exec rm -rf /tmp`
+/// - **Legitimate destructive commands**: `find / -delete`
+///
+/// **Production environments should use allowlist mode** (``SandboxSettings/allowedCommands``)
+/// for strong security. Allowlist mode only permits explicitly listed commands,
+/// blocking all unknown vectors by default.
+///
 /// Logger integration: denials are logged at `.info` level because they represent
 /// important security events.
 enum SandboxChecker {
@@ -130,6 +143,32 @@ enum SandboxChecker {
             return true
         }
 
+        // Check for subshell invocation: bash -c "cmd"
+        switch extractSubshellCommand(command) {
+        case .innerCommand(let innerCmd):
+            return isCommandAllowed(innerCmd, settings: settings)
+        case .unparseable:
+            return false // Deny by default for unparseable patterns
+        case .notSubshell:
+            break
+        }
+
+        // Check for command substitution: $(cmd) or `cmd`
+        let substitutions = extractCommandSubstitution(command)
+        if !substitutions.isEmpty {
+            for innerCmd in substitutions {
+                let innerBasename = extractCommandBasename(innerCmd)
+                if let allowed = settings.allowedCommands {
+                    if !allowed.contains(innerBasename) {
+                        return false
+                    }
+                } else if settings.deniedCommands.contains(innerBasename) {
+                    return false
+                }
+            }
+            return true
+        }
+
         let basename = extractCommandBasename(command)
 
         // Allowlist mode: only listed commands are permitted
@@ -143,6 +182,11 @@ enum SandboxChecker {
 
     /// Verify a command is allowed and throw if denied.
     ///
+    /// Performs three-phase checking:
+    /// 1. Shell metacharacter detection (subshell, command substitution, escape bypasses)
+    /// 2. Basename extraction from command path
+    /// 3. Allowlist/blocklist matching
+    ///
     /// - Parameters:
     ///   - command: The command to check.
     ///   - settings: The sandbox settings to apply.
@@ -151,6 +195,15 @@ enum SandboxChecker {
         _ command: String,
         settings: SandboxSettings
     ) throws {
+        // Phase 1: No restrictions configured -- all commands allowed
+        guard !settings.deniedCommands.isEmpty || settings.allowedCommands != nil else {
+            return
+        }
+
+        // Phase 2: Shell metacharacter detection (subshell, substitution, escape bypasses)
+        try checkShellMetacharacters(command, settings: settings)
+
+        // Phase 3: Basename extraction + allowlist/blocklist matching
         let basename = extractCommandBasename(command)
 
         guard isCommandAllowed(command, settings: settings) else {
@@ -164,6 +217,230 @@ enum SandboxChecker {
 
             throw SDKError.permissionDenied(tool: "Bash", reason: reason)
         }
+    }
+
+    // MARK: - Shell Metacharacter Detection
+
+    /// Known shell binary names used in subshell invocations (e.g. `bash -c "cmd"`).
+    private static let shellBinaries = ["bash", "sh", "zsh", "dash", "ksh"]
+
+    /// Result of subshell command extraction.
+    private enum SubshellExtraction {
+        /// The command is not a subshell invocation.
+        case notSubshell
+        /// The inner command was successfully extracted.
+        case innerCommand(String)
+        /// A subshell pattern was detected but could not be reliably parsed (deny by default).
+        case unparseable
+    }
+
+    /// Detect and handle shell metacharacter bypass attempts.
+    ///
+    /// This method inspects the command string for patterns that could be used to
+    /// circumvent the sandbox's command filtering:
+    /// - **Subshell invocation**: `bash -c "cmd"`, `sh -c "cmd"`, `zsh -c "cmd"`, etc.
+    /// - **Command substitution**: `$(cmd)` or `` `cmd` ``
+    /// - **Escape/quote bypasses**: `\cmd`, `"cmd"`, `'cmd'` (handled by ``extractCommandBasename(_:)``)
+    ///
+    /// If metacharacters cannot be reliably parsed, the command is denied by default.
+    ///
+    /// - Parameters:
+    ///   - command: The raw command string to inspect.
+    ///   - settings: The sandbox settings to apply.
+    /// - Throws: ``SDKError/permissionDenied(tool:reason:)`` if a bypass is detected or parsing is ambiguous.
+    static func checkShellMetacharacters(
+        _ command: String,
+        settings: SandboxSettings
+    ) throws {
+        let trimmed = command.trimmingCharacters(in: .whitespaces)
+
+        // Check for subshell invocation: bash -c "cmd", sh -c 'cmd', etc.
+        switch extractSubshellCommand(trimmed) {
+        case .innerCommand(let innerCmd):
+            // Recursively check the inner command
+            try checkCommand(innerCmd, settings: settings)
+            return
+        case .unparseable:
+            // Deny by default for unparseable subshell patterns
+            let reason = "command contains unparseable shell metacharacters"
+            Logger.shared.info("SandboxChecker", "sandbox_denial", data: [
+                "type": "unparseable_metachar",
+                "value": trimmed,
+                "reason": reason
+            ])
+            throw SDKError.permissionDenied(tool: "Bash", reason: reason)
+        case .notSubshell:
+            break // Continue to other checks
+        }
+
+        // Check for command substitution: $(cmd) or `cmd`
+        let substitutions = extractCommandSubstitution(trimmed)
+        for innerCmd in substitutions {
+            let innerBasename = extractCommandBasename(innerCmd)
+            if let allowed = settings.allowedCommands {
+                if !allowed.contains(innerBasename) {
+                    let reason = "command '\(innerBasename)' is denied by sandbox policy (detected in substitution)"
+                    Logger.shared.info("SandboxChecker", "sandbox_denial", data: [
+                        "type": "command_substitution",
+                        "value": innerBasename,
+                        "reason": reason
+                    ])
+                    throw SDKError.permissionDenied(tool: "Bash", reason: reason)
+                }
+            } else if !settings.deniedCommands.isEmpty {
+                if settings.deniedCommands.contains(innerBasename) {
+                    let reason = "command '\(innerBasename)' is denied by sandbox policy (detected in substitution)"
+                    Logger.shared.info("SandboxChecker", "sandbox_denial", data: [
+                        "type": "command_substitution",
+                        "value": innerBasename,
+                        "reason": reason
+                    ])
+                    throw SDKError.permissionDenied(tool: "Bash", reason: reason)
+                }
+            }
+        }
+    }
+
+    /// Extract the inner command from a subshell invocation pattern.
+    ///
+    /// Matches patterns like:
+    /// - `bash -c "rm -rf /tmp"` -> `.innerCommand("rm -rf /tmp")`
+    /// - `sh -c 'rm -rf /tmp'` -> `.innerCommand("rm -rf /tmp")`
+    /// - `/bin/bash -c "rm -rf /tmp"` -> `.innerCommand("rm -rf /tmp")`
+    /// - `bash -c "bash -c 'rm -rf /tmp'"` -> `.unparseable` (deeply nested)
+    ///
+    /// Returns `.notSubshell` if the command does not match a subshell pattern.
+    private static func extractSubshellCommand(_ command: String) -> SubshellExtraction {
+        // Extract the first token (command name) and get its basename
+        var firstToken = command
+        if let spaceRange = firstToken.rangeOfCharacter(from: .whitespaces) {
+            firstToken = String(firstToken[..<spaceRange.lowerBound])
+        }
+
+        // Strip leading backslash and quotes from the first token
+        if firstToken.hasPrefix("\\") {
+            firstToken = String(firstToken.dropFirst())
+        }
+        if (firstToken.hasPrefix("\"") && firstToken.hasSuffix("\""))
+            || (firstToken.hasPrefix("'") && firstToken.hasSuffix("'")) {
+            firstToken = String(firstToken.dropFirst().dropLast())
+        }
+
+        // Extract basename if it's a path
+        let basename: String
+        if firstToken.contains("/") {
+            basename = URL(fileURLWithPath: firstToken).lastPathComponent
+        } else {
+            basename = firstToken
+        }
+
+        // Only proceed if the command is a known shell binary
+        guard shellBinaries.contains(basename) else {
+            return .notSubshell
+        }
+
+        // Find the "-c" flag and extract its argument
+        // Pattern: <shell> [-options...] -c <command_string>
+        let remaining = command.trimmingCharacters(in: .whitespaces)
+
+        // Find "-c" flag as a standalone argument (surrounded by whitespace)
+        // Uses character-by-character scan to handle both spaces and tabs.
+        let chars = Array(remaining)
+        var cFlagEnd: Int? = nil
+        var i = 0
+        while i < chars.count - 2 {
+            // Look for: whitespace + '-' + 'c' + whitespace-or-end
+            if chars[i].isWhitespace && chars[i + 1] == "-" && chars[i + 2] == "c" {
+                if i + 3 >= chars.count || chars[i + 3].isWhitespace {
+                    // Found " -c " or " -c" at end
+                    cFlagEnd = i + 3
+                    break
+                }
+            }
+            i += 1
+        }
+
+        guard let flagEnd = cFlagEnd else {
+            // No -c flag found -- shell without -c is just the shell itself
+            return .notSubshell
+        }
+
+        // Check if there's nothing after -c (no argument -- unparseable)
+        let afterFlag = remaining[remaining.index(remaining.startIndex, offsetBy: flagEnd)...]
+            .trimmingCharacters(in: .whitespaces)
+        if afterFlag.isEmpty {
+            return .unparseable
+        }
+
+        var afterC = afterFlag
+
+        // Strip surrounding quotes from the -c argument
+        if afterC.hasPrefix("\"") && afterC.hasSuffix("\"") {
+            afterC = String(afterC.dropFirst().dropLast())
+        } else if afterC.hasPrefix("'") && afterC.hasSuffix("'") {
+            afterC = String(afterC.dropFirst().dropLast())
+        }
+
+        // Check for nested subshell patterns (unparseable)
+        // If the inner command itself starts with a shell binary, it's deeply nested
+        let innerFirstToken: String
+        if let spaceRange = afterC.rangeOfCharacter(from: .whitespaces) {
+            innerFirstToken = String(afterC[..<spaceRange.lowerBound])
+        } else {
+            innerFirstToken = afterC
+        }
+
+        if shellBinaries.contains(innerFirstToken) {
+            // Deeply nested: deny by default (unparseable)
+            return .unparseable
+        }
+
+        return afterC.isEmpty ? .unparseable : .innerCommand(afterC)
+    }
+
+    /// Extract all inner commands from command substitution patterns.
+    ///
+    /// Matches patterns like:
+    /// - `$(rm -rf /tmp)` -> `["rm -rf /tmp"]`
+    /// - `$(rm) && $(sudo ...)` -> `["rm", "sudo ..."]`
+    /// - `` `rm -rf /tmp` `` -> `["rm -rf /tmp"]`
+    ///
+    /// Returns an empty array if no substitution pattern is found.
+    private static func extractCommandSubstitution(_ command: String) -> [String] {
+        var results: [String] = []
+
+        // Extract all $() substitutions
+        var searchStart = command.startIndex
+        while let dollarRange = command.range(of: "$(", options: .literal, range: searchStart..<command.endIndex) {
+            let afterDollarParen = command[dollarRange.upperBound...]
+            if let closeParen = afterDollarParen.firstIndex(of: ")") {
+                let inner = String(afterDollarParen[..<closeParen]).trimmingCharacters(in: .whitespaces)
+                if !inner.isEmpty {
+                    results.append(inner)
+                }
+                searchStart = command.index(after: closeParen)
+            } else {
+                break
+            }
+        }
+
+        // Extract all backtick substitutions
+        var backtickStart = command.startIndex
+        while let firstBacktick = command.range(of: "`", range: backtickStart..<command.endIndex).map({ $0.lowerBound }) {
+            let afterFirst = command[firstBacktick...]
+            let afterDrop = afterFirst.dropFirst()
+            if let secondBacktick = afterDrop.firstIndex(of: "`") {
+                let inner = String(afterDrop[..<secondBacktick]).trimmingCharacters(in: .whitespaces)
+                if !inner.isEmpty {
+                    results.append(inner)
+                }
+                backtickStart = command.index(after: secondBacktick)
+            } else {
+                break
+            }
+        }
+
+        return results
     }
 
     // MARK: - Internal Helpers
