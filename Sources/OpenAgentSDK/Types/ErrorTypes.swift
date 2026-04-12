@@ -36,6 +36,8 @@ public enum SDKError: Error, Equatable, LocalizedError, Sendable {
     case permissionDenied(tool: String, reason: String)
     /// The operation was aborted.
     case abortError
+    /// An invalid configuration was provided.
+    case invalidConfiguration(String)
 
     // MARK: - Computed Properties for Associated Value Access
 
@@ -51,7 +53,8 @@ public enum SDKError: Error, Equatable, LocalizedError, Sendable {
         case .apiError(_, let msg),
              .toolExecutionError(_, let msg),
              .sessionError(let msg),
-             .mcpConnectionError(_, let msg):
+             .mcpConnectionError(_, let msg),
+             .invalidConfiguration(let msg):
             return msg
         case .permissionDenied(_, let reason):
             return reason
@@ -123,6 +126,8 @@ public enum SDKError: Error, Equatable, LocalizedError, Sendable {
             return "Permission denied for \(tool): \(reason)"
         case .abortError:
             return "Operation aborted"
+        case .invalidConfiguration(let message):
+            return "Invalid configuration: \(message)"
         }
     }
 }

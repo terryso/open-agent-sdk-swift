@@ -20,7 +20,10 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
     // MARK: - Public Read-Only Properties
 
     /// The model identifier used for API requests.
-    public let model: String
+    ///
+    /// Use ``switchModel(_:)`` to change the model at runtime. The property is
+    /// externally read-only but can be mutated internally via ``switchModel(_:)``.
+    public private(set) var model: String
 
     /// The system prompt provided to the agent, or `nil` if none was specified.
     public let systemPrompt: String?
@@ -119,6 +122,27 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
     /// - Parameter callback: The authorization callback, or nil to clear it.
     public func setCanUseTool(_ callback: CanUseToolFn?) {
         options.canUseTool = callback
+    }
+
+    // MARK: - Dynamic Model Switching
+
+    /// Switches the LLM model used for subsequent API requests.
+    ///
+    /// After calling this method, the next ``prompt(_:)`` or ``stream(_:)`` invocation
+    /// will use the new model. Any in-progress stream continues to use the model that
+    /// was active when it started.
+    ///
+    /// - Parameter model: The new model identifier. Must be a non-empty, non-whitespace string.
+    /// - Throws: ``SDKError/invalidConfiguration`` if the model name is empty or whitespace-only.
+    ///   No whitelist validation is performed -- unknown model names are allowed and any
+    ///   API errors (e.g., 404) are reported at query time.
+    public func switchModel(_ model: String) throws {
+        let trimmed = model.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            throw SDKError.invalidConfiguration("Model name cannot be empty")
+        }
+        self.model = trimmed
+        self.options.model = trimmed
     }
 
     // MARK: - MCP Integration
@@ -262,6 +286,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
         var maxTokensRecoveryAttempts = 0
         let MAX_TOKENS_RECOVERY = 3
         var compactState = createAutoCompactState()
+        var costByModel: [String: CostBreakdownEntry] = [:]
         // Skill system: create restriction stack once before the loop so it persists across turns
         let restrictionStack = options.skillRegistry != nil ? ToolRestrictionStack() : nil
         // File cache: shared across all tool executions in this agent session
@@ -345,7 +370,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                     durationMs: Self.computeDurationMs(ContinuousClock.now - startTime),
                     messages: [],
                     status: .errorDuringExecution,
-                    totalCostUsd: totalCostUsd
+                    totalCostUsd: totalCostUsd,
+                    costBreakdown: Array(costByModel.values)
                 )
             }
 
@@ -358,7 +384,28 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                     outputTokens: usage["output_tokens"] as? Int ?? 0
                 )
                 totalUsage = totalUsage + turnUsage
-                totalCostUsd += estimateCost(model: model, usage: turnUsage)
+                let turnCost = estimateCost(model: model, usage: turnUsage)
+                totalCostUsd += turnCost
+                // Track per-model cost breakdown
+                let currentModel = model
+                if var existing = costByModel[currentModel] {
+                    let newInput = existing.inputTokens + turnUsage.inputTokens
+                    let newOutput = existing.outputTokens + turnUsage.outputTokens
+                    let newCost = existing.costUsd + turnCost
+                    costByModel[currentModel] = CostBreakdownEntry(
+                        model: currentModel,
+                        inputTokens: newInput,
+                        outputTokens: newOutput,
+                        costUsd: newCost
+                    )
+                } else {
+                    costByModel[currentModel] = CostBreakdownEntry(
+                        model: currentModel,
+                        inputTokens: turnUsage.inputTokens,
+                        outputTokens: turnUsage.outputTokens,
+                        costUsd: turnCost
+                    )
+                }
             }
 
             // Check budget limit after cost accumulation
@@ -515,7 +562,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
             durationMs: Self.computeDurationMs(ContinuousClock.now - startTime),
             messages: [],
             status: status,
-            totalCostUsd: totalCostUsd
+            totalCostUsd: totalCostUsd,
+            costBreakdown: Array(costByModel.values)
         )
     }
 
@@ -666,6 +714,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                 var loopExitedCleanly = false
                 let MAX_TOKENS_RECOVERY = 3
                 var compactState = createAutoCompactState()
+                var costByModel: [String: CostBreakdownEntry] = [:]
 
                 while turnCount < capturedMaxTurns {
                     // Auto-compact if context is too large (FR9)
@@ -718,7 +767,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                         Self.yieldStreamError(
                             continuation: continuation, text: "",
                             usage: totalUsage, turnCount: turnCount, startTime: startTime,
-                            totalCostUsd: totalCostUsd
+                            totalCostUsd: totalCostUsd,
+                            costBreakdown: Array(costByModel.values)
                         )
                         return
                     }
@@ -745,7 +795,25 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                                         outputTokens: 0
                                     )
                                     // Calculate cost for input tokens at message start
-                                    totalCostUsd += estimateCost(model: currentModel, usage: TokenUsage(inputTokens: inputTokens, outputTokens: 0))
+                                    let turnCost = estimateCost(model: currentModel, usage: TokenUsage(inputTokens: inputTokens, outputTokens: 0))
+                                    totalCostUsd += turnCost
+                                    // Track per-model cost breakdown
+                                    let modelKey = currentModel
+                                    if var existing = costByModel[modelKey] {
+                                        costByModel[modelKey] = CostBreakdownEntry(
+                                            model: modelKey,
+                                            inputTokens: existing.inputTokens + inputTokens,
+                                            outputTokens: existing.outputTokens,
+                                            costUsd: existing.costUsd + turnCost
+                                        )
+                                    } else {
+                                        costByModel[modelKey] = CostBreakdownEntry(
+                                            model: modelKey,
+                                            inputTokens: inputTokens,
+                                            outputTokens: 0,
+                                            costUsd: turnCost
+                                        )
+                                    }
                                 }
 
                                 // Check budget after input token cost accumulation
@@ -774,7 +842,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                                         usage: totalUsage,
                                         numTurns: turnCount,
                                         durationMs: durationMs,
-                                        totalCostUsd: totalCostUsd
+                                        totalCostUsd: totalCostUsd,
+                                        costBreakdown: Array(costByModel.values)
                                     )))
                                     continuation.finish()
                                     return
@@ -828,7 +897,25 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                                     outputTokens: usage["output_tokens"] as? Int ?? 0
                                 )
                                 totalUsage = totalUsage + turnUsage
-                                totalCostUsd += estimateCost(model: currentModel, usage: turnUsage)
+                                let turnCost = estimateCost(model: currentModel, usage: turnUsage)
+                                totalCostUsd += turnCost
+                                // Track per-model cost breakdown
+                                let modelKey = currentModel
+                                if var existing = costByModel[modelKey] {
+                                    costByModel[modelKey] = CostBreakdownEntry(
+                                        model: modelKey,
+                                        inputTokens: existing.inputTokens + turnUsage.inputTokens,
+                                        outputTokens: existing.outputTokens + turnUsage.outputTokens,
+                                        costUsd: existing.costUsd + turnCost
+                                    )
+                                } else {
+                                    costByModel[modelKey] = CostBreakdownEntry(
+                                        model: modelKey,
+                                        inputTokens: turnUsage.inputTokens,
+                                        outputTokens: turnUsage.outputTokens,
+                                        costUsd: turnCost
+                                    )
+                                }
 
                                 // Check budget after cost accumulation
                                 if let budget = capturedMaxBudgetUsd, totalCostUsd > budget {
@@ -857,7 +944,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                                         usage: totalUsage,
                                         numTurns: turnCount + 1,
                                         durationMs: durationMs,
-                                        totalCostUsd: totalCostUsd
+                                        totalCostUsd: totalCostUsd,
+                                        costBreakdown: Array(costByModel.values)
                                     )))
                                     continuation.finish()
                                     return
@@ -900,7 +988,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                                 Self.yieldStreamError(
                                     continuation: continuation, text: accumulatedText,
                                     usage: totalUsage, turnCount: turnCount, startTime: startTime,
-                                    totalCostUsd: totalCostUsd
+                                    totalCostUsd: totalCostUsd,
+                                    costBreakdown: Array(costByModel.values)
                                 )
                                 return
 
@@ -919,7 +1008,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                         Self.yieldStreamError(
                             continuation: continuation, text: accumulatedText,
                             usage: totalUsage, turnCount: turnCount, startTime: startTime,
-                            totalCostUsd: totalCostUsd
+                            totalCostUsd: totalCostUsd,
+                            costBreakdown: Array(costByModel.values)
                         )
                         return
                     }
@@ -1049,7 +1139,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                     usage: totalUsage,
                     numTurns: turnCount,
                     durationMs: durationMs,
-                    totalCostUsd: totalCostUsd
+                    totalCostUsd: totalCostUsd,
+                    costBreakdown: Array(costByModel.values)
                 )))
                 // MCP cleanup handled by defer block above
                 // Primary MCP cleanup — synchronous await on the main exit path.
@@ -1161,7 +1252,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
         usage: TokenUsage,
         turnCount: Int,
         startTime: ContinuousClock.Instant,
-        totalCostUsd: Double = 0.0
+        totalCostUsd: Double = 0.0,
+        costBreakdown: [CostBreakdownEntry] = []
     ) {
         continuation.yield(.result(SDKMessage.ResultData(
             subtype: .errorDuringExecution,
@@ -1169,7 +1261,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
             usage: usage,
             numTurns: turnCount,
             durationMs: computeDurationMs(ContinuousClock.now - startTime),
-            totalCostUsd: totalCostUsd
+            totalCostUsd: totalCostUsd,
+            costBreakdown: costBreakdown
         )))
         continuation.finish()
     }

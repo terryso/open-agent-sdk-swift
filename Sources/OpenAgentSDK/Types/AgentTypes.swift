@@ -239,6 +239,29 @@ public enum QueryStatus: String, Sendable, Equatable {
     case errorMaxBudgetUsd
 }
 
+/// Per-model cost entry for cost breakdown tracking.
+///
+/// Each entry records the token usage and estimated cost attributed to a specific
+/// model during an agent query. When the model is switched mid-session, multiple
+/// entries are produced -- one per model used.
+public struct CostBreakdownEntry: Sendable, Equatable {
+    /// The model identifier this entry tracks.
+    public let model: String
+    /// Total input tokens consumed by this model.
+    public let inputTokens: Int
+    /// Total output tokens produced by this model.
+    public let outputTokens: Int
+    /// Estimated cost in USD for this model's usage.
+    public let costUsd: Double
+
+    public init(model: String, inputTokens: Int, outputTokens: Int, costUsd: Double) {
+        self.model = model
+        self.inputTokens = inputTokens
+        self.outputTokens = outputTokens
+        self.costUsd = costUsd
+    }
+}
+
 /// Result of a completed agent query.
 ///
 /// Contains the final response text, token usage statistics, timing information,
@@ -258,8 +281,10 @@ public struct QueryResult: Sendable {
     public let status: QueryStatus
     /// Total cost in USD for this query.
     public let totalCostUsd: Double
+    /// Per-model cost breakdown for this query.
+    public let costBreakdown: [CostBreakdownEntry]
 
-    public init(text: String, usage: TokenUsage, numTurns: Int, durationMs: Int, messages: [SDKMessage], status: QueryStatus = .success, totalCostUsd: Double = 0.0) {
+    public init(text: String, usage: TokenUsage, numTurns: Int, durationMs: Int, messages: [SDKMessage], status: QueryStatus = .success, totalCostUsd: Double = 0.0, costBreakdown: [CostBreakdownEntry] = []) {
         self.text = text
         self.usage = usage
         self.numTurns = numTurns
@@ -267,6 +292,7 @@ public struct QueryResult: Sendable {
         self.messages = messages
         self.status = status
         self.totalCostUsd = totalCostUsd
+        self.costBreakdown = costBreakdown
     }
 }
 

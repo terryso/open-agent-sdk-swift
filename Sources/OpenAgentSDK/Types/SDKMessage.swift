@@ -170,14 +170,17 @@ public enum SDKMessage: Sendable {
         public let durationMs: Int
         /// Total cost in USD for this query.
         public let totalCostUsd: Double
+        /// Per-model cost breakdown for this query.
+        public let costBreakdown: [CostBreakdownEntry]
 
-        public init(subtype: Subtype, text: String, usage: TokenUsage?, numTurns: Int, durationMs: Int, totalCostUsd: Double = 0.0) {
+        public init(subtype: Subtype, text: String, usage: TokenUsage?, numTurns: Int, durationMs: Int, totalCostUsd: Double = 0.0, costBreakdown: [CostBreakdownEntry] = []) {
             self.subtype = subtype
             self.text = text
             self.usage = usage
             self.numTurns = numTurns
             self.durationMs = durationMs
             self.totalCostUsd = totalCostUsd
+            self.costBreakdown = costBreakdown
         }
     }
 
