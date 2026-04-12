@@ -569,7 +569,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                             restrictionStack: restrictionStack,
                             skillNestingDepth: restrictionStack?.nestingDepth ?? 0,
                             maxSkillRecursionDepth: options.maxSkillRecursionDepth,
-                            fileCache: fileCache
+                            fileCache: fileCache,
+                            sandbox: options.sandbox
                         )
                     )
 
@@ -720,6 +721,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
             maxSizeBytes: options.fileCacheMaxSizeBytes,
             maxEntrySizeBytes: options.fileCacheMaxEntrySizeBytes
         )
+        let capturedSandbox = options.sandbox
 
         // Build tool definitions for API call
         let capturedApiTools: [[String: Any]]? = {
@@ -1258,7 +1260,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                                     restrictionStack: capturedRestrictionStack,
                                     skillNestingDepth: capturedRestrictionStack?.nestingDepth ?? 0,
                                     maxSkillRecursionDepth: capturedMaxSkillRecursionDepth,
-                                    fileCache: capturedFileCache
+                                    fileCache: capturedFileCache,
+                                    sandbox: capturedSandbox
                                 )
                             )
 

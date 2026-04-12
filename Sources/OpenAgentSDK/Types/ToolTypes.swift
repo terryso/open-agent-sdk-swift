@@ -95,6 +95,10 @@ public struct ToolContext: Sendable {
     /// Injected by Core/ when the agent is created. Nil when file caching is not enabled.
     public let fileCache: FileCache?
 
+    /// Optional sandbox settings for restricting tool execution.
+    /// Injected by Core/ from AgentOptions.sandbox. Nil when no sandbox is configured.
+    public let sandbox: SandboxSettings?
+
     public init(
         cwd: String,
         toolUseId: String = "",
@@ -114,7 +118,8 @@ public struct ToolContext: Sendable {
         restrictionStack: ToolRestrictionStack? = nil,
         skillNestingDepth: Int = 0,
         maxSkillRecursionDepth: Int = 4,
-        fileCache: FileCache? = nil
+        fileCache: FileCache? = nil,
+        sandbox: SandboxSettings? = nil
     ) {
         self.cwd = cwd
         self.toolUseId = toolUseId
@@ -135,6 +140,7 @@ public struct ToolContext: Sendable {
         self.skillNestingDepth = skillNestingDepth
         self.maxSkillRecursionDepth = maxSkillRecursionDepth
         self.fileCache = fileCache
+        self.sandbox = sandbox
     }
 
     /// Returns a copy of this context with the toolUseId replaced.
@@ -156,7 +162,8 @@ public struct ToolContext: Sendable {
             restrictionStack: restrictionStack,
             skillNestingDepth: skillNestingDepth,
             maxSkillRecursionDepth: maxSkillRecursionDepth,
-            fileCache: fileCache
+            fileCache: fileCache,
+            sandbox: sandbox
         )
     }
 
@@ -181,7 +188,8 @@ public struct ToolContext: Sendable {
             restrictionStack: restrictionStack,
             skillNestingDepth: depth,
             maxSkillRecursionDepth: maxSkillRecursionDepth,
-            fileCache: fileCache
+            fileCache: fileCache,
+            sandbox: sandbox
         )
     }
 }

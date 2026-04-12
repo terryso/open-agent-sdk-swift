@@ -72,6 +72,10 @@ public struct SDKConfiguration: Sendable, Equatable, CustomStringConvertible,
     /// Output destination for log entries. Defaults to ``LogOutput/console`` (stderr).
     public var logOutput: LogOutput
 
+    /// Optional sandbox settings for restricting agent tool execution.
+    /// When `nil` (default), no sandbox restrictions are applied.
+    public var sandbox: SandboxSettings?
+
     /// Default model used when none is specified.
     public static let defaultModel = "claude-sonnet-4-6"
 
@@ -109,7 +113,8 @@ public struct SDKConfiguration: Sendable, Equatable, CustomStringConvertible,
         gitCacheTTL: TimeInterval = 5.0,
         projectRoot: String? = nil,
         logLevel: LogLevel = .none,
-        logOutput: LogOutput = .console
+        logOutput: LogOutput = .console,
+        sandbox: SandboxSettings? = nil
     ) {
         self.apiKey = Self.sanitizeAPIKey(apiKey)
         self.model = model
@@ -123,6 +128,7 @@ public struct SDKConfiguration: Sendable, Equatable, CustomStringConvertible,
         self.projectRoot = projectRoot
         self.logLevel = logLevel
         self.logOutput = logOutput
+        self.sandbox = sandbox
     }
 
     // MARK: - Environment Variable Parsing
@@ -182,7 +188,8 @@ public struct SDKConfiguration: Sendable, Equatable, CustomStringConvertible,
             gitCacheTTL: overrides.gitCacheTTL,
             projectRoot: overrides.projectRoot,
             logLevel: overrides.logLevel,
-            logOutput: overrides.logOutput
+            logOutput: overrides.logOutput,
+            sandbox: overrides.sandbox ?? env.sandbox
         )
     }
 
@@ -199,7 +206,8 @@ public struct SDKConfiguration: Sendable, Equatable, CustomStringConvertible,
             + "gitCacheTTL: \(gitCacheTTL), "
             + "projectRoot: \(projectRoot.map { "\"\($0)\"" } ?? "nil"), "
             + "logLevel: \(logLevel.description), "
-            + "logOutput: \(logOutputDescription))"
+            + "logOutput: \(logOutputDescription), "
+            + "sandbox: \(sandbox?.description ?? "nil"))"
     }
 
     /// A debug representation with the API key masked as `"***"`.
@@ -213,7 +221,8 @@ public struct SDKConfiguration: Sendable, Equatable, CustomStringConvertible,
             + "gitCacheTTL: \(gitCacheTTL), "
             + "projectRoot: \(projectRoot.map { "\"\($0)\"" } ?? "nil"), "
             + "logLevel: \(logLevel.description), "
-            + "logOutput: \(logOutputDescription))"
+            + "logOutput: \(logOutputDescription), "
+            + "sandbox: \(sandbox?.description ?? "nil"))"
     }
 
     /// Description of logOutput for display (masks custom closure).

@@ -121,6 +121,11 @@ public struct AgentOptions: Sendable {
     /// Output destination for log entries. Defaults to ``LogOutput/console`` (stderr).
     public var logOutput: LogOutput
 
+    /// Optional sandbox settings for restricting agent tool execution.
+    /// When `nil` (default), no sandbox restrictions are applied.
+    /// Propagated to ``ToolContext`` for use during tool execution.
+    public var sandbox: SandboxSettings?
+
     public init(
         apiKey: String? = nil,
         model: String = "claude-sonnet-4-6",
@@ -156,7 +161,8 @@ public struct AgentOptions: Sendable {
         gitCacheTTL: TimeInterval = 5.0,
         projectRoot: String? = nil,
         logLevel: LogLevel = .none,
-        logOutput: LogOutput = .console
+        logOutput: LogOutput = .console,
+        sandbox: SandboxSettings? = nil
     ) {
         self.apiKey = apiKey
         self.model = model
@@ -193,6 +199,7 @@ public struct AgentOptions: Sendable {
         self.projectRoot = projectRoot
         self.logLevel = logLevel
         self.logOutput = logOutput
+        self.sandbox = sandbox
     }
 
     /// Create AgentOptions from an SDKConfiguration, using its resolved values
@@ -236,6 +243,7 @@ public struct AgentOptions: Sendable {
         self.projectRoot = config.projectRoot
         self.logLevel = config.logLevel
         self.logOutput = config.logOutput
+        self.sandbox = config.sandbox
     }
 }
 
