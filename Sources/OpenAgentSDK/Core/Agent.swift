@@ -160,8 +160,10 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
         guard !trimmed.isEmpty else {
             throw SDKError.invalidConfiguration("Model name cannot be empty")
         }
+        let oldModel = self.model
         self.model = trimmed
         self.options.model = trimmed
+        Logger.shared.info("Agent", "model_switch", data: ["from": oldModel, "to": trimmed])
     }
 
     // MARK: - Query Cancellation
@@ -388,6 +390,24 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                     )
                 }, retryConfig: retryCfg)
             } catch {
+                // Structured log for API error
+                let statusCode: String
+                let errorMessage: String
+                if let sdkError = error as? SDKError, let code = sdkError.statusCode {
+                    statusCode = String(code)
+                    errorMessage = sdkError.message
+                } else if let urlError = error as? URLError {
+                    statusCode = String(urlError.errorCode)
+                    errorMessage = urlError.localizedDescription
+                } else {
+                    statusCode = "0"
+                    errorMessage = error.localizedDescription
+                }
+                Logger.shared.error("QueryEngine", "api_error", data: [
+                    "statusCode": statusCode,
+                    "message": errorMessage
+                ])
+
                 // Clean up MCP connections on error
                 if let mcpManager {
                     await mcpManager.shutdown()
@@ -465,9 +485,28 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                 }
             }
 
+            // Structured log for LLM response
+            let turnDurationMs = Self.computeDurationMs(ContinuousClock.now - startTime)
+            if let usage = response["usage"] as? [String: Any] {
+                let turnInputTokens = usage["input_tokens"] as? Int ?? 0
+                let turnOutputTokens = usage["output_tokens"] as? Int ?? 0
+                Logger.shared.debug("QueryEngine", "llm_response", data: [
+                    "inputTokens": String(turnInputTokens),
+                    "outputTokens": String(turnOutputTokens),
+                    "durationMs": String(turnDurationMs),
+                    "model": model
+                ])
+            }
+
             // Check budget limit after cost accumulation
             if let budget = options.maxBudgetUsd, totalCostUsd > budget {
                 status = .errorMaxBudgetUsd
+                // Structured log for budget exceeded
+                Logger.shared.warn("QueryEngine", "budget_exceeded", data: [
+                    "costUsd": String(format: "%.4f", totalCostUsd),
+                    "budgetUsd": String(format: "%.4f", budget),
+                    "turnsUsed": String(turnCount)
+                ])
                 // Extract content before breaking so partial text is preserved
                 if let content = response["content"] {
                     lastAssistantText = extractText(from: content)
@@ -837,6 +876,23 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                             )
                         }, retryConfig: retryCfg)
                     } catch {
+                        // Structured log for API error in stream
+                        let statusCode: String
+                        let errorMessage: String
+                        if let sdkError = error as? SDKError, let code = sdkError.statusCode {
+                            statusCode = String(code)
+                            errorMessage = sdkError.message
+                        } else if let urlError = error as? URLError {
+                            statusCode = String(urlError.errorCode)
+                            errorMessage = urlError.localizedDescription
+                        } else {
+                            statusCode = "0"
+                            errorMessage = error.localizedDescription
+                        }
+                        Logger.shared.error("QueryEngine", "api_error", data: [
+                            "statusCode": statusCode,
+                            "message": errorMessage
+                        ])
                         // API connection error — fire hooks before yielding error
                         if let hookRegistry = capturedHookRegistry {
                             let stopInput = HookInput(event: .stop, cwd: capturedCwd)
@@ -910,6 +966,13 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                                             .compactMap { $0["text"] as? String }
                                             .joined()
                                     }.joined(separator: " ")
+
+                                    // Structured log for budget exceeded
+                                    Logger.shared.warn("QueryEngine", "budget_exceeded", data: [
+                                        "costUsd": String(format: "%.4f", totalCostUsd),
+                                        "budgetUsd": String(format: "%.4f", budget),
+                                        "turnsUsed": String(turnCount)
+                                    ])
 
                                     // Fire hooks before yielding budget error
                                     if let hookRegistry = capturedHookRegistry {
@@ -1013,6 +1076,13 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
                                     }.joined(separator: " ")
                                     let finalText = previousText.isEmpty ? accumulatedText : "\(previousText) \(accumulatedText)"
 
+                                    // Structured log for budget exceeded
+                                    Logger.shared.warn("QueryEngine", "budget_exceeded", data: [
+                                        "costUsd": String(format: "%.4f", totalCostUsd),
+                                        "budgetUsd": String(format: "%.4f", budget),
+                                        "turnsUsed": String(turnCount + 1)
+                                    ])
+
                                     // Fire hooks before yielding budget error
                                     if let hookRegistry = capturedHookRegistry {
                                         let stopInput = HookInput(event: .stop, cwd: capturedCwd)
@@ -1036,6 +1106,15 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
 
                             case .messageStop:
                                 turnCount += 1
+
+                                // Structured log for LLM response (stream)
+                                let streamDurationMs = Self.computeDurationMs(ContinuousClock.now - startTime)
+                                Logger.shared.debug("QueryEngine", "llm_response", data: [
+                                    "inputTokens": String(totalUsage.inputTokens),
+                                    "outputTokens": String(totalUsage.outputTokens),
+                                    "durationMs": String(streamDurationMs),
+                                    "model": currentModel
+                                ])
 
                                 // If there's accumulated text, add it as a text content block
                                 if !accumulatedText.isEmpty && !toolUseAccumulator.isEmpty {

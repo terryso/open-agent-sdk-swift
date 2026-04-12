@@ -137,6 +137,7 @@ func compactConversation(
         }
 
         // Replace messages with compact summary
+        let beforeTokens = estimateMessagesTokens(messages)
         let compactedMessages: [[String: Any]] = [
             [
                 "role": "user",
@@ -147,6 +148,15 @@ func compactConversation(
                 "content": "I understand the context from the previous conversation. I'll continue from where we left off."
             ]
         ]
+
+        let afterTokens = estimateMessagesTokens(compactedMessages)
+
+        // Structured log for compact event
+        Logger.shared.info("QueryEngine", "compact", data: [
+            "trigger": "auto",
+            "beforeTokens": String(beforeTokens),
+            "afterTokens": String(afterTokens)
+        ])
 
         return (
             compactedMessages: compactedMessages,
@@ -387,6 +397,13 @@ func microCompact(
         guard !summary.isEmpty else {
             return content
         }
+
+        // Structured log for micro-compact event
+        Logger.shared.debug("QueryEngine", "compact", data: [
+            "trigger": "micro",
+            "originalSize": String(content.count),
+            "compressedSize": String(summary.count)
+        ])
 
         return "[微压缩] 原始长度: \(content.count), 压缩后长度: \(summary.count)\n\n\(summary)"
     } catch {

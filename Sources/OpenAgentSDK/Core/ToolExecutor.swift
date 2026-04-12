@@ -346,7 +346,16 @@ enum ToolExecutor {
                 }
                 // allow — may have updatedInput
                 let effectiveInput = result.updatedInput ?? block.input
+                let toolStart = Date()
                 let execResult = await tool.call(input: effectiveInput, context: context)
+                let toolDurationMs = String(Int(Date().timeIntervalSince(toolStart) * 1000))
+
+                // Structured log for tool execution
+                Logger.shared.debug("ToolExecutor", "tool_result", data: [
+                    "tool": block.name,
+                    "durationMs": toolDurationMs,
+                    "outputSize": String(execResult.content.utf8.count)
+                ])
 
                 // PostToolUse / PostToolUseFailure hook
                 await firePostToolHook(
@@ -388,7 +397,16 @@ enum ToolExecutor {
         }
 
         // Execute tool — errors are captured in ToolResult, not thrown
+        let toolStart = Date()
         let result = await tool.call(input: block.input, context: context)
+        let toolDurationMs = String(Int(Date().timeIntervalSince(toolStart) * 1000))
+
+        // Structured log for tool execution
+        Logger.shared.debug("ToolExecutor", "tool_result", data: [
+            "tool": block.name,
+            "durationMs": toolDurationMs,
+            "outputSize": String(result.content.utf8.count)
+        ])
 
         // PostToolUse / PostToolUseFailure hook
         await firePostToolHook(
