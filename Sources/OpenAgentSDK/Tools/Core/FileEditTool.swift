@@ -49,6 +49,12 @@ public func createEditTool() -> ToolProtocol {
         isReadOnly: false
     ) { (input: FileEditInput, context: ToolContext) async throws -> ToolExecuteResult in
         let resolvedPath = resolvePath(input.file_path, cwd: context.cwd)
+
+        // Sandbox: enforce write-path restrictions before file I/O
+        if let sandbox = context.sandbox {
+            try SandboxChecker.checkPath(resolvedPath, for: .write, settings: sandbox)
+        }
+
         let fileManager = FileManager.default
 
         // Check file exists and is not a directory

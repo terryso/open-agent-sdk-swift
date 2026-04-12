@@ -54,6 +54,11 @@ public func createGlobTool() -> ToolProtocol {
             searchDir = context.cwd
         }
 
+        // Sandbox: enforce read-path restrictions before directory enumeration
+        if let sandbox = context.sandbox {
+            try SandboxChecker.checkPath(searchDir, for: .read, settings: sandbox)
+        }
+
         let fileManager = FileManager.default
 
         // Check that search directory exists

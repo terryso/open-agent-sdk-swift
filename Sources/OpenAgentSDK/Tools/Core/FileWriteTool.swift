@@ -43,6 +43,12 @@ public func createWriteTool() -> ToolProtocol {
         isReadOnly: false
     ) { (input: FileWriteInput, context: ToolContext) async throws -> ToolExecuteResult in
         let resolvedPath = resolvePath(input.file_path, cwd: context.cwd)
+
+        // Sandbox: enforce write-path restrictions before file I/O
+        if let sandbox = context.sandbox {
+            try SandboxChecker.checkPath(resolvedPath, for: .write, settings: sandbox)
+        }
+
         let fileManager = FileManager.default
 
         // Cancellation check: skip all file operations if task is already cancelled (FR60)

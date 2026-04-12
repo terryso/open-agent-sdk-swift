@@ -51,6 +51,12 @@ public func createReadTool() -> ToolProtocol {
         isReadOnly: true
     ) { (input: FileReadInput, context: ToolContext) async throws -> ToolExecuteResult in
         let resolvedPath = resolvePath(input.file_path, cwd: context.cwd)
+
+        // Sandbox: enforce read-path restrictions before file I/O
+        if let sandbox = context.sandbox {
+            try SandboxChecker.checkPath(resolvedPath, for: .read, settings: sandbox)
+        }
+
         let fileManager = FileManager.default
 
         // Check if path is a directory
