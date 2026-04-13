@@ -102,5 +102,10 @@ let package = Package(
             ],
             path: "Examples/AdvancedMCPExample"
         ),
+        .executableTarget(
+            name: "SkillsExample",
+            dependencies: ["OpenAgentSDK"],
+            path: "Examples/SkillsExample"
+        ),
     ]
 )

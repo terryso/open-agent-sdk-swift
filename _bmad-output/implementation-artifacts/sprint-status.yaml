@@ -1,5 +1,5 @@
 # generated: 2026-04-04
-# last_updated: 2026-04-13 (story 14-5 done)
+# last_updated: 2026-04-13 (story 15-1 done)
 # project: open-agent-sdk-swift
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-04-04
-last_updated: 2026-04-13 (story 14-5 done)
+last_updated: 2026-04-13 (story 15-1 done)
 project_key: NOKEY
 tracking_system: file-system
 story_location: _bmad-output/implementation-artifacts
@@ -162,10 +162,22 @@ development_status:
   epic-13-retrospective: optional
 
   # Epic 14: 运行时防护（日志与沙盒）
-  epic-14: in-progress
+  epic-14: done
   14-1-logger-type-and-injection: done
   14-2-structured-log-output: done
   14-3-sandbox-settings-config-model: done
   14-4-filesystem-sandbox-enforcement: done
   14-5-sandbox-bash-command-filtering: done
   epic-14-retrospective: optional
+
+  # Epic 15: SDK Examples 补充
+  epic-15: in-progress
+  15-1-skills-example: done
+  15-2-sandbox-example: backlog
+  15-3-logger-example: backlog
+  15-4-model-switching-example: backlog
+  15-5-query-abort-example: backlog
+  15-6-context-injection-example: backlog
+  15-7-multi-turn-example: backlog
+  15-8-openai-compat-example: backlog
+  epic-15-retrospective: optional

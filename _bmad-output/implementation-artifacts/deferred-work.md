@@ -59,3 +59,8 @@
 ## Deferred from: code review of 14-5-sandbox-bash-command-filtering (2026-04-13)
 
 - ~~**Single `$(...)`/backtick pair checked**~~ — **FIXED** in checkpoint review: `extractCommandSubstitution` now returns all substitution pairs instead of just the first
+
+## Deferred from: code review of 15-1-skills-example (2026-04-13)
+
+- **Backslash line continuation in promptTemplate** — Multi-line string literal uses `\` for line continuation, making the prompt harder to debug. Style preference, consistent with project patterns. [Examples/SkillsExample/main.swift:71-72]
+- **No error handling around agent.prompt() call** — Example does not wrap agent.prompt() in do/catch. Consistent with all other examples in the project. Pre-existing pattern. [Examples/SkillsExample/main.swift:131]

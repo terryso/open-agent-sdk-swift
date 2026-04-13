@@ -239,6 +239,26 @@
             "target": "AdvancedMCPExample",
             "configuration": "release",
             "preLaunchTask": "swift: Build Release AdvancedMCPExample"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:open-agent-sdk-swift}",
+            "name": "Debug SkillsExample",
+            "target": "SkillsExample",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug SkillsExample"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:open-agent-sdk-swift}",
+            "name": "Release SkillsExample",
+            "target": "SkillsExample",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release SkillsExample"
         }
     ]
 }
