@@ -68,3 +68,7 @@
 
 - **Backslash line continuation in promptTemplate** — Multi-line string literal uses `\` for line continuation, making the prompt harder to debug. Style preference, consistent with project patterns. [Examples/SkillsExample/main.swift:71-72]
 - **No error handling around agent.prompt() call** — Example does not wrap agent.prompt() in do/catch. Consistent with all other examples in the project. Pre-existing pattern. [Examples/SkillsExample/main.swift:131]
+
+## Fixed in: code review of 15-6-context-injection-example (2026-04-13)
+
+- ~~**ShellHookExecutor.swift production code changes are scope creep**~~ — **NOT scope creep**: This was a deeper fix for the CI crash from commit acd5a26 (NSFileHandleOperationException). The previous fix wrapped reads in try?, but the incremental readabilityHandler approach still had race conditions in CI. The refactor eliminates the race by reading all stdout at once after process termination and properly closing the write end of the pipe. [Sources/OpenAgentSDK/Hooks/ShellHookExecutor.swift]

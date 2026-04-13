@@ -1,15 +1,13 @@
 import Foundation
 
-// MARK: - Thread-safe Data Accumator
+// MARK: - Thread-safe State
 
-/// Thread-safe accumulator for capturing shell hook process output.
+/// Thread-safe state for shell hook process execution.
 ///
 /// Uses `@unchecked Sendable` because all mutable state is accessed sequentially:
-/// Pipe readability handlers and the termination handler all fire on the run loop's
-/// dispatch queue, avoiding data races. Mirrors the pattern from BashTool.swift.
-private final class ShellHookOutputAccumulator: @unchecked Sendable {
-    var stdoutData = Data()
-
+/// the timeout fires on a global dispatch queue, and the termination handler fires
+/// on an arbitrary dispatch queue, but only one of them sets `resumed`.
+private final class ShellHookExecutionState: @unchecked Sendable {
     /// Whether the timeout has already fired.
     var timeoutFired = false
 
@@ -51,7 +49,7 @@ public enum ShellHookExecutor {
         let timeoutMs = max(1, timeoutMs)
 
         return await withCheckedContinuation { continuation in
-            let accumulator = ShellHookOutputAccumulator()
+            let accumulator = ShellHookExecutionState()
             let process = Process()
             let stdinPipe = Pipe()
             let stdoutPipe = Pipe()
@@ -88,13 +86,6 @@ public enum ShellHookExecutor {
             }
             try? stdinPipe.fileHandleForWriting.close()
 
-            // Read stdout incrementally
-            stdoutPipe.fileHandleForReading.readabilityHandler = { handler in
-                if let data = try? handler.availableData {
-                    accumulator.stdoutData.append(data)
-                }
-            }
-
             // Timeout: terminate process if it exceeds the limit
             DispatchQueue.global().asyncAfter(
                 deadline: .now() + .milliseconds(timeoutMs)
@@ -105,13 +96,8 @@ public enum ShellHookExecutor {
                 }
             }
 
-            // Termination handler: process output
+            // Termination handler: read and process output
             process.terminationHandler = { _ in
-                stdoutPipe.fileHandleForReading.readabilityHandler = nil
-                if let remaining = try? stdoutPipe.fileHandleForReading.readDataToEndOfFile() {
-                    accumulator.stdoutData.append(remaining)
-                }
-
                 guard !accumulator.resumed else { return }
                 accumulator.resumed = true
 
@@ -127,7 +113,9 @@ public enum ShellHookExecutor {
                     return
                 }
 
-                let stdoutString = String(data: accumulator.stdoutData, encoding: .utf8)?
+                // Read all stdout after process has terminated
+                let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
+                let stdoutString = String(data: stdoutData, encoding: .utf8)?
                     .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
 
                 // Empty stdout: return nil
@@ -149,6 +137,9 @@ public enum ShellHookExecutor {
 
             do {
                 try process.run()
+                // Close our copy of stdout write end so readDataToEndOfFile()
+                // gets EOF when the process terminates
+                try? stdoutPipe.fileHandleForWriting.close()
             } catch {
                 guard !accumulator.resumed else { return }
                 accumulator.resumed = true

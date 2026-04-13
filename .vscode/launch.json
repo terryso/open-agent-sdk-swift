@@ -339,6 +339,26 @@
             "target": "QueryAbortExample",
             "configuration": "release",
             "preLaunchTask": "swift: Build Release QueryAbortExample"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:open-agent-sdk-swift}",
+            "name": "Debug ContextInjectionExample",
+            "target": "ContextInjectionExample",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug ContextInjectionExample"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:open-agent-sdk-swift}",
+            "name": "Release ContextInjectionExample",
+            "target": "ContextInjectionExample",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release ContextInjectionExample"
         }
     ]
 }

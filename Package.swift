@@ -127,5 +127,10 @@ let package = Package(
             dependencies: ["OpenAgentSDK"],
             path: "Examples/QueryAbortExample"
         ),
+        .executableTarget(
+            name: "ContextInjectionExample",
+            dependencies: ["OpenAgentSDK"],
+            path: "Examples/ContextInjectionExample"
+        ),
     ]
 )
