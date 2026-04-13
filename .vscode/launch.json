@@ -299,6 +299,26 @@
             "target": "LoggerExample",
             "configuration": "release",
             "preLaunchTask": "swift: Build Release LoggerExample"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:open-agent-sdk-swift}",
+            "name": "Debug ModelSwitchingExample",
+            "target": "ModelSwitchingExample",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug ModelSwitchingExample"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:open-agent-sdk-swift}",
+            "name": "Release ModelSwitchingExample",
+            "target": "ModelSwitchingExample",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release ModelSwitchingExample"
         }
     ]
 }

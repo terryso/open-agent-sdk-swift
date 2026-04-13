@@ -117,5 +117,10 @@ let package = Package(
             dependencies: ["OpenAgentSDK"],
             path: "Examples/LoggerExample"
         ),
+        .executableTarget(
+            name: "ModelSwitchingExample",
+            dependencies: ["OpenAgentSDK"],
+            path: "Examples/ModelSwitchingExample"
+        ),
     ]
 )
