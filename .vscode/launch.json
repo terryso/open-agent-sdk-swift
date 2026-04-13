@@ -279,6 +279,26 @@
             "target": "SandboxExample",
             "configuration": "release",
             "preLaunchTask": "swift: Build Release SandboxExample"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:open-agent-sdk-swift}",
+            "name": "Debug LoggerExample",
+            "target": "LoggerExample",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug LoggerExample"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:open-agent-sdk-swift}",
+            "name": "Release LoggerExample",
+            "target": "LoggerExample",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release LoggerExample"
         }
     ]
 }
