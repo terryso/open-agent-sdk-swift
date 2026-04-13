@@ -60,6 +60,10 @@
 
 - ~~**Single `$(...)`/backtick pair checked**~~ — **FIXED** in checkpoint review: `extractCommandSubstitution` now returns all substitution pairs instead of just the first
 
+## Deferred from: checkpoint review of 15-2-sandbox-example (2026-04-13)
+
+- **Bash tool bypasses path sandbox** — `cat /etc/passwd` succeeds despite `/etc/` being in `deniedPaths` because BashTool only calls `checkCommand` (command name filtering) not `checkPath` (path filtering). Fix: add path extraction phase to `checkCommand` that extracts file-like arguments and checks them against sandbox path rules. [SandboxChecker.swift, BashTool.swift]
+
 ## Deferred from: code review of 15-1-skills-example (2026-04-13)
 
 - **Backslash line continuation in promptTemplate** — Multi-line string literal uses `\` for line continuation, making the prompt harder to debug. Style preference, consistent with project patterns. [Examples/SkillsExample/main.swift:71-72]

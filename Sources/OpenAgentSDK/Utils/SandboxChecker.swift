@@ -195,27 +195,77 @@ public enum SandboxChecker {
         _ command: String,
         settings: SandboxSettings
     ) throws {
-        // Phase 1: No restrictions configured -- all commands allowed
-        guard !settings.deniedCommands.isEmpty || settings.allowedCommands != nil else {
+        let hasCommandRestrictions = !settings.deniedCommands.isEmpty || settings.allowedCommands != nil
+        let hasPathRestrictions = !settings.allowedReadPaths.isEmpty
+            || !settings.allowedWritePaths.isEmpty
+            || !settings.deniedPaths.isEmpty
+
+        // No restrictions configured -- all commands and paths allowed
+        guard hasCommandRestrictions || hasPathRestrictions else {
             return
         }
 
-        // Phase 2: Shell metacharacter detection (subshell, substitution, escape bypasses)
-        try checkShellMetacharacters(command, settings: settings)
+        // Phase 1: Shell metacharacter detection (subshell, substitution, escape bypasses)
+        if hasCommandRestrictions {
+            try checkShellMetacharacters(command, settings: settings)
+        }
 
-        // Phase 3: Basename extraction + allowlist/blocklist matching
-        let basename = extractCommandBasename(command)
+        // Phase 2: Basename extraction + allowlist/blocklist matching
+        if hasCommandRestrictions {
+            let basename = extractCommandBasename(command)
 
-        guard isCommandAllowed(command, settings: settings) else {
-            let reason = "command '\(basename)' is denied by sandbox policy"
+            guard isCommandAllowed(command, settings: settings) else {
+                let reason = "command '\(basename)' is denied by sandbox policy"
 
-            Logger.shared.info("SandboxChecker", "sandbox_denial", data: [
-                "type": "command",
-                "value": basename,
-                "reason": reason
-            ])
+                Logger.shared.info("SandboxChecker", "sandbox_denial", data: [
+                    "type": "command",
+                    "value": basename,
+                    "reason": reason
+                ])
 
-            throw SDKError.permissionDenied(tool: "Bash", reason: reason)
+                throw SDKError.permissionDenied(tool: "Bash", reason: reason)
+            }
+        }
+
+        // Phase 3: Path argument extraction + path sandbox enforcement
+        if hasPathRestrictions {
+            let paths = extractFilePaths(from: command)
+            for path in paths {
+                let normalizedPath = SandboxPathNormalizer.normalize(path)
+                // Check deniedPaths first (applies regardless of operation)
+                for deniedPath in settings.deniedPaths {
+                    let normalizedDenied = SandboxPathNormalizer.normalize(deniedPath)
+                    if isPrefixMatch(normalizedPath: normalizedPath, configuredPath: normalizedDenied) {
+                        let reason = "path '\(path)' in command is denied by sandbox policy"
+
+                        Logger.shared.info("SandboxChecker", "sandbox_denial", data: [
+                            "type": "command_path_denied",
+                            "value": normalizedPath,
+                            "reason": reason
+                        ])
+
+                        throw SDKError.permissionDenied(tool: "Bash", reason: reason)
+                    }
+                }
+                // Check allowedReadPaths (if configured, only listed paths are readable via bash)
+                if !settings.allowedReadPaths.isEmpty {
+                    let allowed = settings.allowedReadPaths.contains { allowedPath in
+                        let normalizedAllowed = SandboxPathNormalizer.normalize(allowedPath)
+                        return isPrefixMatch(normalizedPath: normalizedPath, configuredPath: normalizedAllowed)
+                    }
+                    if !allowed {
+                        let reason = "path '\(path)' in command is outside allowed read scope"
+
+                        Logger.shared.info("SandboxChecker", "sandbox_denial", data: [
+                            "type": "command_path_read",
+                            "value": normalizedPath,
+                            "reason": reason
+                        ])
+
+                        throw SDKError.permissionDenied(tool: "Bash", reason: reason)
+                    }
+                }
+            }
         }
     }
 
@@ -514,5 +564,65 @@ public enum SandboxChecker {
         }
 
         return cmd
+    }
+
+    /// Extract file path arguments from a command string.
+    ///
+    /// Scans whitespace-delimited tokens after the command name and collects those
+    /// that look like filesystem paths. Flags (starting with `-`) are skipped.
+    ///
+    /// Heuristic: a token is treated as a path if it starts with `/`, `./`, or `~`,
+    /// or contains `/` and doesn't start with `-`. This is best-effort — complex
+    /// shell syntax (redirects, heredocs, pipes) is not parsed.
+    ///
+    /// - `cat /etc/passwd` -> `["/etc/passwd"]`
+    /// - `ls -la /tmp/file.txt` -> `["/tmp/file.txt"]`
+    /// - `cp src.txt dst.txt` -> `["src.txt", "dst.txt"]`
+    /// - `git status` -> `[]`
+    /// - `rm -rf /` -> `["/"]`
+    public static func extractFilePaths(from command: String) -> [String] {
+        let trimmed = command.trimmingCharacters(in: .whitespaces)
+        var tokens: [String] = []
+
+        // Simple whitespace split (does not handle quoted strings with spaces)
+        var current = ""
+        var inQuote: Character? = nil
+
+        for char in trimmed {
+            if char == "\"" || char == "'" {
+                if inQuote == char {
+                    inQuote = nil
+                } else if inQuote == nil {
+                    inQuote = char
+                } else {
+                    current.append(char)
+                }
+            } else if char.isWhitespace && inQuote == nil {
+                if !current.isEmpty {
+                    tokens.append(current)
+                    current = ""
+                }
+            } else {
+                current.append(char)
+            }
+        }
+        if !current.isEmpty {
+            tokens.append(current)
+        }
+
+        // Skip the first token (command name)
+        guard tokens.count > 1 else { return [] }
+        let args = tokens.dropFirst()
+
+        var paths: [String] = []
+        for arg in args {
+            // Skip flags (e.g. -la, --verbose)
+            if arg.hasPrefix("-") { continue }
+            // Recognize paths: absolute, relative with ./, home with ~, or containing /
+            if arg.hasPrefix("/") || arg.hasPrefix("./") || arg.hasPrefix("~/") || arg.contains("/") {
+                paths.append(arg)
+            }
+        }
+        return paths
     }
 }
