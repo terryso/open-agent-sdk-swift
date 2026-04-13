@@ -72,3 +72,8 @@
 ## Fixed in: code review of 15-6-context-injection-example (2026-04-13)
 
 - ~~**ShellHookExecutor.swift production code changes are scope creep**~~ — **NOT scope creep**: This was a deeper fix for the CI crash from commit acd5a26 (NSFileHandleOperationException). The previous fix wrapped reads in try?, but the incremental readabilityHandler approach still had race conditions in CI. The refactor eliminates the race by reading all stdout at once after process termination and properly closing the write end of the pipe. [Sources/OpenAgentSDK/Hooks/ShellHookExecutor.swift]
+
+## Deferred from: code review of 15-7-multi-turn-example (2026-04-13)
+
+- **No error handling around `try await` sessionStore calls** — Three `try await` calls to `sessionStore.load()` and `sessionStore.delete()` have no `do/catch`. Consistent with SessionsAndHooks example pattern. Pre-existing pattern not introduced by this story. [Examples/MultiTurnExample/main.swift:110,182,190]
+- **assert() disabled in release builds** — All assertions use `assert()` which is stripped in release builds. Consistent with all other examples in the project. Pre-established pattern. [Examples/MultiTurnExample/main.swift:94,111,125,169,183,191]

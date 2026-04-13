@@ -359,6 +359,26 @@
             "target": "ContextInjectionExample",
             "configuration": "release",
             "preLaunchTask": "swift: Build Release ContextInjectionExample"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:open-agent-sdk-swift}",
+            "name": "Debug MultiTurnExample",
+            "target": "MultiTurnExample",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug MultiTurnExample"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:open-agent-sdk-swift}",
+            "name": "Release MultiTurnExample",
+            "target": "MultiTurnExample",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release MultiTurnExample"
         }
     ]
 }

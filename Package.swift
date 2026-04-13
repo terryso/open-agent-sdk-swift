@@ -132,5 +132,10 @@ let package = Package(
             dependencies: ["OpenAgentSDK"],
             path: "Examples/ContextInjectionExample"
         ),
+        .executableTarget(
+            name: "MultiTurnExample",
+            dependencies: ["OpenAgentSDK"],
+            path: "Examples/MultiTurnExample"
+        ),
     ]
 )
