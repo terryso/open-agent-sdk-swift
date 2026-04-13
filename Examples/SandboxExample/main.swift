@@ -73,6 +73,8 @@ let deniedWriteOutside = SandboxChecker.isPathAllowed("/project/src/main.swift",
 print("  Write /project/src/main.swift -> \(deniedWriteOutside ? "ALLOWED" : "DENIED") (expected: DENIED)")
 
 // 1e. 演示 SandboxPathNormalizer.normalize() 解析路径遍历
+// SandboxPathNormalizer 会解析 ".." 段、"." 段、多余的斜杠，并解析符号链接（symlink）
+// 这确保了攻击者无法通过路径遍历或 symlink 来逃逸沙箱
 let normalizedPath = SandboxPathNormalizer.normalize("/project/src/../build/./output.o")
 print()
 print("  Normalized '/project/src/../build/./output.o'")
@@ -85,39 +87,6 @@ let escapePath = SandboxPathNormalizer.normalize("/project/src/../../etc/passwd"
 let escapeAllowed = SandboxChecker.isPathAllowed(escapePath, for: .read, settings: pathSettings)
 print("  Normalized '/project/src/../../etc/passwd' -> '\(escapePath)'")
 print("    Read check -> \(escapeAllowed ? "ALLOWED" : "DENIED") (expected: DENIED)")
-
-print()
-
-// 1f. 使用 throwing API 演示 permissionDenied 错误处理
-print("--- Part 1e: Throwing Enforcement API (checkPath / checkCommand) ---")
-
-do {
-    try SandboxChecker.checkPath("/etc/passwd", for: .read, settings: pathSettings)
-    print("  checkPath /etc/passwd -> unexpected success")
-} catch {
-    print("  checkPath /etc/passwd -> caught error: \(error)")
-}
-
-do {
-    try SandboxChecker.checkPath("/project/src/main.swift", for: .read, settings: pathSettings)
-    print("  checkPath /project/src/main.swift -> ALLOWED (no error thrown)")
-} catch {
-    print("  checkPath /project/src/main.swift -> unexpected error: \(error)")
-}
-
-do {
-    try SandboxChecker.checkCommand("rm -rf /tmp", settings: blocklistSettings)
-    print("  checkCommand 'rm -rf /tmp' -> unexpected success")
-} catch {
-    print("  checkCommand 'rm -rf /tmp' -> caught error: \(error)")
-}
-
-do {
-    try SandboxChecker.checkCommand("ls -la /project", settings: blocklistSettings)
-    print("  checkCommand 'ls -la /project' -> ALLOWED (no error thrown)")
-} catch {
-    print("  checkCommand 'ls -la /project' -> unexpected error: \(error)")
-}
 
 print()
 
@@ -196,6 +165,40 @@ print("  extractCommandBasename(\"\\rm -rf /tmp\") -> \"\(basenameEscaped)\" (ex
 
 let basenameQuoted = SandboxChecker.extractCommandBasename("\"rm\" -rf /tmp")
 print("  extractCommandBasename(\"\\\"rm\\\" -rf /tmp\") -> \"\(basenameQuoted)\" (expected: \"rm\")")
+
+print()
+
+// MARK: - Part 2e: Throwing Enforcement API (checkPath / checkCommand)
+// 使用 throwing API 演示 permissionDenied 错误处理
+print("--- Part 2e: Throwing Enforcement API (checkPath / checkCommand) ---")
+
+do {
+    try SandboxChecker.checkPath("/etc/passwd", for: .read, settings: pathSettings)
+    print("  checkPath /etc/passwd -> unexpected success")
+} catch {
+    print("  checkPath /etc/passwd -> caught error: \(error)")
+}
+
+do {
+    try SandboxChecker.checkPath("/project/src/main.swift", for: .read, settings: pathSettings)
+    print("  checkPath /project/src/main.swift -> ALLOWED (no error thrown)")
+} catch {
+    print("  checkPath /project/src/main.swift -> unexpected error: \(error)")
+}
+
+do {
+    try SandboxChecker.checkCommand("rm -rf /tmp", settings: blocklistSettings)
+    print("  checkCommand 'rm -rf /tmp' -> unexpected success")
+} catch {
+    print("  checkCommand 'rm -rf /tmp' -> caught error: \(error)")
+}
+
+do {
+    try SandboxChecker.checkCommand("ls -la /project", settings: blocklistSettings)
+    print("  checkCommand 'ls -la /project' -> ALLOWED (no error thrown)")
+} catch {
+    print("  checkCommand 'ls -la /project' -> unexpected error: \(error)")
+}
 
 print()
 

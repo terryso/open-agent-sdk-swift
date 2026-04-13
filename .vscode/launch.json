@@ -259,6 +259,26 @@
             "target": "SkillsExample",
             "configuration": "release",
             "preLaunchTask": "swift: Build Release SkillsExample"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:open-agent-sdk-swift}",
+            "name": "Debug SandboxExample",
+            "target": "SandboxExample",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug SandboxExample"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:open-agent-sdk-swift}",
+            "name": "Release SandboxExample",
+            "target": "SandboxExample",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release SandboxExample"
         }
     ]
 }
