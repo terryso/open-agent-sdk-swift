@@ -15,7 +15,7 @@ import Foundation
 /// ```
 ///
 /// - Note: API key is intentionally not exposed as a public property (NFR6).
-public class Agent: CustomStringConvertible, CustomDebugStringConvertible {
+public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unchecked Sendable {
 
     // MARK: - Public Read-Only Properties
 

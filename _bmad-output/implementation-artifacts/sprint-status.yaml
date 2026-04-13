@@ -1,5 +1,5 @@
 # generated: 2026-04-04
-# last_updated: 2026-04-13 (story 15-4 review)
+# last_updated: 2026-04-13 (story 15-5 review)
 # project: open-agent-sdk-swift
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-04-04
-last_updated: 2026-04-13 (story 15-4 review)
+last_updated: 2026-04-13 (story 15-5 review)
 project_key: NOKEY
 tracking_system: file-system
 story_location: _bmad-output/implementation-artifacts
@@ -176,7 +176,7 @@ development_status:
   15-2-sandbox-example: done
   15-3-logger-example: done
   15-4-model-switching-example: done
-  15-5-query-abort-example: backlog
+  15-5-query-abort-example: done
   15-6-context-injection-example: backlog
   15-7-multi-turn-example: backlog
   15-8-openai-compat-example: backlog

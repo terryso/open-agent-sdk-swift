@@ -319,6 +319,26 @@
             "target": "ModelSwitchingExample",
             "configuration": "release",
             "preLaunchTask": "swift: Build Release ModelSwitchingExample"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:open-agent-sdk-swift}",
+            "name": "Debug QueryAbortExample",
+            "target": "QueryAbortExample",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug QueryAbortExample"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:open-agent-sdk-swift}",
+            "name": "Release QueryAbortExample",
+            "target": "QueryAbortExample",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release QueryAbortExample"
         }
     ]
 }

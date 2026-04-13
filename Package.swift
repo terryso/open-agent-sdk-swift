@@ -122,5 +122,10 @@ let package = Package(
             dependencies: ["OpenAgentSDK"],
             path: "Examples/ModelSwitchingExample"
         ),
+        .executableTarget(
+            name: "QueryAbortExample",
+            dependencies: ["OpenAgentSDK"],
+            path: "Examples/QueryAbortExample"
+        ),
     ]
 )
