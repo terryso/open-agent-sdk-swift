@@ -35,7 +35,7 @@ import Foundation
 ///
 /// Logger integration: denials are logged at `.info` level because they represent
 /// important security events.
-enum SandboxChecker {
+public enum SandboxChecker {
 
     // MARK: - Path Checking
 
@@ -248,7 +248,7 @@ enum SandboxChecker {
     ///   - command: The raw command string to inspect.
     ///   - settings: The sandbox settings to apply.
     /// - Throws: ``SDKError/permissionDenied(tool:reason:)`` if a bypass is detected or parsing is ambiguous.
-    static func checkShellMetacharacters(
+    public static func checkShellMetacharacters(
         _ command: String,
         settings: SandboxSettings
     ) throws {
@@ -482,7 +482,7 @@ enum SandboxChecker {
     /// - `rm` -> `rm`
     /// - `\rm` -> `rm` (strips leading backslash)
     /// - `"rm" -rf` -> `rm` (strips surrounding quotes)
-    static func extractCommandBasename(_ command: String) -> String {
+    public static func extractCommandBasename(_ command: String) -> String {
         var cmd = command.trimmingCharacters(in: .whitespaces)
 
         // Strip leading backslash

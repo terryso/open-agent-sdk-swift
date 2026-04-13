@@ -107,5 +107,10 @@ let package = Package(
             dependencies: ["OpenAgentSDK"],
             path: "Examples/SkillsExample"
         ),
+        .executableTarget(
+            name: "SandboxExample",
+            dependencies: ["OpenAgentSDK"],
+            path: "Examples/SandboxExample"
+        ),
     ]
 )

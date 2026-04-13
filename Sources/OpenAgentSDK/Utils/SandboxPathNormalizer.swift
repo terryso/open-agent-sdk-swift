@@ -13,7 +13,7 @@ import Foundation
 /// This utility is used by both ``SandboxSettings`` path matching and
 /// ``SandboxChecker`` enforcement logic, and is designed for reuse in
 /// Stories 14.4 and 14.5.
-enum SandboxPathNormalizer {
+public enum SandboxPathNormalizer {
 
     /// Normalize a filesystem path to its canonical absolute form.
     ///
