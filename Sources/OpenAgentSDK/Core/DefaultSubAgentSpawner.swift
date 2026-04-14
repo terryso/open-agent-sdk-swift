@@ -15,17 +15,20 @@ final class DefaultSubAgentSpawner: SubAgentSpawner, @unchecked Sendable {
     private let baseURL: String?
     private let parentModel: String
     private let parentTools: [ToolProtocol]
+    private let client: (any LLMClient)?
 
     init(
         apiKey: String,
         baseURL: String?,
         parentModel: String,
-        parentTools: [ToolProtocol]
+        parentTools: [ToolProtocol],
+        client: (any LLMClient)? = nil
     ) {
         self.apiKey = apiKey
         self.baseURL = baseURL
         self.parentModel = parentModel
         self.parentTools = parentTools
+        self.client = client
     }
 
     func spawn(
@@ -56,7 +59,13 @@ final class DefaultSubAgentSpawner: SubAgentSpawner, @unchecked Sendable {
             maxTurns: resolvedMaxTurns,
             tools: subTools.isEmpty ? nil : subTools
         )
-        let agent = Agent(options: options)
+
+        let agent: Agent
+        if let client = client {
+            agent = Agent(options: options, client: client)
+        } else {
+            agent = Agent(options: options)
+        }
 
         // 4. Execute sub-agent and collect result
         let result = await agent.prompt(prompt)

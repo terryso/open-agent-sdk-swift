@@ -45,38 +45,17 @@ final class ProjectDocumentDiscoveryTests: XCTestCase {
         return ProjectDocumentDiscovery()
     }
 
-    /// Initialize a Git repo in the given directory (with an initial commit).
-    private func initGitRepo(at path: String) {
-        runShell("git init", cwd: path)
-        runShell("git config user.name \"TestUser\"", cwd: path)
-        runShell("git config user.email \"test@example.com\"", cwd: path)
-        let initialFile = (path as NSString).appendingPathComponent(".gitkeep")
-        try! "".write(toFile: initialFile, atomically: true, encoding: .utf8)
-        runShell("git add .", cwd: path)
-        runShell("git commit -m \"initial commit\"", cwd: path)
-    }
-
-    /// Run a shell command in the given working directory.
-    @discardableResult
-    private func runShell(_ command: String, cwd: String) -> String? {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/bin/bash")
-        process.arguments = ["-c", command]
-        process.currentDirectoryURL = URL(fileURLWithPath: cwd)
-
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = Pipe()
-
-        do {
-            try process.run()
-            process.waitUntilExit()
-            guard process.terminationStatus == 0 else { return nil }
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            return String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
-        } catch {
-            return nil
-        }
+    /// Create a minimal `.git` directory for project root discovery.
+    ///
+    /// `ProjectDocumentDiscovery` only checks `FileManager.fileExists(atPath: ".git")`,
+    /// so a real git repo is unnecessary — just an empty `.git` directory suffices.
+    /// This avoids ~0.3s of real I/O per call compared to `git init` + config + commit.
+    private func initGitMarker(at path: String) {
+        let gitDir = (path as NSString).appendingPathComponent(".git")
+        try! FileManager.default.createDirectory(
+            atPath: gitDir,
+            withIntermediateDirectories: true
+        )
     }
 
     // MARK: - AC1: CLAUDE.md Injected into System Prompt
@@ -85,7 +64,7 @@ final class ProjectDocumentDiscoveryTests: XCTestCase {
     /// then projectInstructions contains CLAUDE.md content.
     func testAC1_CollectContext_CLAUDEmd_ContainsProjectInstructions() {
         // Given: a Git project with a CLAUDE.md file (~500 chars)
-        initGitRepo(at: projectDir)
+        initGitMarker(at: projectDir)
         let content = String(repeating: "x", count: 500)
         let claudeMdPath = (projectDir as NSString).appendingPathComponent("CLAUDE.md")
         try! content.write(toFile: claudeMdPath, atomically: true, encoding: .utf8)
@@ -110,7 +89,7 @@ final class ProjectDocumentDiscoveryTests: XCTestCase {
     /// when project has a CLAUDE.md file.
     func testAC1_BuildSystemPrompt_WithCLAUDEmd_ContainsProjectInstructionsBlock() {
         // Given: a project with CLAUDE.md and an Agent pointed at it
-        initGitRepo(at: projectDir)
+        initGitMarker(at: projectDir)
         let content = "Use Swift naming conventions."
         let claudeMdPath = (projectDir as NSString).appendingPathComponent("CLAUDE.md")
         try! content.write(toFile: claudeMdPath, atomically: true, encoding: .utf8)
@@ -147,7 +126,7 @@ final class ProjectDocumentDiscoveryTests: XCTestCase {
     /// are loaded into separate fields.
     func testAC2_GlobalAndProjectInstructions_Separated() {
         // Given: a project with CLAUDE.md and a simulated global ~/.claude/CLAUDE.md
-        initGitRepo(at: projectDir)
+        initGitMarker(at: projectDir)
         let projectContent = "Project-level instructions."
         let claudeMdPath = (projectDir as NSString).appendingPathComponent("CLAUDE.md")
         try! projectContent.write(toFile: claudeMdPath, atomically: true, encoding: .utf8)
@@ -190,7 +169,7 @@ final class ProjectDocumentDiscoveryTests: XCTestCase {
     /// <project-instructions> as separate blocks.
     func testAC2_BuildSystemPrompt_GlobalAndProject_SeparateBlocks() {
         // Given: both global and project instructions exist
-        initGitRepo(at: projectDir)
+        initGitMarker(at: projectDir)
         let projectContent = "Project instructions here."
         let claudeMdPath = (projectDir as NSString).appendingPathComponent("CLAUDE.md")
         try! projectContent.write(toFile: claudeMdPath, atomically: true, encoding: .utf8)
@@ -236,7 +215,7 @@ final class ProjectDocumentDiscoveryTests: XCTestCase {
     /// with CLAUDE.md content first, AGENT.md content second.
     func testAC3_CLAUDEmdAndAGENTmd_MergedInCorrectOrder() {
         // Given: project root has both CLAUDE.md and AGENT.md
-        initGitRepo(at: projectDir)
+        initGitMarker(at: projectDir)
         let claudeContent = "CLAUDE.md instructions."
         let agentContent = "AGENT.md instructions."
         let claudeMdPath = (projectDir as NSString).appendingPathComponent("CLAUDE.md")
@@ -273,7 +252,7 @@ final class ProjectDocumentDiscoveryTests: XCTestCase {
     /// contains AGENT.md content only.
     func testAC3_OnlyAGENTmd_LoadsSuccessfully() {
         // Given: project root has only AGENT.md
-        initGitRepo(at: projectDir)
+        initGitMarker(at: projectDir)
         let agentContent = "Only AGENT.md instructions."
         let agentMdPath = (projectDir as NSString).appendingPathComponent("AGENT.md")
         try! agentContent.write(toFile: agentMdPath, atomically: true, encoding: .utf8)
@@ -347,7 +326,7 @@ final class ProjectDocumentDiscoveryTests: XCTestCase {
     /// with a truncation comment appended.
     func testAC5_LargeFile_TruncatedTo100KB() {
         // Given: a CLAUDE.md file larger than 100KB
-        initGitRepo(at: projectDir)
+        initGitMarker(at: projectDir)
         // Create content > 100KB (102,400 bytes)
         let largeContent = String(repeating: "A", count: 110_000)
         let claudeMdPath = (projectDir as NSString).appendingPathComponent("CLAUDE.md")
@@ -378,7 +357,7 @@ final class ProjectDocumentDiscoveryTests: XCTestCase {
     /// AC5 [P1]: Truncation comment includes original size information.
     func testAC5_TruncationComment_ContainsOriginalSize() {
         // Given: a CLAUDE.md file of 110KB
-        initGitRepo(at: projectDir)
+        initGitMarker(at: projectDir)
         let largeContent = String(repeating: "B", count: 110_000)
         let claudeMdPath = (projectDir as NSString).appendingPathComponent("CLAUDE.md")
         try! largeContent.write(toFile: claudeMdPath, atomically: true, encoding: .utf8)
@@ -406,7 +385,7 @@ final class ProjectDocumentDiscoveryTests: XCTestCase {
     /// without crashing.
     func testAC6_NonUTF8File_ReturnsNilWithoutCrash() {
         // Given: a file with invalid UTF-8 bytes
-        initGitRepo(at: projectDir)
+        initGitMarker(at: projectDir)
         let badData = Data([0xFF, 0xFE, 0x00, 0xD8, 0x01, 0x02]) // Invalid UTF-8 sequence
         let claudeMdPath = (projectDir as NSString).appendingPathComponent("CLAUDE.md")
         try! badData.write(to: URL(fileURLWithPath: claudeMdPath))
@@ -444,7 +423,7 @@ final class ProjectDocumentDiscoveryTests: XCTestCase {
             atPath: deepDir,
             withIntermediateDirectories: true
         )
-        initGitRepo(at: gitRoot)
+        initGitMarker(at: gitRoot)
 
         // Place CLAUDE.md at gitRoot (not deepDir)
         let content = "Found via .git traversal."
@@ -561,7 +540,7 @@ final class ProjectDocumentDiscoveryTests: XCTestCase {
     /// systemPrompt -> git-context -> global-instructions -> project-instructions
     func testIntegration_BuildSystemPrompt_CorrectConcatenationOrder() {
         // Given: a project with CLAUDE.md in a Git repo
-        initGitRepo(at: projectDir)
+        initGitMarker(at: projectDir)
         let claudeContent = "Project conventions."
         let claudeMdPath = (projectDir as NSString).appendingPathComponent("CLAUDE.md")
         try! claudeContent.write(toFile: claudeMdPath, atomically: true, encoding: .utf8)
@@ -637,7 +616,7 @@ final class ProjectDocumentDiscoveryTests: XCTestCase {
     /// Caching [P0]: Second call with same parameters returns cached result.
     func testCaching_SecondCall_ReturnsCachedResult() {
         // Given: a project with CLAUDE.md
-        initGitRepo(at: projectDir)
+        initGitMarker(at: projectDir)
         let content = "Cached instructions."
         let claudeMdPath = (projectDir as NSString).appendingPathComponent("CLAUDE.md")
         try! content.write(toFile: claudeMdPath, atomically: true, encoding: .utf8)
@@ -671,7 +650,7 @@ final class ProjectDocumentDiscoveryTests: XCTestCase {
     /// Caching [P1]: Different cwd returns different result (cache keyed by cwd+projectRoot).
     func testCaching_DifferentCwd_DifferentResult() {
         // Given: two project directories with different CLAUDE.md content
-        initGitRepo(at: projectDir)
+        initGitMarker(at: projectDir)
         let content1 = "Project A instructions."
         let claudeMdPath1 = (projectDir as NSString).appendingPathComponent("CLAUDE.md")
         try! content1.write(toFile: claudeMdPath1, atomically: true, encoding: .utf8)
@@ -681,7 +660,7 @@ final class ProjectDocumentDiscoveryTests: XCTestCase {
             atPath: projectDir2,
             withIntermediateDirectories: true
         )
-        initGitRepo(at: projectDir2)
+        initGitMarker(at: projectDir2)
         let content2 = "Project B instructions."
         let claudeMdPath2 = (projectDir2 as NSString).appendingPathComponent("CLAUDE.md")
         try! content2.write(toFile: claudeMdPath2, atomically: true, encoding: .utf8)

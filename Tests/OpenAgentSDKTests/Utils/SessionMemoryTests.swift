@@ -451,7 +451,8 @@ final class SessionMemoryTests: XCTestCase {
             model: "claude-sonnet-4-6",
             messages: messages,
             state: state,
-            sessionMemory: memory
+            sessionMemory: memory,
+            retryConfig: fastRetryConfig
         )
 
         // After compact, sessionMemory should have been populated
@@ -478,7 +479,8 @@ final class SessionMemoryTests: XCTestCase {
             client: client,
             model: "claude-sonnet-4-6",
             messages: messages,
-            state: state
+            state: state,
+            retryConfig: fastRetryConfig
         )
 
         XCTAssertEqual(result.compactedMessages.count, 2,

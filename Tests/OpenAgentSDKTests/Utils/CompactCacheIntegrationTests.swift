@@ -89,7 +89,8 @@ final class CompactCacheIntegrationTests: XCTestCase {
             model: "claude-sonnet-4-6",
             messages: messages,
             state: state,
-            fileCache: cache
+            fileCache: cache,
+            retryConfig: fastRetryConfig
         )
 
         // Then: compaction succeeds (returns 2 messages)
@@ -143,7 +144,8 @@ final class CompactCacheIntegrationTests: XCTestCase {
             model: "claude-sonnet-4-6",
             messages: messages,
             state: state,
-            fileCache: nil
+            fileCache: nil,
+            retryConfig: fastRetryConfig
         )
 
         // Then: compaction succeeds as before
@@ -172,7 +174,8 @@ final class CompactCacheIntegrationTests: XCTestCase {
             model: "claude-sonnet-4-6",
             messages: messages,
             state: state,
-            fileCache: nil
+            fileCache: nil,
+            retryConfig: fastRetryConfig
         )
 
         // Then: lastCompactTime should be updated to a recent time
@@ -207,7 +210,8 @@ final class CompactCacheIntegrationTests: XCTestCase {
             model: "claude-sonnet-4-6",
             messages: originalMessages,
             state: state,
-            fileCache: nil
+            fileCache: nil,
+            retryConfig: fastRetryConfig
         )
 
         // Then: lastCompactTime should NOT be updated
@@ -238,7 +242,8 @@ final class CompactCacheIntegrationTests: XCTestCase {
             model: "claude-sonnet-4-6",
             messages: messages,
             state: state,
-            fileCache: cache
+            fileCache: cache,
+            retryConfig: fastRetryConfig
         )
 
         // Then: the prompt sent to the LLM should include a section about recently modified files

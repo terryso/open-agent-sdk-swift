@@ -3,6 +3,33 @@ import XCTest
 
 import Foundation
 
+// MARK: - Mock URL Protocol for SubAgentSpawner Tests
+
+/// URLProtocol that returns a canned 401 error for all requests.
+/// Simulates API authentication failure without real network I/O.
+private final class SpawnerMockURLProtocol: URLProtocol {
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        let errorBody: [String: Any] = [
+            "error": ["type": "authentication_error", "message": "invalid api key"]
+        ]
+        let body = try! JSONSerialization.data(withJSONObject: errorBody, options: [])
+        let response = HTTPURLResponse(
+            url: request.url!,
+            statusCode: 401,
+            httpVersion: "HTTP/1.1",
+            headerFields: ["content-type": "application/json"]
+        )!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: body)
+        client?.urlProtocolDidFinishLoading(self)
+    }
+
+    override func stopLoading() {}
+}
+
 // MARK: - DefaultSubAgentSpawner Tests
 
 /// ATDD RED PHASE: Tests for Story 4.3 -- DefaultSubAgentSpawner.
@@ -12,6 +39,16 @@ import Foundation
 ///   - `SubAgentResult` struct is defined in Types/
 /// TDD Phase: RED (feature not implemented yet)
 final class DefaultSubAgentSpawnerTests: XCTestCase {
+
+    // MARK: - Helpers
+
+    /// Creates a mock AnthropicClient that returns 401 without real network I/O.
+    private func makeMockClient() -> AnthropicClient {
+        let sessionConfig = URLSessionConfiguration.ephemeral
+        sessionConfig.protocolClasses = [SpawnerMockURLProtocol.self]
+        let urlSession = URLSession(configuration: sessionConfig)
+        return AnthropicClient(apiKey: "test-key", baseURL: nil, urlSession: urlSession)
+    }
 
     // MARK: - AC4: Tool filtering — removes AgentTool
 
@@ -33,7 +70,8 @@ final class DefaultSubAgentSpawnerTests: XCTestCase {
             apiKey: "test-key",
             baseURL: nil,
             parentModel: "claude-sonnet-4-6",
-            parentTools: allTools
+            parentTools: allTools,
+            client: makeMockClient()
         )
 
         // When: spawning without allowedTools filter
@@ -45,9 +83,9 @@ final class DefaultSubAgentSpawnerTests: XCTestCase {
             maxTurns: nil
         )
 
-        // Then: spawner completes (success or API error with fake key — both prove no crash)
+        // Then: spawner completes without crash
         // The key behavior tested: Agent tool is filtered from sub-agent tools (prevents recursion)
-        _ = result
+        XCTAssertTrue(result.isError, "Should get error from mock 401 response")
     }
 
     /// AC4 [P1]: spawn respects allowedTools list and filters tools accordingly.
@@ -65,7 +103,8 @@ final class DefaultSubAgentSpawnerTests: XCTestCase {
             apiKey: "test-key",
             baseURL: nil,
             parentModel: "claude-sonnet-4-6",
-            parentTools: parentTools
+            parentTools: parentTools,
+            client: makeMockClient()
         )
 
         // When: spawning with allowedTools restricting to read and Glob only
@@ -77,9 +116,9 @@ final class DefaultSubAgentSpawnerTests: XCTestCase {
             maxTurns: 5
         )
 
-        // Then: spawner completes (API error with fake key is expected)
+        // Then: spawner completes (API error with mock client is expected)
         // The key behavior tested: allowedTools filter is applied correctly
-        _ = result
+        XCTAssertTrue(result.isError, "Should get error from mock 401 response")
     }
 
     // MARK: - AC5: Model inheritance and override
@@ -92,7 +131,8 @@ final class DefaultSubAgentSpawnerTests: XCTestCase {
             apiKey: "test-key",
             baseURL: "https://api.example.com",
             parentModel: "claude-sonnet-4-6",
-            parentTools: parentTools
+            parentTools: parentTools,
+            client: makeMockClient()
         )
 
         // When: spawning without specifying a model
@@ -104,8 +144,8 @@ final class DefaultSubAgentSpawnerTests: XCTestCase {
             maxTurns: nil
         )
 
-        // Then: uses parent model (API error with fake key is expected — proves no crash)
-        _ = result
+        // Then: uses parent model (mock error proves no crash)
+        XCTAssertTrue(result.isError, "Should get error from mock 401 response")
     }
 
     /// AC5 [P0]: When model is specified, it overrides the parent model.
@@ -116,7 +156,8 @@ final class DefaultSubAgentSpawnerTests: XCTestCase {
             apiKey: "test-key",
             baseURL: nil,
             parentModel: "claude-sonnet-4-6",
-            parentTools: parentTools
+            parentTools: parentTools,
+            client: makeMockClient()
         )
 
         // When: spawning with a custom model
@@ -128,8 +169,8 @@ final class DefaultSubAgentSpawnerTests: XCTestCase {
             maxTurns: nil
         )
 
-        // Then: uses the custom model (API error with fake key is expected — proves no crash)
-        _ = result
+        // Then: uses the custom model (mock error proves no crash)
+        XCTAssertTrue(result.isError, "Should get error from mock 401 response")
     }
 
     // MARK: - AC2: Error handling
@@ -140,10 +181,11 @@ final class DefaultSubAgentSpawnerTests: XCTestCase {
         let parentTools: [ToolProtocol] = [createReadTool()]
 
         let spawner = DefaultSubAgentSpawner(
-            apiKey: "",  // Invalid key
+            apiKey: "",
             baseURL: nil,
             parentModel: "claude-sonnet-4-6",
-            parentTools: parentTools
+            parentTools: parentTools,
+            client: makeMockClient()
         )
 
         // When: spawning with invalid credentials
@@ -152,7 +194,7 @@ final class DefaultSubAgentSpawnerTests: XCTestCase {
             model: nil,
             systemPrompt: nil,
             allowedTools: nil,
-            maxTurns: 1  // Limit to 1 turn for faster failure
+            maxTurns: 1
         )
 
         // Then: the result should indicate error
@@ -169,7 +211,8 @@ final class DefaultSubAgentSpawnerTests: XCTestCase {
             apiKey: "test-key",
             baseURL: nil,
             parentModel: "claude-sonnet-4-6",
-            parentTools: parentTools
+            parentTools: parentTools,
+            client: makeMockClient()
         )
 
         // When: spawning with maxTurns=1
@@ -181,9 +224,8 @@ final class DefaultSubAgentSpawnerTests: XCTestCase {
             maxTurns: 1
         )
 
-        // Then: completes (success or error, both are acceptable with 1 turn limit)
-        // We just verify it doesn't crash
-        _ = result
+        // Then: completes (error from mock client is expected)
+        XCTAssertTrue(result.isError, "Should get error from mock 401 response")
     }
 
     /// AC5 [P0]: When maxTurns is nil, default of 10 is used.
@@ -194,7 +236,8 @@ final class DefaultSubAgentSpawnerTests: XCTestCase {
             apiKey: "test-key",
             baseURL: nil,
             parentModel: "claude-sonnet-4-6",
-            parentTools: parentTools
+            parentTools: parentTools,
+            client: makeMockClient()
         )
 
         // When: spawning without specifying maxTurns
@@ -206,7 +249,7 @@ final class DefaultSubAgentSpawnerTests: XCTestCase {
             maxTurns: nil
         )
 
-        // Then: default maxTurns (10) is used — implicit verification
-        _ = result
+        // Then: default maxTurns (10) is used — mock error proves completion
+        XCTAssertTrue(result.isError, "Should get error from mock 401 response")
     }
 }

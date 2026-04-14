@@ -170,6 +170,53 @@ final class LogOutputEnumTests: XCTestCase {
         XCTAssertTrue(expectSendable(output),
                       "LogOutput must conform to Sendable")
     }
+
+    // MARK: - LogOutput Equatable edge cases
+
+    /// LogOutput.console == .console returns true.
+    func testLogOutputEquatable_consoleEqualsConsole() {
+        XCTAssertEqual(LogOutput.console, LogOutput.console)
+    }
+
+    /// LogOutput.file with same URL returns true.
+    func testLogOutputEquatable_fileSameURL() {
+        let url = URL(fileURLWithPath: "/var/log/sdk.log")
+        XCTAssertEqual(LogOutput.file(url), LogOutput.file(url))
+    }
+
+    /// LogOutput.file with different URLs returns false.
+    func testLogOutputEquatable_fileDifferentURL() {
+        let url1 = URL(fileURLWithPath: "/var/log/a.log")
+        let url2 = URL(fileURLWithPath: "/var/log/b.log")
+        XCTAssertNotEqual(LogOutput.file(url1), LogOutput.file(url2))
+    }
+
+    /// LogOutput.custom closures always compare as equal (closures cannot be compared).
+    func testLogOutputEquatable_customAlwaysEqual() {
+        let custom1 = LogOutput.custom { _ in }
+        let custom2 = LogOutput.custom { _ in }
+        XCTAssertEqual(custom1, custom2,
+                        "Custom closures should always compare as equal")
+    }
+
+    /// LogOutput.console != .file(...)
+    func testLogOutputEquatable_consoleNotEqualToFile() {
+        let url = URL(fileURLWithPath: "/tmp/test.log")
+        XCTAssertNotEqual(LogOutput.console, LogOutput.file(url))
+    }
+
+    /// LogOutput.console != .custom(...)
+    func testLogOutputEquatable_consoleNotEqualToCustom() {
+        let custom = LogOutput.custom { _ in }
+        XCTAssertNotEqual(LogOutput.console, custom)
+    }
+
+    /// LogOutput.file != .custom(...)
+    func testLogOutputEquatable_fileNotEqualToCustom() {
+        let url = URL(fileURLWithPath: "/tmp/test.log")
+        let custom = LogOutput.custom { _ in }
+        XCTAssertNotEqual(LogOutput.file(url), custom)
+    }
 }
 
 // MARK: - Logger Singleton Tests (AC1, AC5, AC6, AC7)

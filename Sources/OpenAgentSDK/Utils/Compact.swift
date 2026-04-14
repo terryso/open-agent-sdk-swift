@@ -87,7 +87,8 @@ func compactConversation(
     messages: [[String: Any]],
     state: AutoCompactState,
     fileCache: FileCache? = nil,
-    sessionMemory: SessionMemory? = nil
+    sessionMemory: SessionMemory? = nil,
+    retryConfig: RetryConfig = .default
 ) async -> (compactedMessages: [[String: Any]], summary: String, state: AutoCompactState) {
     do {
         // Get recently modified files from cache (if available)
@@ -102,7 +103,7 @@ func compactConversation(
         let compactionPrompt = buildCompactionPrompt(messages, modifiedFiles: modifiedFiles)
 
         let retryModel = model
-        let response = try await withRetry {
+        let response = try await withRetry({
             try await client.sendMessage(
                 model: retryModel,
                 messages: [
@@ -115,7 +116,7 @@ func compactConversation(
                 thinking: nil,
                 temperature: nil
             )
-        }
+        }, retryConfig: retryConfig)
 
         // Extract summary text from response
         var summary = ""
@@ -132,7 +133,8 @@ func compactConversation(
                 client: client,
                 model: model,
                 summary: summary,
-                into: sessionMemory
+                into: sessionMemory,
+                retryConfig: retryConfig
             )
         }
 
@@ -201,7 +203,8 @@ func extractSessionMemory(
     client: any LLMClient,
     model: String,
     summary: String,
-    into sessionMemory: SessionMemory
+    into sessionMemory: SessionMemory,
+    retryConfig: RetryConfig = .default
 ) async {
     // Short summary: store directly without LLM extraction call
     if summary.count < 200 {
@@ -220,7 +223,7 @@ func extractSessionMemory(
 
     do {
         let retryModel = model
-        let response = try await withRetry {
+        let response = try await withRetry({
             try await client.sendMessage(
                 model: retryModel,
                 messages: [
@@ -233,7 +236,7 @@ func extractSessionMemory(
                 thinking: nil,
                 temperature: nil
             )
-        }
+        }, retryConfig: retryConfig)
 
         // Extract text from response
         var responseText = ""
@@ -365,12 +368,13 @@ func shouldMicroCompact(content: String, isError: Bool = false) -> Bool {
 func microCompact(
     client: any LLMClient,
     model: String,
-    content: String
+    content: String,
+    retryConfig: RetryConfig = .default
 ) async -> String {
     do {
         let prompt = buildMicroCompactPrompt(content)
 
-        let response = try await withRetry {
+        let response = try await withRetry({
             try await client.sendMessage(
                 model: model,
                 messages: [
@@ -383,7 +387,7 @@ func microCompact(
                 thinking: nil,
                 temperature: nil
             )
-        }
+        }, retryConfig: retryConfig)
 
         // Extract summary text from response
         var summary = ""

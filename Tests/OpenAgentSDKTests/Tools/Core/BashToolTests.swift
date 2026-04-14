@@ -90,10 +90,10 @@ final class BashToolTests: XCTestCase {
     func testBash_timeout_killsProcess() async {
         let tool = makeBashTool()
 
-        // When: executing a long-running command with a short timeout (1 second)
+        // When: executing a long-running command with a short timeout (100ms)
         let result = await callTool(tool, input: [
-            "command": "sleep 5",
-            "timeout": 1000  // 1 second in milliseconds
+            "command": "sleep 30",
+            "timeout": 100  // 100ms — process should be killed almost immediately
         ])
 
         // Then: the process is killed and a timeout-related message is returned

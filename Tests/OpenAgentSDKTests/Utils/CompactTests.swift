@@ -310,6 +310,11 @@ final class CompactMockURLProtocol: URLProtocol {
 
 extension XCTestCase {
 
+    /// Zero-delay retry config for tests — no waiting in unit tests.
+    var fastRetryConfig: RetryConfig {
+        RetryConfig(maxRetries: 3, baseDelayMs: 0, maxDelayMs: 0, retryableStatusCodes: [429, 500, 502, 503, 529])
+    }
+
     /// Creates an AnthropicClient configured with CompactMockURLProtocol.
     func makeCompactTestClient(
         apiKey: String = "sk-test-compact-key-12345"
@@ -382,7 +387,8 @@ final class CompactConversationTests: XCTestCase {
             client: client,
             model: "claude-sonnet-4-6",
             messages: messages,
-            state: state
+            state: state,
+            retryConfig: fastRetryConfig
         )
 
         XCTAssertEqual(result.compactedMessages.count, 2,
@@ -406,7 +412,8 @@ final class CompactConversationTests: XCTestCase {
             client: client,
             model: "claude-sonnet-4-6",
             messages: messages,
-            state: state
+            state: state,
+            retryConfig: fastRetryConfig
         )
 
         // Check user message contains summary prefix
@@ -448,7 +455,8 @@ final class CompactConversationTests: XCTestCase {
             client: client,
             model: "claude-sonnet-4-6",
             messages: originalMessages,
-            state: state
+            state: state,
+            retryConfig: fastRetryConfig
         )
 
         // Original messages should be preserved
@@ -478,14 +486,14 @@ final class CompactConversationTests: XCTestCase {
 
         let result1 = await compactConversation(
             client: client, model: "claude-sonnet-4-6",
-            messages: messages, state: state0
+            messages: messages, state: state0, retryConfig: fastRetryConfig
         )
         XCTAssertEqual(result1.state.consecutiveFailures, 1,
                        "First failure should increment consecutiveFailures to 1")
 
         let result2 = await compactConversation(
             client: client, model: "claude-sonnet-4-6",
-            messages: messages, state: result1.state
+            messages: messages, state: result1.state, retryConfig: fastRetryConfig
         )
         XCTAssertEqual(result2.state.consecutiveFailures, 2,
                        "Second failure should increment consecutiveFailures to 2")
@@ -522,7 +530,8 @@ final class CompactConversationTests: XCTestCase {
             client: client,
             model: "claude-sonnet-4-6",
             messages: messages,
-            state: state
+            state: state,
+            retryConfig: fastRetryConfig
         )
 
         XCTAssertEqual(result.state.consecutiveFailures, 0,
@@ -549,7 +558,8 @@ final class CompactConversationTests: XCTestCase {
             client: client,
             model: "claude-sonnet-4-6",
             messages: messages,
-            state: state
+            state: state,
+            retryConfig: fastRetryConfig
         )
 
         // Verify the compaction request was sent with the expected system prompt
@@ -587,7 +597,7 @@ final class CompactConversationTests: XCTestCase {
 
         let result1 = await compactConversation(
             client: client, model: "claude-sonnet-4-6",
-            messages: messages, state: state0
+            messages: messages, state: state0, retryConfig: fastRetryConfig
         )
         XCTAssertTrue(result1.state.compacted,
                       "First compaction should set compacted=true")
@@ -597,7 +607,7 @@ final class CompactConversationTests: XCTestCase {
         // Second compaction with compacted state
         let result2 = await compactConversation(
             client: client, model: "claude-sonnet-4-6",
-            messages: result1.compactedMessages, state: result1.state
+            messages: result1.compactedMessages, state: result1.state, retryConfig: fastRetryConfig
         )
         XCTAssertTrue(result2.state.compacted,
                       "Second compaction should maintain compacted=true")

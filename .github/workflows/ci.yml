@@ -18,8 +18,6 @@ jobs:
           path: .build
           key: swift-${{ runner.os }}-${{ hashFiles('Package.resolved') }}
           restore-keys: swift-${{ runner.os }}-
-      - name: Build
-        run: swift build
       - name: Run tests with coverage
         run: swift test --enable-code-coverage
       - name: Extract coverage percentage

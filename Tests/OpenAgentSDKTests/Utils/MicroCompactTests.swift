@@ -125,7 +125,8 @@ final class MicroCompactTests: XCTestCase {
         let result = await microCompact(
             client: client,
             model: "claude-sonnet-4-6",
-            content: largeContent
+            content: largeContent,
+            retryConfig: fastRetryConfig
         )
 
         // Should contain the micro-compaction marker prefix
@@ -156,7 +157,8 @@ final class MicroCompactTests: XCTestCase {
         let result = await microCompact(
             client: client,
             model: "claude-sonnet-4-6",
-            content: originalContent
+            content: originalContent,
+            retryConfig: fastRetryConfig
         )
 
         // Marker should contain original length
@@ -198,7 +200,8 @@ final class MicroCompactTests: XCTestCase {
         let result = await microCompact(
             client: client,
             model: "claude-sonnet-4-6",
-            content: originalContent
+            content: originalContent,
+            retryConfig: fastRetryConfig
         )
 
         // Should return original content unchanged
@@ -218,7 +221,8 @@ final class MicroCompactTests: XCTestCase {
         let result = await microCompact(
             client: client,
             model: "claude-sonnet-4-6",
-            content: originalContent
+            content: originalContent,
+            retryConfig: fastRetryConfig
         )
 
         // Should return original content unchanged
@@ -242,7 +246,8 @@ final class MicroCompactTests: XCTestCase {
         _ = await microCompact(
             client: client,
             model: "claude-sonnet-4-6",
-            content: largeContent
+            content: largeContent,
+            retryConfig: fastRetryConfig
         )
 
         // Verify the request body contains the expected system prompt
@@ -278,7 +283,8 @@ final class MicroCompactTests: XCTestCase {
         _ = await microCompact(
             client: client,
             model: "claude-sonnet-4-6",
-            content: largeContent
+            content: largeContent,
+            retryConfig: fastRetryConfig
         )
 
         let requests = CompactMockURLProtocol.allRequests
@@ -311,7 +317,8 @@ final class MicroCompactTests: XCTestCase {
         let result = await microCompact(
             client: client,
             model: "claude-sonnet-4-6",
-            content: largeContent
+            content: largeContent,
+            retryConfig: fastRetryConfig
         )
 
         // The function returns a String -- no cost data in the return type.
@@ -337,7 +344,8 @@ final class MicroCompactTests: XCTestCase {
         _ = await microCompact(
             client: client,
             model: "claude-sonnet-4-6",
-            content: largeContent
+            content: largeContent,
+            retryConfig: fastRetryConfig
         )
 
         let requests = CompactMockURLProtocol.allRequests

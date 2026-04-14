@@ -547,7 +547,8 @@ final class CompactLogTests: XCTestCase {
             model: "claude-sonnet-4-6",
             messages: messages,
             state: state,
-            fileCache: FileCache()
+            fileCache: FileCache(),
+            retryConfig: fastRetryConfig
         )
 
         let entry = try XCTUnwrap(capture.findEntry(event: "compact"),
@@ -601,7 +602,8 @@ final class CompactLogTests: XCTestCase {
             model: "claude-sonnet-4-6",
             messages: messages,
             state: state,
-            fileCache: FileCache()
+            fileCache: FileCache(),
+            retryConfig: fastRetryConfig
         )
 
         let entry = try XCTUnwrap(capture.findEntry(event: "compact"),
@@ -648,7 +650,8 @@ final class CompactLogTests: XCTestCase {
             model: "claude-sonnet-4-6",
             messages: messages,
             state: state,
-            fileCache: FileCache()
+            fileCache: FileCache(),
+            retryConfig: fastRetryConfig
         )
 
         let entry = try XCTUnwrap(capture.findEntry(event: "compact"),

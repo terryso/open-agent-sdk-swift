@@ -1,11 +1,75 @@
 import Foundation
 
+/// Protocol for executing Git commands. Enables dependency injection for testing.
+///
+/// The default implementation (`ProcessGitCommandRunner`) runs commands via `Process`.
+/// Tests can provide a mock implementation to avoid real I/O.
+public protocol GitCommandRunning: Sendable {
+    /// Execute a Git command and return its trimmed output.
+    ///
+    /// - Parameters:
+    ///   - command: The shell command to execute.
+    ///   - cwd: The working directory for the command.
+    /// - Returns: The trimmed standard output, or `nil` on failure.
+    func runGitCommand(_ command: String, cwd: String) -> String?
+}
+
+/// Default `GitCommandRunning` implementation that executes commands via `Process`.
+public struct ProcessGitCommandRunner: GitCommandRunning, Sendable {
+
+    /// Timeout in milliseconds for each command.
+    public let timeoutMs: Int
+
+    public init(timeoutMs: Int = 5000) {
+        self.timeoutMs = timeoutMs
+    }
+
+    public func runGitCommand(_ command: String, cwd: String) -> String? {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/bash")
+        process.arguments = ["-c", command]
+        process.currentDirectoryURL = URL(fileURLWithPath: cwd)
+
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = Pipe()
+
+        do {
+            try process.run()
+
+            // Apply timeout
+            if #available(macOS 13.0, *) {
+                let deadline = Date().addingTimeInterval(Double(timeoutMs) / 1000.0)
+                while process.isRunning && Date() < deadline {
+                    RunLoop.current.run(until: Date().addingTimeInterval(0.01))
+                }
+                if process.isRunning {
+                    process.terminate()
+                    return nil
+                }
+            } else {
+                // Fallback for older macOS: just wait
+                process.waitUntilExit()
+            }
+
+            guard process.terminationStatus == 0 else { return nil }
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            let output = String(data: data, encoding: .utf8)?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            return (output?.isEmpty ?? true) ? nil : output
+        } catch {
+            return nil
+        }
+    }
+}
+
 /// Collects Git repository context (branch, status, recent commits) for injection
 /// into the agent's system prompt.
 ///
-/// `GitContextCollector` executes Git commands via `Process` to gather repository
-/// status information, formats it into an XML block, and caches the result with
-/// a configurable TTL. Thread safety is provided by an internal `NSLock`.
+/// `GitContextCollector` executes Git commands via an injected `GitCommandRunning`
+/// instance to gather repository status information, formats it into an XML block,
+/// and caches the result with a configurable TTL. Thread safety is provided by an
+/// internal `NSLock`.
 ///
 /// ## Output Format
 ///
@@ -55,10 +119,22 @@ public final class GitContextCollector: @unchecked Sendable {
     /// Maximum length for `git status --short` output before truncation.
     private static let maxStatusLength = 2000
 
+    /// The command runner used to execute Git commands.
+    private let commandRunner: any GitCommandRunning
+
     // MARK: - Initialization
 
-    /// Create a new GitContextCollector.
-    public init() {}
+    /// Create a new GitContextCollector with the default `ProcessGitCommandRunner`.
+    public init() {
+        self.commandRunner = ProcessGitCommandRunner()
+    }
+
+    /// Create a new GitContextCollector with a custom command runner (for testing).
+    ///
+    /// - Parameter commandRunner: The `GitCommandRunning` implementation to use.
+    public init(commandRunner: any GitCommandRunning) {
+        self.commandRunner = commandRunner
+    }
 
     // MARK: - Public API
 
@@ -92,7 +168,7 @@ public final class GitContextCollector: @unchecked Sendable {
         }
         lock.unlock()
 
-        // Collect fresh context (outside lock to avoid holding it during Process execution)
+        // Collect fresh context (outside lock to avoid holding it during command execution)
         guard let context = collectFreshContext(cwd: cwd) else {
             return nil
         }
@@ -109,63 +185,18 @@ public final class GitContextCollector: @unchecked Sendable {
 
     // MARK: - Private Helpers
 
-    /// Execute a Git command via `Process` and return its trimmed output.
-    ///
-    /// - Parameters:
-    ///   - command: The Git command to execute (e.g., "git rev-parse --abbrev-ref HEAD").
-    ///   - cwd: The working directory for the command.
-    ///   - timeoutMs: Timeout in milliseconds (default 5000).
-    /// - Returns: The trimmed standard output, or `nil` on failure.
-    private func runGitCommand(_ command: String, cwd: String, timeoutMs: Int = 5000) -> String? {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/bin/bash")
-        process.arguments = ["-c", command]
-        process.currentDirectoryURL = URL(fileURLWithPath: cwd)
-
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = Pipe()
-
-        do {
-            try process.run()
-
-            // Apply timeout
-            if #available(macOS 13.0, *) {
-                let deadline = Date().addingTimeInterval(Double(timeoutMs) / 1000.0)
-                while process.isRunning && Date() < deadline {
-                    RunLoop.current.run(until: Date().addingTimeInterval(0.01))
-                }
-                if process.isRunning {
-                    process.terminate()
-                    return nil
-                }
-            } else {
-                // Fallback for older macOS: just wait
-                process.waitUntilExit()
-            }
-
-            guard process.terminationStatus == 0 else { return nil }
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            let output = String(data: data, encoding: .utf8)?
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            return (output?.isEmpty ?? true) ? nil : output
-        } catch {
-            return nil
-        }
-    }
-
     /// Detect the main branch name (prefers "main", falls back to "master").
     ///
     /// - Parameter cwd: The working directory of the Git repository.
     /// - Returns: "main", "master", or `nil` if neither branch exists.
     private func detectMainBranch(cwd: String) -> String? {
         // Check if "main" branch exists
-        if let output = runGitCommand("git branch -l main", cwd: cwd),
+        if let output = commandRunner.runGitCommand("git branch -l main", cwd: cwd),
            output.contains("main") {
             return "main"
         }
         // Check if "master" branch exists
-        if let output = runGitCommand("git branch -l master", cwd: cwd),
+        if let output = commandRunner.runGitCommand("git branch -l master", cwd: cwd),
            output.contains("master") {
             return "master"
         }
@@ -178,22 +209,22 @@ public final class GitContextCollector: @unchecked Sendable {
     /// - Returns: A formatted `<git-context>` block, or `nil` if not a Git repo.
     private func collectFreshContext(cwd: String) -> String? {
         // Step 1: Verify this is a Git repository
-        guard runGitCommand("git rev-parse --git-dir", cwd: cwd) != nil else {
+        guard commandRunner.runGitCommand("git rev-parse --git-dir", cwd: cwd) != nil else {
             return nil
         }
 
         // Step 2: Get current branch
-        let branch = runGitCommand("git rev-parse --abbrev-ref HEAD", cwd: cwd) ?? "unknown"
+        let branch = commandRunner.runGitCommand("git rev-parse --abbrev-ref HEAD", cwd: cwd) ?? "unknown"
 
         // Step 3: Detect main branch
         let mainBranch = detectMainBranch(cwd: cwd)
 
         // Step 4: Get Git user name
-        let gitUser = runGitCommand("git config user.name", cwd: cwd)
+        let gitUser = commandRunner.runGitCommand("git config user.name", cwd: cwd)
 
         // Step 5: Get git status (with truncation)
         var statusSection = ""
-        if let rawStatus = runGitCommand("git status --short", cwd: cwd) {
+        if let rawStatus = commandRunner.runGitCommand("git status --short", cwd: cwd) {
             if rawStatus.utf8.count > Self.maxStatusLength {
                 // Count the number of changed files
                 let fileCount = rawStatus.components(separatedBy: "\n").filter { !$0.isEmpty }.count
@@ -215,8 +246,8 @@ public final class GitContextCollector: @unchecked Sendable {
         // Step 6: Get recent commits
         var commitsSection = ""
         // First check if there are any commits (git rev-parse HEAD succeeds)
-        if runGitCommand("git rev-parse HEAD", cwd: cwd) != nil {
-            if let log = runGitCommand("git log --oneline -5 --no-decorate", cwd: cwd) {
+        if commandRunner.runGitCommand("git rev-parse HEAD", cwd: cwd) != nil {
+            if let log = commandRunner.runGitCommand("git log --oneline -5 --no-decorate", cwd: cwd) {
                 commitsSection = log
             }
         }
