@@ -3,7 +3,7 @@
 ## Deferred from: code review of 1-1-spm-package-core-types (2026-04-04)
 
 - ~~**SessionMetadata 使用 String 时间戳**~~ — **FIXED**: `createdAt`/`updatedAt` are now `Date` type with proper `Codable` conformance. [SessionTypes.swift:15-17]
-- **McpSseConfig/McpHttpConfig 结构完全相同** — 两者均为 url+headers，按 MCP 协议传输类型区分，未来可考虑合并 [MCPConfig.swift:24-43]
+- ~~**McpSseConfig/McpHttpConfig 结构完全相同**~~ — **FIXED**: Merged into `McpTransportConfig` struct. `McpSseConfig` and `McpHttpConfig` retained as backward-compatible typealiases. [MCPConfig.swift:42-60]
 - ~~**HookNotification.level / PermissionUpdate.behavior 为字符串类型**~~ — **FIXED**: Added `HookNotificationLevel` enum (info/warning/error/debug with unknown-value fallback) and `PermissionBehavior` enum (allow/deny). Both use `String` raw values with `Codable` conformance. [HookTypes.swift, PermissionTypes.swift]
 - ~~**ThinkingConfig.enabled 无 budgetTokens 验证**~~ — **FIXED**: `ThinkingConfig.validate()` throws when budgetTokens <= 0; `AgentOptions.validate()` calls it. [ThinkingConfig.swift:25]
 - **HookDefinition 所有字段可选** — 全 nil 实例无语义，匹配 TS SDK 模式 [HookTypes.swift]
@@ -33,7 +33,7 @@
 ## Deferred from: code review of 8-1-hook-event-types-registry (2026-04-09)
 
 - ~~**Silent error swallowing in execute() catch block**~~ — **FIXED**: Hook errors are now logged with `Logger.shared.error("HookRegistry", "hook_execution_failed", ...)` including event type and error description. [HookRegistry.swift:125-128]
-- **HookOutput lacks Equatable conformance** — Cannot perform full structural equality assertions in tests. Low priority since all fields are individually Equatable [HookTypes.swift:62]
+- ~~**HookOutput lacks Equatable conformance**~~ — **FIXED**: Added `Equatable` conformance to `HookOutput`. All fields are individually `Equatable`, so synthesized conformance works. Tests cover equality and inequality cases. [HookTypes.swift:102]
 
 ## Deferred from: code review of 8-5-custom-authorization-callback (2026-04-09)
 
