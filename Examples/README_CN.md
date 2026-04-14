@@ -287,21 +287,259 @@ let agent = createAgent(options: AgentOptions(
 ))
 ```
 
+---
+
+### 12. SkillsExample — 技能系统（内置与自定义）
+
+演示技能系统 — 注册内置技能（commit、review、simplify、debug、test）、创建自定义技能、通过 LLM 执行技能。
+
+```bash
+swift run SkillsExample
+```
+
+**你将学到：**
+- 通过 `BuiltInSkills` 初始化内置技能
+- 使用 `SkillRegistry` 注册和发现技能
+- 使用 `Skill(name:description:promptTemplate:toolRestrictions:)` 创建自定义技能
+- Agent 通过 `createSkillTool(registry:)` 执行技能
+
+**关键代码：**
+```swift
+let registry = SkillRegistry()
+registry.register(BuiltInSkills.commit)
+registry.register(BuiltInSkills.review)
+
+let customSkill = Skill(
+    name: "explain", description: "详细解释代码",
+    promptTemplate: "读取文件并解释...", toolRestrictions: [.bash, .read]
+)
+registry.register(customSkill)
+
+let agent = createAgent(options: AgentOptions(
+    apiKey: apiKey,
+    tools: getAllBaseTools(tier: .core) + [createSkillTool(registry: registry)]
+))
+```
+
+---
+
+### 13. SandboxExample — 沙盒配置与强制执行
+
+展示如何配置路径和命令限制，控制 Agent 的文件系统和 Bash 操作。
+
+```bash
+swift run SandboxExample
+```
+
+**你将学到：**
+- 使用 `SandboxSettings` 配置路径白名单/黑名单
+- 命令黑名单（`deniedCommands`）和白名单（`allowedCommands`）
+- 路径遍历防护和符号链接解析
+- Shell 元字符检测，防止绕过
+
+**关键代码：**
+```swift
+let agent = createAgent(options: AgentOptions(
+    apiKey: apiKey,
+    sandbox: SandboxSettings(
+        allowedReadPaths: ["/project/"],
+        allowedWritePaths: ["/project/src/"],
+        deniedCommands: ["rm", "sudo"]
+    )
+))
+```
+
+---
+
+### 14. LoggerExample — 结构化日志系统
+
+演示可配置的日志级别（none/error/warn/info/debug）和输出目标（控制台/文件/自定义）用于 SDK 诊断事件。
+
+```bash
+swift run LoggerExample
+```
+
+**你将学到：**
+- 通过 `AgentOptions.logLevel` 配置日志级别
+- 输出目标：`.console`、`.file(URL)`、`.custom(closure)`
+- 结构化 JSON 日志格式（时间戳、级别、模块、事件、数据）
+- `logLevel = .none` 时的零开销验证
+
+**关键代码：**
+```swift
+Logger.configure(level: .debug, output: .custom { jsonLine in
+    print("[SDK 日志] \(jsonLine)")
+})
+let agent = createAgent(options: AgentOptions(
+    apiKey: apiKey,
+    logLevel: .debug,
+    logOutput: .custom { line in myHandler(line) }
+))
+```
+
+---
+
+### 15. ModelSwitchingExample — 运行时模型切换
+
+展示如何在对话中动态切换 LLM 模型，支持按模型追踪成本。
+
+```bash
+swift run ModelSwitchingExample
+```
+
+**你将学到：**
+- 使用 `agent.switchModel()` 切换模型
+- `QueryResult` 中按模型的 Token 用量和成本明细
+- 无效模型名称的错误处理
+
+**关键代码：**
+```swift
+let agent = createAgent(options: AgentOptions(
+    apiKey: apiKey, model: "claude-sonnet-4-6"
+))
+let result1 = await agent.prompt("简单问题...")
+
+try agent.switchModel("claude-opus-4-6")
+let result2 = await agent.prompt("复杂分析...")
+// result2.usage 显示各模型的独立成本
+```
+
+---
+
+### 16. QueryAbortExample — 查询中断
+
+演示如何使用 Swift 的 `Task.cancel()` 取消正在运行的 Agent 查询并获取部分结果。
+
+```bash
+swift run QueryAbortExample
+```
+
+**你将学到：**
+- 在 Swift `Task` 中启动查询以支持取消
+- 使用 `Task.cancel()` 或 `agent.interrupt()` 取消查询
+- 处理 `QueryResult.isCancelled` 和部分工具结果
+- 通过 `SDKMessage` 事件处理流式取消
+
+**关键代码：**
+```swift
+let task = Task {
+    for await message in agent.stream("长时间任务...") {
+        // 处理事件
+    }
+}
+// 延迟后取消
+DispatchQueue.global().asyncAfter(deadline: .now() + 3) {
+    task.cancel()
+}
+```
+
+---
+
+### 17. ContextInjectionExample — 文件缓存与上下文注入
+
+展示文件缓存（LRU 淘汰）、Git 状态自动注入和项目文档发现（CLAUDE.md/AGENT.md）。
+
+```bash
+swift run ContextInjectionExample
+```
+
+**你将学到：**
+- 配置 `FileCache` 参数（maxEntries、maxSizeBytes）
+- 缓存命中/未命中统计和淘汰追踪
+- Git 上下文收集（系统提示中的 `<git-context>` 块）
+- 项目文档发现（CLAUDE.md/AGENT.md 的 `<project-instructions>` 块）
+- 文件写入后的缓存失效
+
+**关键代码：**
+```swift
+let agent = createAgent(options: AgentOptions(
+    apiKey: apiKey,
+    projectRoot: "/path/to/project"
+))
+// 系统提示自动包含 <git-context> 和 <project-instructions>
+```
+
+---
+
+### 18. MultiTurnExample — SessionStore 多轮对话
+
+演示使用 `SessionStore` 实现多轮对话，跨查询保持上下文。
+
+```bash
+swift run MultiTurnExample
+```
+
+**你将学到：**
+- 在同一 Agent 实例上执行连续查询
+- 跨轮次的上下文保持（Agent 记住之前的消息）
+- 使用 `agent.getMessages()` 查看对话历史
+- 多轮对话中的流式支持
+
+**关键代码：**
+```swift
+let sessionStore = SessionStore()
+let agent = createAgent(options: AgentOptions(
+    apiKey: apiKey,
+    sessionStore: sessionStore,
+    sessionId: "conversation-1"
+))
+
+// 第一轮
+let result1 = await agent.prompt("我的名字是 Nick。")
+// 第二轮 — Agent 记住第一轮的名字
+let result2 = await agent.prompt("我叫什么名字？")
+```
+
+---
+
+### 19. OpenAICompatExample — OpenAI 兼容 API 提供商
+
+展示如何使用 OpenAI 兼容 API（GLM、DeepSeek、Qwen、Ollama、OpenRouter 等）配合相同的 Agent API。
+
+```bash
+swift run OpenAICompatExample
+```
+
+**你将学到：**
+- 配置 `provider: .openai` 和自定义 `baseURL`
+- 使用环境变量（`CODEANY_API_KEY`、`CODEANY_BASE_URL`、`CODEANY_MODEL`）
+- Anthropic 与 OpenAI 兼容提供商的配置对比
+- 在 OpenAI 兼容提供商下运行工具
+
+**关键代码：**
+```swift
+let agent = createAgent(options: AgentOptions(
+    provider: .openai,
+    apiKey: ProcessInfo.processInfo.environment["CODEANY_API_KEY"] ?? "",
+    model: "glm-5.1",
+    baseURL: "https://open.bigmodel.cn/api/coding/paas/v4",
+    permissionMode: .bypassPermissions
+))
+```
+
 ## 示例依赖
 
-| 示例                | 需要 MCP 依赖          | 额外配置                  |
-| ------------------- | ---------------------- | ------------------------- |
-| BasicAgent          | 否                     | 无                        |
-| StreamingAgent      | 否                     | 无                        |
-| CustomTools         | 否                     | 无                        |
-| CustomSystemPrompt  | 否                     | 无                        |
-| PromptAPIExample    | 否                     | 无                        |
-| MultiToolExample    | 否                     | 无                        |
-| SubagentExample     | 否                     | 无                        |
-| PermissionsExample  | 否                     | 无                        |
-| MCPIntegration      | 是（`import MCP`）     | 无                        |
-| AdvancedMCPExample  | 是（`import MCP`）     | 无                        |
-| SessionsAndHooks    | 否                     | 无                        |
+| 示例                     | 需要 MCP 依赖          | 额外配置                  |
+| ------------------------ | ---------------------- | ------------------------- |
+| BasicAgent               | 否                     | 无                        |
+| StreamingAgent           | 否                     | 无                        |
+| CustomTools              | 否                     | 无                        |
+| CustomSystemPrompt       | 否                     | 无                        |
+| PromptAPIExample         | 否                     | 无                        |
+| MultiToolExample         | 否                     | 无                        |
+| SubagentExample          | 否                     | 无                        |
+| PermissionsExample       | 否                     | 无                        |
+| MCPIntegration           | 是（`import MCP`）     | 无                        |
+| AdvancedMCPExample       | 是（`import MCP`）     | 无                        |
+| SessionsAndHooks         | 否                     | 无                        |
+| SkillsExample            | 否                     | 无                        |
+| SandboxExample           | 否                     | 无                        |
+| LoggerExample            | 否                     | 无                        |
+| ModelSwitchingExample    | 否                     | 无                        |
+| QueryAbortExample        | 否                     | 无                        |
+| ContextInjectionExample  | 否                     | 无                        |
+| MultiTurnExample         | 否                     | 无                        |
+| OpenAICompatExample      | 否                     | 无                        |
 
 所有示例都已作为可执行目标定义在 `Package.swift` 中 — 无需额外配置。
 
@@ -311,7 +549,9 @@ let agent = createAgent(options: AgentOptions(
 BasicAgent → StreamingAgent → CustomTools → CustomSystemPromptExample
     → PromptAPIExample → MultiToolExample → SubagentExample
     → PermissionsExample → MCPIntegration → AdvancedMCPExample
-    → SessionsAndHooks
+    → SessionsAndHooks → SkillsExample → SandboxExample
+    → LoggerExample → ModelSwitchingExample → QueryAbortExample
+    → ContextInjectionExample → MultiTurnExample → OpenAICompatExample
 ```
 
 1. **从这里开始：** BasicAgent、StreamingAgent — 理解核心 prompt/stream API
@@ -321,6 +561,11 @@ BasicAgent → StreamingAgent → CustomTools → CustomSystemPromptExample
 5. **安全控制：** PermissionsExample — 控制 Agent 可以使用哪些工具
 6. **MCP 集成：** MCPIntegration、AdvancedMCPExample — 连接外部工具服务器
 7. **持久化：** SessionsAndHooks — 保存会话和注册生命周期钩子
+8. **技能系统：** SkillsExample — 注册和执行内置/自定义技能
+9. **沙盒与日志：** SandboxExample、LoggerExample — 限制操作范围和捕获日志
+10. **高级控制：** ModelSwitchingExample、QueryAbortExample — 运行时模型切换和查询中断
+11. **上下文与多轮对话：** ContextInjectionExample、MultiTurnExample — 文件缓存、上下文注入、多轮对话
+12. **OpenAI 兼容：** OpenAICompatExample — 使用 DeepSeek、Qwen、Ollama 等 OpenAI 兼容 API
 
 ## 常见问题
 

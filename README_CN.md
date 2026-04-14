@@ -26,6 +26,10 @@
 - **权限控制** — 6 种权限模式，支持自定义授权回调和策略组合
 - **多 Agent 编排** — 生成子 Agent、管理团队、任务和 Agent 间消息传递
 - **自动压缩** — 长对话自动压缩，保持在上下文窗口限制内
+- **技能系统** — 5 个内置技能（Commit、Review、Simplify、Debug、Test），支持自定义技能注册
+- **文件缓存与上下文** — LRU 文件缓存、Git 状态自动注入、项目文档发现（CLAUDE.md/AGENT.md）
+- **运行时控制** — 动态模型切换、查询中断并获取部分结果、会话记忆
+- **沙盒与日志** — 可配置的命令/路径沙盒限制，结构化 JSON 日志输出
 
 ## 快速入门（15 分钟）
 
@@ -249,6 +253,100 @@ let agent = createAgent(options: AgentOptions(
 ))
 ```
 
+### 技能系统
+
+注册内置或自定义技能，封装提示词模板和工具限制：
+
+```swift
+import OpenAgentSDK
+
+// 内置技能自动注册
+let registry = SkillRegistry()
+registry.register(BuiltInSkills.commit)
+registry.register(BuiltInSkills.review)
+
+// 注册自定义技能
+let explainSkill = Skill(
+    name: "explain",
+    description: "详细解释代码",
+    promptTemplate: "读取指定文件并逐行解释代码...",
+    toolRestrictions: [.bash, .read, .glob, .grep]
+)
+registry.register(explainSkill)
+
+let agent = createAgent(options: AgentOptions(
+    apiKey: "sk-...",
+    tools: getAllBaseTools(tier: .core) + [createSkillTool(registry: registry)]
+))
+```
+
+### 运行时模型切换
+
+在对话中切换 LLM 模型，支持按模型追踪成本：
+
+```swift
+let agent = createAgent(options: AgentOptions(
+    apiKey: "sk-...",
+    model: "claude-sonnet-4-6"
+))
+
+// 简单问题使用快速模型
+let result1 = await agent.prompt("简单问题...")
+
+// 切换到强力模型处理复杂任务
+try agent.switchModel("claude-opus-4-6")
+let result2 = await agent.prompt("分析这个复杂代码库...")
+// result2.usage.costBreakdown 包含各模型的独立计数
+```
+
+### 查询中断
+
+取消正在执行的查询并获取部分结果：
+
+```swift
+let task = Task {
+    for await message in agent.stream("长时间分析任务...") {
+        // 处理事件
+    }
+}
+
+// 超时后取消
+task.cancel()
+// Agent 返回 QueryResult，isCancelled=true，包含部分结果
+```
+
+### 上下文注入
+
+自动注入 Git 状态和发现项目文档：
+
+```swift
+let agent = createAgent(options: AgentOptions(
+    apiKey: "sk-...",
+    projectRoot: "/path/to/project"  // 自动发现 CLAUDE.md、AGENT.md
+))
+// 系统提示现在包含 <git-context> 和 <project-instructions> 块
+```
+
+### 沙盒与日志
+
+限制 Agent 操作范围并捕获结构化日志：
+
+```swift
+let agent = createAgent(options: AgentOptions(
+    apiKey: "sk-...",
+    sandbox: SandboxSettings(
+        allowedReadPaths: ["/project/"],
+        allowedWritePaths: ["/project/src/"],
+        deniedCommands: ["rm", "sudo"]
+    ),
+    logLevel: .debug,
+    logOutput: .custom { jsonLine in
+        // 集成到 ELK、Datadog 等系统
+        print(jsonLine)
+    }
+))
+```
+
 ## 内置工具
 
 ### Core 工具（10 个）
@@ -343,7 +441,7 @@ API 文档和指南通过 Swift-DocC 提供：
 - [工具系统](Sources/OpenAgentSDK/Documentation.docc/ToolSystem.md) — 工具协议、自定义工具、层级
 - [多 Agent 编排](Sources/OpenAgentSDK/Documentation.docc/MultiAgent.md) — 子 Agent、团队、任务
 - [MCP、会话与钩子](Sources/OpenAgentSDK/Documentation.docc/MCPSessionHooks.md) — MCP 集成、持久化、钩子系统
-- [可运行示例](Examples/README.md) — 11 个完整示例，含逐步教程
+- [可运行示例](Examples/README.md) — 19 个完整示例，含逐步教程
 
 ## 系统要求
 

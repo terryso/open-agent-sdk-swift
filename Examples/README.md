@@ -287,21 +287,259 @@ let agent = createAgent(options: AgentOptions(
 ))
 ```
 
+---
+
+### 12. SkillsExample — Skills System (Built-in & Custom)
+
+Demonstrates the Skills system — registering built-in skills (commit, review, simplify, debug, test), creating custom skills, and executing skills via the LLM.
+
+```bash
+swift run SkillsExample
+```
+
+**What you'll learn:**
+- Initializing built-in skills via `BuiltInSkills`
+- Registering and discovering skills with `SkillRegistry`
+- Creating custom skills with `Skill(name:description:promptTemplate:toolRestrictions:)`
+- Agent executing skills via `createSkillTool(registry:)`
+
+**Key code:**
+```swift
+let registry = SkillRegistry()
+registry.register(BuiltInSkills.commit)
+registry.register(BuiltInSkills.review)
+
+let customSkill = Skill(
+    name: "explain", description: "Explain code in detail",
+    promptTemplate: "Read the files and explain...", toolRestrictions: [.bash, .read]
+)
+registry.register(customSkill)
+
+let agent = createAgent(options: AgentOptions(
+    apiKey: apiKey,
+    tools: getAllBaseTools(tier: .core) + [createSkillTool(registry: registry)]
+))
+```
+
+---
+
+### 13. SandboxExample — Sandbox Configuration & Enforcement
+
+Shows how to configure path and command restrictions to control Agent's filesystem and Bash operations.
+
+```bash
+swift run SandboxExample
+```
+
+**What you'll learn:**
+- Configuring `SandboxSettings` with path allowlists/denylists
+- Command blacklisting (`deniedCommands`) and whitelisting (`allowedCommands`)
+- Path traversal protection and symlink resolution
+- Shell metacharacter detection for bypass prevention
+
+**Key code:**
+```swift
+let agent = createAgent(options: AgentOptions(
+    apiKey: apiKey,
+    sandbox: SandboxSettings(
+        allowedReadPaths: ["/project/"],
+        allowedWritePaths: ["/project/src/"],
+        deniedCommands: ["rm", "sudo"]
+    )
+))
+```
+
+---
+
+### 14. LoggerExample — Structured Logging System
+
+Demonstrates configurable log levels (none/error/warn/info/debug) and output targets (console/file/custom) for SDK diagnostic events.
+
+```bash
+swift run LoggerExample
+```
+
+**What you'll learn:**
+- Configuring log levels via `AgentOptions.logLevel`
+- Output targets: `.console`, `.file(URL)`, `.custom(closure)`
+- Structured JSON log format (timestamp, level, module, event, data)
+- Zero-overhead verification when `logLevel = .none`
+
+**Key code:**
+```swift
+Logger.configure(level: .debug, output: .custom { jsonLine in
+    print("[SDK LOG] \(jsonLine)")
+})
+let agent = createAgent(options: AgentOptions(
+    apiKey: apiKey,
+    logLevel: .debug,
+    logOutput: .custom { line in myHandler(line) }
+))
+```
+
+---
+
+### 15. ModelSwitchingExample — Runtime Model Switching
+
+Shows how to dynamically switch LLM models mid-conversation with per-model cost tracking.
+
+```bash
+swift run ModelSwitchingExample
+```
+
+**What you'll learn:**
+- Switching models with `agent.switchModel()`
+- Per-model token usage and cost breakdown in `QueryResult`
+- Error handling for invalid model names
+
+**Key code:**
+```swift
+let agent = createAgent(options: AgentOptions(
+    apiKey: apiKey, model: "claude-sonnet-4-6"
+))
+let result1 = await agent.prompt("Simple question...")
+
+try agent.switchModel("claude-opus-4-6")
+let result2 = await agent.prompt("Complex analysis...")
+// result2.usage shows separate costs per model
+```
+
+---
+
+### 16. QueryAbortExample — Query Cancellation
+
+Demonstrates how to cancel running Agent queries using Swift's `Task.cancel()` and retrieve partial results.
+
+```bash
+swift run QueryAbortExample
+```
+
+**What you'll learn:**
+- Launching queries in Swift `Task` for cancellation support
+- Cancelling with `Task.cancel()` or `agent.interrupt()`
+- Handling `QueryResult.isCancelled` and partial tool results
+- Stream cancellation via `SDKMessage` events
+
+**Key code:**
+```swift
+let task = Task {
+    for await message in agent.stream("Long-running task...") {
+        // process events
+    }
+}
+// Cancel after delay
+DispatchQueue.global().asyncAfter(deadline: .now() + 3) {
+    task.cancel()
+}
+```
+
+---
+
+### 17. ContextInjectionExample — File Cache & Context Injection
+
+Shows file caching with LRU eviction, Git status auto-injection, and project document discovery (CLAUDE.md/AGENT.md).
+
+```bash
+swift run ContextInjectionExample
+```
+
+**What you'll learn:**
+- Configuring `FileCache` parameters (maxEntries, maxSizeBytes)
+- Cache hit/miss statistics and eviction tracking
+- Git context collection (`<git-context>` in system prompt)
+- Project document discovery (`<project-instructions>` from CLAUDE.md/AGENT.md)
+- Cache invalidation on file writes
+
+**Key code:**
+```swift
+let agent = createAgent(options: AgentOptions(
+    apiKey: apiKey,
+    projectRoot: "/path/to/project"
+))
+// System prompt automatically includes <git-context> and <project-instructions>
+```
+
+---
+
+### 18. MultiTurnExample — Multi-Turn Conversation with SessionStore
+
+Demonstrates multi-turn conversations with context retention across queries using `SessionStore`.
+
+```bash
+swift run MultiTurnExample
+```
+
+**What you'll learn:**
+- Executing sequential queries on the same Agent instance
+- Context retention across turns (Agent remembers earlier messages)
+- Inspecting conversation history with `agent.getMessages()`
+- Streaming support in multi-turn conversations
+
+**Key code:**
+```swift
+let sessionStore = SessionStore()
+let agent = createAgent(options: AgentOptions(
+    apiKey: apiKey,
+    sessionStore: sessionStore,
+    sessionId: "conversation-1"
+))
+
+// Turn 1
+let result1 = await agent.prompt("My name is Nick.")
+// Turn 2 — Agent remembers the name from turn 1
+let result2 = await agent.prompt("What is my name?")
+```
+
+---
+
+### 19. OpenAICompatExample — OpenAI-Compatible API Providers
+
+Shows how to use OpenAI-compatible APIs (GLM, DeepSeek, Qwen, Ollama, OpenRouter, etc.) with the same Agent API.
+
+```bash
+swift run OpenAICompatExample
+```
+
+**What you'll learn:**
+- Configuring `provider: .openai` with custom `baseURL`
+- Using environment variables (`CODEANY_API_KEY`, `CODEANY_BASE_URL`, `CODEANY_MODEL`)
+- Comparing Anthropic vs OpenAI-compatible provider setup
+- Running tools with OpenAI-compatible providers
+
+**Key code:**
+```swift
+let agent = createAgent(options: AgentOptions(
+    provider: .openai,
+    apiKey: ProcessInfo.processInfo.environment["CODEANY_API_KEY"] ?? "",
+    model: "glm-5.1",
+    baseURL: "https://open.bigmodel.cn/api/coding/paas/v4",
+    permissionMode: .bypassPermissions
+))
+```
+
 ## Example Dependencies
 
-| Example             | Requires MCP dependency | Extra setup              |
-| ------------------- | ---------------------- | ------------------------ |
-| BasicAgent          | No                     | None                     |
-| StreamingAgent      | No                     | None                     |
-| CustomTools         | No                     | None                     |
-| CustomSystemPrompt  | No                     | None                     |
-| PromptAPIExample    | No                     | None                     |
-| MultiToolExample    | No                     | None                     |
-| SubagentExample     | No                     | None                     |
-| PermissionsExample  | No                     | None                     |
-| MCPIntegration      | Yes (`import MCP`)     | None                     |
-| AdvancedMCPExample  | Yes (`import MCP`)     | None                     |
-| SessionsAndHooks    | No                     | None                     |
+| Example                  | Requires MCP dependency | Extra setup              |
+| ------------------------ | ---------------------- | ------------------------ |
+| BasicAgent               | No                     | None                     |
+| StreamingAgent           | No                     | None                     |
+| CustomTools              | No                     | None                     |
+| CustomSystemPrompt       | No                     | None                     |
+| PromptAPIExample         | No                     | None                     |
+| MultiToolExample         | No                     | None                     |
+| SubagentExample          | No                     | None                     |
+| PermissionsExample       | No                     | None                     |
+| MCPIntegration           | Yes (`import MCP`)     | None                     |
+| AdvancedMCPExample       | Yes (`import MCP`)     | None                     |
+| SessionsAndHooks         | No                     | None                     |
+| SkillsExample            | No                     | None                     |
+| SandboxExample           | No                     | None                     |
+| LoggerExample            | No                     | None                     |
+| ModelSwitchingExample    | No                     | None                     |
+| QueryAbortExample        | No                     | None                     |
+| ContextInjectionExample  | No                     | None                     |
+| MultiTurnExample         | No                     | None                     |
+| OpenAICompatExample      | No                     | None                     |
 
 All examples are defined as executable targets in `Package.swift` — no additional configuration needed.
 
@@ -311,7 +549,9 @@ All examples are defined as executable targets in `Package.swift` — no additio
 BasicAgent → StreamingAgent → CustomTools → CustomSystemPromptExample
     → PromptAPIExample → MultiToolExample → SubagentExample
     → PermissionsExample → MCPIntegration → AdvancedMCPExample
-    → SessionsAndHooks
+    → SessionsAndHooks → SkillsExample → SandboxExample
+    → LoggerExample → ModelSwitchingExample → QueryAbortExample
+    → ContextInjectionExample → MultiTurnExample → OpenAICompatExample
 ```
 
 1. **Start here:** BasicAgent, StreamingAgent — understand the core prompt/stream APIs
@@ -321,6 +561,11 @@ BasicAgent → StreamingAgent → CustomTools → CustomSystemPromptExample
 5. **Security:** PermissionsExample — control what tools agents can use
 6. **MCP integration:** MCPIntegration, AdvancedMCPExample — connect external tool servers
 7. **Persistence:** SessionsAndHooks — save sessions and hook into lifecycle events
+8. **Skills:** SkillsExample — register and execute built-in/custom skills
+9. **Sandbox & Logging:** SandboxExample, LoggerExample — restrict operations and capture logs
+10. **Advanced controls:** ModelSwitchingExample, QueryAbortExample — runtime model switching and query cancellation
+11. **Context & multi-turn:** ContextInjectionExample, MultiTurnExample — file caching, context injection, multi-turn conversations
+12. **OpenAI compat:** OpenAICompatExample — use DeepSeek, Qwen, Ollama, and other OpenAI-compatible APIs
 
 ## Troubleshooting
 

@@ -26,6 +26,10 @@ Also available in **TypeScript**: [open-agent-sdk-typescript](https://github.com
 - **Permission Control** — 6 permission modes plus custom authorization callbacks with policy composition
 - **Sub-Agent Orchestration** — Spawn child agents, manage teams, tasks, and inter-agent messaging
 - **Auto-Compaction** — Automatically compresses long conversations to stay within context limits
+- **Skills System** — 5 built-in skills (Commit, Review, Simplify, Debug, Test) with custom skill registration
+- **File Cache & Context** — LRU file cache, Git status auto-injection, project document discovery (CLAUDE.md/AGENT.md)
+- **Runtime Controls** — Dynamic model switching, query abort with partial results, session memory
+- **Sandbox & Logging** — Configurable sandbox for command/path restrictions, structured JSON logging
 
 ## Quick Start (15 minutes)
 
@@ -249,6 +253,100 @@ let agent = createAgent(options: AgentOptions(
 ))
 ```
 
+### Skills System
+
+Register built-in or custom skills that encapsulate prompt templates and tool restrictions:
+
+```swift
+import OpenAgentSDK
+
+// Built-in skills are auto-registered
+let registry = SkillRegistry()
+registry.register(BuiltInSkills.commit)
+registry.register(BuiltInSkills.review)
+
+// Register a custom skill
+let explainSkill = Skill(
+    name: "explain",
+    description: "Explain code in detail",
+    promptTemplate: "Read the specified files and explain the code line by line...",
+    toolRestrictions: [.bash, .read, .glob, .grep]
+)
+registry.register(explainSkill)
+
+let agent = createAgent(options: AgentOptions(
+    apiKey: "sk-...",
+    tools: getAllBaseTools(tier: .core) + [createSkillTool(registry: registry)]
+))
+```
+
+### Runtime Model Switching
+
+Switch LLM models mid-conversation with per-model cost tracking:
+
+```swift
+let agent = createAgent(options: AgentOptions(
+    apiKey: "sk-...",
+    model: "claude-sonnet-4-6"
+))
+
+// Use fast model for simple queries
+let result1 = await agent.prompt("Quick question...")
+
+// Switch to powerful model for complex tasks
+try agent.switchModel("claude-opus-4-6")
+let result2 = await agent.prompt("Analyze this complex codebase...")
+// result2.usage.costBreakdown contains separate entries per model
+```
+
+### Query Abort
+
+Cancel running queries and retrieve partial results:
+
+```swift
+let task = Task {
+    for await message in agent.stream("Long-running analysis...") {
+        // process events
+    }
+}
+
+// Cancel after timeout
+task.cancel()
+// The agent returns a QueryResult with isCancelled=true and partial results
+```
+
+### Context Injection
+
+Automatic Git status and project document discovery:
+
+```swift
+let agent = createAgent(options: AgentOptions(
+    apiKey: "sk-...",
+    projectRoot: "/path/to/project"  // auto-discovers CLAUDE.md, AGENT.md
+))
+// System prompt now includes <git-context> and <project-instructions> blocks
+```
+
+### Sandbox & Logging
+
+Restrict agent operations and capture structured logs:
+
+```swift
+let agent = createAgent(options: AgentOptions(
+    apiKey: "sk-...",
+    sandbox: SandboxSettings(
+        allowedReadPaths: ["/project/"],
+        allowedWritePaths: ["/project/src/"],
+        deniedCommands: ["rm", "sudo"]
+    ),
+    logLevel: .debug,
+    logOutput: .custom { jsonLine in
+        // Integrate with ELK, Datadog, etc.
+        print(jsonLine)
+    }
+))
+```
+
 ## Built-in Tools
 
 ### Core Tools (10)
@@ -343,7 +441,7 @@ API documentation and guides are available via Swift-DocC:
 - [Tool System](Sources/OpenAgentSDK/Documentation.docc/ToolSystem.md) — Tool protocol, custom tools, tiers
 - [Multi-Agent Orchestration](Sources/OpenAgentSDK/Documentation.docc/MultiAgent.md) — Sub-agents, teams, tasks
 - [MCP, Sessions & Hooks](Sources/OpenAgentSDK/Documentation.docc/MCPSessionHooks.md) — MCP integration, persistence, hook system
-- [Runnable Examples](Examples/README.md) — 11 complete examples with step-by-step tutorial
+- [Runnable Examples](Examples/README.md) — 19 complete examples with step-by-step tutorial
 
 ## Requirements
 
