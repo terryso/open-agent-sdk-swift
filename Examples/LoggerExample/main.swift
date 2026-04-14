@@ -206,6 +206,8 @@ let agentLogs = LogBuffer()
 let agent = createAgent(options: AgentOptions(
     apiKey: apiKey,
     model: defaultModel,
+    baseURL: useOpenAI ? getDefaultOpenAIBaseURL(from: dotEnv) : nil,
+    provider: useOpenAI ? .openai : .anthropic,
     permissionMode: .bypassPermissions,
     logLevel: .debug,
     logOutput: .custom { jsonLine in

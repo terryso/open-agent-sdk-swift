@@ -25,6 +25,8 @@ let apiKey = getEnv("CODEANY_API_KEY", from: dotEnv)
     ?? getEnv("ANTHROPIC_API_KEY", from: dotEnv)
     ?? "sk-..."
 let defaultModel = getEnv("CODEANY_MODEL", from: dotEnv) ?? "claude-sonnet-4-6"
+let useOpenAI = getEnv("CODEANY_API_KEY", from: dotEnv) != nil
+let secondModel = useOpenAI ? "glm-4-plus" : "claude-opus-4-6"
 
 print("=== ModelSwitchingExample ===")
 print()
@@ -34,11 +36,12 @@ print()
 print("--- Part 1: Model Switching and Cost Tracking ---")
 print()
 
-// 创建 Agent，使用默认模型 claude-sonnet-4-6
-// Create Agent with default model claude-sonnet-4-6
+// 创建 Agent，使用默认模型
 let agent = createAgent(options: AgentOptions(
     apiKey: apiKey,
     model: defaultModel,
+    baseURL: useOpenAI ? getDefaultOpenAIBaseURL(from: dotEnv) : nil,
+    provider: useOpenAI ? .openai : .anthropic,
     permissionMode: .bypassPermissions
 ))
 
@@ -73,18 +76,18 @@ assert(!result1.costBreakdown.isEmpty, "Cost breakdown should not be empty")
 print("✅ Cost breakdown entries: \(result1.costBreakdown.count)")
 print()
 
-// 切换到 claude-opus-4-6 模型
-// Switch to claude-opus-4-6 model
-print("[Switching model to claude-opus-4-6...]")
+// 切换到第二个模型
+// Switch to second model
+print("[Switching model to \(secondModel)...]")
 do {
-    try agent.switchModel("claude-opus-4-6")
+    try agent.switchModel(secondModel)
 } catch {
     print("❌ Failed to switch model: \(error)")
-    fatalError("Model switch to claude-opus-4-6 should not fail")
+    fatalError("Model switch to \(secondModel) should not fail")
 }
 print("[Agent model after switch: \(agent.model)]")
-assert(agent.model == "claude-opus-4-6", "Agent model should be claude-opus-4-6 after switch")
-print("✅ Model switched to claude-opus-4-6: PASS")
+assert(agent.model == secondModel, "Agent model should be \(secondModel) after switch")
+print("✅ Model switched to \(secondModel): PASS")
 print()
 
 // 使用新模型执行第二个查询（推理密集型问题）
