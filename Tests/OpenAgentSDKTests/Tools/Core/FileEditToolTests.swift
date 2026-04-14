@@ -297,4 +297,120 @@ final class FileEditToolTests: XCTestCase {
         XCTAssertEqual(fileContent, "Hello World",
                        "File should not be modified when strings are identical")
     }
+
+    // MARK: - replace_all parameter
+
+    /// When replace_all=true and old_string appears multiple times, all are replaced.
+    func testEditFile_replaceAll_replacesMultipleOccurrences() async {
+        let filePath = writeTestFile(
+            name: "replace_all_test.txt",
+            content: "foo bar foo baz foo"
+        )
+        let tool = makeEditTool()
+
+        let result = await callTool(
+            tool,
+            input: [
+                "file_path": filePath,
+                "old_string": "foo",
+                "new_string": "qux",
+                "replace_all": true
+            ]
+        )
+
+        XCTAssertFalse(result.isError,
+                       "replace_all should succeed with multiple occurrences, got: \(result.content)")
+        let updatedContent = try! String(contentsOfFile: filePath, encoding: .utf8)
+        XCTAssertEqual(updatedContent, "qux bar qux baz qux",
+                       "All occurrences should be replaced")
+    }
+
+    /// When replace_all=true and old_string appears once, it still works.
+    func testEditFile_replaceAll_singleOccurrence_succeeds() async {
+        let filePath = writeTestFile(
+            name: "replace_all_single.txt",
+            content: "only one foo here"
+        )
+        let tool = makeEditTool()
+
+        let result = await callTool(
+            tool,
+            input: [
+                "file_path": filePath,
+                "old_string": "foo",
+                "new_string": "bar",
+                "replace_all": true
+            ]
+        )
+
+        XCTAssertFalse(result.isError,
+                       "replace_all with single occurrence should succeed")
+        let updatedContent = try! String(contentsOfFile: filePath, encoding: .utf8)
+        XCTAssertEqual(updatedContent, "only one bar here")
+    }
+
+    /// When replace_all=true but old_string is not found, error is still returned.
+    func testEditFile_replaceAll_notFound_stillErrors() async {
+        let filePath = writeTestFile(
+            name: "replace_all_notfound.txt",
+            content: "nothing to replace"
+        )
+        let tool = makeEditTool()
+
+        let result = await callTool(
+            tool,
+            input: [
+                "file_path": filePath,
+                "old_string": "missing",
+                "new_string": "replacement",
+                "replace_all": true
+            ]
+        )
+
+        XCTAssertTrue(result.isError,
+                      "replace_all should still error when old_string not found")
+    }
+
+    /// When replace_all is omitted (nil), multiple occurrences still error (backward compat).
+    func testEditFile_replaceAllOmitted_multipleOccurences_stillErrors() async {
+        let filePath = writeTestFile(
+            name: "replace_all_omit.txt",
+            content: "dup dup dup"
+        )
+        let tool = makeEditTool()
+
+        let result = await callTool(
+            tool,
+            input: [
+                "file_path": filePath,
+                "old_string": "dup",
+                "new_string": "single"
+            ]
+        )
+
+        XCTAssertTrue(result.isError,
+                      "Without replace_all, multiple occurrences should error")
+    }
+
+    /// When replace_all=false, behavior is the same as omitted (backward compat).
+    func testEditFile_replaceAllFalse_multipleOccurences_errors() async {
+        let filePath = writeTestFile(
+            name: "replace_all_false.txt",
+            content: "dup dup dup"
+        )
+        let tool = makeEditTool()
+
+        let result = await callTool(
+            tool,
+            input: [
+                "file_path": filePath,
+                "old_string": "dup",
+                "new_string": "single",
+                "replace_all": false
+            ]
+        )
+
+        XCTAssertTrue(result.isError,
+                      "replace_all=false should error on multiple occurrences")
+    }
 }

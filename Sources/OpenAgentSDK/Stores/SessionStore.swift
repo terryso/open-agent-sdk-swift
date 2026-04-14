@@ -117,6 +117,9 @@ public actor SessionStore {
               let metadataDict = dict["metadata"] as? [String: Any],
               let messagesArray = dict["messages"] as? [[String: Any]]
         else {
+            Logger.shared.warn("SessionStore", "load_corrupt_json", data: [
+                "sessionId": sessionId
+            ])
             return nil
         }
 
@@ -128,6 +131,12 @@ public actor SessionStore {
               let updatedAt = metadataDict["updatedAt"] as? String,
               let messageCount = metadataDict["messageCount"] as? Int
         else {
+            let missingKeys = ["id", "cwd", "model", "createdAt", "updatedAt", "messageCount"]
+                .filter { metadataDict[$0] == nil }
+            Logger.shared.warn("SessionStore", "load_missing_fields", data: [
+                "sessionId": sessionId,
+                "missingKeys": missingKeys.joined(separator: ",")
+            ])
             return nil
         }
 

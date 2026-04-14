@@ -122,18 +122,43 @@ public struct HookOutput: @unchecked Sendable {
     }
 }
 
+/// Permission behaviors for hook-driven permission updates.
+///
+/// Use `.allow` to permit tool execution or `.deny` to block it.
+public enum PermissionBehavior: String, Sendable, Equatable, CaseIterable {
+    case allow = "allow"
+    case deny = "deny"
+}
+
 /// A permission update from a hook.
 ///
 /// Dynamically changes tool permissions during hook execution.
 public struct PermissionUpdate: Sendable, Equatable {
     /// The tool name to update permissions for.
     public let tool: String
-    /// The new permission behavior (e.g., "allow", "deny").
-    public let behavior: String
+    /// The new permission behavior.
+    public let behavior: PermissionBehavior
 
-    public init(tool: String, behavior: String) {
+    public init(tool: String, behavior: PermissionBehavior) {
         self.tool = tool
         self.behavior = behavior
+    }
+}
+
+/// Severity levels for hook notifications.
+///
+/// Use `.info` for general messages, `.warning` for potential issues,
+/// `.error` for failures, and `.debug` for diagnostic information.
+/// Unknown string values from external sources fall back to `.info`.
+public enum HookNotificationLevel: String, Sendable, Equatable, CaseIterable {
+    case info = "info"
+    case warning = "warning"
+    case error = "error"
+    case debug = "debug"
+
+    /// Initialize from a string, falling back to `.info` for unknown values.
+    public init(_ string: String) {
+        self = HookNotificationLevel(rawValue: string) ?? .info
     }
 }
 
@@ -145,10 +170,10 @@ public struct HookNotification: Sendable, Equatable {
     public let title: String
     /// The notification body text.
     public let body: String
-    /// The severity level (e.g., "info", "warning", "error"). Defaults to "info".
-    public let level: String
+    /// The severity level. Defaults to `.info`.
+    public let level: HookNotificationLevel
 
-    public init(title: String, body: String, level: String = "info") {
+    public init(title: String, body: String, level: HookNotificationLevel = .info) {
         self.title = title
         self.body = body
         self.level = level

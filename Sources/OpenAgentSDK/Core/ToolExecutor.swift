@@ -337,7 +337,7 @@ enum ToolExecutor {
         // Step 1: Try canUseTool callback (takes priority over permissionMode)
         if let canUseTool = context.canUseTool {
             if let result = await canUseTool(tool, block.input, context) {
-                if result.behavior == "deny" {
+                if result.behavior == .deny {
                     return ToolResult(
                         toolUseId: block.id,
                         content: result.message ?? "Permission denied for tool \"\(block.name)\"",

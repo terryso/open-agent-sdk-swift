@@ -160,7 +160,8 @@ public enum ShellHookExecutor {
         var permissionUpdate: PermissionUpdate?
         if let permDict = dict["permissionUpdate"] as? [String: Any],
            let tool = permDict["tool"] as? String,
-           let behavior = permDict["behavior"] as? String {
+           let behaviorStr = permDict["behavior"] as? String,
+           let behavior = PermissionBehavior(rawValue: behaviorStr) {
             permissionUpdate = PermissionUpdate(tool: tool, behavior: behavior)
         }
 
@@ -170,8 +171,8 @@ public enum ShellHookExecutor {
         if let notifDict = dict["notification"] as? [String: Any],
            let title = notifDict["title"] as? String,
            let body = notifDict["body"] as? String {
-            let level = notifDict["level"] as? String ?? "info"
-            notification = HookNotification(title: title, body: body, level: level)
+            let levelStr = notifDict["level"] as? String ?? "info"
+            notification = HookNotification(title: title, body: body, level: HookNotificationLevel(levelStr))
         }
 
         return HookOutput(

@@ -7,6 +7,7 @@ private struct FileEditInput: Codable {
     let file_path: String
     let old_string: String
     let new_string: String
+    let replace_all: Bool?
 }
 
 // MARK: - Factory
@@ -14,9 +15,9 @@ private struct FileEditInput: Codable {
 /// Creates the Edit tool for replacing strings in files on the filesystem.
 ///
 /// The Edit tool performs a targeted string replacement in an existing file.
-/// The `old_string` must appear exactly once in the file; if it appears zero
-/// or multiple times, an error is returned. This ensures replacements are
-/// unambiguous and prevents unintended modifications.
+/// By default, `old_string` must appear exactly once in the file; if it appears
+/// zero or multiple times, an error is returned. Set `replace_all` to `true` to
+/// allow replacing all occurrences without the uniqueness requirement.
 /// Relative paths are resolved against `ToolContext.cwd`.
 ///
 /// - Returns: A `ToolProtocol` instance for the Edit tool.
@@ -25,8 +26,8 @@ public func createEditTool() -> ToolProtocol {
         name: "Edit",
         description:
             "Replace a specific string in a file. " +
-            "The old_string must be unique in the file (exactly one occurrence). " +
-            "If old_string is not found or appears multiple times, an error is returned. " +
+            "The old_string must be unique in the file (exactly one occurrence) unless replace_all is true. " +
+            "If old_string is not found or appears multiple times (and replace_all is false), an error is returned. " +
             "Relative paths are resolved against the current working directory.",
         inputSchema: [
             "type": "object",
@@ -42,6 +43,10 @@ public func createEditTool() -> ToolProtocol {
                 "new_string": [
                     "type": "string",
                     "description": "The text to replace it with"
+                ],
+                "replace_all": [
+                    "type": "boolean",
+                    "description": "Replace all occurrences of old_string. If false (default), old_string must be unique in the file."
                 ]
             ],
             "required": ["file_path", "old_string", "new_string"]
@@ -113,7 +118,8 @@ public func createEditTool() -> ToolProtocol {
                 isError: true
             )
         }
-        if occurrences > 1 {
+        let shouldReplaceAll = input.replace_all ?? false
+        if !shouldReplaceAll && occurrences > 1 {
             return ToolExecuteResult(
                 content: "Error: old_string appears \(occurrences) times in \(resolvedPath). Provide more context to make the match unique.",
                 isError: true

@@ -30,7 +30,7 @@ final class PermissionPolicyTests: XCTestCase {
         let result = await policy.evaluate(tool: tool, input: [:], context: context)
 
         XCTAssertNotNil(result, "Allowlist policy should return non-nil for allowed tool")
-        XCTAssertEqual(result?.behavior, "allow",
+        XCTAssertEqual(result?.behavior, .allow,
                        "Allowed tool should get 'allow' behavior")
     }
 
@@ -45,7 +45,7 @@ final class PermissionPolicyTests: XCTestCase {
         let result = await policy.evaluate(tool: tool, input: [:], context: context)
 
         XCTAssertNotNil(result, "Allowlist policy should return non-nil for denied tool")
-        XCTAssertEqual(result?.behavior, "deny",
+        XCTAssertEqual(result?.behavior, .deny,
                        "Tool not in allowlist should get 'deny' behavior")
         XCTAssertTrue(result?.message?.contains("Bash") ?? false,
                       "Deny message should mention the tool name")
@@ -62,7 +62,7 @@ final class PermissionPolicyTests: XCTestCase {
         let result = await policy.evaluate(tool: tool, input: [:], context: context)
 
         XCTAssertNotNil(result, "Empty allowlist should return non-nil")
-        XCTAssertEqual(result?.behavior, "deny",
+        XCTAssertEqual(result?.behavior, .deny,
                        "Empty allowlist should deny all tools")
     }
 
@@ -77,7 +77,7 @@ final class PermissionPolicyTests: XCTestCase {
         let result = await policy.evaluate(tool: tool, input: [:], context: context)
 
         XCTAssertNotNil(result, "Denylist policy should return non-nil for denied tool")
-        XCTAssertEqual(result?.behavior, "deny",
+        XCTAssertEqual(result?.behavior, .deny,
                        "Tool in denylist should get 'deny' behavior")
         XCTAssertTrue(result?.message?.contains("Bash") ?? false,
                       "Deny message should mention the tool name")
@@ -94,7 +94,7 @@ final class PermissionPolicyTests: XCTestCase {
         let result = await policy.evaluate(tool: tool, input: [:], context: context)
 
         XCTAssertNotNil(result, "Denylist policy should return non-nil for allowed tool")
-        XCTAssertEqual(result?.behavior, "allow",
+        XCTAssertEqual(result?.behavior, .allow,
                        "Tool not in denylist should get 'allow' behavior")
     }
 
@@ -109,7 +109,7 @@ final class PermissionPolicyTests: XCTestCase {
         let result = await policy.evaluate(tool: tool, input: [:], context: context)
 
         XCTAssertNotNil(result, "Empty denylist should return non-nil")
-        XCTAssertEqual(result?.behavior, "allow",
+        XCTAssertEqual(result?.behavior, .allow,
                        "Empty denylist should allow all tools")
     }
 
@@ -124,7 +124,7 @@ final class PermissionPolicyTests: XCTestCase {
         let result = await policy.evaluate(tool: tool, input: [:], context: context)
 
         XCTAssertNotNil(result, "ReadOnlyPolicy should return non-nil for read-only tool")
-        XCTAssertEqual(result?.behavior, "allow",
+        XCTAssertEqual(result?.behavior, .allow,
                        "Read-only tool should be allowed")
     }
 
@@ -139,7 +139,7 @@ final class PermissionPolicyTests: XCTestCase {
         let result = await policy.evaluate(tool: tool, input: [:], context: context)
 
         XCTAssertNotNil(result, "ReadOnlyPolicy should return non-nil for mutation tool")
-        XCTAssertEqual(result?.behavior, "deny",
+        XCTAssertEqual(result?.behavior, .deny,
                        "Mutation tool should be denied under read-only policy")
         XCTAssertTrue(result?.message?.contains("read-only") ?? false,
                       "Deny message should mention read-only policy")
@@ -159,7 +159,7 @@ final class PermissionPolicyTests: XCTestCase {
         let result = await policy.evaluate(tool: tool, input: [:], context: context)
 
         XCTAssertNotNil(result, "CompositePolicy should return non-nil")
-        XCTAssertEqual(result?.behavior, "allow",
+        XCTAssertEqual(result?.behavior, .allow,
                        "All-allowing policies should result in allow")
     }
 
@@ -177,7 +177,7 @@ final class PermissionPolicyTests: XCTestCase {
         let result = await policy.evaluate(tool: tool, input: [:], context: context)
 
         XCTAssertNotNil(result, "CompositePolicy should return non-nil")
-        XCTAssertEqual(result?.behavior, "deny",
+        XCTAssertEqual(result?.behavior, .deny,
                        "Any deny should make composite return deny")
     }
 
@@ -198,7 +198,7 @@ final class PermissionPolicyTests: XCTestCase {
         let result = await policy.evaluate(tool: tool, input: [:], context: context)
 
         // Even though the second policy would allow Bash, the first deny should win
-        XCTAssertEqual(result?.behavior, "deny",
+        XCTAssertEqual(result?.behavior, .deny,
                        "Deny should short-circuit and win over subsequent allow")
     }
 
@@ -216,7 +216,7 @@ final class PermissionPolicyTests: XCTestCase {
 
         let result = await policy.evaluate(tool: tool, input: [:], context: context)
 
-        XCTAssertEqual(result?.behavior, "allow",
+        XCTAssertEqual(result?.behavior, .allow,
                        "Nil policy should be skipped, allow policy should take effect")
     }
 
@@ -230,7 +230,7 @@ final class PermissionPolicyTests: XCTestCase {
 
         let result = await policy.evaluate(tool: tool, input: [:], context: context)
 
-        XCTAssertEqual(result?.behavior, "allow",
+        XCTAssertEqual(result?.behavior, .allow,
                        "Empty policy list should default to allow")
     }
 
@@ -247,12 +247,12 @@ final class PermissionPolicyTests: XCTestCase {
 
         // Test allow path
         let allowResult = await fn(allowedTool, [:], context)
-        XCTAssertEqual(allowResult?.behavior, "allow",
+        XCTAssertEqual(allowResult?.behavior, .allow,
                        "Bridge function should delegate allow correctly")
 
         // Test deny path
         let denyResult = await fn(deniedTool, [:], context)
-        XCTAssertEqual(denyResult?.behavior, "deny",
+        XCTAssertEqual(denyResult?.behavior, .deny,
                        "Bridge function should delegate deny correctly")
     }
 
@@ -262,7 +262,7 @@ final class PermissionPolicyTests: XCTestCase {
     func testCanUseToolResult_allow_createsAllowResult() {
         let result = CanUseToolResult.allow()
 
-        XCTAssertEqual(result.behavior, "allow",
+        XCTAssertEqual(result.behavior, .allow,
                        "allow() should create result with 'allow' behavior")
         XCTAssertNil(result.message,
                      "allow() should have no message")
@@ -274,7 +274,7 @@ final class PermissionPolicyTests: XCTestCase {
     func testCanUseToolResult_deny_createsDenyResult() {
         let result = CanUseToolResult.deny("Access denied")
 
-        XCTAssertEqual(result.behavior, "deny",
+        XCTAssertEqual(result.behavior, .deny,
                        "deny() should create result with 'deny' behavior")
         XCTAssertEqual(result.message, "Access denied",
                        "deny() should preserve the message")
@@ -287,7 +287,7 @@ final class PermissionPolicyTests: XCTestCase {
         let modifiedInput = ["command": "echo safe"]
         let result = CanUseToolResult.allowWithInput(modifiedInput)
 
-        XCTAssertEqual(result.behavior, "allow",
+        XCTAssertEqual(result.behavior, .allow,
                        "allowWithInput() should create result with 'allow' behavior")
         XCTAssertNotNil(result.updatedInput,
                         "allowWithInput() should have updatedInput")
@@ -322,7 +322,7 @@ final class PermissionPolicyTests: XCTestCase {
     /// AC6: Agent.setPermissionMode() clears the canUseTool callback.
     func testAgent_setPermissionMode_clearsCanUseTool() async throws {
         let canUseTool: CanUseToolFn = { _, _, _ in
-            return CanUseToolResult(behavior: "allow")
+            return CanUseToolResult(behavior: .allow)
         }
         let options = AgentOptions(
             apiKey: "test-key",
@@ -361,7 +361,7 @@ final class PermissionPolicyTests: XCTestCase {
 
         // Set a callback
         let newCallback: CanUseToolFn = { _, _, _ in
-            return CanUseToolResult(behavior: "deny", message: "test deny")
+            return CanUseToolResult(behavior: .deny, message: "test deny")
         }
         agent.setCanUseTool(newCallback)
 
@@ -375,7 +375,7 @@ final class PermissionPolicyTests: XCTestCase {
     /// AC7: Agent.setCanUseTool(nil) clears the callback.
     func testAgent_setCanUseTool_nil_clearsCallback() async throws {
         let canUseTool: CanUseToolFn = { _, _, _ in
-            return CanUseToolResult(behavior: "allow")
+            return CanUseToolResult(behavior: .allow)
         }
         let options = AgentOptions(
             apiKey: "test-key",
@@ -407,7 +407,7 @@ final class PermissionPolicyTests: XCTestCase {
         let result = await policy.evaluate(tool: tool, input: [:], context: context)
 
         // ContextAwarePolicy should deny under plan mode
-        XCTAssertEqual(result?.behavior, "deny",
+        XCTAssertEqual(result?.behavior, .deny,
                        "Policy should be able to read permissionMode from context")
     }
 }

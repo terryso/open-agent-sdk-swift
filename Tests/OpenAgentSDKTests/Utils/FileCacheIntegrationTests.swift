@@ -426,4 +426,37 @@ final class FileCacheIntegrationTests: XCTestCase {
             )
         }
     }
+
+    // MARK: - modifiedPaths Cap
+
+    /// When modifiedPaths exceeds maxModifiedPaths, oldest entries are evicted.
+    func testModifiedPaths_evictionWhenCapExceeded() {
+        // Given: a cache with a small cap
+        let cache = FileCache(
+            maxEntries: 200,
+            maxSizeBytes: 50 * 1024 * 1024,
+            maxEntrySizeBytes: 5 * 1024 * 1024,
+            maxModifiedPaths: 5
+        )
+
+        // When: adding 7 entries (2 more than cap)
+        for i in 0..<7 {
+            cache.set("/file_\(i).txt", content: "content_\(i)")
+        }
+
+        // Then: only 5 entries remain (the newest 5)
+        let modifiedFiles = cache.getModifiedFiles(since: Date.distantPast)
+        XCTAssertEqual(modifiedFiles.count, 5,
+                       "modifiedPaths should be capped at maxModifiedPaths")
+        // Oldest entries (file_0, file_1) should be evicted
+        XCTAssertFalse(modifiedFiles.contains("/file_0.txt"),
+                       "Oldest entry should be evicted")
+        XCTAssertFalse(modifiedFiles.contains("/file_1.txt"),
+                       "Second oldest entry should be evicted")
+        // Newest entries should remain
+        XCTAssertTrue(modifiedFiles.contains("/file_5.txt"),
+                      "Newest entries should remain")
+        XCTAssertTrue(modifiedFiles.contains("/file_6.txt"),
+                      "Newest entries should remain")
+    }
 }

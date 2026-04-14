@@ -183,7 +183,7 @@ final class PermissionModeExecuteSingleToolTests: XCTestCase {
         let block = ToolUseBlock(id: "tu_deny_1", name: "Bash", input: ["command": "rm -rf /"])
 
         let canUseTool: CanUseToolFn = { _, _, _ in
-            return CanUseToolResult(behavior: "deny", message: "Permission denied for Bash")
+            return CanUseToolResult(behavior: .deny, message: "Permission denied for Bash")
         }
 
         let context = ToolContext(
@@ -209,7 +209,7 @@ final class PermissionModeExecuteSingleToolTests: XCTestCase {
         let block = ToolUseBlock(id: "tu_allow_1", name: "Bash", input: ["command": "ls"])
 
         let canUseTool: CanUseToolFn = { _, _, _ in
-            return CanUseToolResult(behavior: "allow")
+            return CanUseToolResult(behavior: .allow)
         }
 
         let context = ToolContext(
@@ -235,7 +235,7 @@ final class PermissionModeExecuteSingleToolTests: XCTestCase {
         let block = ToolUseBlock(id: "tu_mod_1", name: "Bash", input: originalInput)
 
         let canUseTool: CanUseToolFn = { _, _, _ in
-            return CanUseToolResult(behavior: "allow", updatedInput: modifiedInput)
+            return CanUseToolResult(behavior: .allow, updatedInput: modifiedInput)
         }
 
         let context = ToolContext(
@@ -288,7 +288,7 @@ final class PermissionModeExecuteSingleToolTests: XCTestCase {
         let block = ToolUseBlock(id: "tu_err_1", name: "Bash", input: ["command": "ls"])
 
         let canUseTool: CanUseToolFn = { _, _, _ in
-            return CanUseToolResult(behavior: "deny", message: "Permission check error: callback failed")
+            return CanUseToolResult(behavior: .deny, message: "Permission check error: callback failed")
         }
 
         let context = ToolContext(

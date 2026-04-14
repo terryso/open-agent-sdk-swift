@@ -113,6 +113,9 @@ public final class FileCache: @unchecked Sendable {
     /// Entries exceeding this limit are not cached.
     public let maxEntrySizeBytes: Int
 
+    /// Maximum number of entries tracked in `modifiedPaths` before oldest are evicted.
+    public let maxModifiedPaths: Int
+
     // Internal storage
     private let lock = NSLock()
     private var map: [String: ListNode] = [:]
@@ -139,7 +142,8 @@ public final class FileCache: @unchecked Sendable {
         self.init(
             maxEntries: 100,
             maxSizeBytes: 25 * 1024 * 1024,
-            maxEntrySizeBytes: 5 * 1024 * 1024
+            maxEntrySizeBytes: 5 * 1024 * 1024,
+            maxModifiedPaths: 1000
         )
     }
 
@@ -149,14 +153,17 @@ public final class FileCache: @unchecked Sendable {
     ///   - maxEntries: Maximum number of cached entries.
     ///   - maxSizeBytes: Maximum total size of all cached entries in bytes.
     ///   - maxEntrySizeBytes: Maximum size of a single entry in bytes.
+    ///   - maxModifiedPaths: Maximum number of modified-path entries before eviction.
     public init(
         maxEntries: Int,
         maxSizeBytes: Int,
-        maxEntrySizeBytes: Int
+        maxEntrySizeBytes: Int,
+        maxModifiedPaths: Int = 1000
     ) {
         self.maxEntries = maxEntries
         self.maxSizeBytes = maxSizeBytes
         self.maxEntrySizeBytes = maxEntrySizeBytes
+        self.maxModifiedPaths = max(1, maxModifiedPaths)
     }
 
     // MARK: - Public API
@@ -200,6 +207,7 @@ public final class FileCache: @unchecked Sendable {
 
         // Record modification time for compaction tracking
         modifiedPaths[normalized] = Date()
+        evictModifiedPathsIfNeeded()
 
         // Check single-entry size limit
         guard sizeBytes <= maxEntrySizeBytes else {
@@ -238,6 +246,7 @@ public final class FileCache: @unchecked Sendable {
         // Record modification time for compaction tracking
         // (invalidate means the file was written/edited externally)
         modifiedPaths[normalized] = Date()
+        evictModifiedPathsIfNeeded()
 
         guard let node = map[normalized] else {
             return
@@ -360,6 +369,16 @@ public final class FileCache: @unchecked Sendable {
             _stats.totalSizeBytes -= tailNode.entry.sizeBytes
             _stats.totalEntries -= 1
             _stats.evictionCount += 1
+        }
+    }
+
+    /// Evict oldest entries from `modifiedPaths` when it exceeds `maxModifiedPaths`.
+    private func evictModifiedPathsIfNeeded() {
+        guard modifiedPaths.count > maxModifiedPaths else { return }
+        let sorted = modifiedPaths.sorted { $0.value < $1.value }
+        let removeCount = modifiedPaths.count - maxModifiedPaths
+        for i in 0..<removeCount {
+            modifiedPaths.removeValue(forKey: sorted[i].key)
         }
     }
 }

@@ -15,11 +15,11 @@ public enum PermissionMode: String, Sendable, Equatable, CaseIterable {
 /// `Any?` value. Equality comparison excludes `updatedInput` since `Any?`
 /// cannot be compared at compile time.
 public struct CanUseToolResult: @unchecked Sendable, Equatable {
-    public let behavior: String
+    public let behavior: PermissionBehavior
     public let updatedInput: Any?
     public let message: String?
 
-    public init(behavior: String, updatedInput: Any? = nil, message: String? = nil) {
+    public init(behavior: PermissionBehavior, updatedInput: Any? = nil, message: String? = nil) {
         self.behavior = behavior
         self.updatedInput = updatedInput
         self.message = message
@@ -38,17 +38,17 @@ public typealias CanUseToolFn = @Sendable (ToolProtocol, Any, ToolContext) async
 extension CanUseToolResult {
     /// Creates an allow result.
     public static func allow() -> CanUseToolResult {
-        CanUseToolResult(behavior: "allow")
+        CanUseToolResult(behavior: .allow)
     }
 
     /// Creates a deny result with a message.
     public static func deny(_ message: String) -> CanUseToolResult {
-        CanUseToolResult(behavior: "deny", message: message)
+        CanUseToolResult(behavior: .deny, message: message)
     }
 
     /// Creates an allow result with modified input.
     public static func allowWithInput(_ updatedInput: Any) -> CanUseToolResult {
-        CanUseToolResult(behavior: "allow", updatedInput: updatedInput)
+        CanUseToolResult(behavior: .allow, updatedInput: updatedInput)
     }
 }
 
@@ -160,7 +160,7 @@ public struct CompositePolicy: PermissionPolicy, Sendable {
     public func evaluate(tool: ToolProtocol, input: Any, context: ToolContext) async -> CanUseToolResult? {
         for policy in policies {
             if let result = await policy.evaluate(tool: tool, input: input, context: context) {
-                if result.behavior == "deny" {
+                if result.behavior == .deny {
                     return result  // Any deny -> overall deny (short-circuit)
                 }
                 // allow or allowWithInput -> continue checking other policies

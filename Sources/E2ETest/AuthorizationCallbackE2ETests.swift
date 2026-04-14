@@ -42,9 +42,9 @@ struct AuthorizationCallbackE2ETests {
         // Wrap policy to track invocations
         let trackingFn: CanUseToolFn = { tool, input, context in
             let result = await policyFn(tool, input, context)
-            if result?.behavior == "allow" {
+            if result?.behavior == .allow {
                 await tracker.recordAllow(toolName: tool.name)
-            } else if result?.behavior == "deny" {
+            } else if result?.behavior == .deny {
                 await tracker.recordDeny(toolName: tool.name)
             }
             return result
@@ -97,9 +97,9 @@ struct AuthorizationCallbackE2ETests {
         // Wrap policy to track invocations
         let trackingFn: CanUseToolFn = { tool, input, context in
             let result = await policyFn(tool, input, context)
-            if result?.behavior == "allow" {
+            if result?.behavior == .allow {
                 await tracker.recordAllow(toolName: tool.name)
-            } else if result?.behavior == "deny" {
+            } else if result?.behavior == .deny {
                 await tracker.recordDeny(toolName: tool.name)
             }
             return result
@@ -150,7 +150,7 @@ struct AuthorizationCallbackE2ETests {
         // Phase 1: Create agent with deny-all callback
         let denyAllCallback: CanUseToolFn = { tool, _, _ in
             await tracker.recordDeny(toolName: tool.name)
-            return CanUseToolResult(behavior: "deny", message: "deny-all policy")
+            return CanUseToolResult(behavior: .deny, message: "deny-all policy")
         }
 
         let bashTool = createBashTool()
@@ -182,7 +182,7 @@ struct AuthorizationCallbackE2ETests {
         // Phase 4: Now set a new allow-all callback via setCanUseTool
         let allowAllCallback: CanUseToolFn = { tool, _, _ in
             await tracker.recordAllow(toolName: tool.name)
-            return CanUseToolResult(behavior: "allow")
+            return CanUseToolResult(behavior: .allow)
         }
         agent.setCanUseTool(allowAllCallback)
 

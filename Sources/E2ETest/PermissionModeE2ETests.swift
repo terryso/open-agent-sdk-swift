@@ -110,7 +110,7 @@ struct PermissionModeE2ETests {
 
         let canUseTool: CanUseToolFn = { tool, _, _ in
             await tracker.recordDeny(toolName: tool.name)
-            return CanUseToolResult(behavior: "deny", message: "Tool '\(tool.name)' denied by policy")
+            return CanUseToolResult(behavior: .deny, message: "Tool '\(tool.name)' denied by policy")
         }
 
         let bashTool = createBashTool()
@@ -156,7 +156,7 @@ struct PermissionModeE2ETests {
 
         let canUseTool: CanUseToolFn = { tool, _, _ in
             await tracker.recordAllow(toolName: tool.name)
-            return CanUseToolResult(behavior: "allow")
+            return CanUseToolResult(behavior: .allow)
         }
 
         let bashTool = createBashTool()

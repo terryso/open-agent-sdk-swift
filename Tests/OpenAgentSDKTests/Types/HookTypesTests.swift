@@ -91,10 +91,10 @@ final class HookTypesTests: XCTestCase {
     }
 
     func testHookOutput_withPermissionUpdate() {
-        let update = PermissionUpdate(tool: "bash", behavior: "deny")
+        let update = PermissionUpdate(tool: "bash", behavior: .deny)
         let output = HookOutput(permissionUpdate: update)
         XCTAssertEqual(output.permissionUpdate?.tool, "bash")
-        XCTAssertEqual(output.permissionUpdate?.behavior, "deny")
+        XCTAssertEqual(output.permissionUpdate?.behavior, .deny)
     }
 
     func testHookOutput_withNotification() {
@@ -107,20 +107,20 @@ final class HookTypesTests: XCTestCase {
     // MARK: - PermissionUpdate
 
     func testPermissionUpdate_creation() {
-        let update = PermissionUpdate(tool: "file_write", behavior: "allow")
+        let update = PermissionUpdate(tool: "file_write", behavior: .allow)
         XCTAssertEqual(update.tool, "file_write")
-        XCTAssertEqual(update.behavior, "allow")
+        XCTAssertEqual(update.behavior, .allow)
     }
 
     func testPermissionUpdate_equality() {
-        let a = PermissionUpdate(tool: "bash", behavior: "deny")
-        let b = PermissionUpdate(tool: "bash", behavior: "deny")
+        let a = PermissionUpdate(tool: "bash", behavior: .deny)
+        let b = PermissionUpdate(tool: "bash", behavior: .deny)
         XCTAssertEqual(a, b)
     }
 
     func testPermissionUpdate_inequality() {
-        let a = PermissionUpdate(tool: "bash", behavior: "deny")
-        let b = PermissionUpdate(tool: "bash", behavior: "allow")
+        let a = PermissionUpdate(tool: "bash", behavior: .deny)
+        let b = PermissionUpdate(tool: "bash", behavior: .allow)
         XCTAssertNotEqual(a, b)
     }
 
@@ -130,17 +130,17 @@ final class HookTypesTests: XCTestCase {
         let notification = HookNotification(title: "Alert", body: "Something happened")
         XCTAssertEqual(notification.title, "Alert")
         XCTAssertEqual(notification.body, "Something happened")
-        XCTAssertEqual(notification.level, "info")
+        XCTAssertEqual(notification.level, .info)
     }
 
     func testHookNotification_customLevel() {
-        let notification = HookNotification(title: "Error", body: "Failed", level: "error")
-        XCTAssertEqual(notification.level, "error")
+        let notification = HookNotification(title: "Error", body: "Failed", level: .error)
+        XCTAssertEqual(notification.level, .error)
     }
 
     func testHookNotification_equality() {
-        let a = HookNotification(title: "A", body: "B", level: "info")
-        let b = HookNotification(title: "A", body: "B", level: "info")
+        let a = HookNotification(title: "A", body: "B", level: .info)
+        let b = HookNotification(title: "A", body: "B", level: .info)
         XCTAssertEqual(a, b)
     }
 
@@ -165,5 +165,42 @@ final class HookTypesTests: XCTestCase {
         XCTAssertEqual(def.command, "echo")
         XCTAssertEqual(def.matcher, "bash")
         XCTAssertEqual(def.timeout, 30)
+    }
+
+    // MARK: - HookNotificationLevel
+
+    func testHookNotificationLevel_rawValues() {
+        XCTAssertEqual(HookNotificationLevel.info.rawValue, "info")
+        XCTAssertEqual(HookNotificationLevel.warning.rawValue, "warning")
+        XCTAssertEqual(HookNotificationLevel.error.rawValue, "error")
+        XCTAssertEqual(HookNotificationLevel.debug.rawValue, "debug")
+    }
+
+    func testHookNotificationLevel_allCases() {
+        XCTAssertEqual(HookNotificationLevel.allCases.count, 4)
+    }
+
+    func testHookNotificationLevel_initFromString_fallsBackToInfo() {
+        XCTAssertEqual(HookNotificationLevel("critical"), .info)
+        XCTAssertEqual(HookNotificationLevel(""), .info)
+        XCTAssertEqual(HookNotificationLevel("info"), .info)
+        XCTAssertEqual(HookNotificationLevel("warning"), .warning)
+    }
+
+    // MARK: - PermissionBehavior
+
+    func testPermissionBehavior_rawValues() {
+        XCTAssertEqual(PermissionBehavior.allow.rawValue, "allow")
+        XCTAssertEqual(PermissionBehavior.deny.rawValue, "deny")
+    }
+
+    func testPermissionBehavior_allCases() {
+        XCTAssertEqual(PermissionBehavior.allCases.count, 2)
+    }
+
+    func testPermissionBehavior_initFromRawValue() {
+        XCTAssertEqual(PermissionBehavior(rawValue: "allow"), .allow)
+        XCTAssertEqual(PermissionBehavior(rawValue: "deny"), .deny)
+        XCTAssertNil(PermissionBehavior(rawValue: "unknown"))
     }
 }

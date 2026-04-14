@@ -81,3 +81,7 @@
 ## Deferred from: code review of add-core-validation-guards (2026-04-14)
 
 - **ThinkingConfig with OpenAI provider** — `ThinkingConfig` is validated regardless of provider, but OpenAI doesn't support thinking tokens. The warning/log may be misleading for OpenAI users. Pre-existing design decision (ThinkingConfig is provider-agnostic). [Agent.swift, ThinkingConfig.swift]
+
+## Deferred from: code review of deferred-work-cleanup (2026-04-14)
+
+- **`evictModifiedPathsIfNeeded` not reflected in `CacheStats.evictionCount`** — `modifiedPaths` eviction is a separate tracking mechanism from cache entry eviction, so `evictionCount` remains semantically correct for cache entries. Future enhancement: add a dedicated `modifiedPathsEvictionCount` stat if monitoring is needed. [FileCache.swift]
