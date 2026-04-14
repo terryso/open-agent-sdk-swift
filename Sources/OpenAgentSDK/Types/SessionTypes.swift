@@ -11,10 +11,10 @@ public struct SessionMetadata: Sendable, Equatable {
     public let cwd: String
     /// The model used in this session.
     public let model: String
-    /// ISO 8601 timestamp when the session was created.
-    public let createdAt: String
-    /// ISO 8601 timestamp when the session was last updated.
-    public let updatedAt: String
+    /// When the session was created.
+    public let createdAt: Date
+    /// When the session was last updated.
+    public let updatedAt: Date
     /// Number of messages in the session transcript.
     public let messageCount: Int
     /// An optional summary or title for the session.
@@ -26,8 +26,8 @@ public struct SessionMetadata: Sendable, Equatable {
         id: String,
         cwd: String,
         model: String,
-        createdAt: String,
-        updatedAt: String,
+        createdAt: Date,
+        updatedAt: Date,
         messageCount: Int,
         summary: String? = nil,
         tag: String? = nil

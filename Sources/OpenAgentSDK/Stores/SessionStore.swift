@@ -127,8 +127,8 @@ public actor SessionStore {
         guard let id = metadataDict["id"] as? String,
               let cwd = metadataDict["cwd"] as? String,
               let model = metadataDict["model"] as? String,
-              let createdAt = metadataDict["createdAt"] as? String,
-              let updatedAt = metadataDict["updatedAt"] as? String,
+              let createdAtString = metadataDict["createdAt"] as? String,
+              let updatedAtString = metadataDict["updatedAt"] as? String,
               let messageCount = metadataDict["messageCount"] as? Int
         else {
             let missingKeys = ["id", "cwd", "model", "createdAt", "updatedAt", "messageCount"]
@@ -136,6 +136,17 @@ public actor SessionStore {
             Logger.shared.warn("SessionStore", "load_missing_fields", data: [
                 "sessionId": sessionId,
                 "missingKeys": missingKeys.joined(separator: ",")
+            ])
+            return nil
+        }
+
+        guard let createdAt = dateFormatter.date(from: createdAtString),
+              let updatedAt = dateFormatter.date(from: updatedAtString)
+        else {
+            Logger.shared.warn("SessionStore", "load_malformed_dates", data: [
+                "sessionId": sessionId,
+                "createdAt": createdAtString,
+                "updatedAt": updatedAtString,
             ])
             return nil
         }

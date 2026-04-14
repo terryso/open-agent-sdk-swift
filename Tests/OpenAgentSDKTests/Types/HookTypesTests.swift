@@ -104,6 +104,26 @@ final class HookTypesTests: XCTestCase {
         XCTAssertEqual(output.notification?.body, "Body")
     }
 
+    func testHookOutput_equality() {
+        let a = HookOutput(message: "hi", block: true)
+        let b = HookOutput(message: "hi", block: true)
+        XCTAssertEqual(a, b)
+    }
+
+    func testHookOutput_inequality_message() {
+        let a = HookOutput(message: "hi")
+        let b = HookOutput(message: "bye")
+        XCTAssertNotEqual(a, b)
+    }
+
+    func testHookOutput_equality_allFields() {
+        let notification = HookNotification(title: "T", body: "B", level: .warning)
+        let permUpdate = PermissionUpdate(tool: "bash", behavior: .deny)
+        let a = HookOutput(message: "msg", permissionUpdate: permUpdate, block: true, notification: notification)
+        let b = HookOutput(message: "msg", permissionUpdate: permUpdate, block: true, notification: notification)
+        XCTAssertEqual(a, b)
+    }
+
     // MARK: - PermissionUpdate
 
     func testPermissionUpdate_creation() {

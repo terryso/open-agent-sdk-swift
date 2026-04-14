@@ -116,11 +116,12 @@ public actor MCPClientManager {
         }
     }
 
-    // MARK: - SSE Connection
+    // MARK: - HTTP/SSE Connection
 
-    /// Connects to an MCP server using the given SSE configuration.
+    /// Connects to an MCP server using the given transport configuration.
     ///
-    /// Uses mcp-swift-sdk's `HTTPClientTransport` with `streaming: true` for SSE support.
+    /// Uses mcp-swift-sdk's `HTTPClientTransport`. Set `streaming: true` for SSE
+    /// transport or `streaming: false` for plain HTTP POST transport.
     /// Performs the full MCP lifecycle:
     /// 1. Validates the URL and creates HTTPClientTransport
     /// 2. Creates an MCPClient and performs MCP handshake (initialize)
@@ -132,39 +133,14 @@ public actor MCPClientManager {
     ///
     /// - Parameters:
     ///   - name: The server name for identification and tool namespacing.
-    ///   - config: The SSE configuration for the server.
-    public func connect(name: String, config: McpSseConfig) async {
+    ///   - config: The transport configuration (URL and optional headers).
+    ///   - streaming: Whether to use SSE streaming mode. Defaults to `true`.
+    public func connect(name: String, config: McpTransportConfig, streaming: Bool = true) async {
         await connectHTTP(
             name: name,
             urlString: config.url,
             headers: config.headers,
-            streaming: true
-        )
-    }
-
-    // MARK: - HTTP Connection
-
-    /// Connects to an MCP server using the given HTTP configuration.
-    ///
-    /// Uses mcp-swift-sdk's `HTTPClientTransport` with `streaming: false` for plain HTTP.
-    /// Performs the full MCP lifecycle:
-    /// 1. Validates the URL and creates HTTPClientTransport
-    /// 2. Creates an MCPClient and performs MCP handshake (initialize)
-    /// 3. Discovers tools via `listTools()`
-    /// 4. Wraps discovered tools as `MCPToolDefinition`
-    ///
-    /// If any step fails, the connection is tracked with `error` status and empty tools.
-    /// The manager does not crash.
-    ///
-    /// - Parameters:
-    ///   - name: The server name for identification and tool namespacing.
-    ///   - config: The HTTP configuration for the server.
-    public func connect(name: String, config: McpHttpConfig) async {
-        await connectHTTP(
-            name: name,
-            urlString: config.url,
-            headers: config.headers,
-            streaming: false
+            streaming: streaming
         )
     }
 
@@ -260,9 +236,9 @@ public actor MCPClientManager {
                     case .stdio(let stdioConfig):
                         await self.connect(name: name, config: stdioConfig)
                     case .sse(let sseConfig):
-                        await self.connect(name: name, config: sseConfig)
+                        await self.connect(name: name, config: sseConfig, streaming: true)
                     case .http(let httpConfig):
-                        await self.connect(name: name, config: httpConfig)
+                        await self.connect(name: name, config: httpConfig, streaming: false)
                     case .sdk:
                         // SDK servers are handled directly by Agent, not via MCPClientManager
                         break

@@ -99,7 +99,7 @@ public struct HookInput: @unchecked Sendable {
 /// updating permissions, blocking operations, or sending notifications.
 ///
 /// - Note: Uses `@unchecked Sendable` for compatibility with dynamic `Any?` values.
-public struct HookOutput: @unchecked Sendable {
+public struct HookOutput: @unchecked Sendable, Equatable {
     /// An optional log or status message from the hook.
     public let message: String?
     /// An optional permission update to apply.

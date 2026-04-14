@@ -122,6 +122,10 @@ public actor HookRegistry {
                 } catch {
                     // Hook failed (including timeout) — log and continue
                     // Matches TS SDK behavior: errors are caught, not propagated
+                    Logger.shared.error("HookRegistry", "hook_execution_failed", data: [
+                        "event": event.rawValue,
+                        "error": error.localizedDescription,
+                    ])
                 }
             } else if let command = def.command {
                 // Shell command hook (Story 8-3)

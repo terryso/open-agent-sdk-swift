@@ -87,8 +87,7 @@ struct SessionManagementE2ETests {
         // Verify each session has complete metadata fields
         let testSessions = sessions.filter { $0.id.hasPrefix("e2e-mgmt-list-") }
         for session in testSessions {
-            if !session.id.isEmpty && !session.model.isEmpty && !session.cwd.isEmpty
-                && !session.createdAt.isEmpty && !session.updatedAt.isEmpty {
+            if !session.id.isEmpty && !session.model.isEmpty && !session.cwd.isEmpty {
                 pass("Session management E2E: session \(session.id.prefix(20)) has complete metadata")
             } else {
                 fail("Session management E2E: session metadata complete", "missing fields in \(session.id)")

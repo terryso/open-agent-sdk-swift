@@ -92,4 +92,37 @@ final class ModelInfoTests: XCTestCase {
         XCTAssertNotNil(MODEL_PRICING["claude-3-5-haiku"])
         XCTAssertNotNil(MODEL_PRICING["claude-3-opus"])
     }
+
+    // MARK: - registerModel / unregisterModel
+
+    func testRegisterModel_addsNewModel() {
+        let customPricing = ModelPricing(input: 1.0 / 1_000_000, output: 5.0 / 1_000_000)
+        registerModel("my-custom-model", pricing: customPricing)
+        XCTAssertEqual(MODEL_PRICING["my-custom-model"], customPricing)
+        // Cleanup
+        unregisterModel("my-custom-model")
+    }
+
+    func testRegisterModel_overwritesExisting() {
+        let originalCount = MODEL_PRICING.count
+        let overridePricing = ModelPricing(input: 0.0, output: 0.0)
+        registerModel("claude-sonnet-4-6", pricing: overridePricing)
+        XCTAssertEqual(MODEL_PRICING["claude-sonnet-4-6"], overridePricing)
+        XCTAssertEqual(MODEL_PRICING.count, originalCount, "Count should stay the same when overwriting")
+        // Restore original
+        MODEL_PRICING["claude-sonnet-4-6"] = ModelPricing(input: 3.0 / 1_000_000, output: 15.0 / 1_000_000)
+    }
+
+    func testUnregisterModel_removesModel() {
+        registerModel("temp-model", pricing: ModelPricing(input: 1.0, output: 2.0))
+        XCTAssertNotNil(MODEL_PRICING["temp-model"])
+        unregisterModel("temp-model")
+        XCTAssertNil(MODEL_PRICING["temp-model"])
+    }
+
+    func testUnregisterModel_nonexistent_isNoOp() {
+        let originalCount = MODEL_PRICING.count
+        unregisterModel("nonexistent-model-xyz")
+        XCTAssertEqual(MODEL_PRICING.count, originalCount)
+    }
 }

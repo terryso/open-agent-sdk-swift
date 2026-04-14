@@ -34,11 +34,13 @@ public struct McpStdioConfig: Sendable, Equatable {
     }
 }
 
-/// Configuration for MCP SSE transport.
+/// Configuration for MCP remote transport (SSE or HTTP).
 ///
-/// Connects to a remote MCP server using Server-Sent Events for streaming responses.
-public struct McpSseConfig: Sendable, Equatable {
-    /// The URL of the SSE endpoint.
+/// Holds the URL and optional headers for connecting to a remote MCP server.
+/// Used by both SSE and HTTP transport modes — the transport type is determined
+/// by the ``McpServerConfig`` enum case that wraps this config.
+public struct McpTransportConfig: Sendable, Equatable {
+    /// The URL of the remote endpoint.
     public let url: String
     /// Optional HTTP headers to include in requests.
     public let headers: [String: String]?
@@ -49,20 +51,13 @@ public struct McpSseConfig: Sendable, Equatable {
     }
 }
 
-/// Configuration for MCP HTTP transport.
-///
-/// Connects to a remote MCP server using HTTP POST requests (non-streaming).
-public struct McpHttpConfig: Sendable, Equatable {
-    /// The URL of the HTTP endpoint.
-    public let url: String
-    /// Optional HTTP headers to include in requests.
-    public let headers: [String: String]?
+/// Backward-compatible alias for SSE transport configuration.
+/// - SeeAlso: ``McpTransportConfig``
+public typealias McpSseConfig = McpTransportConfig
 
-    public init(url: String, headers: [String: String]? = nil) {
-        self.url = url
-        self.headers = headers
-    }
-}
+/// Backward-compatible alias for HTTP transport configuration.
+/// - SeeAlso: ``McpTransportConfig``
+public typealias McpHttpConfig = McpTransportConfig
 
 /// Configuration for in-process SDK MCP server.
 ///
