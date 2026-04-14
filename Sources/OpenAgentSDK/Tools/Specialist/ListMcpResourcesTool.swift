@@ -2,15 +2,10 @@ import Foundation
 
 // MARK: - Global MCP Connection Storage
 
-/// File-level MCP connection storage (matches TS SDK's module-level variable).
-/// Uses nonisolated(unsafe) because connection state is session-scoped
-/// and does not require cross-thread synchronization.
-nonisolated(unsafe) var mcpConnections: [MCPConnectionInfo] = []
-
-/// Set MCP connections for resource access (called by agent setup).
-/// Matches the TS SDK's `setMcpConnections()` pattern.
+/// Backward-compatible stub. MCP connections are now passed via ToolContext.
+/// This function is kept for source compatibility but is a no-op.
 public func setMcpConnections(_ connections: [MCPConnectionInfo]) {
-    mcpConnections = connections
+    // No-op: connections are now injected via ToolContext.mcpConnections
 }
 
 // MARK: - Schema
@@ -39,8 +34,8 @@ private nonisolated(unsafe) let listMcpResourcesSchema: ToolInputSchema = [
 /// - For each connected server, attempts to list resources via `MCPResourceProvider`.
 /// - If a server does not support resource listing, shows an appropriate message.
 ///
-/// **Architecture:** This tool uses file-level `mcpConnections` storage.
-/// It does not require an Actor store, ToolContext modifications, or AgentOptions changes.
+/// **Architecture:** This tool reads MCP connections from `ToolContext.mcpConnections`.
+/// Connections are injected by Core/ at tool execution time, eliminating global mutable state.
 /// Only imports Foundation and Types/ -- never Core/ or Stores/.
 ///
 /// - Returns: A ``ToolProtocol`` instance for the ListMcpResources tool.
@@ -53,8 +48,8 @@ public func createListMcpResourcesTool() -> ToolProtocol {
     ) { (input: [String: Any], context: ToolContext) async -> ToolExecuteResult in
         let serverFilter = input["server"] as? String
 
-        // Filter connections by server name if provided
-        var connections = mcpConnections
+        // Read connections from ToolContext (thread-safe value type snapshot)
+        var connections = context.mcpConnections ?? []
         if let serverFilter = serverFilter, !serverFilter.isEmpty {
             connections = connections.filter { $0.name == serverFilter }
         }

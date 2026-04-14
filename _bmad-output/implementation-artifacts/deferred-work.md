@@ -22,7 +22,7 @@
 
 ## Deferred from: code review of 5-7-mcp-resource-tools (2026-04-07)
 
-- **mcpConnections thread safety (latent risk)** — `nonisolated(unsafe) var mcpConnections` is genuinely mutable shared state. Acceptable for single-agent but would clobber with concurrent multi-agent. Design choice matching TS SDK pattern [ListMcpResourcesTool.swift:8]
+- ~~**mcpConnections thread safety (latent risk)**~~ — **FIXED**: Removed `nonisolated(unsafe) var mcpConnections` global. MCP connections now passed via `ToolContext.mcpConnections` (Sendable value type). `setMcpConnections()` kept as no-op stub for backward compat. [ListMcpResourcesTool.swift, ToolTypes.swift]
 - **AC5: missing tool count hint in listing-not-supported** — TS SDK shows `({tools.length} tools available)` but Swift MCPConnectionInfo lacks tools field. Deferred to Epic 6 when real MCP connections exist [ListMcpResourcesTool.swift:79-91]
 
 ## Deferred from: code review of 7-1-session-store-json-persistence (2026-04-08)
@@ -37,7 +37,7 @@
 
 ## Deferred from: code review of 8-5-custom-authorization-callback (2026-04-09)
 
-- **Stream path ignores dynamic permission changes** — stream() captures permissionMode and canUseTool at stream creation time. Calling setPermissionMode()/setCanUseTool() during an active stream has no effect. This is pre-existing behavior of the stream architecture, not introduced by this story. Future enhancement: re-read options at each tool execution in stream path [Agent.swift:506-507]
+- ~~**Stream path ignores dynamic permission changes**~~ — **FIXED**: `stream()` now reads `self.options.permissionMode` and `self.options.canUseTool` at each tool execution point instead of using captured locals. `setPermissionMode()` and `setCanUseTool()` now take effect mid-stream. [Agent.swift:1275-1276]
 
 ## Deferred from: code review of 10-3-prompt-api-example (2026-04-10)
 
@@ -85,3 +85,9 @@
 ## Deferred from: code review of deferred-work-cleanup (2026-04-14)
 
 - **`evictModifiedPathsIfNeeded` not reflected in `CacheStats.evictionCount`** — `modifiedPaths` eviction is a separate tracking mechanism from cache entry eviction, so `evictionCount` remains semantically correct for cache entries. Future enhancement: add a dedicated `modifiedPathsEvictionCount` stat if monitoring is needed. [FileCache.swift]
+
+## Deferred from: code review of thread-safety-dynamic-permissions (2026-04-14)
+
+- **ToolContext.mcpConnections always nil** — Both `prompt()` and `stream()` pass `mcpConnections: nil`. Wiring actual connections requires extracting `MCPConnectionInfo` from `MCPClientManager`, which doesn't yet expose such an API. Structural migration is complete (tools read from context); injection wiring deferred to Epic 6 when MCP integration matures. [Agent.swift:589,1282]
+- **Data race on self.options in stream path** — `permissionMode` and `canUseTool` are now read from `self.options` at each tool execution point to support dynamic mid-stream permission changes. Agent is `@unchecked Sendable` with `var options`, so concurrent mutation is a theoretical race. Trade-off accepted: working public API (`setPermissionMode`/`setCanUseTool`) is more valuable than avoiding a theoretical race that the previous code already had for other `self` reads (e.g., `sessionMemory`). Future: make `options` thread-safe (actor isolation or atomic snapshot). [Agent.swift:1275-1276]
+- **Schema `nonisolated(unsafe)` constants in MCP tools** — `listMcpResourcesSchema` and `readMcpResourceSchema` are static `nonisolated(unsafe) let` constants. Technically safe (immutable after init) but inconsistent with the project's direction away from `nonisolated(unsafe)`. Pre-existing, not introduced by this story. [ListMcpResourcesTool.swift:13, ReadMcpResourceTool.swift:5]

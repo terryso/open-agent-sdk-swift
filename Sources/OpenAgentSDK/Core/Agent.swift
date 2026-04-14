@@ -585,7 +585,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                             skillNestingDepth: restrictionStack?.nestingDepth ?? 0,
                             maxSkillRecursionDepth: options.maxSkillRecursionDepth,
                             fileCache: fileCache,
-                            sandbox: options.sandbox
+                            sandbox: options.sandbox,
+                            mcpConnections: nil
                         )
                     )
 
@@ -719,8 +720,11 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
         let capturedCronStore = options.cronStore
         let capturedTodoStore = options.todoStore
         let capturedMcpServers = options.mcpServers
-        let capturedPermissionMode = options.permissionMode
-        let capturedCanUseTool = options.canUseTool
+        // Note: permissionMode and canUseTool are read fresh from self.options
+        // at each tool execution point to support dynamic permission changes mid-stream.
+        // Trade-off: Agent is @unchecked Sendable, so concurrent mutation of options
+        // is a theoretical race — but the previous captured-local approach silently
+        // broke the setPermissionMode()/setCanUseTool() public APIs.
         let capturedSessionStore = options.sessionStore
         let capturedSessionId = options.sessionId
         let capturedHookRegistry = options.hookRegistry
@@ -1269,14 +1273,15 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                                     cronStore: capturedCronStore,
                                     todoStore: capturedTodoStore,
                                     hookRegistry: capturedHookRegistry,
-                                    permissionMode: capturedPermissionMode,
-                                    canUseTool: capturedCanUseTool,
+                                    permissionMode: self.options.permissionMode,
+                                    canUseTool: self.options.canUseTool,
                                     skillRegistry: capturedSkillRegistry,
                                     restrictionStack: capturedRestrictionStack,
                                     skillNestingDepth: capturedRestrictionStack?.nestingDepth ?? 0,
                                     maxSkillRecursionDepth: capturedMaxSkillRecursionDepth,
                                     fileCache: capturedFileCache,
-                                    sandbox: capturedSandbox
+                                    sandbox: capturedSandbox,
+                                    mcpConnections: nil
                                 )
                             )
 

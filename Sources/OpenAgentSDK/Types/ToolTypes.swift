@@ -98,6 +98,9 @@ public struct ToolContext: Sendable {
     /// Optional sandbox settings for restricting tool execution.
     /// Injected by Core/ from AgentOptions.sandbox. Nil when no sandbox is configured.
     public let sandbox: SandboxSettings?
+    /// Optional MCP connection list for MCP resource tools (ListMcpResources, ReadMcpResource).
+    /// Injected by Core/ at tool execution time. Nil when no MCP connections are configured.
+    public let mcpConnections: [MCPConnectionInfo]?
 
     public init(
         cwd: String,
@@ -119,7 +122,8 @@ public struct ToolContext: Sendable {
         skillNestingDepth: Int = 0,
         maxSkillRecursionDepth: Int = 4,
         fileCache: FileCache? = nil,
-        sandbox: SandboxSettings? = nil
+        sandbox: SandboxSettings? = nil,
+        mcpConnections: [MCPConnectionInfo]? = nil
     ) {
         self.cwd = cwd
         self.toolUseId = toolUseId
@@ -141,6 +145,7 @@ public struct ToolContext: Sendable {
         self.maxSkillRecursionDepth = maxSkillRecursionDepth
         self.fileCache = fileCache
         self.sandbox = sandbox
+        self.mcpConnections = mcpConnections
     }
 
     /// Returns a copy of this context with the toolUseId replaced.
@@ -163,7 +168,8 @@ public struct ToolContext: Sendable {
             skillNestingDepth: skillNestingDepth,
             maxSkillRecursionDepth: maxSkillRecursionDepth,
             fileCache: fileCache,
-            sandbox: sandbox
+            sandbox: sandbox,
+            mcpConnections: mcpConnections
         )
     }
 
@@ -189,7 +195,8 @@ public struct ToolContext: Sendable {
             skillNestingDepth: depth,
             maxSkillRecursionDepth: maxSkillRecursionDepth,
             fileCache: fileCache,
-            sandbox: sandbox
+            sandbox: sandbox,
+            mcpConnections: mcpConnections
         )
     }
 }

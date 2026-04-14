@@ -32,9 +32,8 @@ private nonisolated(unsafe) let readMcpResourceSchema: ToolInputSchema = [
 /// - On success with empty/nil contents, returns "Resource read returned no content."
 /// - On error, returns `is_error: true` with "Error reading resource: {message}".
 ///
-/// **Architecture:** This tool uses file-level `mcpConnections` storage (defined in
-/// ListMcpResourcesTool.swift). It does not require an Actor store, ToolContext
-/// modifications, or AgentOptions changes.
+/// **Architecture:** This tool reads MCP connections from `ToolContext.mcpConnections`
+/// (injected by Core/ at tool execution time). No global mutable state.
 /// Only imports Foundation and Types/ -- never Core/ or Stores/.
 ///
 /// - Returns: A ``ToolProtocol`` instance for the ReadMcpResource tool.
@@ -60,7 +59,7 @@ public func createReadMcpResourceTool() -> ToolProtocol {
         }
 
         // Find the matching connection
-        guard let connection = mcpConnections.first(where: { $0.name == server }) else {
+        guard let connection = (context.mcpConnections ?? []).first(where: { $0.name == server }) else {
             return ToolExecuteResult(
                 content: "MCP server not found: \(server)",
                 isError: true
