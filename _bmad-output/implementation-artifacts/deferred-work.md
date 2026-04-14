@@ -4,7 +4,7 @@
 
 - **SessionMetadata 使用 String 时间戳** — createdAt/updatedAt 为 String 类型无格式约束，未来改为 Date 或添加格式文档 [SessionTypes.swift:4-30]
 - **McpSseConfig/McpHttpConfig 结构完全相同** — 两者均为 url+headers，按 MCP 协议传输类型区分，未来可考虑合并 [MCPConfig.swift:24-43]
-- **HookNotification.level / PermissionUpdate.behavior 为字符串类型** — 应使用 enum 提供类型安全，匹配 TS SDK 模式但可改进 [HookTypes.swift, PermissionTypes.swift]
+- ~~**HookNotification.level / PermissionUpdate.behavior 为字符串类型**~~ — **FIXED**: Added `HookNotificationLevel` enum (info/warning/error/debug with unknown-value fallback) and `PermissionBehavior` enum (allow/deny). Both use `String` raw values with `Codable` conformance. [HookTypes.swift, PermissionTypes.swift]
 - ~~**ThinkingConfig.enabled 无 budgetTokens 验证**~~ — **FIXED**: `ThinkingConfig.validate()` throws when budgetTokens <= 0; `AgentOptions.validate()` calls it. [ThinkingConfig.swift:25]
 - **HookDefinition 所有字段可选** — 全 nil 实例无语义，匹配 TS SDK 模式 [HookTypes.swift]
 - **MODEL_PRICING 字典对新模型返回 nil** — 新模型发布需更新 SDK，可改为可注册模式 [ModelInfo.swift:30-39]
@@ -13,7 +13,7 @@
 ## Deferred from: code review of 3-4-core-file-tools-read-write-edit (2026-04-05)
 
 - ~~**Edit tool missing old_string == new_string guard**~~ — **FIXED**: Guard rejects identical strings with error "old_string and new_string must differ". [FileEditTool.swift:103]
-- **Edit tool missing replace_all parameter** — TS SDK supports replacing all occurrences via boolean flag. Not in story AC, future story enhancement [FileEditTool.swift]
+- ~~**Edit tool missing replace_all parameter**~~ — **FIXED**: Added optional `replace_all: Bool?` to `FileEditInput`. When true, skips uniqueness check and replaces all occurrences. Backward compatible (defaults to false/nil). [FileEditTool.swift]
 - **NFR2 performance test not verified** — No test confirms <1MB file reads complete in 500ms. Requires performance test infrastructure not available locally [FileReadTool.swift]
 
 ## Deferred from: code review of 4-1-task-store-mailbox-store (2026-04-06)
@@ -27,7 +27,7 @@
 
 ## Deferred from: code review of 7-1-session-store-json-persistence (2026-04-08)
 
-- **load() silently swallows JSON corruption** — If transcript.json is truncated or corrupted, load() returns nil with no diagnostic. Matches TypeScript SDK `catch { return null }` behavior. Future enhancement: add optional logging [SessionStore.swift:101-143]
+- ~~**load() silently swallows JSON corruption**~~ — **FIXED**: Added `Logger.shared.warn()` calls in load() where JSON decoding or metadata extraction fails. Returns nil with diagnostic logging. [SessionStore.swift:119]
 - **E2E tests missing concurrent/delete coverage** — AC10 minimum coverage met (round-trip, permissions, auto-creation). Missing E2E tests for concurrent saves and delete. Future enhancement [SessionStoreE2ETests.swift]
 
 ## Deferred from: code review of 8-1-hook-event-types-registry (2026-04-09)
@@ -50,7 +50,7 @@
 
 ## Deferred from: code review of 12-2-cache-tool-and-compaction-integration (2026-04-12)
 
-- **modifiedPaths grows unboundedly in FileCache** — Evicted entries remain in modifiedPaths dictionary; the dictionary is capped only by clear(). Acceptable for compaction use case (knowing what files were touched), but should be capped in a future optimization pass to prevent unbounded memory growth in very long sessions [FileCache.swift:124]
+- ~~**modifiedPaths grows unboundedly in FileCache**~~ — **FIXED**: Added `maxModifiedPaths` property (default 1000). After adding entries in `set()` and `invalidate()`, oldest entries are evicted if count exceeds cap. [FileCache.swift:117]
 
 ## Deferred from: code review of 12-4-project-document-discovery (2026-04-12)
 
