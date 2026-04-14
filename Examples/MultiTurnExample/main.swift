@@ -51,7 +51,7 @@ let sessionId = "multi-turn-demo"
 let agent = createAgent(options: AgentOptions(
     apiKey: apiKey,
     model: defaultModel,
-    baseURL: useOpenAI ? (getEnv("CODEANY_BASE_URL", from: dotEnv) ?? "https://open.bigmodel.cn/api/coding/paas/v4") : nil,
+    baseURL: useOpenAI ? getDefaultOpenAIBaseURL(from: dotEnv) : nil,
     provider: useOpenAI ? .openai : .anthropic,
     permissionMode: .bypassPermissions,
     sessionStore: sessionStore,

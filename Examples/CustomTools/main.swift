@@ -100,7 +100,7 @@ let healthCheckTool = defineTool(
 let agent = createAgent(options: AgentOptions(
     apiKey: apiKey,
     model: defaultModel,
-    baseURL: useOpenAI ? (getEnv("CODEANY_BASE_URL", from: dotEnv) ?? "https://open.bigmodel.cn/api/coding/paas/v4") : nil,
+    baseURL: useOpenAI ? getDefaultOpenAIBaseURL(from: dotEnv) : nil,
     provider: useOpenAI ? .openai : .anthropic,
     systemPrompt: "You are a helpful assistant with access to weather, calculator, and health check tools.",
     permissionMode: .bypassPermissions,

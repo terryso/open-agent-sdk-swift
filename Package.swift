@@ -137,5 +137,10 @@ let package = Package(
             dependencies: ["OpenAgentSDK"],
             path: "Examples/MultiTurnExample"
         ),
+        .executableTarget(
+            name: "OpenAICompatExample",
+            dependencies: ["OpenAgentSDK"],
+            path: "Examples/OpenAICompatExample"
+        ),
     ]
 )

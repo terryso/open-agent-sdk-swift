@@ -343,9 +343,9 @@ final class GitContextCollectorTests: XCTestCase {
         try! "New content".write(toFile: newFile, atomically: true, encoding: .utf8)
 
         // Wait for TTL to expire
-        try await _Concurrency.Task.sleep(nanoseconds: 10_000_000) // 10ms
+        try await _Concurrency.Task.sleep(nanoseconds: 50_000_000) // 50ms
 
-        let result2 = collector.collectGitContext(cwd: gitRepoDir, ttl: 0.01)
+        let result2 = collector.collectGitContext(cwd: gitRepoDir, ttl: 0.05)
 
         // Then: second result reflects the new file (cache was refreshed)
         XCTAssertNotNil(result1)

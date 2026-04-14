@@ -21,7 +21,7 @@ let useOpenAI = getEnv("CODEANY_API_KEY", from: dotEnv) != nil
 let agent = createAgent(options: AgentOptions(
     apiKey: apiKey,
     model: defaultModel,
-    baseURL: useOpenAI ? (getEnv("CODEANY_BASE_URL", from: dotEnv) ?? "https://open.bigmodel.cn/api/coding/paas/v4") : nil,
+    baseURL: useOpenAI ? getDefaultOpenAIBaseURL(from: dotEnv) : nil,
     provider: useOpenAI ? .openai : .anthropic,
     systemPrompt: "You are a helpful assistant.",
     maxBudgetUsd: 0.50,  // 最多花费 $0.50

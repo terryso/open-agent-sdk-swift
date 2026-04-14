@@ -87,11 +87,11 @@ final class SessionStoreManagementTests: XCTestCase {
         // Create sessions with small delays to ensure different updatedAt values
         let id1 = "session-alpha-\(UUID().uuidString)"
         try await createSampleSession(store: store, sessionId: id1, messageCount: 2, summary: "First session")
-        try await _Concurrency.Task.sleep(nanoseconds: 10_000_000) // 10ms
+        try await _Concurrency.Task.sleep(nanoseconds: 50_000_000) // 50ms
 
         let id2 = "session-beta-\(UUID().uuidString)"
         try await createSampleSession(store: store, sessionId: id2, messageCount: 3, summary: "Second session")
-        try await _Concurrency.Task.sleep(nanoseconds: 10_000_000) // 10ms
+        try await _Concurrency.Task.sleep(nanoseconds: 50_000_000) // 50ms
 
         let id3 = "session-gamma-\(UUID().uuidString)"
         try await createSampleSession(store: store, sessionId: id3, messageCount: 1, summary: "Third session")
@@ -188,7 +188,7 @@ final class SessionStoreManagementTests: XCTestCase {
         let originalCreatedAt = originalData?.metadata.createdAt
 
         // Small delay to ensure updatedAt changes
-        try await _Concurrency.Task.sleep(nanoseconds: 10_000_000) // 10ms
+        try await _Concurrency.Task.sleep(nanoseconds: 50_000_000) // 50ms
 
         // When: renaming the session
         try await store.rename(sessionId: sessionId, newTitle: "Renamed Title")

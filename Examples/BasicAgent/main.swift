@@ -54,7 +54,7 @@ if let apiKey = anthropicKey, !apiKey.isEmpty {
 let codeanyKey = getEnv("CODEANY_API_KEY", from: dotEnv)
 
 if let apiKey = codeanyKey, !apiKey.isEmpty {
-    let baseURL = getEnv("CODEANY_BASE_URL", from: dotEnv) ?? "https://open.bigmodel.cn/api/coding/paas/v4"
+    let baseURL = getDefaultOpenAIBaseURL(from: dotEnv)
     let model = getEnv("CODEANY_MODEL", from: dotEnv) ?? "glm-5.1"
 
     let openaiAgent = createAgent(options: AgentOptions(

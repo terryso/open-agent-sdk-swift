@@ -308,7 +308,7 @@ final class TaskStoreTests: XCTestCase {
         let originalUpdatedAt = task.updatedAt
 
         // Small delay to ensure timestamp difference
-        try await _Concurrency.Task.sleep(nanoseconds: 10_000_000) // 10ms
+        try await _Concurrency.Task.sleep(nanoseconds: 50_000_000) // 50ms
 
         // When: updating the task
         let updated = try await store.update(id: task.id, status: .inProgress)
@@ -325,7 +325,7 @@ final class TaskStoreTests: XCTestCase {
         let originalUpdatedAt = task.updatedAt
 
         // Small delay to ensure timestamp difference
-        try await _Concurrency.Task.sleep(nanoseconds: 10_000_000) // 10ms
+        try await _Concurrency.Task.sleep(nanoseconds: 50_000_000) // 50ms
 
         // When: updating only the description (no status change)
         let updated = try await store.update(id: task.id, description: "Updated description")

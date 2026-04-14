@@ -218,7 +218,7 @@ let agentSandbox = SandboxSettings(
 let agent = createAgent(options: AgentOptions(
     apiKey: apiKey,
     model: defaultModel,
-    baseURL: useOpenAI ? (getEnv("CODEANY_BASE_URL", from: dotEnv) ?? "https://open.bigmodel.cn/api/paas/v4") : nil,
+    baseURL: useOpenAI ? getDefaultOpenAIBaseURL(from: dotEnv) : nil,
     provider: useOpenAI ? .openai : .anthropic,
     systemPrompt: "You are a project analysis assistant. Use the available tools to examine the project structure.",
     maxTurns: 10,

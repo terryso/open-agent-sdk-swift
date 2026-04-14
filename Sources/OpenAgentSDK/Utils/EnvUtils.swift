@@ -51,3 +51,17 @@ public func getEnv(_ key: String, from dotEnv: [String: String]) -> String? {
     }
     return dotEnv[key]
 }
+
+/// Get the default OpenAI-compatible base URL.
+///
+/// Priority: `CODEANY_BASE_URL` environment variable > built-in default.
+/// The default points to a common OpenAI-compatible endpoint. Override via
+/// `CODEANY_BASE_URL` in `.env` or process environment to use a different provider
+/// (DeepSeek, Ollama, OpenAI, etc.).
+///
+/// - Parameter dotEnv: A dictionary loaded by ``loadDotEnv(path:)``.
+/// - Returns: The base URL string for the OpenAI-compatible API endpoint.
+public func getDefaultOpenAIBaseURL(from dotEnv: [String: String] = [:]) -> String {
+    getEnv("CODEANY_BASE_URL", from: dotEnv)
+        ?? "https://open.bigmodel.cn/api/coding/paas/v4"
+}
