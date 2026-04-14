@@ -49,6 +49,13 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
     /// The full agent options (used internally for prompt/stream calls).
     var options: AgentOptions
 
+    /// Lock protecting concurrent access to `options` permission-related fields.
+    private let _permissionLock: NSLock = {
+        let lock = NSLock()
+        lock.name = "Agent.permissionLock"
+        return lock
+    }()
+
     /// The LLM API client used for communication.
     let client: any LLMClient
 
@@ -144,8 +151,10 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
     ///
     /// - Parameter mode: The new permission mode to use.
     public func setPermissionMode(_ mode: PermissionMode) {
-        options.permissionMode = mode
-        options.canUseTool = nil
+        _permissionLock.withLock {
+            options.permissionMode = mode
+            options.canUseTool = nil
+        }
     }
 
     /// Sets a custom authorization callback for subsequent tool executions.
@@ -155,7 +164,9 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
     ///
     /// - Parameter callback: The authorization callback, or nil to clear it.
     public func setCanUseTool(_ callback: CanUseToolFn?) {
-        options.canUseTool = callback
+        _permissionLock.withLock {
+            options.canUseTool = callback
+        }
     }
 
     // MARK: - Dynamic Model Switching
@@ -1258,6 +1269,9 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                                     parentTools: allToolProtocols
                                 )
                             }()
+                            let (capturedPermissionMode, capturedCanUseTool) = _permissionLock.withLock {
+                                (self.options.permissionMode, self.options.canUseTool)
+                            }
                             let toolResults = await ToolExecutor.executeTools(
                                 toolUseBlocks: toolUseBlocks,
                                 tools: allToolProtocols,
@@ -1273,8 +1287,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                                     cronStore: capturedCronStore,
                                     todoStore: capturedTodoStore,
                                     hookRegistry: capturedHookRegistry,
-                                    permissionMode: self.options.permissionMode,
-                                    canUseTool: self.options.canUseTool,
+                                    permissionMode: capturedPermissionMode,
+                                    canUseTool: capturedCanUseTool,
                                     skillRegistry: capturedSkillRegistry,
                                     restrictionStack: capturedRestrictionStack,
                                     skillNestingDepth: capturedRestrictionStack?.nestingDepth ?? 0,

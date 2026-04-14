@@ -38,8 +38,8 @@ public struct ModelPricing: Sendable, Equatable {
 
 /// Pricing table mapping model IDs to per-token costs (USD).
 ///
-/// Configure custom models at startup via ``registerModel(_:pricing:)`` before
-/// any concurrent access.
+/// Configure custom models at startup via ``registerModel(_:pricing:)``.
+/// Mutations are protected by an internal lock for thread safety.
 public nonisolated(unsafe) var MODEL_PRICING: [String: ModelPricing] = [
     "claude-opus-4-6": ModelPricing(input: 15.0 / 1_000_000, output: 75.0 / 1_000_000),
     "claude-sonnet-4-6": ModelPricing(input: 3.0 / 1_000_000, output: 15.0 / 1_000_000),
@@ -51,23 +51,33 @@ public nonisolated(unsafe) var MODEL_PRICING: [String: ModelPricing] = [
     "claude-3-opus": ModelPricing(input: 15.0 / 1_000_000, output: 75.0 / 1_000_000),
 ]
 
+private let _pricingLock: NSLock = {
+    let lock = NSLock()
+    lock.name = "ModelInfo.pricingLock"
+    return lock
+}()
+
 /// Register pricing for a custom or updated model.
 ///
 /// Use this to add pricing for models not included in the built-in table,
-/// or to override pricing for existing models.
+/// or to override pricing for existing models. Thread-safe.
 ///
 /// - Parameters:
 ///   - modelId: The model identifier string (e.g., "my-custom-model").
 ///   - pricing: The per-token pricing for the model.
 public func registerModel(_ modelId: String, pricing: ModelPricing) {
-    MODEL_PRICING[modelId] = pricing
+    _pricingLock.withLock {
+        MODEL_PRICING[modelId] = pricing
+    }
 }
 
 /// Remove pricing for a previously registered model.
 ///
-/// Has no effect if the model ID is not in the pricing table.
+/// Has no effect if the model ID is not in the pricing table. Thread-safe.
 ///
 /// - Parameter modelId: The model identifier to remove.
 public func unregisterModel(_ modelId: String) {
-    MODEL_PRICING.removeValue(forKey: modelId)
+    _pricingLock.withLock {
+        MODEL_PRICING.removeValue(forKey: modelId)
+    }
 }

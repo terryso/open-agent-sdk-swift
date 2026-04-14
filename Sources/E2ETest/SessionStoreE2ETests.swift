@@ -12,6 +12,8 @@ struct SessionStoreE2ETests {
         await testSaveLoadRoundTrip()
         await testFilePermissions()
         await testDirectoryAutoCreation()
+        await testConcurrentSaves()
+        await testDeleteSession()
     }
 
     // MARK: Test 34a: Save and Load Round Trip
@@ -166,5 +168,96 @@ struct SessionStoreE2ETests {
 
         // Cleanup
         _ = try? await store.delete(sessionId: sessionId)
+    }
+
+    // MARK: Test 34d: Concurrent Saves
+
+    static func testConcurrentSaves() async {
+        let store = SessionStore()
+        let sessionId = "e2e-concurrent-\(UUID().uuidString)"
+        let metadata = PartialSessionMetadata(cwd: "/tmp", model: "test")
+        let msgs1: [[String: Any]] = [["role": "user", "content": "Save 1"]]
+        let msgs2: [[String: Any]] = [["role": "user", "content": "Save 2"]]
+
+        // Launch two concurrent saves to the same session
+        async let save1 = store.save(sessionId: sessionId, messages: msgs1, metadata: metadata)
+        async let save2 = store.save(sessionId: sessionId, messages: msgs2, metadata: metadata)
+
+        var saveErrors = 0
+        do { try await save1 } catch { saveErrors += 1 }
+        do { try await save2 } catch { saveErrors += 1 }
+
+        if saveErrors == 0 {
+            pass("SessionStore E2E: concurrent saves complete without crash")
+        } else {
+            fail("SessionStore E2E: concurrent saves complete without crash", "\(saveErrors) errors")
+        }
+
+        // Verify session is loadable and data is valid (last-write-wins — content from either save)
+        if let loaded = try? await store.load(sessionId: sessionId) {
+            if loaded.metadata.id == sessionId && loaded.messages.count == 1 {
+                let content = loaded.messages[0]["content"] as? String ?? ""
+                if content == "Save 1" || content == "Save 2" {
+                    pass("SessionStore E2E: session data valid after concurrent saves")
+                } else {
+                    fail("SessionStore E2E: session data valid after concurrent saves", "unexpected content: \(content)")
+                }
+            } else {
+                fail("SessionStore E2E: session data valid after concurrent saves", "id=\(loaded.metadata.id) count=\(loaded.messages.count)")
+            }
+        } else {
+            fail("SessionStore E2E: session data valid after concurrent saves", "load returned nil")
+        }
+
+        // Cleanup
+        _ = try? await store.delete(sessionId: sessionId)
+    }
+
+    // MARK: Test 34e: Delete Session
+
+    static func testDeleteSession() async {
+        let store = SessionStore()
+        let sessionId = "e2e-delete-\(UUID().uuidString)"
+        let messages: [[String: Any]] = [["role": "user", "content": "Delete test"]]
+        let metadata = PartialSessionMetadata(cwd: "/tmp", model: "test")
+
+        // Save first
+        do {
+            try await store.save(sessionId: sessionId, messages: messages, metadata: metadata)
+        } catch {
+            fail("SessionStore E2E: delete setup save", "threw: \(error)")
+            return
+        }
+
+        // Delete existing session
+        do {
+            let deleted = try await store.delete(sessionId: sessionId)
+            if deleted {
+                pass("SessionStore E2E: delete existing session returns true")
+            } else {
+                fail("SessionStore E2E: delete existing session returns true", "returned false")
+            }
+        } catch {
+            fail("SessionStore E2E: delete existing session returns true", "threw: \(error)")
+        }
+
+        // Verify session is gone
+        if let _ = try? await store.load(sessionId: sessionId) {
+            fail("SessionStore E2E: deleted session is gone", "session still loadable")
+        } else {
+            pass("SessionStore E2E: deleted session is gone")
+        }
+
+        // Delete nonexistent session
+        do {
+            let deleted = try await store.delete(sessionId: "nonexistent-\(UUID().uuidString)")
+            if !deleted {
+                pass("SessionStore E2E: delete nonexistent session returns false")
+            } else {
+                fail("SessionStore E2E: delete nonexistent session returns false", "returned true")
+            }
+        } catch {
+            fail("SessionStore E2E: delete nonexistent session returns false", "threw: \(error)")
+        }
     }
 }

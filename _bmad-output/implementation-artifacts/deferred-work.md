@@ -2,7 +2,7 @@
 
 ## Deferred from: code review of 1-1-spm-package-core-types (2026-04-04)
 
-- **SessionMetadata 使用 String 时间戳** — createdAt/updatedAt 为 String 类型无格式约束，未来改为 Date 或添加格式文档 [SessionTypes.swift:4-30]
+- ~~**SessionMetadata 使用 String 时间戳**~~ — **FIXED**: `createdAt`/`updatedAt` are now `Date` type with proper `Codable` conformance. [SessionTypes.swift:15-17]
 - **McpSseConfig/McpHttpConfig 结构完全相同** — 两者均为 url+headers，按 MCP 协议传输类型区分，未来可考虑合并 [MCPConfig.swift:24-43]
 - ~~**HookNotification.level / PermissionUpdate.behavior 为字符串类型**~~ — **FIXED**: Added `HookNotificationLevel` enum (info/warning/error/debug with unknown-value fallback) and `PermissionBehavior` enum (allow/deny). Both use `String` raw values with `Codable` conformance. [HookTypes.swift, PermissionTypes.swift]
 - ~~**ThinkingConfig.enabled 无 budgetTokens 验证**~~ — **FIXED**: `ThinkingConfig.validate()` throws when budgetTokens <= 0; `AgentOptions.validate()` calls it. [ThinkingConfig.swift:25]
@@ -28,11 +28,11 @@
 ## Deferred from: code review of 7-1-session-store-json-persistence (2026-04-08)
 
 - ~~**load() silently swallows JSON corruption**~~ — **FIXED**: Added `Logger.shared.warn()` calls in load() where JSON decoding or metadata extraction fails. Returns nil with diagnostic logging. [SessionStore.swift:119]
-- **E2E tests missing concurrent/delete coverage** — AC10 minimum coverage met (round-trip, permissions, auto-creation). Missing E2E tests for concurrent saves and delete. Future enhancement [SessionStoreE2ETests.swift]
+- ~~**E2E tests missing concurrent/delete coverage**~~ — **FIXED**: Added `testConcurrentSaves()` (two concurrent writes, verify loadable after) and `testDeleteSession()` (delete existing, verify gone, delete nonexistent returns false). [SessionStoreE2ETests.swift]
 
 ## Deferred from: code review of 8-1-hook-event-types-registry (2026-04-09)
 
-- **Silent error swallowing in execute() catch block** — All hook errors (including timeout) are silently caught with no logging. Matches TS SDK `console.error` pattern but Swift has no logging infrastructure. Future enhancement when logging is added [HookRegistry.swift:122-125]
+- ~~**Silent error swallowing in execute() catch block**~~ — **FIXED**: Hook errors are now logged with `Logger.shared.error("HookRegistry", "hook_execution_failed", ...)` including event type and error description. [HookRegistry.swift:125-128]
 - **HookOutput lacks Equatable conformance** — Cannot perform full structural equality assertions in tests. Low priority since all fields are individually Equatable [HookTypes.swift:62]
 
 ## Deferred from: code review of 8-5-custom-authorization-callback (2026-04-09)
@@ -89,9 +89,14 @@
 ## Deferred from: code review of thread-safety-dynamic-permissions (2026-04-14)
 
 - **ToolContext.mcpConnections always nil** — Both `prompt()` and `stream()` pass `mcpConnections: nil`. Wiring actual connections requires extracting `MCPConnectionInfo` from `MCPClientManager`, which doesn't yet expose such an API. Structural migration is complete (tools read from context); injection wiring deferred to Epic 6 when MCP integration matures. [Agent.swift:589,1282]
-- **Data race on self.options in stream path** — `permissionMode` and `canUseTool` are now read from `self.options` at each tool execution point to support dynamic mid-stream permission changes. Agent is `@unchecked Sendable` with `var options`, so concurrent mutation is a theoretical race. Trade-off accepted: working public API (`setPermissionMode`/`setCanUseTool`) is more valuable than avoiding a theoretical race that the previous code already had for other `self` reads (e.g., `sessionMemory`). Future: make `options` thread-safe (actor isolation or atomic snapshot). [Agent.swift:1275-1276]
-- **Schema `nonisolated(unsafe)` constants in MCP tools** — `listMcpResourcesSchema` and `readMcpResourceSchema` are static `nonisolated(unsafe) let` constants. Technically safe (immutable after init) but inconsistent with the project's direction away from `nonisolated(unsafe)`. Pre-existing, not introduced by this story. [ListMcpResourcesTool.swift:13, ReadMcpResourceTool.swift:5]
+- ~~**Data race on self.options in stream path**~~ — **FIXED**: Added `_permissionLock` (NSLock) protecting `setPermissionMode()`, `setCanUseTool()` writes, and stream-path reads of `permissionMode`/`canUseTool`. Other `self.options` fields remain unlocked (read-heavy, startup-configured). [Agent.swift:53,149,160,1283-1284]
+- **Schema `nonisolated(unsafe)` constants in MCP tools** — `listMcpResourcesSchema` and `readMcpResourceSchema` are file-scope `nonisolated(unsafe) let` constants. Cannot remove `nonisolated(unsafe)` because `ToolInputSchema` (`[String: Any]`) is not `Sendable` — the compiler requires the annotation. Constants are immutable after init so this is safe. [ListMcpResourcesTool.swift:13, ReadMcpResourceTool.swift:5]
 
 ## Deferred from: code review of deferred-core-improvements (2026-04-15)
 
-- **MODEL_PRICING concurrent access race** — `MODEL_PRICING` is `nonisolated(unsafe) var` with `registerModel()`/`unregisterModel()` performing unsynchronized mutations. Swift Dictionary is not thread-safe for concurrent writes. Trade-off accepted: pricing is typically configured at startup before any concurrent access. Future: wrap in an actor or use a lock if runtime registration becomes common. [ModelInfo.swift:43]
+- ~~**MODEL_PRICING concurrent access race**~~ — **FIXED**: Added `_pricingLock` (NSLock) protecting `registerModel()` and `unregisterModel()` mutations. Direct dictionary access still possible for reads (startup-time), but public mutation API is now thread-safe. [ModelInfo.swift:56,66,74]
+
+## Deferred from: code review of deferred-thread-safety-quality (2026-04-15)
+
+- **MODEL_PRICING reads bypass lock** — Direct reads (e.g., `MODEL_PRICING["claude-sonnet-4-6"]`) are not protected by `_pricingLock`. Swift Dictionary with value types is safe for concurrent reads in practice on Apple platforms, but this is formally UB. Making all reads go through lock-protected accessors would require a major API change (private var + public getter). Trade-off accepted: lock prevents the crash scenario (concurrent writes), reads are safe in practice. [ModelInfo.swift:43]
+- **CanUseToolFn Sendable conformance** — `setCanUseTool()` stores a closure read on the stream's async context. If the closure type is not `@Sendable`, this crosses concurrency boundaries. Pre-existing design decision, not introduced by this change.

@@ -125,4 +125,40 @@ final class ModelInfoTests: XCTestCase {
         unregisterModel("nonexistent-model-xyz")
         XCTAssertEqual(MODEL_PRICING.count, originalCount)
     }
+
+    // MARK: - Thread Safety
+
+    func testRegisterModel_concurrentAccess() {
+        // Register 100 models from concurrent threads to stress-test the lock.
+        // If the lock is broken, this will crash or corrupt the dictionary.
+        let taskCount = 100
+        let group = DispatchGroup()
+
+        for i in 0..<taskCount {
+            group.enter()
+            DispatchQueue.global().async {
+                registerModel("concurrent-model-\(i)", pricing: ModelPricing(
+                    input: Double(i) / 1_000_000,
+                    output: Double(i) / 1_000_000
+                ))
+                group.leave()
+            }
+        }
+
+        let result = group.wait(timeout: .now() + 5.0)
+        XCTAssertEqual(result, .success, "All concurrent registrations should complete within timeout")
+
+        // Verify all models were registered
+        for i in 0..<taskCount {
+            let key = "concurrent-model-\(i)"
+            XCTAssertNotNil(MODEL_PRICING[key], "Model \(key) should be registered")
+        }
+        XCTAssertEqual(MODEL_PRICING.count, 8 + taskCount, "Should have original 8 + \(taskCount) concurrent models")
+
+        // Cleanup
+        for i in 0..<taskCount {
+            unregisterModel("concurrent-model-\(i)")
+        }
+        XCTAssertEqual(MODEL_PRICING.count, 8, "Should be back to original 8 models")
+    }
 }
