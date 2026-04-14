@@ -267,4 +267,34 @@ final class FileEditToolTests: XCTestCase {
         XCTAssertTrue(required!.contains("new_string"),
                       "'new_string' should be in required fields")
     }
+
+    // MARK: - Identical string guard
+
+    /// When old_string and new_string are identical, the tool should return an error
+    /// without modifying the file (matching TypeScript SDK behavior).
+    func testEditFile_identicalStrings_returnsError() async {
+        let filePath = writeTestFile(
+            name: "identical_test.txt",
+            content: "Hello World"
+        )
+        let tool = makeEditTool()
+
+        let result = await callTool(
+            tool,
+            input: [
+                "file_path": filePath,
+                "old_string": "Hello World",
+                "new_string": "Hello World"
+            ]
+        )
+
+        XCTAssertTrue(result.isError,
+                      "Identical old_string/new_string should return isError=true")
+        XCTAssertTrue(result.content.contains("differ"),
+                      "Error should mention strings must differ, got: \(result.content)")
+        // File should be unchanged
+        let fileContent = try! String(contentsOfFile: filePath, encoding: .utf8)
+        XCTAssertEqual(fileContent, "Hello World",
+                       "File should not be modified when strings are identical")
+    }
 }

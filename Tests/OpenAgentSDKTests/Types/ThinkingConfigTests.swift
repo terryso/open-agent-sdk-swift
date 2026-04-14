@@ -105,4 +105,46 @@ final class ThinkingConfigTests: XCTestCase {
             }
         }
     }
+
+    // MARK: - Validation
+
+    func testValidate_enabledZeroBudget_throws() {
+        let config = ThinkingConfig.enabled(budgetTokens: 0)
+        XCTAssertThrowsError(try config.validate()) { error in
+            guard let sdkError = error as? SDKError,
+                  case .invalidConfiguration(let msg) = sdkError else {
+                XCTFail("Expected SDKError.invalidConfiguration, got \(error)")
+                return
+            }
+            XCTAssertTrue(msg.contains("positive"),
+                          "Error message should mention 'positive', got: \(msg)")
+        }
+    }
+
+    func testValidate_enabledNegativeBudget_throws() {
+        let config = ThinkingConfig.enabled(budgetTokens: -5)
+        XCTAssertThrowsError(try config.validate()) { error in
+            guard let sdkError = error as? SDKError,
+                  case .invalidConfiguration = sdkError else {
+                XCTFail("Expected SDKError.invalidConfiguration, got \(error)")
+                return
+            }
+        }
+    }
+
+    func testValidate_enabledPositiveBudget_succeeds() {
+        let config = ThinkingConfig.enabled(budgetTokens: 10000)
+        XCTAssertNoThrow(try config.validate(),
+                         "Positive budgetTokens should not throw")
+    }
+
+    func testValidate_adaptive_succeeds() {
+        XCTAssertNoThrow(try ThinkingConfig.adaptive.validate(),
+                         ".adaptive should not throw")
+    }
+
+    func testValidate_disabled_succeeds() {
+        XCTAssertNoThrow(try ThinkingConfig.disabled.validate(),
+                         ".disabled should not throw")
+    }
 }

@@ -19,4 +19,21 @@ public enum ThinkingConfig: Sendable, Equatable {
     case enabled(budgetTokens: Int)
     /// Extended thinking is disabled.
     case disabled
+
+    /// Validate the configuration, throwing if invalid.
+    ///
+    /// - Throws: ``SDKError/invalidConfiguration`` if `budgetTokens` is
+    ///   zero or negative for the `.enabled` case.
+    public func validate() throws {
+        switch self {
+        case .enabled(let budgetTokens):
+            guard budgetTokens > 0 else {
+                throw SDKError.invalidConfiguration(
+                    "ThinkingConfig budgetTokens must be positive, got \(budgetTokens)"
+                )
+            }
+        case .adaptive, .disabled:
+            break
+        }
+    }
 }

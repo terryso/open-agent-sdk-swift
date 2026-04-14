@@ -245,6 +245,22 @@ public struct AgentOptions: Sendable {
         self.logOutput = config.logOutput
         self.sandbox = config.sandbox
     }
+
+    /// Validate the options, throwing if any configuration is invalid.
+    ///
+    /// Checks:
+    /// - `baseURL` (if non-nil) must be a valid URL string parseable by `URL(string:)`.
+    /// - `thinking` (if non-nil) must pass ``ThinkingConfig/validate()``.
+    ///
+    /// - Throws: ``SDKError/invalidConfiguration`` if any check fails.
+    public func validate() throws {
+        if let baseURL {
+            guard URL(string: baseURL) != nil else {
+                throw SDKError.invalidConfiguration("Invalid baseURL: '\(baseURL)' is not a valid URL")
+            }
+        }
+        try thinking?.validate()
+    }
 }
 
 /// Status of a completed agent query.

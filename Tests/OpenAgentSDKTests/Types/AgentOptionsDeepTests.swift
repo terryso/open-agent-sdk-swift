@@ -226,4 +226,60 @@ final class AgentOptionsDeepTests: XCTestCase {
         let d = SubAgentResult(text: "World", toolCalls: ["A"], isError: false)
         XCTAssertNotEqual(a, d, "Different text should not be equal")
     }
+
+    // MARK: - AgentOptions Validation
+
+    func testAgentOptions_validate_invalidBaseURL_throws() {
+        let options = AgentOptions(
+            apiKey: "sk-test",
+            baseURL: "not a url!!"
+        )
+        XCTAssertThrowsError(try options.validate()) { error in
+            guard let sdkError = error as? SDKError,
+                  case .invalidConfiguration(let msg) = sdkError else {
+                XCTFail("Expected SDKError.invalidConfiguration, got \(error)")
+                return
+            }
+            XCTAssertTrue(msg.contains("baseURL"),
+                          "Error message should mention baseURL, got: \(msg)")
+        }
+    }
+
+    func testAgentOptions_validate_validBaseURL_succeeds() {
+        let options = AgentOptions(
+            apiKey: "sk-test",
+            baseURL: "https://api.example.com"
+        )
+        XCTAssertNoThrow(try options.validate(),
+                         "Valid baseURL should not throw")
+    }
+
+    func testAgentOptions_validate_nilBaseURL_succeeds() {
+        let options = AgentOptions(apiKey: "sk-test")
+        XCTAssertNoThrow(try options.validate(),
+                         "nil baseURL should not throw")
+    }
+
+    func testAgentOptions_validate_invalidThinking_throws() {
+        let options = AgentOptions(
+            apiKey: "sk-test",
+            thinking: .enabled(budgetTokens: 0)
+        )
+        XCTAssertThrowsError(try options.validate()) { error in
+            guard let sdkError = error as? SDKError,
+                  case .invalidConfiguration = sdkError else {
+                XCTFail("Expected SDKError.invalidConfiguration, got \(error)")
+                return
+            }
+        }
+    }
+
+    func testAgentOptions_validate_validThinking_succeeds() {
+        let options = AgentOptions(
+            apiKey: "sk-test",
+            thinking: .enabled(budgetTokens: 10000)
+        )
+        XCTAssertNoThrow(try options.validate(),
+                         "Valid thinking config should not throw")
+    }
 }

@@ -62,7 +62,7 @@
 
 ## Deferred from: checkpoint review of 15-2-sandbox-example (2026-04-13)
 
-- **Bash tool bypasses path sandbox** — `cat /etc/passwd` succeeds despite `/etc/` being in `deniedPaths` because BashTool only calls `checkCommand` (command name filtering) not `checkPath` (path filtering). Fix: add path extraction phase to `checkCommand` that extracts file-like arguments and checks them against sandbox path rules. [SandboxChecker.swift, BashTool.swift]
+- ~~**Bash tool bypasses path sandbox**~~ — **FIXED**: `checkCommand` now includes Phase 3 path extraction (lines 230-269) that extracts file-like arguments and validates against `deniedPaths`/`allowedReadPaths`. [SandboxChecker.swift]
 
 ## Deferred from: code review of 15-1-skills-example (2026-04-13)
 
@@ -77,3 +77,7 @@
 
 - **No error handling around `try await` sessionStore calls** — Three `try await` calls to `sessionStore.load()` and `sessionStore.delete()` have no `do/catch`. Consistent with SessionsAndHooks example pattern. Pre-existing pattern not introduced by this story. [Examples/MultiTurnExample/main.swift:110,182,190]
 - **assert() disabled in release builds** — All assertions use `assert()` which is stripped in release builds. Consistent with all other examples in the project. Pre-established pattern. [Examples/MultiTurnExample/main.swift:94,111,125,169,183,191]
+
+## Deferred from: code review of add-core-validation-guards (2026-04-14)
+
+- **ThinkingConfig with OpenAI provider** — `ThinkingConfig` is validated regardless of provider, but OpenAI doesn't support thinking tokens. The warning/log may be misleading for OpenAI users. Pre-existing design decision (ThinkingConfig is provider-agnostic). [Agent.swift, ThinkingConfig.swift]

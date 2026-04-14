@@ -100,6 +100,12 @@ public func createEditTool() -> ToolProtocol {
                 isError: true
             )
         }
+        guard input.old_string != input.new_string else {
+            return ToolExecuteResult(
+                content: "Error: old_string and new_string must differ.",
+                isError: true
+            )
+        }
         let occurrences = originalContent.components(separatedBy: input.old_string).count - 1
         if occurrences == 0 {
             return ToolExecuteResult(

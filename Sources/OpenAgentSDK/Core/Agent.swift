@@ -85,6 +85,21 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
             Logger.configure(level: options.logLevel, output: options.logOutput)
         }
 
+        // Soft validation: warn on invalid baseURL or thinking config.
+        if let baseURL = options.baseURL, URL(string: baseURL) == nil {
+            Logger.shared.info("Agent", "invalid_config", data: [
+                "field": "baseURL",
+                "warning": "Invalid baseURL will fall back to provider default"
+            ])
+        }
+        if let thinking = options.thinking, case .enabled(let budget) = thinking, budget <= 0 {
+            Logger.shared.info("Agent", "invalid_config", data: [
+                "field": "thinking.budgetTokens",
+                "value": String(budget),
+                "warning": "budgetTokens must be positive"
+            ])
+        }
+
         // Create the appropriate client based on provider.
         // Empty API key fallback — calls will fail naturally if no key was provided.
         let apiKey = options.apiKey ?? ""
