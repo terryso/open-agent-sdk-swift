@@ -232,7 +232,7 @@ final class AgentOptionsDeepTests: XCTestCase {
     func testAgentOptions_validate_invalidBaseURL_throws() {
         let options = AgentOptions(
             apiKey: "sk-test",
-            baseURL: "not a url!!"
+            baseURL: "http://[invalid host]"
         )
         XCTAssertThrowsError(try options.validate()) { error in
             guard let sdkError = error as? SDKError,
