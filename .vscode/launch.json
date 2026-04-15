@@ -519,6 +519,26 @@
             "target": "CompatMCP",
             "configuration": "release",
             "preLaunchTask": "swift: Build Release CompatMCP"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:open-agent-sdk-swift}",
+            "name": "Debug CompatSessions",
+            "target": "CompatSessions",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug CompatSessions"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:open-agent-sdk-swift}",
+            "name": "Release CompatSessions",
+            "target": "CompatSessions",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release CompatSessions"
         }
     ]
 }

@@ -172,5 +172,10 @@ let package = Package(
             dependencies: ["OpenAgentSDK"],
             path: "Examples/CompatMCP"
         ),
+        .executableTarget(
+            name: "CompatSessions",
+            dependencies: ["OpenAgentSDK"],
+            path: "Examples/CompatSessions"
+        ),
     ]
 )
