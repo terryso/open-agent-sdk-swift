@@ -167,5 +167,10 @@ let package = Package(
             dependencies: ["OpenAgentSDK"],
             path: "Examples/CompatHooks"
         ),
+        .executableTarget(
+            name: "CompatMCP",
+            dependencies: ["OpenAgentSDK"],
+            path: "Examples/CompatMCP"
+        ),
     ]
 )
