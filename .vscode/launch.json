@@ -559,6 +559,26 @@
             "target": "CompatQueryMethods",
             "configuration": "release",
             "preLaunchTask": "swift: Build Release CompatQueryMethods"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:open-agent-sdk-swift}",
+            "name": "Debug CompatOptions",
+            "target": "CompatOptions",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug CompatOptions"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:open-agent-sdk-swift}",
+            "name": "Release CompatOptions",
+            "target": "CompatOptions",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release CompatOptions"
         }
     ]
 }

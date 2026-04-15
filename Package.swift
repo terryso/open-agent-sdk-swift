@@ -182,5 +182,10 @@ let package = Package(
             dependencies: ["OpenAgentSDK"],
             path: "Examples/CompatQueryMethods"
         ),
+        .executableTarget(
+            name: "CompatOptions",
+            dependencies: ["OpenAgentSDK"],
+            path: "Examples/CompatOptions"
+        ),
     ]
 )
