@@ -571,7 +571,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                             apiKey: options.apiKey ?? "",
                             baseURL: options.baseURL,
                             parentModel: model,
-                            parentTools: registeredTools
+                            parentTools: registeredTools,
+                            provider: options.provider
                         )
                     }()
                     let toolResults = await ToolExecutor.executeTools(
@@ -722,6 +723,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
         let capturedRetryConfig = options.retryConfig ?? RetryConfig.default
         let capturedApiKey = options.apiKey ?? ""
         let capturedBaseURL = options.baseURL
+        let capturedProvider = options.provider
         let capturedMailboxStore = options.mailboxStore
         let capturedTeamStore = options.teamStore
         let capturedAgentName = options.agentName
@@ -1266,7 +1268,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                                     apiKey: capturedApiKey,
                                     baseURL: capturedBaseURL,
                                     parentModel: capturedModel,
-                                    parentTools: allToolProtocols
+                                    parentTools: allToolProtocols,
+                                    provider: capturedProvider
                                 )
                             }()
                             let (capturedPermissionMode, capturedCanUseTool) = _permissionLock.withLock {

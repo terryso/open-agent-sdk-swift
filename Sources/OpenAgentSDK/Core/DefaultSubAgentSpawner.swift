@@ -15,6 +15,7 @@ final class DefaultSubAgentSpawner: SubAgentSpawner, @unchecked Sendable {
     private let baseURL: String?
     private let parentModel: String
     private let parentTools: [ToolProtocol]
+    private let provider: LLMProvider
     private let client: (any LLMClient)?
 
     init(
@@ -22,12 +23,14 @@ final class DefaultSubAgentSpawner: SubAgentSpawner, @unchecked Sendable {
         baseURL: String?,
         parentModel: String,
         parentTools: [ToolProtocol],
+        provider: LLMProvider = .anthropic,
         client: (any LLMClient)? = nil
     ) {
         self.apiKey = apiKey
         self.baseURL = baseURL
         self.parentModel = parentModel
         self.parentTools = parentTools
+        self.provider = provider
         self.client = client
     }
 
@@ -55,6 +58,7 @@ final class DefaultSubAgentSpawner: SubAgentSpawner, @unchecked Sendable {
             apiKey: apiKey,
             model: resolvedModel,
             baseURL: baseURL,
+            provider: provider,
             systemPrompt: systemPrompt,
             maxTurns: resolvedMaxTurns,
             tools: subTools.isEmpty ? nil : subTools
