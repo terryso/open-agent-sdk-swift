@@ -399,6 +399,26 @@
             "target": "OpenAICompatExample",
             "configuration": "release",
             "preLaunchTask": "swift: Build Release OpenAICompatExample"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:open-agent-sdk-swift}",
+            "name": "Debug PolyvLiveExample",
+            "target": "PolyvLiveExample",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug PolyvLiveExample"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:open-agent-sdk-swift}",
+            "name": "Release PolyvLiveExample",
+            "target": "PolyvLiveExample",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release PolyvLiveExample"
         }
     ]
 }

@@ -94,6 +94,14 @@ public struct AgentOptions: Sendable {
     /// Optional skill registry for skill execution.
     /// When set, the Skill tool is registered and skills can be discovered and invoked by the LLM.
     public var skillRegistry: SkillRegistry?
+    /// Directories to scan for SKILL.md-based skill packages.
+    /// When `nil`, uses default directories (`~/.agents/skills`, `~/.claude/skills`, etc.).
+    /// When set, only the specified directories are scanned.
+    /// Skills are automatically discovered, registered in `skillRegistry`, and a SkillTool is injected.
+    public var skillDirectories: [String]?
+    /// Optional whitelist of skill names to load. When `nil`, all discovered skills are registered.
+    /// When set, only skills whose names appear in this list are registered.
+    public var skillNames: [String]?
     /// Maximum allowed skill recursion depth. Defaults to 4.
     /// Prevents infinite loops when skills call other skills.
     public var maxSkillRecursionDepth: Int
@@ -154,6 +162,8 @@ public struct AgentOptions: Sendable {
         sessionId: String? = nil,
         hookRegistry: HookRegistry? = nil,
         skillRegistry: SkillRegistry? = nil,
+        skillDirectories: [String]? = nil,
+        skillNames: [String]? = nil,
         maxSkillRecursionDepth: Int = 4,
         fileCacheMaxEntries: Int = 100,
         fileCacheMaxSizeBytes: Int = 25 * 1024 * 1024,
@@ -191,6 +201,8 @@ public struct AgentOptions: Sendable {
         self.sessionId = sessionId
         self.hookRegistry = hookRegistry
         self.skillRegistry = skillRegistry
+        self.skillDirectories = skillDirectories
+        self.skillNames = skillNames
         self.maxSkillRecursionDepth = maxSkillRecursionDepth
         self.fileCacheMaxEntries = fileCacheMaxEntries
         self.fileCacheMaxSizeBytes = fileCacheMaxSizeBytes
@@ -200,6 +212,44 @@ public struct AgentOptions: Sendable {
         self.logLevel = logLevel
         self.logOutput = logOutput
         self.sandbox = sandbox
+    }
+
+    /// Auto-discovers skills from filesystem and sets up the skill registry and tools.
+    ///
+    /// When `skillDirectories` or `skillNames` is set, this method:
+    /// 1. Creates a `SkillRegistry` if one doesn't already exist
+    /// 2. Discovers skills from the specified (or default) directories
+    /// 3. Filters by `skillNames` if specified
+    /// 4. Registers discovered skills into the registry
+    /// 5. Injects a `SkillTool` into the `tools` array
+    mutating func autoDiscoverSkills() {
+        guard skillDirectories != nil || skillNames != nil else { return }
+
+        // Create registry if not already provided
+        if skillRegistry == nil {
+            skillRegistry = SkillRegistry()
+        }
+
+        // Discover and register skills
+        let count = skillRegistry!.registerDiscoveredSkills(
+            from: skillDirectories,
+            skillNames: skillNames
+        )
+
+        if count > 0 {
+            Logger.shared.info("Agent", "skills_discovered", data: [
+                "count": String(count)
+            ])
+
+            // Inject SkillTool into tools array
+            let skillTool = createSkillTool(registry: skillRegistry!)
+            if var existingTools = tools {
+                existingTools.append(skillTool)
+                tools = existingTools
+            } else {
+                tools = [skillTool]
+            }
+        }
     }
 
     /// Create AgentOptions from an SDKConfiguration, using its resolved values

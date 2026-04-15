@@ -92,6 +92,9 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
             Logger.configure(level: options.logLevel, output: options.logOutput)
         }
 
+        // Auto-discover skills from filesystem if skillDirectories or skillNames is specified
+        self.options.autoDiscoverSkills()
+
         // Soft validation: warn on invalid baseURL or thinking config.
         if let baseURL = options.baseURL, URL(string: baseURL) == nil {
             Logger.shared.info("Agent", "invalid_config", data: [
@@ -139,6 +142,10 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
         self.systemPrompt = options.systemPrompt
         self.maxTurns = options.maxTurns
         self.maxTokens = options.maxTokens
+
+        // Auto-discover skills from filesystem if skillDirectories or skillNames is specified
+        self.options.autoDiscoverSkills()
+
         self.client = client
     }
 

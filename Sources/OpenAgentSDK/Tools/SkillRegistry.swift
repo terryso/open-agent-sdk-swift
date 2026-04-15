@@ -201,6 +201,29 @@ public final class SkillRegistry: @unchecked Sendable {
         }
     }
 
+    // MARK: - Filesystem Discovery
+
+    /// Discovers skills from the filesystem and registers them.
+    ///
+    /// Uses `SkillLoader` to scan directories and register discovered skills.
+    /// When `skillNames` is set, only skills matching the whitelist are registered.
+    ///
+    /// - Parameters:
+    ///   - directories: Directories to scan. When `nil`, uses default skill directories.
+    ///   - skillNames: Optional whitelist of skill names. When `nil`, all discovered skills are registered.
+    /// - Returns: The number of skills successfully registered.
+    @discardableResult
+    public func registerDiscoveredSkills(
+        from directories: [String]? = nil,
+        skillNames: [String]? = nil
+    ) -> Int {
+        let skills = SkillLoader.discoverSkills(from: directories, skillNames: skillNames)
+        for skill in skills {
+            register(skill)
+        }
+        return skills.count
+    }
+
     // MARK: - Prompt Formatting
 
     /// Formats the skills listing for system prompt injection.

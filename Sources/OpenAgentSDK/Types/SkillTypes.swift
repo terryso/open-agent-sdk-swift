@@ -88,6 +88,20 @@ public struct Skill: Sendable {
     /// Hint for expected arguments (e.g., "[message]" for commit).
     public let argumentHint: String?
 
+    /// Absolute path to the skill's directory on disk.
+    ///
+    /// Set by `SkillLoader` when loading skills from the filesystem. `nil` for
+    /// programmatically created skills. Used by the SkillTool to provide the agent
+    /// with the skill's location for on-demand reference loading via Read tool.
+    public let baseDir: String?
+
+    /// Relative paths of supporting files in the skill directory (e.g., references, scripts, templates).
+    ///
+    /// Populated by `SkillLoader` when scanning the skill directory. Only the paths
+    /// are recorded; file contents are NOT loaded (progressive disclosure).
+    /// The agent uses Read/Bash tools to access these files on-demand.
+    public let supportingFiles: [String]
+
     /// Creates a new skill definition.
     ///
     /// - Parameters:
@@ -101,6 +115,8 @@ public struct Skill: Sendable {
     ///   - promptTemplate: The prompt template string.
     ///   - whenToUse: When to invoke this skill (for system prompt).
     ///   - argumentHint: Hint for expected arguments.
+    ///   - baseDir: Absolute path to the skill directory on disk. Defaults to `nil`.
+    ///   - supportingFiles: Relative paths of supporting files. Defaults to `[]`.
     public init(
         name: String,
         description: String = "",
@@ -111,7 +127,9 @@ public struct Skill: Sendable {
         isAvailable: @escaping @Sendable () -> Bool = { true },
         promptTemplate: String,
         whenToUse: String? = nil,
-        argumentHint: String? = nil
+        argumentHint: String? = nil,
+        baseDir: String? = nil,
+        supportingFiles: [String] = []
     ) {
         self.name = name
         self.description = description
@@ -123,6 +141,8 @@ public struct Skill: Sendable {
         self.promptTemplate = promptTemplate
         self.whenToUse = whenToUse
         self.argumentHint = argumentHint
+        self.baseDir = baseDir
+        self.supportingFiles = supportingFiles
     }
 }
 

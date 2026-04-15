@@ -142,5 +142,10 @@ let package = Package(
             dependencies: ["OpenAgentSDK"],
             path: "Examples/OpenAICompatExample"
         ),
+        .executableTarget(
+            name: "PolyvLiveExample",
+            dependencies: ["OpenAgentSDK"],
+            path: "Examples/PolyvLiveExample"
+        ),
     ]
 )

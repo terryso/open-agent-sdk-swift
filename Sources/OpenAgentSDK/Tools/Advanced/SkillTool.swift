@@ -111,6 +111,16 @@ public func createSkillTool(registry: SkillRegistry) -> ToolProtocol {
             result["model"] = modelOverride
         }
 
+        // Include baseDir for filesystem-loaded skills (progressive disclosure)
+        if let baseDir = skill.baseDir {
+            result["baseDir"] = baseDir
+        }
+
+        // Include supporting files list so agent knows what's available
+        if !skill.supportingFiles.isEmpty {
+            result["supportingFiles"] = skill.supportingFiles
+        }
+
         // Serialize to JSON string
         let jsonData = try JSONSerialization.data(withJSONObject: result, options: [.sortedKeys])
         let jsonString = String(data: jsonData, encoding: .utf8) ?? "{\"success\":true}"
