@@ -157,5 +157,10 @@ let package = Package(
             dependencies: ["OpenAgentSDK"],
             path: "Examples/CompatToolSystem"
         ),
+        .executableTarget(
+            name: "CompatMessageTypes",
+            dependencies: ["OpenAgentSDK"],
+            path: "Examples/CompatMessageTypes"
+        ),
     ]
 )
