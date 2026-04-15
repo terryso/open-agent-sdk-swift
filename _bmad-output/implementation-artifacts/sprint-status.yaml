@@ -1,5 +1,5 @@
 # generated: 2026-04-04
-# last_updated: 2026-04-15 (story 16-1 context created)
+# last_updated: 2026-04-15 (story 16-2 complete)
 # project: open-agent-sdk-swift
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-04-04
-last_updated: 2026-04-15 (story 16-1 complete, ready for review)
+last_updated: 2026-04-15 (story 16-2 complete)
 project_key: NOKEY
 tracking_system: file-system
 story_location: _bmad-output/implementation-artifacts
@@ -185,7 +185,7 @@ development_status:
   # Epic 16: 官方 TypeScript SDK 兼容性验证
   epic-16: in-progress
   16-1-core-query-api-compat: done
-  16-2-tool-system-compat: ready-for-dev
+  16-2-tool-system-compat: done
   16-3-message-types-compat: ready-for-dev
   16-4-hook-system-compat: ready-for-dev
   16-5-mcp-integration-compat: ready-for-dev

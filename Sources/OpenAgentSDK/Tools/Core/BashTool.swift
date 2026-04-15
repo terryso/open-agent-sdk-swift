@@ -6,6 +6,7 @@ import Foundation
 private struct BashInput: Codable {
     let command: String
     let timeout: Int?
+    let description: String?
 }
 
 // MARK: - Constants
@@ -72,6 +73,10 @@ public func createBashTool() -> ToolProtocol {
                 "timeout": [
                     "type": "integer",
                     "description": "Optional timeout in milliseconds (max 600000, default 120000)"
+                ],
+                "description": [
+                    "type": "string",
+                    "description": "A short description of what the command does (3-5 words)"
                 ]
             ],
             "required": ["command"]

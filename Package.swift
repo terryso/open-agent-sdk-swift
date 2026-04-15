@@ -152,5 +152,10 @@ let package = Package(
             dependencies: ["OpenAgentSDK"],
             path: "Examples/CompatCoreQuery"
         ),
+        .executableTarget(
+            name: "CompatToolSystem",
+            dependencies: ["OpenAgentSDK"],
+            path: "Examples/CompatToolSystem"
+        ),
     ]
 )

@@ -439,6 +439,26 @@
             "target": "CompatCoreQuery",
             "configuration": "release",
             "preLaunchTask": "swift: Build Release CompatCoreQuery"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:open-agent-sdk-swift}",
+            "name": "Debug CompatToolSystem",
+            "target": "CompatToolSystem",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug CompatToolSystem"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:open-agent-sdk-swift}",
+            "name": "Release CompatToolSystem",
+            "target": "CompatToolSystem",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release CompatToolSystem"
         }
     ]
 }
