@@ -419,6 +419,26 @@
             "target": "PolyvLiveExample",
             "configuration": "release",
             "preLaunchTask": "swift: Build Release PolyvLiveExample"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:open-agent-sdk-swift}",
+            "name": "Debug CompatCoreQuery",
+            "target": "CompatCoreQuery",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug CompatCoreQuery"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:open-agent-sdk-swift}",
+            "name": "Release CompatCoreQuery",
+            "target": "CompatCoreQuery",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release CompatCoreQuery"
         }
     ]
 }

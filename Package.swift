@@ -147,5 +147,10 @@ let package = Package(
             dependencies: ["OpenAgentSDK"],
             path: "Examples/PolyvLiveExample"
         ),
+        .executableTarget(
+            name: "CompatCoreQuery",
+            dependencies: ["OpenAgentSDK"],
+            path: "Examples/CompatCoreQuery"
+        ),
     ]
 )
