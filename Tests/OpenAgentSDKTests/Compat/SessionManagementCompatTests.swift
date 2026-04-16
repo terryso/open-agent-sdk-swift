@@ -600,25 +600,28 @@ final class SessionRestoreOptionsCompatTests: XCTestCase {
             "[GAP] AgentOptions should NOT have 'continueSession' field.")
     }
 
-    /// AC5 [GAP]: AgentOptions has NO forkSession option (TS SDK has forkSession: true).
+    /// AC5 [RESOLVED]: AgentOptions now has forkSession option (Story 17-2).
     func testAgentOptions_forkSession_gap() {
-        let options = AgentOptions()
+        let options = AgentOptions(forkSession: true)
         let mirror = Mirror(reflecting: options)
         let fieldNames = Set(mirror.children.compactMap { $0.label })
         // TS SDK: forkSession: true -- fork instead of continue
-        // Swift: Has SessionStore.fork() as standalone method, but no AgentOption
-        XCTAssertFalse(fieldNames.contains("forkSession"),
-            "[GAP] AgentOptions should NOT have 'forkSession' field. TS SDK has forkSession: true option.")
+        // Swift: Now has AgentOptions.forkSession (Story 17-2)
+        XCTAssertTrue(fieldNames.contains("forkSession"),
+            "[RESOLVED] AgentOptions now has 'forkSession' field (Story 17-2). TS SDK has forkSession: true option.")
+        XCTAssertTrue(options.forkSession)
     }
 
-    /// AC5 [GAP]: AgentOptions has NO resumeSessionAt option (TS SDK has resumeSessionAt: messageUUID).
+    /// AC5 [RESOLVED]: AgentOptions now has resumeSessionAt option (Story 17-2).
     func testAgentOptions_resumeSessionAt_gap() {
-        let options = AgentOptions()
+        let options = AgentOptions(resumeSessionAt: "msg-uuid-001")
         let mirror = Mirror(reflecting: options)
         let fieldNames = Set(mirror.children.compactMap { $0.label })
         // TS SDK: resumeSessionAt: messageUUID -- resume at specific message
-        XCTAssertFalse(fieldNames.contains("resumeSessionAt"),
-            "[GAP] AgentOptions should NOT have 'resumeSessionAt' field. TS SDK has this option.")
+        // Swift: Now has AgentOptions.resumeSessionAt (Story 17-2)
+        XCTAssertTrue(fieldNames.contains("resumeSessionAt"),
+            "[RESOLVED] AgentOptions now has 'resumeSessionAt' field (Story 17-2). TS SDK has this option.")
+        XCTAssertEqual(options.resumeSessionAt, "msg-uuid-001")
     }
 
     /// AC5 [P0]: AgentOptions has sessionId field (maps to TS SDK sessionId: uuid).
@@ -629,15 +632,16 @@ final class SessionRestoreOptionsCompatTests: XCTestCase {
             "AgentOptions.sessionId maps to TS SDK Options.sessionId")
     }
 
-    /// AC5 [GAP]: AgentOptions has NO persistSession option (TS SDK has persistSession: false).
+    /// AC5 [RESOLVED]: AgentOptions now has persistSession option (Story 17-2).
     func testAgentOptions_persistSession_gap() {
         let options = AgentOptions()
         let mirror = Mirror(reflecting: options)
         let fieldNames = Set(mirror.children.compactMap { $0.label })
         // TS SDK: persistSession: false -- disable persistence
-        // Swift: Always persists when sessionStore+sessionId are set; no way to disable
-        XCTAssertFalse(fieldNames.contains("persistSession"),
-            "[GAP] AgentOptions should NOT have 'persistSession' field. TS SDK has persistSession: false option.")
+        // Swift: Now has AgentOptions.persistSession (Story 17-2), defaults to true
+        XCTAssertTrue(fieldNames.contains("persistSession"),
+            "[RESOLVED] AgentOptions now has 'persistSession' field (Story 17-2). TS SDK has persistSession: false option.")
+        XCTAssertTrue(options.persistSession, "persistSession defaults to true")
     }
 
     /// AC5 [P0]: SessionStore.fork() exists as standalone method (Swift-only approach).

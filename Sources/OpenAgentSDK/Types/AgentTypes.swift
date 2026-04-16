@@ -11,6 +11,157 @@ public enum LLMProvider: String, Sendable, Equatable {
     case openai
 }
 
+// MARK: - EffortLevel
+
+/// Effort level controlling the model's reasoning depth.
+///
+/// Maps to API-level thinking budget tokens. Higher effort levels produce
+/// more thorough reasoning at the cost of increased latency and token usage.
+///
+/// ```swift
+/// let options = AgentOptions(effort: .high)
+/// ```
+public enum EffortLevel: String, Sendable, Equatable, CaseIterable {
+    /// Low effort -- minimal reasoning, fastest response.
+    case low
+    /// Medium effort -- balanced reasoning and speed.
+    case medium
+    /// High effort -- thorough reasoning.
+    case high
+    /// Maximum effort -- deepest reasoning, highest token usage.
+    case max
+
+    /// The thinking budget tokens associated with this effort level.
+    ///
+    /// Maps to the `budget_tokens` parameter in the API thinking configuration:
+    /// - `.low` = 1024 tokens
+    /// - `.medium` = 5120 tokens
+    /// - `.high` = 10240 tokens
+    /// - `.max` = 32768 tokens
+    public var budgetTokens: Int {
+        switch self {
+        case .low: return 1024
+        case .medium: return 5120
+        case .high: return 10240
+        case .max: return 32768
+        }
+    }
+}
+
+// MARK: - SendableJSONSchema
+
+/// A type-erased Sendable wrapper for JSON Schema dictionaries.
+///
+/// Used by ``OutputFormat`` to hold arbitrary JSON Schema definitions
+/// while maintaining Sendable conformance. The schema value is expected
+/// to be a valid JSON Schema object but this is not enforced at compile time.
+public struct SendableJSONSchema: @unchecked Sendable, Equatable {
+    /// The underlying JSON Schema dictionary.
+    public let schema: [String: Any]
+
+    /// Creates a SendableJSONSchema wrapping the given schema dictionary.
+    ///
+    /// - Parameter schema: A JSON Schema dictionary.
+    public init(schema: [String: Any]) {
+        self.schema = schema
+    }
+
+    public static func == (lhs: SendableJSONSchema, rhs: SendableJSONSchema) -> Bool {
+        return NSDictionary(dictionary: lhs.schema).isEqual(to: rhs.schema)
+    }
+}
+
+// MARK: - OutputFormat
+
+/// Output format configuration for structured output requests.
+///
+/// When set on ``AgentOptions``, requests the API to produce output conforming
+/// to the provided JSON Schema.
+///
+/// ```swift
+/// let schema: [String: Any] = [
+///     "type": "object",
+///     "properties": ["answer": ["type": "string"]]
+/// ]
+/// let format = OutputFormat(jsonSchema: schema)
+/// ```
+public struct OutputFormat: Sendable, Equatable {
+    /// The format type, always `"json_schema"`.
+    public let type: String
+
+    /// The JSON Schema describing the expected output structure.
+    private let _jsonSchema: SendableJSONSchema
+
+    /// The JSON Schema dictionary describing the expected output.
+    public var jsonSchema: [String: Any] {
+        return _jsonSchema.schema
+    }
+
+    /// Creates an OutputFormat with the given JSON Schema.
+    ///
+    /// - Parameter jsonSchema: A JSON Schema dictionary describing the expected output.
+    public init(jsonSchema: [String: Any]) {
+        self.type = "json_schema"
+        self._jsonSchema = SendableJSONSchema(schema: jsonSchema)
+    }
+
+    public static func == (lhs: OutputFormat, rhs: OutputFormat) -> Bool {
+        return lhs.type == rhs.type && lhs._jsonSchema == rhs._jsonSchema
+    }
+}
+
+// MARK: - ToolConfig
+
+/// Configuration for tool execution behavior.
+///
+/// Controls concurrency limits for read and write tool operations.
+///
+/// ```swift
+/// let config = ToolConfig(maxConcurrentReadTools: 5, maxConcurrentWriteTools: 2)
+/// ```
+public struct ToolConfig: Sendable, Equatable {
+    /// Maximum number of concurrent read-only tool executions.
+    /// When `nil`, the default concurrency limit is used.
+    public let maxConcurrentReadTools: Int?
+
+    /// Maximum number of concurrent write tool executions.
+    /// When `nil`, the default concurrency limit is used.
+    public let maxConcurrentWriteTools: Int?
+
+    /// Creates a ToolConfig with optional concurrency limits.
+    ///
+    /// - Parameters:
+    ///   - maxConcurrentReadTools: Maximum concurrent read tools. Defaults to `nil`.
+    ///   - maxConcurrentWriteTools: Maximum concurrent write tools. Defaults to `nil`.
+    public init(maxConcurrentReadTools: Int? = nil, maxConcurrentWriteTools: Int? = nil) {
+        self.maxConcurrentReadTools = maxConcurrentReadTools
+        self.maxConcurrentWriteTools = maxConcurrentWriteTools
+    }
+}
+
+// MARK: - SystemPromptConfig
+
+/// Configuration for the agent's system prompt, supporting both plain text and presets.
+///
+/// ```swift
+/// // Plain text prompt
+/// let textConfig = SystemPromptConfig.text("You are a helpful assistant.")
+///
+/// // Preset prompt with optional append
+/// let presetConfig = SystemPromptConfig.preset(name: "claude_code", append: "Be concise.")
+/// ```
+public enum SystemPromptConfig: Sendable, Equatable {
+    /// A plain text system prompt.
+    case text(String)
+
+    /// A preset system prompt identified by name, with an optional appended string.
+    ///
+    /// Known preset names include `"claude_code"` (standard Code agent prompt).
+    case preset(name: String, append: String?)
+}
+
+// MARK: - AgentOptions
+
 /// Configuration options for creating an agent.
 ///
 /// `AgentOptions` controls all aspects of agent behavior including model selection,
@@ -134,6 +285,71 @@ public struct AgentOptions: Sendable {
     /// Propagated to ``ToolContext`` for use during tool execution.
     public var sandbox: SandboxSettings?
 
+    // MARK: - Story 17-2: New Fields
+
+    /// Optional fallback model identifier. When the primary model is unavailable or
+    /// fails, the agent will retry with this model.
+    public var fallbackModel: String?
+
+    /// Optional environment variables to inject into tool execution context.
+    /// Keys and values are both strings, e.g. `["HOME": "/custom/home"]`.
+    public var env: [String: String]?
+
+    /// Optional whitelist of tool names the agent is allowed to use.
+    /// When `nil`, all registered tools are available. When set, only tools
+    /// whose names appear in this list are available to the LLM.
+    public var allowedTools: [String]?
+
+    /// Optional blacklist of tool names the agent is denied from using.
+    /// Takes priority over `allowedTools` -- if a tool name appears in both
+    /// lists, it is blocked.
+    public var disallowedTools: [String]?
+
+    /// Optional effort level controlling the model's reasoning depth.
+    /// Maps to API-level thinking budget tokens when set.
+    public var effort: EffortLevel?
+
+    /// Optional output format for structured output requests.
+    /// When set, requests the API to produce output conforming to the
+    /// provided JSON Schema.
+    public var outputFormat: OutputFormat?
+
+    /// Optional tool behavior configuration controlling concurrency limits.
+    public var toolConfig: ToolConfig?
+
+    /// Whether to include partial (streaming) messages in the SDKMessage stream.
+    /// Defaults to `true`. Set to `false` to receive only complete messages.
+    public var includePartialMessages: Bool
+
+    /// Whether to generate prompt suggestions after the query completes.
+    /// Defaults to `false`.
+    public var promptSuggestions: Bool
+
+    /// Whether to continue the most recent session for this agent.
+    /// When `true` and a session store is configured, the agent will restore
+    /// the latest session. Defaults to `false`.
+    public var continueRecentSession: Bool
+
+    /// Whether to fork the current session into a new session.
+    /// When `true`, the current conversation history is copied into a new session.
+    /// Defaults to `false`.
+    public var forkSession: Bool
+
+    /// Optional message ID at which to resume the session. When set, the session
+    /// history is truncated to this point before the new prompt is appended.
+    public var resumeSessionAt: String?
+
+    /// Whether to persist the session after the query completes.
+    /// When `true` (default), the agent auto-saves the updated session.
+    /// Set to `false` for ephemeral sessions that should not be persisted.
+    public var persistSession: Bool
+
+    /// Optional system prompt configuration supporting preset prompts.
+    /// When set, takes priority over the plain `systemPrompt` string.
+    public var systemPromptConfig: SystemPromptConfig?
+
+    // MARK: - Memberwise Init
+
     public init(
         apiKey: String? = nil,
         model: String = "claude-sonnet-4-6",
@@ -172,7 +388,21 @@ public struct AgentOptions: Sendable {
         projectRoot: String? = nil,
         logLevel: LogLevel = .none,
         logOutput: LogOutput = .console,
-        sandbox: SandboxSettings? = nil
+        sandbox: SandboxSettings? = nil,
+        fallbackModel: String? = nil,
+        env: [String: String]? = nil,
+        allowedTools: [String]? = nil,
+        disallowedTools: [String]? = nil,
+        effort: EffortLevel? = nil,
+        outputFormat: OutputFormat? = nil,
+        toolConfig: ToolConfig? = nil,
+        includePartialMessages: Bool = true,
+        promptSuggestions: Bool = false,
+        continueRecentSession: Bool = false,
+        forkSession: Bool = false,
+        resumeSessionAt: String? = nil,
+        persistSession: Bool = true,
+        systemPromptConfig: SystemPromptConfig? = nil
     ) {
         self.apiKey = apiKey
         self.model = model
@@ -212,7 +442,23 @@ public struct AgentOptions: Sendable {
         self.logLevel = logLevel
         self.logOutput = logOutput
         self.sandbox = sandbox
+        self.fallbackModel = fallbackModel
+        self.env = env
+        self.allowedTools = allowedTools
+        self.disallowedTools = disallowedTools
+        self.effort = effort
+        self.outputFormat = outputFormat
+        self.toolConfig = toolConfig
+        self.includePartialMessages = includePartialMessages
+        self.promptSuggestions = promptSuggestions
+        self.continueRecentSession = continueRecentSession
+        self.forkSession = forkSession
+        self.resumeSessionAt = resumeSessionAt
+        self.persistSession = persistSession
+        self.systemPromptConfig = systemPromptConfig
     }
+
+    // MARK: - Auto-Discover Skills
 
     /// Auto-discovers skills from filesystem and sets up the skill registry and tools.
     ///
@@ -251,6 +497,8 @@ public struct AgentOptions: Sendable {
             }
         }
     }
+
+    // MARK: - Config-Based Init
 
     /// Create AgentOptions from an SDKConfiguration, using its resolved values
     /// as defaults for the core SDK properties. Agent-specific properties
@@ -294,7 +542,24 @@ public struct AgentOptions: Sendable {
         self.logLevel = config.logLevel
         self.logOutput = config.logOutput
         self.sandbox = config.sandbox
+        // Story 17-2 new fields -- all defaults
+        self.fallbackModel = nil
+        self.env = nil
+        self.allowedTools = nil
+        self.disallowedTools = nil
+        self.effort = nil
+        self.outputFormat = nil
+        self.toolConfig = nil
+        self.includePartialMessages = true
+        self.promptSuggestions = false
+        self.continueRecentSession = false
+        self.forkSession = false
+        self.resumeSessionAt = nil
+        self.persistSession = true
+        self.systemPromptConfig = nil
     }
+
+    // MARK: - Validation
 
     /// Validate the options, throwing if any configuration is invalid.
     ///
@@ -310,6 +575,20 @@ public struct AgentOptions: Sendable {
             }
         }
         try thinking?.validate()
+        if let fallbackModel {
+            let trimmed = fallbackModel.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else {
+                throw SDKError.invalidConfiguration("fallbackModel must be non-empty if set")
+            }
+        }
+        if let outputFormat {
+            guard !outputFormat.jsonSchema.isEmpty else {
+                throw SDKError.invalidConfiguration("outputFormat.jsonSchema must be a non-empty schema")
+            }
+        }
+        if let allowedTools, allowedTools.isEmpty {
+            throw SDKError.invalidConfiguration("allowedTools must be non-empty if set (or nil for all tools)")
+        }
     }
 }
 

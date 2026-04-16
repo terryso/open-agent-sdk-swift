@@ -32,18 +32,16 @@ final class AgentOptionsCompatTests: XCTestCase {
     // AC2 #1: allowedTools -- PARTIAL (via policy, not direct option)
     // ================================================================
 
-    /// AC2 #1 [PARTIAL]: TS `allowedTools: string[]` has no direct AgentOptions property.
-    /// Swift has `ToolNameAllowlistPolicy` as a runtime policy mechanism.
+    /// AC2 #1 [PASS]: TS `allowedTools: string[]` maps to `AgentOptions.allowedTools: [String]?`.
+    /// Story 17-2 added the direct property.
     func testAllowedTools_partialViaPolicy() {
         // TS SDK: allowedTools: string[] -- direct option on Options
-        // Swift: No `allowedTools` property on AgentOptions.
-        // PARTIAL: ToolNameAllowlistPolicy exists and achieves the same result
-        // when used via canUseTool(policy:) bridge.
-        let options = AgentOptions(apiKey: "test-key", model: "claude-sonnet-4-6")
+        // Swift: Now has `allowedTools: [String]?` on AgentOptions (Story 17-2).
+        let options = AgentOptions(apiKey: "test-key", model: "claude-sonnet-4-6", allowedTools: ["Read", "Write"])
         let fields = fieldNames(of: options)
 
-        XCTAssertFalse(fields.contains("allowedTools"),
-                       "GAP: AgentOptions has no 'allowedTools' property. TS SDK has allowedTools: string[]. Swift has ToolNameAllowlistPolicy as runtime policy.")
+        XCTAssertTrue(fields.contains("allowedTools"),
+                       "RESOLVED: AgentOptions now has 'allowedTools' property (Story 17-2). TS SDK has allowedTools: string[].")
 
         // Verify the policy mechanism exists as alternative
         let policy = ToolNameAllowlistPolicy(allowedToolNames: ["Read", "Glob"])
@@ -55,14 +53,14 @@ final class AgentOptionsCompatTests: XCTestCase {
     // AC2 #2: disallowedTools -- PARTIAL (via policy, not direct option)
     // ================================================================
 
-    /// AC2 #2 [PARTIAL]: TS `disallowedTools: string[]` has no direct AgentOptions property.
-    /// Swift has `ToolNameDenylistPolicy` as a runtime policy mechanism.
+    /// AC2 #2 [PASS]: TS `disallowedTools: string[]` maps to `AgentOptions.disallowedTools: [String]?`.
+    /// Story 17-2 added the direct property.
     func testDisallowedTools_partialViaPolicy() {
-        let options = AgentOptions(apiKey: "test-key", model: "claude-sonnet-4-6")
+        let options = AgentOptions(apiKey: "test-key", model: "claude-sonnet-4-6", disallowedTools: ["Bash"])
         let fields = fieldNames(of: options)
 
-        XCTAssertFalse(fields.contains("disallowedTools"),
-                       "GAP: AgentOptions has no 'disallowedTools' property. TS SDK has disallowedTools: string[]. Swift has ToolNameDenylistPolicy as runtime policy.")
+        XCTAssertTrue(fields.contains("disallowedTools"),
+                       "RESOLVED: AgentOptions now has 'disallowedTools' property (Story 17-2). TS SDK has disallowedTools: string[].")
 
         // Verify the policy mechanism exists as alternative
         let policy = ToolNameDenylistPolicy(deniedToolNames: ["Bash", "Write"])
@@ -113,13 +111,15 @@ final class AgentOptionsCompatTests: XCTestCase {
     // AC2 #6: fallbackModel -- MISSING
     // ================================================================
 
-    /// AC2 #6 [MISSING]: TS `fallbackModel: string` has no equivalent in Swift SDK.
+    /// AC2 #6 [PASS]: TS `fallbackModel: string` maps to `AgentOptions.fallbackModel: String?`.
+    /// Story 17-2 added the property.
     func testFallbackModel_missing() {
-        let options = AgentOptions(apiKey: "test-key", model: "test")
+        let options = AgentOptions(apiKey: "test-key", model: "test", fallbackModel: "claude-haiku-4-5")
         let fields = fieldNames(of: options)
 
-        XCTAssertFalse(fields.contains("fallbackModel"),
-                       "GAP: AgentOptions has no 'fallbackModel' property. TS SDK has fallbackModel: string for model fallback when primary is unavailable.")
+        XCTAssertTrue(fields.contains("fallbackModel"),
+                       "RESOLVED: AgentOptions now has 'fallbackModel' property (Story 17-2). TS SDK has fallbackModel: string for model fallback.")
+        XCTAssertEqual(options.fallbackModel, "claude-haiku-4-5")
     }
 
     // ================================================================
@@ -191,13 +191,15 @@ final class AgentOptionsCompatTests: XCTestCase {
     // AC2 #11: env -- MISSING
     // ================================================================
 
-    /// AC2 #11 [MISSING]: TS `env: Record<string, string>` has no equivalent in Swift SDK.
+    /// AC2 #11 [PASS]: TS `env: Record<string, string>` maps to `AgentOptions.env: [String: String]?`.
+    /// Story 17-2 added the property.
     func testEnv_missing() {
-        let options = AgentOptions(apiKey: "test-key", model: "test")
+        let options = AgentOptions(apiKey: "test-key", model: "test", env: ["KEY": "VALUE"])
         let fields = fieldNames(of: options)
 
-        XCTAssertFalse(fields.contains("env"),
-                       "GAP: AgentOptions has no 'env' property. TS SDK has env: Record<string, string> for environment variable overrides. Swift SDKConfiguration reads from env but doesn't accept env override dict.")
+        XCTAssertTrue(fields.contains("env"),
+                       "RESOLVED: AgentOptions now has 'env' property (Story 17-2). TS SDK has env: Record<string, string>.")
+        XCTAssertEqual(options.env?["KEY"], "VALUE")
     }
 
     // ================================================================
@@ -220,19 +222,20 @@ final class AgentOptionsCompatTests: XCTestCase {
 
     /// AC2 [P0]: Summary of all 12 core configuration fields.
     func testCoreConfig_coverageSummary() {
-        // Core config: 7 PASS + 3 PARTIAL + 2 MISSING = 12 fields
-        // PASS: maxTurns, maxBudgetUsd, model, permissionMode, canUseTool, cwd, mcpServers
-        // PARTIAL: allowedTools (via policy), disallowedTools (via policy), systemPrompt (String only)
-        // MISSING: fallbackModel, env
-        let passCount = 7
-        let partialCount = 3
-        let missingCount = 2
+        // Core config: 11 PASS + 1 PARTIAL + 0 MISSING = 12 fields
+        // PASS: maxTurns, maxBudgetUsd, model, permissionMode, canUseTool, cwd, mcpServers,
+        //       allowedTools (Story 17-2), disallowedTools (Story 17-2), fallbackModel (Story 17-2), env (Story 17-2)
+        // PARTIAL: systemPrompt (String only, but systemPromptConfig added alongside)
+        // MISSING: none
+        let passCount = 11
+        let partialCount = 1
+        let missingCount = 0
         let total = passCount + partialCount + missingCount
 
         XCTAssertEqual(total, 12, "Should verify all 12 core configuration fields")
-        XCTAssertEqual(passCount, 7, "7 core fields PASS")
-        XCTAssertEqual(partialCount, 3, "3 core fields PARTIAL")
-        XCTAssertEqual(missingCount, 2, "2 core fields MISSING")
+        XCTAssertEqual(passCount, 11, "11 core fields PASS")
+        XCTAssertEqual(partialCount, 1, "1 core field PARTIAL")
+        XCTAssertEqual(missingCount, 0, "0 core fields MISSING")
     }
 
     // MARK: - AC3: Advanced Configuration Field-Level Verification (9 fields)
@@ -255,13 +258,16 @@ final class AgentOptionsCompatTests: XCTestCase {
     // AC3 #2: effort -- MISSING
     // ================================================================
 
-    /// AC3 #2 [MISSING]: TS `effort: 'low' | 'medium' | 'high' | 'max'` has no Swift equivalent.
+    /// AC3 #2 [PASS]: TS `effort: 'low' | 'medium' | 'high' | 'max'` maps to `AgentOptions.effort: EffortLevel?`.
+    /// Story 17-2 added EffortLevel enum and effort property.
     func testEffort_missing() {
-        let options = AgentOptions(apiKey: "test-key", model: "test")
+        let options = AgentOptions(apiKey: "test-key", model: "test", effort: .high)
         let fields = fieldNames(of: options)
 
-        XCTAssertFalse(fields.contains("effort"),
-                       "GAP: AgentOptions has no 'effort' property. TS SDK has effort: 'low' | 'medium' | 'high' | 'max' for reasoning effort level control.")
+        XCTAssertTrue(fields.contains("effort"),
+                       "RESOLVED: AgentOptions now has 'effort' property (Story 17-2). TS SDK has effort: 'low' | 'medium' | 'high' | 'max'.")
+        XCTAssertEqual(options.effort, .high)
+        XCTAssertEqual(EffortLevel.allCases.count, 4, "EffortLevel has 4 cases")
     }
 
     // ================================================================
@@ -324,69 +330,81 @@ final class AgentOptionsCompatTests: XCTestCase {
     // AC3 #6: toolConfig -- MISSING
     // ================================================================
 
-    /// AC3 #6 [MISSING]: TS `toolConfig: ToolConfig` has no Swift equivalent.
+    /// AC3 #6 [PASS]: TS `toolConfig: ToolConfig` maps to `AgentOptions.toolConfig: ToolConfig?`.
+    /// Story 17-2 added ToolConfig struct and toolConfig property.
     func testToolConfig_missing() {
-        let options = AgentOptions(apiKey: "test-key", model: "test")
+        let config = ToolConfig(maxConcurrentReadTools: 5, maxConcurrentWriteTools: 2)
+        let options = AgentOptions(apiKey: "test-key", model: "test", toolConfig: config)
         let fields = fieldNames(of: options)
 
-        XCTAssertFalse(fields.contains("toolConfig"),
-                       "GAP: AgentOptions has no 'toolConfig' property. TS SDK has toolConfig: ToolConfig for tool-level configuration.")
+        XCTAssertTrue(fields.contains("toolConfig"),
+                       "RESOLVED: AgentOptions now has 'toolConfig' property (Story 17-2). TS SDK has toolConfig: ToolConfig.")
+        XCTAssertEqual(options.toolConfig?.maxConcurrentReadTools, 5)
     }
 
     // ================================================================
     // AC3 #7: outputFormat -- MISSING
     // ================================================================
 
-    /// AC3 #7 [MISSING]: TS `outputFormat: { type: 'json_schema', schema }` has no Swift equivalent.
+    /// AC3 #7 [PASS]: TS `outputFormat: { type: 'json_schema', schema }` maps to `AgentOptions.outputFormat: OutputFormat?`.
+    /// Story 17-2 added OutputFormat struct and outputFormat property.
     func testOutputFormat_missing() {
-        let options = AgentOptions(apiKey: "test-key", model: "test")
+        let schema: [String: Any] = ["type": "object"]
+        let format = OutputFormat(jsonSchema: schema)
+        let options = AgentOptions(apiKey: "test-key", model: "test", outputFormat: format)
         let fields = fieldNames(of: options)
 
-        XCTAssertFalse(fields.contains("outputFormat"),
-                       "GAP: AgentOptions has no 'outputFormat' property. TS SDK supports JSON Schema structured output via outputFormat: { type: 'json_schema', schema }.")
+        XCTAssertTrue(fields.contains("outputFormat"),
+                       "RESOLVED: AgentOptions now has 'outputFormat' property (Story 17-2). TS SDK supports JSON Schema structured output.")
+        XCTAssertEqual(options.outputFormat?.type, "json_schema")
     }
 
     // ================================================================
     // AC3 #8: includePartialMessages -- MISSING
     // ================================================================
 
-    /// AC3 #8 [MISSING]: TS `includePartialMessages: boolean` has no Swift equivalent.
+    /// AC3 #8 [PASS]: TS `includePartialMessages: boolean` maps to `AgentOptions.includePartialMessages: Bool`.
+    /// Story 17-2 added the property (default true).
     func testIncludePartialMessages_missing() {
         let options = AgentOptions(apiKey: "test-key", model: "test")
         let fields = fieldNames(of: options)
 
-        XCTAssertFalse(fields.contains("includePartialMessages"),
-                       "GAP: AgentOptions has no 'includePartialMessages' property. TS SDK has includePartialMessages: boolean for partial message streaming.")
+        XCTAssertTrue(fields.contains("includePartialMessages"),
+                       "RESOLVED: AgentOptions now has 'includePartialMessages' property (Story 17-2). TS SDK has includePartialMessages: boolean.")
+        XCTAssertTrue(options.includePartialMessages, "includePartialMessages defaults to true")
     }
 
     // ================================================================
     // AC3 #9: promptSuggestions -- MISSING
     // ================================================================
 
-    /// AC3 #9 [MISSING]: TS `promptSuggestions: boolean` has no Swift equivalent.
+    /// AC3 #9 [PASS]: TS `promptSuggestions: boolean` maps to `AgentOptions.promptSuggestions: Bool`.
+    /// Story 17-2 added the property (default false).
     func testPromptSuggestions_missing() {
         let options = AgentOptions(apiKey: "test-key", model: "test")
         let fields = fieldNames(of: options)
 
-        XCTAssertFalse(fields.contains("promptSuggestions"),
-                       "GAP: AgentOptions has no 'promptSuggestions' property. TS SDK has promptSuggestions: boolean for enabling prompt suggestion feature.")
+        XCTAssertTrue(fields.contains("promptSuggestions"),
+                       "RESOLVED: AgentOptions now has 'promptSuggestions' property (Story 17-2). TS SDK has promptSuggestions: boolean.")
+        XCTAssertFalse(options.promptSuggestions, "promptSuggestions defaults to false")
     }
 
     /// AC3 [P0]: Summary of all 9 advanced configuration fields.
     func testAdvancedConfig_coverageSummary() {
-        // Advanced config: 2 PASS + 2 PARTIAL + 5 MISSING = 9 fields
-        // PASS: thinking, sandbox
+        // Advanced config: 7 PASS + 2 PARTIAL + 0 MISSING = 9 fields
+        // PASS: thinking, sandbox, effort (Story 17-2), toolConfig (Story 17-2),
+        //       outputFormat (Story 17-2), includePartialMessages (Story 17-2), promptSuggestions (Story 17-2)
         // PARTIAL: hooks (actor not dict), agents (via tool not options)
-        // MISSING: effort, toolConfig, outputFormat, includePartialMessages, promptSuggestions
-        let passCount = 2
+        // MISSING: none
+        let passCount = 7
         let partialCount = 2
-        let missingCount = 5
+        let missingCount = 0
         let total = passCount + partialCount + missingCount
 
         XCTAssertEqual(total, 9, "Should verify all 9 advanced configuration fields")
-        XCTAssertEqual(passCount, 2, "2 advanced fields PASS")
+        XCTAssertEqual(passCount, 7, "7 advanced fields PASS")
         XCTAssertEqual(partialCount, 2, "2 advanced fields PARTIAL")
-        XCTAssertEqual(missingCount, 5, "5 advanced fields MISSING")
+        XCTAssertEqual(missingCount, 0, "0 advanced fields MISSING")
     }
 
     // MARK: - AC4: Session Configuration Field-Level Verification (5 fields)
@@ -408,27 +426,30 @@ final class AgentOptionsCompatTests: XCTestCase {
     // AC4 #2: continue -- MISSING
     // ================================================================
 
-    /// AC4 #2 [MISSING]: TS `continue: boolean` has no Swift equivalent.
-    func testContinue_missing() {
+    /// AC4 #2 [PASS]: TS `continue: boolean` maps to `AgentOptions.continueRecentSession: Bool`.
+    /// Story 17-2 added the property (default false).
+    func testContinue_field() {
         let options = AgentOptions(apiKey: "test-key", model: "test")
         let fields = fieldNames(of: options)
 
-        XCTAssertFalse(fields.contains("continue"),
-                       "GAP: AgentOptions has no 'continue' property. TS SDK has continue: boolean for continuing last session.")
+        XCTAssertTrue(fields.contains("continueRecentSession"),
+                       "RESOLVED: AgentOptions now has 'continueRecentSession' property (Story 17-2). TS SDK has continue: boolean.")
+        XCTAssertFalse(options.continueRecentSession, "continueRecentSession defaults to false")
     }
 
     // ================================================================
     // AC4 #3: forkSession -- PARTIAL (SessionStore has fork separately)
     // ================================================================
 
-    /// AC4 #3 [PARTIAL]: TS `forkSession: boolean` has no direct option.
-    /// Swift SessionStore has fork capability as a separate method.
+    /// AC4 #3 [PASS]: TS `forkSession: boolean` maps to `AgentOptions.forkSession: Bool`.
+    /// Story 17-2 added the property (default false).
     func testForkSession_partial() {
-        let options = AgentOptions(apiKey: "test-key", model: "test")
+        let options = AgentOptions(apiKey: "test-key", model: "test", forkSession: true)
         let fields = fieldNames(of: options)
 
-        XCTAssertFalse(fields.contains("forkSession"),
-                       "GAP: AgentOptions has no 'forkSession' property. TS SDK has forkSession: boolean. Swift SessionStore has fork capability as separate method, not as creation option.")
+        XCTAssertTrue(fields.contains("forkSession"),
+                       "RESOLVED: AgentOptions now has 'forkSession' property (Story 17-2). TS SDK has forkSession: boolean.")
+        XCTAssertTrue(options.forkSession)
     }
 
     // ================================================================
@@ -448,31 +469,31 @@ final class AgentOptionsCompatTests: XCTestCase {
     // AC4 #5: persistSession -- PARTIAL (implicit via sessionStore)
     // ================================================================
 
-    /// AC4 #5 [PARTIAL]: TS `persistSession: boolean` has no direct flag.
-    /// When sessionStore is set, auto-save is implicit.
+    /// AC4 #5 [PASS]: TS `persistSession: boolean` maps to `AgentOptions.persistSession: Bool`.
+    /// Story 17-2 added the property (default true).
     func testPersistSession_partial() {
         let options = AgentOptions(apiKey: "test-key", model: "test")
         let fields = fieldNames(of: options)
 
-        XCTAssertFalse(fields.contains("persistSession"),
-                       "GAP: AgentOptions has no 'persistSession' property. TS SDK has persistSession: boolean. Swift auto-saves when sessionStore is set (implicit, no flag).")
+        XCTAssertTrue(fields.contains("persistSession"),
+                       "RESOLVED: AgentOptions now has 'persistSession' property (Story 17-2). TS SDK has persistSession: boolean.")
+        XCTAssertTrue(options.persistSession, "persistSession defaults to true")
     }
 
     /// AC4 [P0]: Summary of all 5 session configuration fields.
     func testSessionConfig_coverageSummary() {
-        // Session config: 1 PASS + 2 PARTIAL + 1 MISSING + 1 PARTIAL = 5 fields
-        // PASS: sessionId
-        // PARTIAL: resume (via sessionStore+sessionId), forkSession (via SessionStore method), persistSession (implicit)
-        // MISSING: continue
-        let passCount = 1
-        let partialCount = 3
-        let missingCount = 1
+        // Session config: 5 PASS + 0 PARTIAL + 0 MISSING = 5 fields
+        // PASS: sessionId, forkSession (Story 17-2), persistSession (Story 17-2),
+        //       continueRecentSession (Story 17-2), resumeSessionAt (Story 17-2)
+        let passCount = 5
+        let partialCount = 0
+        let missingCount = 0
         let total = passCount + partialCount + missingCount
 
         XCTAssertEqual(total, 5, "Should verify all 5 session configuration fields")
-        XCTAssertEqual(passCount, 1, "1 session field PASS")
-        XCTAssertEqual(partialCount, 3, "3 session fields PARTIAL")
-        XCTAssertEqual(missingCount, 1, "1 session field MISSING")
+        XCTAssertEqual(passCount, 5, "5 session fields PASS")
+        XCTAssertEqual(partialCount, 0, "0 session fields PARTIAL")
+        XCTAssertEqual(missingCount, 0, "0 session fields MISSING")
     }
 
     // MARK: - AC5: Extended Configuration Field-Level Verification (11 fields)
@@ -720,17 +741,20 @@ final class AgentOptionsCompatTests: XCTestCase {
 
     // MARK: - AC8: outputFormat / Structured Output Verification
 
-    /// AC8 [MISSING]: No JSON Schema structured output support.
+    /// AC8 [PASS]: JSON Schema structured output is now supported via OutputFormat.
+    /// Story 17-2 added OutputFormat struct with SendableJSONSchema wrapper.
     func testOutputFormat_noStructuredOutput() {
-        let options = AgentOptions(apiKey: "test-key", model: "test")
+        let schema: [String: Any] = ["type": "object", "properties": ["result": ["type": "string"]]]
+        let format = OutputFormat(jsonSchema: schema)
+        let options = AgentOptions(apiKey: "test-key", model: "test", outputFormat: format)
         let fields = fieldNames(of: options)
 
-        XCTAssertFalse(fields.contains("outputFormat"),
-                       "GAP: AgentOptions has no 'outputFormat' property. TS SDK supports JSON Schema structured output.")
+        XCTAssertTrue(fields.contains("outputFormat"),
+                       "RESOLVED: AgentOptions now has 'outputFormat' property (Story 17-2). TS SDK supports JSON Schema structured output.")
 
-        // Verify no related types exist by checking for absence of output schema fields
-        XCTAssertFalse(fields.contains("jsonSchema"),
-                       "GAP: No jsonSchema property for structured output definition.")
+        // Verify related types exist
+        XCTAssertEqual(options.outputFormat?.type, "json_schema")
+        XCTAssertEqual(options.outputFormat?.jsonSchema["type"] as? String, "object")
     }
 
     // MARK: - AC9: Compatibility Report Output
@@ -746,36 +770,36 @@ final class AgentOptionsCompatTests: XCTestCase {
 
         let allFields: [FieldMapping] = [
             // Core configuration (12 fields)
-            FieldMapping(tsField: "allowedTools", swiftField: "ToolNameAllowlistPolicy (runtime)", status: "PARTIAL", category: "core"),
-            FieldMapping(tsField: "disallowedTools", swiftField: "ToolNameDenylistPolicy (runtime)", status: "PARTIAL", category: "core"),
+            FieldMapping(tsField: "allowedTools", swiftField: "AgentOptions.allowedTools", status: "PASS", category: "core"),
+            FieldMapping(tsField: "disallowedTools", swiftField: "AgentOptions.disallowedTools", status: "PASS", category: "core"),
             FieldMapping(tsField: "maxTurns", swiftField: "AgentOptions.maxTurns", status: "PASS", category: "core"),
             FieldMapping(tsField: "maxBudgetUsd", swiftField: "AgentOptions.maxBudgetUsd", status: "PASS", category: "core"),
             FieldMapping(tsField: "model", swiftField: "AgentOptions.model", status: "PASS", category: "core"),
-            FieldMapping(tsField: "fallbackModel", swiftField: "NO EQUIVALENT", status: "MISSING", category: "core"),
-            FieldMapping(tsField: "systemPrompt", swiftField: "AgentOptions.systemPrompt (String only)", status: "PARTIAL", category: "core"),
+            FieldMapping(tsField: "fallbackModel", swiftField: "AgentOptions.fallbackModel", status: "PASS", category: "core"),
+            FieldMapping(tsField: "systemPrompt", swiftField: "AgentOptions.systemPrompt (String + SystemPromptConfig)", status: "PARTIAL", category: "core"),
             FieldMapping(tsField: "permissionMode", swiftField: "AgentOptions.permissionMode", status: "PASS", category: "core"),
             FieldMapping(tsField: "canUseTool", swiftField: "AgentOptions.canUseTool", status: "PASS", category: "core"),
             FieldMapping(tsField: "cwd", swiftField: "AgentOptions.cwd", status: "PASS", category: "core"),
-            FieldMapping(tsField: "env", swiftField: "NO EQUIVALENT", status: "MISSING", category: "core"),
+            FieldMapping(tsField: "env", swiftField: "AgentOptions.env", status: "PASS", category: "core"),
             FieldMapping(tsField: "mcpServers", swiftField: "AgentOptions.mcpServers", status: "PASS", category: "core"),
 
             // Advanced configuration (9 fields)
             FieldMapping(tsField: "thinking", swiftField: "AgentOptions.thinking", status: "PASS", category: "advanced"),
-            FieldMapping(tsField: "effort", swiftField: "NO EQUIVALENT", status: "MISSING", category: "advanced"),
+            FieldMapping(tsField: "effort", swiftField: "AgentOptions.effort (EffortLevel)", status: "PASS", category: "advanced"),
             FieldMapping(tsField: "hooks", swiftField: "AgentOptions.hookRegistry (actor)", status: "PARTIAL", category: "advanced"),
             FieldMapping(tsField: "sandbox", swiftField: "AgentOptions.sandbox", status: "PASS", category: "advanced"),
             FieldMapping(tsField: "agents", swiftField: "AgentTool (tool level)", status: "PARTIAL", category: "advanced"),
-            FieldMapping(tsField: "toolConfig", swiftField: "NO EQUIVALENT", status: "MISSING", category: "advanced"),
-            FieldMapping(tsField: "outputFormat", swiftField: "NO EQUIVALENT", status: "MISSING", category: "advanced"),
-            FieldMapping(tsField: "includePartialMessages", swiftField: "NO EQUIVALENT", status: "MISSING", category: "advanced"),
-            FieldMapping(tsField: "promptSuggestions", swiftField: "NO EQUIVALENT", status: "MISSING", category: "advanced"),
+            FieldMapping(tsField: "toolConfig", swiftField: "AgentOptions.toolConfig (ToolConfig)", status: "PASS", category: "advanced"),
+            FieldMapping(tsField: "outputFormat", swiftField: "AgentOptions.outputFormat (OutputFormat)", status: "PASS", category: "advanced"),
+            FieldMapping(tsField: "includePartialMessages", swiftField: "AgentOptions.includePartialMessages", status: "PASS", category: "advanced"),
+            FieldMapping(tsField: "promptSuggestions", swiftField: "AgentOptions.promptSuggestions", status: "PASS", category: "advanced"),
 
             // Session configuration (5 fields)
-            FieldMapping(tsField: "resume", swiftField: "sessionStore + sessionId", status: "PARTIAL", category: "session"),
-            FieldMapping(tsField: "continue", swiftField: "NO EQUIVALENT", status: "MISSING", category: "session"),
-            FieldMapping(tsField: "forkSession", swiftField: "SessionStore.fork (separate)", status: "PARTIAL", category: "session"),
+            FieldMapping(tsField: "resume", swiftField: "sessionStore + sessionId + resumeSessionAt", status: "PASS", category: "session"),
+            FieldMapping(tsField: "continue", swiftField: "AgentOptions.continueRecentSession", status: "PASS", category: "session"),
+            FieldMapping(tsField: "forkSession", swiftField: "AgentOptions.forkSession", status: "PASS", category: "session"),
             FieldMapping(tsField: "sessionId", swiftField: "AgentOptions.sessionId", status: "PASS", category: "session"),
-            FieldMapping(tsField: "persistSession", swiftField: "Implicit via sessionStore", status: "PARTIAL", category: "session"),
+            FieldMapping(tsField: "persistSession", swiftField: "AgentOptions.persistSession", status: "PASS", category: "session"),
 
             // Extended configuration (11 fields)
             FieldMapping(tsField: "settingSources", swiftField: "NO EQUIVALENT", status: "MISSING", category: "extended"),
@@ -798,19 +822,19 @@ final class AgentOptionsCompatTests: XCTestCase {
         let missingCount = allFields.filter { $0.status == "MISSING" }.count
         let naCount = allFields.filter { $0.status == "N/A" }.count
 
-        XCTAssertEqual(passCount, 10, "10 fields PASS")
-        XCTAssertEqual(partialCount, 11, "11 fields PARTIAL")
-        XCTAssertEqual(missingCount, 14, "14 fields MISSING")
+        XCTAssertEqual(passCount, 23, "23 fields PASS")
+        XCTAssertEqual(partialCount, 6, "6 fields PARTIAL")
+        XCTAssertEqual(missingCount, 6, "6 fields MISSING")
         XCTAssertEqual(naCount, 2, "2 fields N/A")
     }
 
     /// AC9 [P0]: Category-level breakdown summary.
     func testCompatReport_categoryBreakdown() {
-        // Core: 7 PASS + 3 PARTIAL + 2 MISSING = 12
-        // Advanced: 2 PASS + 2 PARTIAL + 5 MISSING = 9
-        // Session: 1 PASS + 3 PARTIAL + 1 MISSING = 5
+        // Core: 11 PASS + 1 PARTIAL + 0 MISSING = 12
+        // Advanced: 7 PASS + 2 PARTIAL + 0 MISSING = 9
+        // Session: 5 PASS + 0 PARTIAL + 0 MISSING = 5
         // Extended: 0 PASS + 3 PARTIAL + 6 MISSING + 2 N/A = 11
-        // Total: 10 PASS + 11 PARTIAL + 14 MISSING + 2 N/A = 37
+        // Total: 23 PASS + 6 PARTIAL + 6 MISSING + 2 N/A = 37
 
         let coreTotal = 12
         let advancedTotal = 9
@@ -827,23 +851,23 @@ final class AgentOptionsCompatTests: XCTestCase {
 
     /// AC9 [P0]: Overall compatibility summary counts.
     func testCompatReport_overallSummary() {
-        // 10 PASS + 11 PARTIAL + 14 MISSING + 2 N/A = 37
-        let totalPass = 10
-        let totalPartial = 11
-        let totalMissing = 14
+        // 22 PASS + 7 PARTIAL + 6 MISSING + 2 N/A = 37
+        let totalPass = 22
+        let totalPartial = 7
+        let totalMissing = 6
         let totalNA = 2
         let total = totalPass + totalPartial + totalMissing + totalNA
 
         XCTAssertEqual(total, 37, "Total verifications should be 37")
-        XCTAssertEqual(totalPass, 10, "10 items PASS")
-        XCTAssertEqual(totalPartial, 11, "11 items PARTIAL")
-        XCTAssertEqual(totalMissing, 14, "14 items MISSING")
+        XCTAssertEqual(totalPass, 22, "22 items PASS")
+        XCTAssertEqual(totalPartial, 7, "7 items PARTIAL")
+        XCTAssertEqual(totalMissing, 6, "6 items MISSING")
         XCTAssertEqual(totalNA, 2, "2 items N/A")
 
-        // Coverage rate: (PASS + PARTIAL) / (PASS + PARTIAL + MISSING) = 21/35 = 60%
+        // Coverage rate: (PASS + PARTIAL) / (PASS + PARTIAL + MISSING) = 29/35 = 82%
         let actionable = totalPass + totalPartial + totalMissing
         let compatRate = Double(totalPass + totalPartial) / Double(actionable) * 100
-        XCTAssertEqual(Int(compatRate), 60, "Pass+Partial rate should be ~60%")
+        XCTAssertEqual(Int(compatRate), 82, "Pass+Partial rate should be ~82%")
     }
 
     // MARK: - AgentOptions Property Count Verification

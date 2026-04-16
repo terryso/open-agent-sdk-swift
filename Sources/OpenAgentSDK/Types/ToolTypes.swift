@@ -102,6 +102,11 @@ public struct ToolContext: Sendable {
     /// Injected by Core/ at tool execution time. Nil when no MCP connections are configured.
     public let mcpConnections: [MCPConnectionInfo]?
 
+    /// Optional environment variables to inject into subprocess execution context.
+    /// Injected by Core/ from AgentOptions.env. Used by BashTool and ShellHookExecutor
+    /// to set environment variables for child processes. Nil when no custom env is configured.
+    public let env: [String: String]?
+
     public init(
         cwd: String,
         toolUseId: String = "",
@@ -123,7 +128,8 @@ public struct ToolContext: Sendable {
         maxSkillRecursionDepth: Int = 4,
         fileCache: FileCache? = nil,
         sandbox: SandboxSettings? = nil,
-        mcpConnections: [MCPConnectionInfo]? = nil
+        mcpConnections: [MCPConnectionInfo]? = nil,
+        env: [String: String]? = nil
     ) {
         self.cwd = cwd
         self.toolUseId = toolUseId
@@ -146,6 +152,7 @@ public struct ToolContext: Sendable {
         self.fileCache = fileCache
         self.sandbox = sandbox
         self.mcpConnections = mcpConnections
+        self.env = env
     }
 
     /// Returns a copy of this context with the toolUseId replaced.

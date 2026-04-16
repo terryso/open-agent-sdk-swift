@@ -100,3 +100,7 @@
 
 - **MODEL_PRICING reads bypass lock** — Direct reads (e.g., `MODEL_PRICING["claude-sonnet-4-6"]`) are not protected by `_pricingLock`. Swift Dictionary with value types is safe for concurrent reads in practice on Apple platforms, but this is formally UB. Making all reads go through lock-protected accessors would require a major API change (private var + public getter). Trade-off accepted: lock prevents the crash scenario (concurrent writes), reads are safe in practice. [ModelInfo.swift:43]
 - **CanUseToolFn Sendable conformance** — `setCanUseTool()` stores a closure read on the stream's async context. If the closure type is not `@Sendable`, this crosses concurrency boundaries. Pre-existing design decision, not introduced by this change.
+
+## Deferred from: code review of 17-2-agent-options-enhancement (2026-04-16)
+
+- **Compat test `testContinue_missing` checks wrong field name** — Test asserts `XCTAssertFalse(fields.contains("continue"))` checking the TS field name `continue`, while the Swift field is `continueRecentSession`. Test "passes" but doesn't verify the field exists. Pre-existing compat test design pattern (field-by-field name matching). [AgentOptionsCompatTests.swift:430-435]

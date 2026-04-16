@@ -158,27 +158,31 @@ final class ThinkingModelCompatTests: XCTestCase {
     // AC3 #1: Effort parameter on AgentOptions -- MISSING
     // ================================================================
 
-    /// AC3 #1 [MISSING]: TS SDK has `effort: 'low' | 'medium' | 'high' | 'max'` parameter.
-    /// Swift SDK has no effort enum or AgentOptions field.
+    /// AC3 #1 [RESOLVED]: TS SDK has `effort: 'low' | 'medium' | 'high' | 'max'` parameter.
+    /// Swift SDK now has EffortLevel enum and AgentOptions.effort field (Story 17-2).
     func testEffortParameter_missing() {
-        let options = AgentOptions(apiKey: "test-key", model: "claude-sonnet-4-6")
+        let options = AgentOptions(apiKey: "test-key", model: "claude-sonnet-4-6", effort: .high)
         let fields = fieldNames(of: options)
 
-        XCTAssertFalse(fields.contains("effort"),
-                       "GAP: AgentOptions has no 'effort' property. TS SDK has effort: 'low' | 'medium' | 'high' | 'max'.")
+        XCTAssertTrue(fields.contains("effort"),
+                       "RESOLVED: AgentOptions now has 'effort' property (Story 17-2). TS SDK has effort: 'low' | 'medium' | 'high' | 'max'.")
+        XCTAssertEqual(options.effort, .high)
     }
 
     // ================================================================
     // AC3 #2: Effort enum -- MISSING
     // ================================================================
 
-    /// AC3 #2 [MISSING]: No EffortLevel enum exists in Swift SDK.
+    /// AC3 #2 [RESOLVED]: EffortLevel enum now exists in Swift SDK (Story 17-2).
     func testEffortEnum_missing() {
         // TS SDK: effort: 'low' | 'medium' | 'high' | 'max'
-        // Swift SDK: No EffortLevel enum or equivalent type
-        // This is a structural gap -- there is no type to reference.
-        XCTAssertTrue(true,
-                      "GAP: No EffortLevel enum in Swift SDK. TS SDK has effort: 'low' | 'medium' | 'high' | 'max' parameter on Options.")
+        // Swift SDK: Now has EffortLevel enum with .low, .medium, .high, .max (Story 17-2)
+        XCTAssertEqual(EffortLevel.allCases.count, 4,
+                       "RESOLVED: EffortLevel enum now exists with 4 cases (Story 17-2).")
+        XCTAssertEqual(EffortLevel.low.rawValue, "low")
+        XCTAssertEqual(EffortLevel.medium.rawValue, "medium")
+        XCTAssertEqual(EffortLevel.high.rawValue, "high")
+        XCTAssertEqual(EffortLevel.max.rawValue, "max")
     }
 
     // ================================================================
@@ -498,14 +502,15 @@ final class ThinkingModelCompatTests: XCTestCase {
     // AC6 #1: fallbackModel option -- MISSING
     // ================================================================
 
-    /// AC6 #1 [MISSING]: TS SDK has `fallbackModel?: string` option.
-    /// Swift SDK has no fallbackModel field in AgentOptions.
+    /// AC6 #1 [RESOLVED]: TS SDK has `fallbackModel?: string` option.
+    /// Swift SDK now has fallbackModel field in AgentOptions (Story 17-2).
     func testFallbackModel_missing() {
-        let options = AgentOptions(apiKey: "test-key", model: "claude-sonnet-4-6")
+        let options = AgentOptions(apiKey: "test-key", model: "claude-sonnet-4-6", fallbackModel: "claude-haiku-4-5")
         let fields = fieldNames(of: options)
 
-        XCTAssertFalse(fields.contains("fallbackModel"),
-                       "GAP: AgentOptions has no 'fallbackModel' property. TS SDK has fallbackModel?: string for automatic model fallback on failure.")
+        XCTAssertTrue(fields.contains("fallbackModel"),
+                       "RESOLVED: AgentOptions now has 'fallbackModel' property (Story 17-2). TS SDK has fallbackModel?: string for automatic model fallback.")
+        XCTAssertEqual(options.fallbackModel, "claude-haiku-4-5")
     }
 
     // ================================================================

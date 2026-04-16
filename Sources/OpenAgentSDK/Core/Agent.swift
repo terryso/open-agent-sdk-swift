@@ -250,8 +250,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
             baseTools: getAllBaseTools(tier: .core) + getAllBaseTools(tier: .specialist),
             customTools: baseTools,
             mcpTools: allMCPTools,
-            allowed: nil,
-            disallowed: nil
+            allowed: options.allowedTools,
+            disallowed: options.disallowedTools
         )
 
         return (pool, manager)
@@ -265,7 +265,20 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
     /// If no system prompt is set but Git context exists, returns the Git context alone.
     /// If neither is available, returns `nil`.
     func buildSystemPrompt() -> String? {
-        let basePrompt = options.systemPrompt
+        // Resolve base prompt: systemPromptConfig takes priority over systemPrompt (AC7)
+        let basePrompt: String?
+        if let config = options.systemPromptConfig {
+            switch config {
+            case .text(let text):
+                basePrompt = text
+            case .preset(let name, let append):
+                // Preset names are resolved to known templates.
+                // Currently only "claude_code" is supported; others fall back to the name itself.
+                basePrompt = Self.resolvePreset(name: name, append: append)
+            }
+        } else {
+            basePrompt = options.systemPrompt
+        }
         let cwd = options.cwd ?? FileManager.default.currentDirectoryPath
         let gitContext = gitContextCollector.collectGitContext(
             cwd: cwd,
@@ -410,6 +423,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                 let retryMessages = messages
                 let retryApiTools = apiTools
                 let retryCfg = self.options.retryConfig ?? RetryConfig.default
+                let retryThinking = Self.computeThinkingConfig(from: self.options)
                 response = try await withRetry({
                     try await retryClient.sendMessage(
                         model: retryModel,
@@ -418,11 +432,79 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                         system: retrySystemPrompt,
                         tools: retryApiTools,
                         toolChoice: nil,
-                        thinking: nil,
+                        thinking: retryThinking,
                         temperature: nil
                     )
                 }, retryConfig: retryCfg)
             } catch {
+                // Fallback model retry: if a fallbackModel is configured, retry once with it
+                if let fallbackModel = self.options.fallbackModel, fallbackModel != self.model {
+                    Logger.shared.info("Agent", "fallback_model_retry", data: [
+                        "originalModel": self.model,
+                        "fallbackModel": fallbackModel
+                    ])
+                    do {
+                        let retryClient = self.client
+                        let retryMaxTokens = self.maxTokens
+                        let retrySystemPrompt = self.buildSystemPrompt()
+                        let retryMessages = messages
+                        let retryApiTools = apiTools
+                        let retryThinking = Self.computeThinkingConfig(from: self.options)
+                        let fallbackResponse = try await retryClient.sendMessage(
+                            model: fallbackModel,
+                            messages: retryMessages,
+                            maxTokens: retryMaxTokens,
+                            system: retrySystemPrompt,
+                            tools: retryApiTools,
+                            toolChoice: nil,
+                            thinking: retryThinking,
+                            temperature: nil
+                        )
+                        // Fallback succeeded — use this response in the loop
+                        // Temporarily switch model for cost tracking
+                        let originalModel = self.model
+                        self.model = fallbackModel
+                        // Process the fallback response through the normal loop path
+                        // by assigning to `response` and continuing below
+                        turnCount += 1
+                        if let usage = fallbackResponse["usage"] as? [String: Any] {
+                            let turnUsage = TokenUsage(
+                                inputTokens: usage["input_tokens"] as? Int ?? 0,
+                                outputTokens: usage["output_tokens"] as? Int ?? 0
+                            )
+                            totalUsage = totalUsage + turnUsage
+                            let turnCost = estimateCost(model: fallbackModel, usage: turnUsage)
+                            totalCostUsd += turnCost
+                            costByModel[fallbackModel] = CostBreakdownEntry(
+                                model: fallbackModel,
+                                inputTokens: turnUsage.inputTokens,
+                                outputTokens: turnUsage.outputTokens,
+                                costUsd: turnCost
+                            )
+                        }
+                        let content = fallbackResponse["content"]
+                        if let content {
+                            lastAssistantText += extractText(from: content)
+                        }
+                        messages.append([
+                            "role": "assistant",
+                            "content": content ?? []
+                        ])
+                        let stopReason = fallbackResponse["stop_reason"] as? String ?? ""
+                        if stopReason == "end_turn" || stopReason == "stop_sequence" {
+                            loopExitedCleanly = true
+                        }
+                        self.model = originalModel
+                        break
+                    } catch {
+                        // Fallback also failed — fall through to original error handling
+                        Logger.shared.error("Agent", "fallback_model_failed", data: [
+                            "fallbackModel": fallbackModel,
+                            "error": error.localizedDescription
+                        ])
+                    }
+                }
+
                 // Structured log for API error
                 let statusCode: String
                 let errorMessage: String
@@ -446,7 +528,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                     await mcpManager.shutdown()
                 }
                 // Session auto-save on error: persist whatever messages we have so far
-                if let sessionStore = options.sessionStore, let sessionId = options.sessionId {
+                if let sessionStore = options.sessionStore, let sessionId = options.sessionId, options.persistSession {
                     let metadata = PartialSessionMetadata(
                         cwd: options.cwd ?? FileManager.default.currentDirectoryPath,
                         model: model,
@@ -605,7 +687,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                             maxSkillRecursionDepth: options.maxSkillRecursionDepth,
                             fileCache: fileCache,
                             sandbox: options.sandbox,
-                            mcpConnections: nil
+                            mcpConnections: nil,
+                            env: options.env
                         )
                     )
 
@@ -667,8 +750,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
             await mcpManager.shutdown()
         }
 
-        // Session auto-save: persist updated messages if sessionStore is configured
-        if let sessionStore = options.sessionStore, let sessionId = options.sessionId {
+        // Session auto-save: persist updated messages if sessionStore is configured and persistSession is true
+        if let sessionStore = options.sessionStore, let sessionId = options.sessionId, options.persistSession {
             let metadata = PartialSessionMetadata(
                 cwd: options.cwd ?? "",
                 model: model,
@@ -761,6 +844,9 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
             maxEntrySizeBytes: options.fileCacheMaxEntrySizeBytes
         )
         let capturedSandbox = options.sandbox
+        let capturedPersistSession = options.persistSession
+        let capturedEnv = options.env
+        let capturedIncludePartialMessages = options.includePartialMessages
 
         // Build tool definitions for API call
         let capturedApiTools: [[String: Any]]? = {
@@ -936,6 +1022,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                         let retryMessages = messages
                         let retryApiTools = decodedApiTools
                         let retryCfg = capturedRetryConfig
+                        let retryThinking = Self.computeThinkingConfig(from: self.options)
                         eventStream = try await withRetry({
                             try await retryClient.streamMessage(
                                 model: retryModel,
@@ -944,7 +1031,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                                 system: retrySystemPrompt,
                                 tools: retryApiTools,
                                 toolChoice: nil,
-                                thinking: nil,
+                                thinking: retryThinking,
                                 temperature: nil
                             )
                         }, retryConfig: retryCfg)
@@ -1072,7 +1159,9 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                                 // Handle text delta
                                 if let deltaText = delta["text"] as? String {
                                     accumulatedText += deltaText
-                                    continuation.yield(.partialMessage(SDKMessage.PartialData(text: deltaText)))
+                                    if capturedIncludePartialMessages {
+                                        continuation.yield(.partialMessage(SDKMessage.PartialData(text: deltaText)))
+                                    }
                                 }
                                 // Handle tool_use input_json_delta
                                 if let partialJson = delta["partial_json"] as? String {
@@ -1345,7 +1434,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                                     maxSkillRecursionDepth: capturedMaxSkillRecursionDepth,
                                     fileCache: capturedFileCache,
                                     sandbox: capturedSandbox,
-                                    mcpConnections: nil
+                                    mcpConnections: nil,
+                                    env: capturedEnv
                                 )
                             )
 
@@ -1440,8 +1530,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                 if let mcpManagerForCleanup {
                     await mcpManagerForCleanup.shutdown()
                 }
-                // Session auto-save: persist updated messages if sessionStore is configured
-                if let sessionStore = capturedSessionStore, let sessionId = capturedSessionId {
+                // Session auto-save: persist updated messages if sessionStore is configured and persistSession is true
+                if let sessionStore = capturedSessionStore, let sessionId = capturedSessionId, capturedPersistSession {
                     let metadata = PartialSessionMetadata(
                         cwd: capturedCwd,
                         model: capturedModel,
@@ -1469,6 +1559,57 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
     }
 
     // MARK: - Private Helpers
+
+    // MARK: System Prompt Preset Resolution (Story 17-2)
+
+    /// Resolves a preset system prompt name to its template text.
+    ///
+    /// Known presets:
+    /// - `"claude_code"`: Standard Code agent prompt optimized for software engineering.
+    ///
+    /// Unknown preset names return the name itself as a placeholder.
+    ///
+    /// - Parameters:
+    ///   - name: The preset name to resolve.
+    ///   - append: Optional text to append after the resolved preset.
+    /// - Returns: The resolved prompt string, with append text joined if provided.
+    private static func resolvePreset(name: String, append: String?) -> String {
+        let template: String
+        switch name {
+        case "claude_code":
+            template = "You are Claude Code, an interactive CLI agent powered by Anthropic's Claude. You help users with software engineering tasks."
+        default:
+            template = "You are \(name)."
+        }
+        if let append {
+            return template + "\n\n" + append
+        }
+        return template
+    }
+
+    /// Computes the thinking configuration for an API call based on agent options.
+    ///
+    /// Priority: explicit `thinking` config > `effort` level > `nil`.
+    /// When `effort` is set, it maps to a thinking config with the corresponding budget tokens.
+    ///
+    /// - Parameter options: The agent options to derive thinking config from.
+    /// - Returns: The thinking configuration dictionary, or nil if neither is set.
+    private static func computeThinkingConfig(from options: AgentOptions) -> [String: Any]? {
+        if let thinking = options.thinking {
+            switch thinking {
+            case .enabled(let budget):
+                return ["type": "enabled", "budget_tokens": budget]
+            case .disabled:
+                return ["type": "disabled"]
+            case .adaptive:
+                return ["type": "enabled", "budget_tokens": 10000]
+            }
+        }
+        if let effort = options.effort {
+            return ["type": "enabled", "budget_tokens": effort.budgetTokens]
+        }
+        return nil
+    }
 
     // MARK: Micro-Compaction Integration (Story 2.6)
 

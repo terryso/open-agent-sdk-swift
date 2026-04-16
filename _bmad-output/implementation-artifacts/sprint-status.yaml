@@ -1,5 +1,5 @@
 # generated: 2026-04-04
-# last_updated: 2026-04-16 (story 17-1 ready-for-dev)
+# last_updated: 2026-04-16 (story 17-2 ready-for-dev)
 # project: open-agent-sdk-swift
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-04-04
-last_updated: 2026-04-16 (story 17-1 ready-for-dev)
+last_updated: 2026-04-16 (story 17-2 ready-for-dev)
 project_key: NOKEY
 tracking_system: file-system
 story_location: _bmad-output/implementation-artifacts
@@ -201,7 +201,7 @@ development_status:
   # Epic 17: 官方 TypeScript SDK 功能对齐
   epic-17: in-progress
   17-1-sdkmessage-type-enhancement: done
-  17-2-agent-options-enhancement: backlog
+  17-2-agent-options-enhancement: done
   17-3-tool-system-enhancement: backlog
   17-4-hook-system-enhancement: backlog
   17-5-permission-system-enhancement: backlog
