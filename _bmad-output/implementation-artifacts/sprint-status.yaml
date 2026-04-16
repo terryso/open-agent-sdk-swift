@@ -1,5 +1,5 @@
 # generated: 2026-04-04
-# last_updated: 2026-04-16 (story 16-10 done)
+# last_updated: 2026-04-16 (story 16-11 done)
 # project: open-agent-sdk-swift
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-04-04
-last_updated: 2026-04-16 (story 16-10 review)
+last_updated: 2026-04-16 (story 16-11 done)
 project_key: NOKEY
 tracking_system: file-system
 story_location: _bmad-output/implementation-artifacts
@@ -194,6 +194,6 @@ development_status:
   16-8-agent-options-compat: done
   16-9-permission-system-compat: done
   16-10-subagent-system-compat: done
-  16-11-thinking-model-compat: ready-for-dev
+  16-11-thinking-model-compat: done
   16-12-sandbox-config-compat: ready-for-dev
   epic-16-retrospective: optional

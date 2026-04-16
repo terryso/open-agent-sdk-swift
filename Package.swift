@@ -197,5 +197,10 @@ let package = Package(
             dependencies: ["OpenAgentSDK"],
             path: "Examples/CompatSubagents"
         ),
+        .executableTarget(
+            name: "CompatThinkingModel",
+            dependencies: ["OpenAgentSDK"],
+            path: "Examples/CompatThinkingModel"
+        ),
     ]
 )
