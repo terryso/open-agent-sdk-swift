@@ -165,6 +165,8 @@ struct ToolExecutionTests {
                 gotFinalResult = true
             case .system:
                 break
+            case .userMessage, .toolProgress, .hookStarted, .hookProgress, .hookResponse, .taskStarted, .taskProgress, .authStatus, .filesPersisted, .localCommandOutput, .promptSuggestion, .toolUseSummary:
+                break
             }
         }
 

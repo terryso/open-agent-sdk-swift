@@ -282,39 +282,30 @@ final class SystemInitCompatTests: XCTestCase {
         XCTAssertEqual(subtype.rawValue, "compactBoundary")
     }
 
-    // NOTE: The following tests document KNOWN GAPS between TS SDK and Swift SDK.
-    // They verify that the gap EXISTS by checking the field count / available properties,
-    // ensuring the gap is not accidentally closed without the test being updated.
+    // NOTE: The following tests now verify FIELDS THAT EXIST after Story 17.1.
+    // Previously these documented gaps; now they confirm the fields are available.
 
-    /// AC4 [GAP]: SystemData does NOT expose session_id (TS SDK has this).
-    /// This test verifies the gap exists by confirming SystemData has no sessionId property.
-    /// When SystemData gains a sessionId field, update this test to use the new field.
-    func testSystemData_sessionId_gap() {
-        let data = SDKMessage.SystemData(subtype: .`init`, message: "Session abc123 started")
-        // Verify SystemData only has subtype and message (no sessionId)
-        // Mirror introspection confirms the property count matches expected fields
-        let mirror = Mirror(reflecting: data)
-        let fieldNames = Set(mirror.children.map { $0.label ?? "" })
-        XCTAssertFalse(fieldNames.contains("sessionId"),
-            "[GAP] SystemData should NOT have sessionId yet. If this fails, update the compat report.")
+    /// AC4 [PASS]: SystemData NOW exposes session_id (added by Story 17.1).
+    func testSystemData_sessionId_available() {
+        let data = SDKMessage.SystemData(subtype: .`init`, message: "Session abc123 started", sessionId: "abc123")
+        XCTAssertEqual(data.sessionId, "abc123",
+            "SystemData.sessionId maps to TS SDK system/init session_id")
     }
 
-    /// AC4 [GAP]: SystemData does NOT expose tools list (TS SDK has this).
-    func testSystemData_tools_gap() {
-        let data = SDKMessage.SystemData(subtype: .`init`, message: "init")
-        let mirror = Mirror(reflecting: data)
-        let fieldNames = Set(mirror.children.map { $0.label ?? "" })
-        XCTAssertFalse(fieldNames.contains("tools"),
-            "[GAP] SystemData should NOT have tools yet. If this fails, update the compat report.")
+    /// AC4 [PASS]: SystemData NOW exposes tools list (added by Story 17.1).
+    func testSystemData_tools_available() {
+        let tools = [SDKMessage.ToolInfo(name: "Bash", description: "Run commands")]
+        let data = SDKMessage.SystemData(subtype: .`init`, message: "init", tools: tools)
+        XCTAssertNotNil(data.tools,
+            "SystemData.tools maps to TS SDK system/init tools")
+        XCTAssertEqual(data.tools?.count, 1)
     }
 
-    /// AC4 [GAP]: SystemData does NOT expose model (TS SDK has this).
-    func testSystemData_model_gap() {
-        let data = SDKMessage.SystemData(subtype: .`init`, message: "init")
-        let mirror = Mirror(reflecting: data)
-        let fieldNames = Set(mirror.children.map { $0.label ?? "" })
-        XCTAssertFalse(fieldNames.contains("model"),
-            "[GAP] SystemData should NOT have model yet. If this fails, update the compat report.")
+    /// AC4 [PASS]: SystemData NOW exposes model (added by Story 17.1).
+    func testSystemData_model_available() {
+        let data = SDKMessage.SystemData(subtype: .`init`, message: "init", model: "claude-sonnet-4-6")
+        XCTAssertEqual(data.model, "claude-sonnet-4-6",
+            "SystemData.model maps to TS SDK system/init model")
     }
 }
 

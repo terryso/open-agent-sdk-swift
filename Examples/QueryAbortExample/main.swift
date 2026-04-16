@@ -226,6 +226,8 @@ let task3 = _Concurrency.Task {
             print("  [stream event: system]")
         case .result:
             print("  [stream event: result]")
+        case .userMessage, .toolProgress, .hookStarted, .hookProgress, .hookResponse, .taskStarted, .taskProgress, .authStatus, .filesPersisted, .localCommandOutput, .promptSuggestion, .toolUseSummary:
+            break
         }
     }
 }

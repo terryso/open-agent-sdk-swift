@@ -31,6 +31,8 @@ struct SDKMessageTests {
                 receivedTypes.insert("toolResult")
             case .system:
                 receivedTypes.insert("system")
+            case .userMessage, .toolProgress, .hookStarted, .hookProgress, .hookResponse, .taskStarted, .taskProgress, .authStatus, .filesPersisted, .localCommandOutput, .promptSuggestion, .toolUseSummary:
+                break
             }
         }
 

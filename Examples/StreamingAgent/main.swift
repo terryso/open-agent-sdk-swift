@@ -76,6 +76,9 @@ for await message in agent.stream("Write a haiku about programming.") {
     case .system(let data):
         // 系统级事件
         print("[System: \(data.subtype) - \(data.message)]")
+
+    case .userMessage, .toolProgress, .hookStarted, .hookProgress, .hookResponse, .taskStarted, .taskProgress, .authStatus, .filesPersisted, .localCommandOutput, .promptSuggestion, .toolUseSummary:
+        break
     }
 }
 

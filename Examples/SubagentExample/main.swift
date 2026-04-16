@@ -142,6 +142,9 @@ for await message in agent.stream(prompt) {
     case .system(let data):
         // 系统级事件（如初始化、压缩边界等）
         print("[System Event: \(data.subtype) - \(data.message)]")
+
+    case .userMessage, .toolProgress, .hookStarted, .hookProgress, .hookResponse, .taskStarted, .taskProgress, .authStatus, .filesPersisted, .localCommandOutput, .promptSuggestion, .toolUseSummary:
+        break
     }
 }
 

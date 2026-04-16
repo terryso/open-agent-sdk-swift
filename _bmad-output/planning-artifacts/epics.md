@@ -3153,3 +3153,594 @@ Story: 16.N - [Story 名称]
 2. **P1 — 高级功能缺失**：影响特定场景的功能（如 structured output、streaming input）
 3. **P2 — 增强功能缺失**：提升体验但非必须的功能（如 promptSuggestions、plugins）
 4. **N/A — 不适用**：TypeScript 特有的功能（如 executable、spawnClaudeCodeProcess）
+
+---
+
+## Epic 17: 官方 TypeScript SDK 功能对齐
+
+基于 Epic 16 兼容性验证发现的 ~100+ 个 MISSING/PARTIAL 功能缺口，系统性补齐 Swift SDK 与官方 TypeScript SDK 的功能差异。每个 Story 聚焦一个功能域，实现缺失类型、补全字段、增加新方法，使 Swift SDK 达到与 TS SDK 的功能等价。
+
+**目标来源：** Epic 16 兼容性报告（12 个 Story）、官方 TS SDK 文档 https://code.claude.com/docs/en/agent-sdk/typescript
+**覆盖的 FR：** FR1-FR24（详见下方）
+**依赖：** Epic 1-16（所有基础功能和兼容性验证必须已完成）
+
+### 功能需求映射
+
+| FR | Story | 描述 |
+|---|---|---|
+| FR1 | 17-1 | 添加 12 个缺失的 SDKMessage 类型/子类型 |
+| FR2 | 17-1 | 补全现有消息类型的缺失字段 |
+| FR3 | 17-3 | ToolAnnotations 类型（4 个 hint 字段） |
+| FR4 | 17-3 | ToolResult 类型化内容数组 |
+| FR5 | 17-3 | BashInput.run_in_background |
+| FR6 | 17-4 | 3 个缺失 Hook 事件 |
+| FR7 | 17-4 | HookInput 字段补全 |
+| FR8 | 17-4 | HookOutput 字段补全 |
+| FR9 | 17-2 | 14 个缺失 AgentOptions 字段 |
+| FR10 | 17-5 | PermissionUpdate 6 种操作 |
+| FR11 | 17-5 | CanUseTool 回调参数扩展 |
+| FR12 | 17-5 | SDKPermissionDenial 类型 |
+| FR13 | 17-6 | AgentDefinition 缺失字段 |
+| FR14 | 17-6 | AgentInput 缺失字段 |
+| FR15 | 17-6 | AgentOutput 三态判定 |
+| FR16 | 17-7 | 4 个会话恢复选项 |
+| FR17 | 17-8 | McpClaudeAIProxyServerConfig |
+| FR18 | 17-8 | MCP 运行时管理操作 |
+| FR19 | 17-9 | SandboxNetworkConfig（7 个字段） |
+| FR20 | 17-9 | 5 个缺失 SandboxSettings 字段 |
+| FR21 | 17-10 | 9 个缺失查询方法 |
+| FR22 | 17-11 | effort 级别支持 |
+| FR23 | 17-11 | ModelInfo 字段补全 |
+| FR24 | 17-11 | fallbackModel 行为 |
+
+### 非功能需求
+
+- **NFR1：** 所有新增类型和字段必须维持 `Sendable` 一致性
+- **NFR2：** 所有新增 public API 必须有 Swift-DocC 文档
+- **NFR3：** 所有变更必须通过现有测试套件（3400+ tests）零回归
+- **NFR4：** 新消息类型必须集成到现有 `AsyncStream<SDKMessage>` 管道
+- **NFR5：** 所有新增 AgentOptions 字段必须为 optional 以保持向后兼容
+
+### Story 17.1: SDKMessage 类型增强
+
+作为 SDK 开发者，
+我希望补齐 Swift SDK 的 `SDKMessage` 类型系统，使其覆盖 TypeScript SDK 的全部 20 种消息类型和完整字段，
+以便消费消息流的代码能正确处理所有事件。
+
+**验收标准：**
+
+**给定** TypeScript SDK 有 20 种消息类型，其中 12 种在 Swift SDK 中完全缺失
+**当** 在 SDKMessage enum 中添加缺失的 case
+**则** 新增 `.userMessage(UserMessageData)`、`.toolProgress(ToolProgressData)`、`.hookStarted(HookStartedData)`、`.hookProgress(HookProgressData)`、`.hookResponse(HookResponseData)`、`.taskStarted(TaskStartedData)`、`.taskProgress(TaskProgressData)`、`.authStatus(AuthStatusData)`、`.filesPersisted(FilesPersistedData)`、`.localCommandOutput(LocalCommandOutputData)`、`.promptSuggestion(PromptSuggestionData)`、`.toolUseSummary(ToolUseSummaryData)`
+**且** 每个新类型的关联值包含 TS SDK 文档定义的所有字段
+**且** 所有新类型遵循 `Sendable` 协议
+
+**给定** 现有 AssistantData 缺少 `uuid`、`sessionId`、`parentToolUseId`、`error` 字段
+**当** 在 AssistantData 中添加这些字段
+**则** 字段类型与 TS SDK 一致（`error` 支持 7 种错误子类型：authenticationFailed、billingError、rateLimit、invalidRequest、serverError、maxOutputTokens、unknown）
+**且** 字段均为 optional 以保持向后兼容
+
+**给定** 现有 ResultData 缺少 `structuredOutput`、`permissionDenials`、`modelUsage` 字段和 `errorMaxStructuredOutputRetries` 子类型
+**当** 在 ResultData 中添加这些字段和子类型
+**则** `structuredOutput` 类型为 `Any?`（JSON 兼容）
+**且** `permissionDenials` 类型为 `[SDKPermissionDenial]`
+**且** `modelUsage` 与 `costBreakdown` 共存（命名不同但都可用）
+
+**给定** 现有 SystemData.init 缺少 `sessionId`、`tools`、`model`、`permissionMode`、`mcpServers`、`cwd` 字段
+**当** 在 SystemData 中添加 init 专属字段
+**则** 使用独立的 `SystemInitData` 结构或通过 optional 字段扩展 SystemData
+**且** 流式查询时这些字段被正确填充
+
+**给定** 现有 PartialData 缺少 `parentToolUseId`、`uuid`、`sessionId` 字段
+**当** 在 PartialData 中添加这些字段
+**则** 所有字段为 optional，不影响现有用法
+
+> **参考：** Story 16-3 兼容性报告、TS SDK Message Types 文档
+
+### Story 17.2: AgentOptions 完整参数
+
+作为 SDK 开发者，
+我希望补齐 Swift SDK 的 `AgentOptions` 中缺失的 TS SDK Options 字段，
+以便开发者迁移时不需要妥协功能。
+
+**验收标准：**
+
+**给定** TS SDK 有 12 个核心配置字段，Swift 缺少 `fallbackModel`、`env`、`allowedTools`、`disallowedTools`
+**当** 在 AgentOptions 中添加这些字段
+**则** `fallbackModel: String?` — 主模型失败时自动切换
+**且** `env: [String: String]?` — 注入环境变量
+**且** `allowedTools: [String]?` — 工具白名单
+**且** `disallowedTools: [String]?` — 工具黑名单（优先级高于 allowedTools 和 permissionMode）
+
+**给定** TS SDK 有 9 个高级配置字段，Swift 缺少 `effort`、`toolConfig`、`outputFormat`、`includePartialMessages`、`promptSuggestions`
+**当** 在 AgentOptions 中添加这些字段
+**则** `effort: EffortLevel?` — 支持 low/medium/high/max
+**且** `outputFormat: OutputFormat?` — 支持 `{ type: "json_schema", schema: [String: Any] }`
+**且** `includePartialMessages: Bool` — 控制是否发送 partial message 事件（默认 true）
+**且** `promptSuggestions: Bool` — 控制是否生成提示建议
+
+**给定** TS SDK 有 6 个会话配置字段，Swift 缺少 `continue`、`forkSession`、`resumeSessionAt`、`persistSession`
+**当** 在 AgentOptions 中添加这些字段
+**则** `continueRecentSession: Bool` — 继续最近的会话
+**且** `forkSession: Bool` — 分叉而非继续
+**且** `resumeSessionAt: String?` — 从指定消息 UUID 恢复
+**且** `persistSession: Bool` — 是否持久化会话（默认 true）
+
+**给定** TS SDK 的 `systemPrompt` 支持 preset 模式
+**当** 检查 Swift 的 systemPrompt 类型
+**则** 支持 `String` 和 `SystemPromptConfig.preset(name:append:)` 两种模式
+
+> **参考：** Story 16-8 兼容性报告、TS SDK Options 文档
+
+### Story 17.3: 工具系统增强
+
+作为 SDK 开发者，
+我希望补齐 Swift SDK 工具系统中缺失的 ToolAnnotations、类型化 ToolResult 和 BashInput.run_in_background，
+以便 Swift SDK 的工具系统达到 TS SDK 功能等价。
+
+**验收标准：**
+
+**给定** TS SDK 的 `ToolAnnotations` 包含 4 个 hint 字段
+**当** 在 Swift SDK 中添加 `ToolAnnotations` 结构
+**则** 包含 `readOnlyHint: Bool`、`destructiveHint: Bool`、`idempotentHint: Bool`、`openWorldHint: Bool`
+**且** `ToolProtocol` 添加可选的 `annotations: ToolAnnotations?` 属性
+**且** `defineTool()` 支持 annotations 参数
+
+**给定** TS SDK 的 `CallToolResult.content` 是类型化数组
+**当** 扩展 Swift SDK 的 `ToolResult.content`
+**则** 支持 `ToolContent` 类型数组（`.text(String)`、`.image(data:mimeType:)`、`.resource(uri:name:)`）
+**且** 现有 `content: String` 保持向后兼容（通过便捷属性）
+**且** `ToolExecuteResult` 同步支持类型化内容
+
+**给定** TS SDK 的 BashInput 有 `run_in_background` 字段
+**当** 在 Swift 的 BashInput 中添加此字段
+**则** `runInBackground: Bool?` — 命令在后台执行
+**且** 后台执行返回 backgroundTaskId 用于后续管理
+
+> **参考：** Story 16-2 兼容性报告、TS SDK tool()、ToolAnnotations 文档
+
+### Story 17.4: Hook 系统增强
+
+作为 SDK 开发者，
+我希望补齐 Swift SDK Hook 系统中缺失的 3 个事件和 HookInput/Output 字段，
+以便所有 Hook 用法都能从 TS 迁移到 Swift。
+
+**验收标准：**
+
+**给定** TS SDK 有 18 个 HookEvent，Swift 缺少 `setup`、`worktreeCreate`、`worktreeRemove`
+**当** 在 HookEvent enum 中添加这 3 个 case
+**则** HookEvent.CaseIterable 自动更新
+**且** 每个新事件都有对应的 HookInput 字段
+
+**给定** HookInput 缺少 `transcriptPath`、`permissionMode`、`agentId`、`agentType` 等字段
+**当** 扩展 HookInput 结构
+**则** 添加 `transcriptPath: String?`、`permissionMode: String?`、`agentId: String?`、`agentType: String?`
+**且** Per-event 专用字段：`stopHookActive`、`lastAssistantMessage`、`trigger`、`customInstructions`、`permissionSuggestions`、`isInterrupt`
+
+**给定** HookOutput 缺少 `systemMessage`、`reason`、`updatedInput`、`additionalContext` 等字段
+**当** 扩展 HookOutput 结构
+**则** PreToolUse output 支持 `permissionDecision`、`updatedInput`、`additionalContext`
+**且** PostToolUse output 支持 `updatedMCPToolOutput`、`additionalContext`
+**且** PermissionRequest output 支持 `decision` (allow/deny)
+
+> **参考：** Story 16-4 兼容性报告、TS SDK Hook Types 文档
+
+### Story 17.5: 权限系统增强
+
+作为 SDK 开发者，
+我希望补齐 Swift SDK 权限系统中缺失的 PermissionUpdate 操作、CanUseTool 扩展参数和 PermissionDenial 类型，
+以便所有权限控制模式都能在 Swift 中使用。
+
+**验收标准：**
+
+**给定** TS SDK 有 6 种 PermissionUpdate 操作
+**当** 在 Swift SDK 中添加 `PermissionUpdate` 类型
+**则** 支持 `addRules`、`replaceRules`、`removeRules`（含 `rules`、`behavior: allow/deny/ask`）
+**且** 支持 `setMode`（含 `mode: PermissionMode`）
+**且** 支持 `addDirectories`、`removeDirectories`
+**且** 每种操作支持 `destination`（userSettings/projectSettings/localSettings/session/cliArg）
+
+**给定** CanUseToolFn 回调缺少 `signal`、`suggestions`、`blockedPath`、`decisionReason`、`toolUseID`、`agentID` 参数
+**当** 扩展 CanUseToolFn 的上下文参数
+**则** `ToolPermissionContext` 包含所有 TS SDK 等价字段
+**且** 返回结果支持 `updatedPermissions` 和 `toolUseID`
+
+**给定** TS SDK 有 `SDKPermissionDenial` 类型
+**当** 在 Swift SDK 中添加此类型
+**则** 包含 `toolName: String`、`toolUseId: String`、`toolInput: [String: Any]`
+**且** 在 ResultData.permissionDenials 中正确填充
+
+> **参考：** Story 16-9 兼容性报告、TS SDK PermissionMode、PermissionUpdate 文档
+
+### Story 17.6: 子代理系统增强
+
+作为 SDK 开发者，
+我希望补齐 Swift SDK 子代理系统中缺失的 AgentDefinition 字段、AgentInput 字段和 AgentOutput 三态判定，
+以便所有多 Agent 编排模式都能在 Swift 中使用。
+
+**验收标准：**
+
+**给定** AgentDefinition 缺少 `mcpServers`、`skills`、`criticalSystemReminder_EXPERIMENTAL` 字段
+**当** 在 AgentDefinition 中添加这些字段
+**则** `mcpServers: [AgentMcpServerSpec]?` — 支持 string 引用和 inline 配置两种模式
+**且** `skills: [String]?` — 预加载技能名称列表
+**且** `criticalSystemReminderExperimental: String?` — 实验性系统提醒
+
+**给定** AgentInput 缺少 `run_in_background`、`isolation`、`name`、`team_name`、`mode` 字段
+**当** 在 AgentTool 输入中添加这些字段
+**则** `runInBackground: Bool?` — 后台执行 subagent
+**且** `isolation: String?` — 支持 "worktree" 隔离模式
+**且** `name: String?` — subagent 名称
+**且** `teamName: String?` — 团队名称
+**且** `mode: PermissionMode?` — subagent 权限模式
+
+**给定** TS SDK 的 AgentOutput 有三种状态
+**当** 在 Swift SDK 中实现 AgentOutput 三态判定
+**则** `.completed` — 含 agentId、content、totalToolUseCount、totalDurationMs、totalTokens、usage、prompt
+**且** `.asyncLaunched` — 含 agentId、description、prompt、outputFile、canReadOutputFile
+**且** `.subAgentEntered` — 含 description、message
+
+> **参考：** Story 16-10 兼容性报告、TS SDK AgentDefinition、AgentOutput 文档
+
+### Story 17.7: 会话管理增强
+
+作为 SDK 开发者，
+我希望补齐 Swift SDK 中缺失的 4 个会话恢复选项，
+以便开发者可以灵活控制会话生命周期。
+
+**验收标准：**
+
+**给定** TS SDK 支持 `continue: true` 继续最近会话
+**当** 在 AgentOptions 中添加 `continueRecentSession: Bool`
+**则** 设为 true 时，Agent 自动加载最近的会话历史
+**且** 如果没有可恢复的会话，按新会话处理（不报错）
+
+**给定** TS SDK 支持 `forkSession: true` 分叉会话
+**当** 在 AgentOptions 中添加 `forkSession: Bool`
+**则** 设为 true 时，创建会话副本而非直接修改原会话
+**且** 原会话保持不变
+
+**给定** TS SDK 支持 `resumeSessionAt: messageUUID` 从指定消息恢复
+**当** 在 AgentOptions 中添加 `resumeSessionAt: String?`
+**则** 加载会话历史截至指定 UUID 的消息
+**且** 如果 UUID 不存在，从最近的消息恢复
+
+**给定** TS SDK 支持 `persistSession: false` 禁用持久化
+**当** 在 AgentOptions 中添加 `persistSession: Bool`
+**则** 默认为 true（与现有行为一致）
+**且** 设为 false 时，会话仅在内存中，不写入磁盘
+
+> **参考：** Story 16-6 兼容性报告、TS SDK Session Management 文档
+
+### Story 17.8: MCP 集成增强
+
+作为 SDK 开发者，
+我希望补齐 Swift SDK 中缺失的 ClaudeAI Proxy 配置和 MCP 运行时管理操作，
+以便所有 MCP 用法都能在 Swift 中使用。
+
+**验收标准：**
+
+**给定** TS SDK 有 `McpClaudeAIProxyServerConfig`（type: "claudeai-proxy"）
+**当** 在 Swift SDK 中添加此配置类型
+**则** 包含 `url: String`、`id: String` 字段
+**且** 可通过 `McpServerConfig.claudeAIProxy(url:id:)` 创建
+
+**给定** TS SDK 有 4 个 MCP 运行时管理操作
+**当** 在 Swift SDK 中添加这些方法
+**则** `agent.mcpServerStatus() -> [String: McpServerStatus]` — 返回所有服务器状态
+**且** `agent.reconnectMcpServer(name: String) async throws` — 重连指定服务器
+**且** `agent.toggleMcpServer(name: String, enabled: Bool) async throws` — 启用/禁用
+**且** `agent.setMcpServers(_ servers: [String: McpServerConfig]) async throws -> McpServerUpdateResult` — 动态替换服务器集
+
+**给定** McpServerStatus 包含连接状态和工具列表
+**当** 实现 McpServerStatus 类型
+**则** 状态值：connected、failed、needsAuth、pending、disabled
+**且** 包含 serverInfo、error、tools（含 annotations）
+
+> **参考：** Story 16-5 兼容性报告、TS SDK McpServerConfig 文档
+
+### Story 17.9: 沙盒配置增强
+
+作为 SDK 开发者，
+我希望补齐 Swift SDK 中缺失的 SandboxNetworkConfig 和 5 个 SandboxSettings 字段，
+以便所有安全控制都能在 Swift 中使用。
+
+**验收标准：**
+
+**给定** TS SDK 有 `SandboxNetworkConfig`（7 个字段）
+**当** 在 Swift SDK 中添加此类型
+**则** 包含 `allowedDomains: [String]`、`allowManagedDomainsOnly: Bool`、`allowLocalBinding: Bool`、`allowUnixSockets: Bool`、`allowAllUnixSockets: Bool`、`httpProxyPort: Int?`、`socksProxyPort: Int?`
+**且** SandboxSettings 添加 `network: SandboxNetworkConfig?` 字段
+
+**给定** SandboxSettings 缺少 `autoAllowBashIfSandboxed`、`allowUnsandboxedCommands`、`ignoreViolations`、`enableWeakerNestedSandbox`、`ripgrep` 字段
+**当** 在 SandboxSettings 中添加这些字段
+**则** `autoAllowBashIfSandboxed: Bool` — 沙盒启用时自动批准 Bash
+**且** `allowUnsandboxedCommands: Bool` — 允许模型请求非沙盒执行
+**且** `ignoreViolations: [String: [String]]?` — 按类别忽略违规规则
+**且** `enableWeakerNestedSandbox: Bool` — 嵌套沙盒降级
+**且** `ripgrep: RipgrepConfig?` — 自定义 ripgrep 配置
+
+**给定** `autoAllowBashIfSandboxed = true` 时 BashTool 自动执行
+**当** 设置 sandbox.enabled + autoAllowBashIfSandboxed
+**则** Bash 工具跳过 canUseTool 检查直接执行
+**且** 命令仍在沙盒环境中运行
+
+> **参考：** Story 16-12 兼容性报告、TS SDK SandboxSettings 文档
+
+### Story 17.10: 查询方法增强
+
+作为 SDK 开发者，
+我希望补齐 Swift SDK 中缺失的 9 个查询控制方法，
+以便开发者可以在查询过程中动态控制 Agent 行为。
+
+**验收标准：**
+
+**给定** TS SDK 有 `rewindFiles(msgId, { dryRun? })` 方法
+**当** 在 Swift SDK 中添加 `agent.rewindFiles(to messageId: String, dryRun: Bool = false) async throws -> RewindResult`
+**则** 将文件系统恢复到指定消息时的状态
+**且** dryRun 模式只返回预览不实际修改
+
+**给定** TS SDK 有 `streamInput(stream)` 流式输入方法
+**当** 在 Swift SDK 中添加 `agent.streamInput(_ input: AsyncStream<String>) -> AsyncStream<SDKMessage>`
+**则** 支持多轮流式对话输入
+**且** 输入流结束时自动触发最终响应
+
+**给定** TS SDK 有 `stopTask(taskId)` 方法
+**当** 在 Swift SDK 中添加 `agent.stopTask(taskId: String) async throws`
+**则** 按 ID 停止后台任务
+**且** 返回任务的部分输出
+
+**给定** TS SDK 有 `close()` 方法
+**当** 在 Swift SDK 中添加 `agent.close() async throws`
+**则** 强制终止查询并清理资源
+**且** 后续查询调用会抛出错误
+
+**给定** TS SDK 有 `initializationResult()`、`supportedCommands()`、`supportedModels()`、`supportedAgents()`、`setMaxThinkingTokens()` 方法
+**当** 在 Swift SDK 中添加对应方法
+**则** `initializationResult()` 返回 `SDKControlInitializeResponse`
+**且** `supportedModels()` 返回 `[ModelInfo]`
+**且** `supportedAgents()` 返回 `[AgentInfo]`
+**且** `setMaxThinkingTokens(_ n: Int?)` 动态调整思考 token 预算
+
+> **参考：** Story 16-7 兼容性报告、TS SDK Query object 文档
+
+### Story 17.11: Thinking 和模型配置增强
+
+作为 SDK 开发者，
+我希望补齐 Swift SDK 中缺失的 effort 级别、ModelInfo 字段和 fallbackModel 行为，
+以便开发者可以精确控制 LLM 的推理行为。
+
+**验收标准：**
+
+**给定** TS SDK 支持 effort 参数（low/medium/high/max）
+**当** 在 Swift SDK 中添加 `EffortLevel` 枚举
+**则** 支持 `.low`、`.medium`、`.high`、`.max` 四个值
+**且** effort 与 ThinkingConfig 正确联动（effort 自动映射到 thinking budget）
+**且** AgentOptions.effort 字段正确传递到 API 请求
+
+**给定** ModelInfo 缺少 `displayName`、`description`、`supportsEffort`、`supportedEffortLevels`、`supportsAdaptiveThinking`、`supportsFastMode` 字段
+**当** 在 ModelInfo 中添加这些字段
+**则** 所有字段为 optional 以保持兼容
+**且** `supportsEffort: Bool?` 标识模型是否支持 effort 控制
+**且** `supportedEffortLevels: [EffortLevel]?` 列出可用级别
+
+**给定** TS SDK 支持 fallbackModel 行为
+**当** 实现主模型失败自动切换
+**则** `AgentOptions.fallbackModel` 指定备用模型名
+**且** 主模型返回错误时自动重试备用模型
+**且** 重试使用相同的消息上下文
+**且** 切换事件通过 `AsyncStream<SDKMessage>` 通知
+
+> **参考：** Story 16-11 兼容性报告、TS SDK ThinkingConfig、ModelInfo 文档
+
+---
+
+## Epic 18: 示例与官方 SDK 完全对齐
+
+在 Epic 17 完成功能缺口填补后，回到 Epic 16 创建的 12 个 Compat* 兼容性验证示例，更新每个示例使其反映填补后的最新状态。核心工作是将兼容性报告中的 `[MISSING]` 条目更新为 `[PASS]`，删除已不再适用的缺口记录，并确保每个示例的兼容性报告准确反映当前 Swift SDK 与 TS SDK 的对齐程度。
+
+**目标来源：** Epic 16（12 个 Compat* 示例）+ Epic 17（功能填补）
+**依赖：** Epic 17 全部完成后执行
+**核心原则：** 每个 Story 对应一个 Epic 16 示例的更新，粒度 1:1
+
+### Story 18.1: 更新 CompatCoreQuery 示例
+
+作为 SDK 开发者，
+我希望更新 `Examples/CompatCoreQuery/` 使其反映 Epic 17 填补后的兼容性状态，
+以便兼容性报告准确展示 Swift SDK 与 TS SDK 的对齐程度。
+
+**验收标准：**
+
+**给定** Epic 17 的 Story 17-1（消息类型增强）和 17-2（AgentOptions 完整参数）已完成
+**当** 重新运行 `CompatCoreQuery` 示例
+**则** SystemData.init 的 session_id/tools/model/permissionMode/mcpServers/cwd 字段标记为 `[PASS]`
+**且** ResultData 的 structuredOutput/permissionDenials/modelUsage/errors 字段标记为 `[PASS]`
+**且** durationApiMs 如未实现仍标记为 `[MISSING]`
+**且** 兼容性报告的 pass rate 提升
+
+> **依赖：** 17-1, 17-2
+
+### Story 18.2: 更新 CompatToolSystem 示例
+
+作为 SDK 开发者，
+我希望更新 `Examples/CompatToolSystem/` 使其反映 Epic 17 填补后的兼容性状态，
+以便工具系统兼容性报告准确展示对齐程度。
+
+**验收标准：**
+
+**给定** Epic 17 的 Story 17-3（工具系统增强）已完成
+**当** 重新运行 `CompatToolSystem` 示例
+**则** ToolAnnotations 的 4 个 hint 字段标记为 `[PASS]`
+**且** ToolResult 类型化内容数组标记为 `[PASS]`
+**且** BashInput.run_in_background 标记为 `[PASS]`
+**且** 兼容性报告的 pass rate 提升
+
+> **依赖：** 17-3
+
+### Story 18.3: 更新 CompatMessageTypes 示例
+
+作为 SDK 开发者，
+我希望更新 `Examples/CompatMessageTypes/` 使其反映 Epic 17 填补后的兼容性状态，
+以便消息类型兼容性报告准确展示对齐程度。
+
+**验收标准：**
+
+**给定** Epic 17 的 Story 17-1（SDKMessage 类型增强）已完成
+**当** 重新运行 `CompatMessageTypes` 示例
+**则** 12 个缺失消息类型现在标记为 `[PASS]`（userMessage, toolProgress, hookStarted/Progress/Response, taskStarted/Progress, authStatus, filesPersisted, localCommandOutput, promptSuggestion, toolUseSummary）
+**且** AssistantData 的 uuid/sessionId/parentToolUseId/error 标记为 `[PASS]`
+**且** ResultData 的 structuredOutput/permissionDenials 标记为 `[PASS]`
+**且** PartialData 的 parentToolUseId/uuid/sessionId 标记为 `[PASS]`
+**且** 兼容性报告从 8 PARTIAL + 12 MISSING 改善为更高 pass rate
+
+> **依赖：** 17-1
+
+### Story 18.4: 更新 CompatHooks 示例
+
+作为 SDK 开发者，
+我希望更新 `Examples/CompatHooks/` 使其反映 Epic 17 填补后的兼容性状态，
+以便 Hook 系统兼容性报告准确展示对齐程度。
+
+**验收标准：**
+
+**给定** Epic 17 的 Story 17-4（Hook 系统增强）已完成
+**当** 重新运行 `CompatHooks` 示例
+**则** setup/worktreeCreate/worktreeRemove 事件标记为 `[PASS]`
+**且** HookInput 缺失字段（transcriptPath, permissionMode, agentId, agentType 等）标记为 `[PASS]`
+**且** HookOutput 缺失字段（systemMessage, reason, updatedInput, additionalContext 等）标记为 `[PASS]`
+
+> **依赖：** 17-4
+
+### Story 18.5: 更新 CompatMCP 示例
+
+作为 SDK 开发者，
+我希望更新 `Examples/CompatMCP/` 使其反映 Epic 17 填补后的兼容性状态，
+以便 MCP 集成兼容性报告准确展示对齐程度。
+
+**验收标准：**
+
+**给定** Epic 17 的 Story 17-8（MCP 集成增强）已完成
+**当** 重新运行 `CompatMCP` 示例
+**则** McpClaudeAIProxyServerConfig 标记为 `[PASS]`
+**且** mcpServerStatus/reconnectMcpServer/toggleMcpServer/setMcpServers 标记为 `[PASS]`
+**且** McpServerStatus 类型标记为 `[PASS]`
+
+> **依赖：** 17-8
+
+### Story 18.6: 更新 CompatSessions 示例
+
+作为 SDK 开发者，
+**且** MCP 运行时管理操作（reconnectMcpServer, toggleMcpServer, setMcpServers）标记为 `[PASS]` 
+
+> **依赖：** 17-8
+
+### Story 18.6: 更新 CompatSessions 示例
+
+作为 SDK 开发者，
+我希望更新 `Examples/CompatSessions/` 使其反映 Epic 17 填补后的兼容性状态，
+以便会话管理兼容性报告准确展示对齐程度。
+
+**验收标准：**
+
+**给定** Epic 17 的 Story 17-7（会话管理增强）已完成
+**当** 重新运行 `CompatSessions` 示例
+**则** continueRecentSession/forkSession/resumeSessionAt/persistSession 标记为 `[PASS]`
+**且** 会话恢复功能实际可用（示例中演示恢复/分叉/禁用持久化）
+
+> **依赖：** 17-7
+
+### Story 18.7: 更新 CompatQueryMethods 示例
+
+作为 SDK 开发者，
+我希望更新 `Examples/CompatQueryMethods/` 使其反映 Epic 17 填补后的兼容性状态，
+以便查询方法兼容性报告准确展示对齐程度。
+
+**验收标准：**
+
+**给定** Epic 17 的 Story 17-10（查询方法增强）已完成
+**当** 重新运行 `CompatQueryMethods` 示例
+**则** rewindFiles/streamInput/stopTask/close/initializationResult/supportedModels/supportedAgents/setMaxThinkingTokens 标记为 `[PASS]`
+**且** 兼容性报告的 pass rate 显著提升
+
+> **依赖：** 17-10
+
+### Story 18.8: 更新 CompatOptions 示例
+
+作为 SDK 开发者，
+我希望更新 `Examples/CompatOptions/` 使其反映 Epic 17 填补后的兼容性状态，
+以便 Agent Options 兼容性报告准确展示对齐程度。
+
+**验收标准：**
+
+**给定** Epic 17 的 Story 17-2（AgentOptions 完整参数）已完成
+**当** 重新运行 `CompatOptions` 示例
+**则** fallbackModel/env/effort/outputFormat/includePartialMessages/promptSuggestions 标记为 `[PASS]`
+**且** continueRecentSession/forkSession/resumeSessionAt/persistSession 标记为 `[PASS]`
+**且** allowedTools/disallowedTools 标记为 `[PASS]`
+
+> **依赖：** 17-2
+
+### Story 18.9: 更新 CompatPermissions 示例
+
+作为 SDK 开发者，
+我希望更新 `Examples/CompatPermissions/` 使其反映 Epic 17 填补后的兼容性状态，
+以便权限系统兼容性报告准确展示对齐程度。
+
+**验收标准：**
+
+**给定** Epic 17 的 Story 17-5（权限系统增强）已完成
+**当** 重新运行 `CompatPermissions` 示例
+**则** PermissionUpdate 6 种操作标记为 `[PASS]`
+**且** CanUseTool 扩展参数（signal, suggestions, blockedPath 等）标记为 `[PASS]`
+**且** SDKPermissionDenial 类型标记为 `[PASS]`
+**且** PermissionUpdateDestination 5 种目标标记为 `[PASS]`
+
+> **依赖：** 17-5
+
+### Story 18.10: 更新 CompatSubagents 示例
+
+作为 SDK 开发者，
+我希望更新 `Examples/CompatSubagents/` 使其反映 Epic 17 填补后的兼容性状态，
+以便子代理系统兼容性报告准确展示对齐程度。
+
+**验收标准：**
+
+**给定** Epic 17 的 Story 17-6（子代理系统增强）已完成
+**当** 重新运行 `CompatSubagents` 示例
+**则** AgentDefinition 的 mcpServers/skills/criticalSystemReminderExperimental 标记为 `[PASS]`
+**且** AgentInput 的 runInBackground/isolation/name/teamName/mode 标记为 `[PASS]`
+**且** AgentOutput 三态判定标记为 `[PASS]`
+
+> **依赖：** 17-6
+
+### Story 18.11: 更新 CompatThinkingModel 示例
+
+作为 SDK 开发者，
+我希望更新 `Examples/CompatThinkingModel/` 使其反映 Epic 17 填补后的兼容性状态，
+以便 Thinking/Model 配置兼容性报告准确展示对齐程度。
+
+**验收标准：**
+
+**给定** Epic 17 的 Story 17-11（Thinking 和模型配置增强）已完成
+**当** 重新运行 `CompatThinkingModel` 示例
+**则** EffortLevel 4 个级别标记为 `[PASS]`
+**且** ModelInfo 补全字段（displayName, description, supportsEffort 等）标记为 `[PASS]`
+**且** fallbackModel 行为标记为 `[PASS]`
+
+> **依赖：** 17-11
+
+### Story 18.12: 更新 CompatSandbox 示例
+
+作为 SDK 开发者，
+我希望更新 `Examples/CompatSandbox/` 使其反映 Epic 17 填补后的兼容性状态，
+以便沙盒配置兼容性报告准确展示对齐程度。
+
+**验收标准：**
+
+**给定** Epic 17 的 Story 17-9（沙盒配置增强）已完成
+**当** 重新运行 `CompatSandbox` 示例
+**则** SandboxNetworkConfig 7 个字段标记为 `[PASS]`
+**且** autoAllowBashIfSandboxed/allowUnsandboxedCommands/ignoreViolations/enableWeakerNestedSandbox/ripgrep 标记为 `[PASS]`
+**且** autoAllowBashIfSandboxed 行为验证通过
+
+> **依赖：** 17-9

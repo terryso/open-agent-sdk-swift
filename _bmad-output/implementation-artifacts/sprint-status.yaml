@@ -1,5 +1,5 @@
 # generated: 2026-04-04
-# last_updated: 2026-04-16 (story 16-12 done)
+# last_updated: 2026-04-16 (story 17-1 ready-for-dev)
 # project: open-agent-sdk-swift
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-04-04
-last_updated: 2026-04-16 (story 16-12 done)
+last_updated: 2026-04-16 (story 17-1 ready-for-dev)
 project_key: NOKEY
 tracking_system: file-system
 story_location: _bmad-output/implementation-artifacts
@@ -197,3 +197,34 @@ development_status:
   16-11-thinking-model-compat: done
   16-12-sandbox-config-compat: done
   epic-16-retrospective: optional
+
+  # Epic 17: 官方 TypeScript SDK 功能对齐
+  epic-17: in-progress
+  17-1-sdkmessage-type-enhancement: done
+  17-2-agent-options-enhancement: backlog
+  17-3-tool-system-enhancement: backlog
+  17-4-hook-system-enhancement: backlog
+  17-5-permission-system-enhancement: backlog
+  17-6-subagent-system-enhancement: backlog
+  17-7-session-management-enhancement: backlog
+  17-8-mcp-integration-enhancement: backlog
+  17-9-sandbox-config-enhancement: backlog
+  17-10-query-methods-enhancement: backlog
+  17-11-thinking-model-enhancement: backlog
+  epic-17-retrospective: optional
+
+  # Epic 18: 示例与官方 SDK 完全对齐
+  epic-18: backlog
+  18-1-update-compat-core-query: backlog
+  18-2-update-compat-tool-system: backlog
+  18-3-update-compat-message-types: backlog
+  18-4-update-compat-hooks: backlog
+  18-5-update-compat-mcp: backlog
+  18-6-update-compat-sessions: backlog
+  18-7-update-compat-query-methods: backlog
+  18-8-update-compat-options: backlog
+  18-9-update-compat-permissions: backlog
+  18-10-update-compat-subagents: backlog
+  18-11-update-compat-thinking-model: backlog
+  18-12-update-compat-sandbox: backlog
+  epic-18-retrospective: optional

@@ -92,6 +92,8 @@ final class CoreQueryCompatE2ETests: XCTestCase {
                 break // Streaming chunks, expected
             case .toolUse, .toolResult:
                 break // May or may not occur depending on query
+            case .userMessage, .toolProgress, .hookStarted, .hookProgress, .hookResponse, .taskStarted, .taskProgress, .authStatus, .filesPersisted, .localCommandOutput, .promptSuggestion, .toolUseSummary:
+                break // New message types from Story 17-1
             }
         }
 

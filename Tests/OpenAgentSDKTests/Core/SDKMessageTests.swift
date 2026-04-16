@@ -176,6 +176,30 @@ final class SDKMessageTests: XCTestCase {
                 break
             case .system:
                 break
+            case .userMessage:
+                break
+            case .toolProgress:
+                break
+            case .hookStarted:
+                break
+            case .hookProgress:
+                break
+            case .hookResponse:
+                break
+            case .taskStarted:
+                break
+            case .taskProgress:
+                break
+            case .authStatus:
+                break
+            case .filesPersisted:
+                break
+            case .localCommandOutput:
+                break
+            case .promptSuggestion:
+                break
+            case .toolUseSummary:
+                break
             }
         }
     }

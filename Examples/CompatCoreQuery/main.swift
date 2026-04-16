@@ -89,6 +89,8 @@ for await message in stream {
     case .result(let data):
         streamedResultData = data
         print("  Received .result: subtype=\(data.subtype.rawValue), text=\(data.text)")
+    case .userMessage, .toolProgress, .hookStarted, .hookProgress, .hookResponse, .taskStarted, .taskProgress, .authStatus, .filesPersisted, .localCommandOutput, .promptSuggestion, .toolUseSummary:
+        break
     }
 }
 

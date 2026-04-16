@@ -849,6 +849,38 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                     await hookRegistry.execute(.sessionStart, input: hookInput)
                 }
 
+                // Emit system init event with session metadata (Story 17-1 AC8)
+                let capturedPermissionMode = _permissionLock.withLock { self.options.permissionMode }
+                let initTools: [SDKMessage.ToolInfo]? = capturedToolProtocols.isEmpty
+                    ? nil
+                    : capturedToolProtocols.map { SDKMessage.ToolInfo(name: $0.name, description: $0.description) }
+                let initMcpServers: [SDKMessage.McpServerInfo]? = capturedMcpServers?.compactMap { (name, config) -> SDKMessage.McpServerInfo? in
+                    let command: String
+                    switch config {
+                    case .stdio(let stdioConfig): command = stdioConfig.command
+                    case .sse(let transportConfig): command = transportConfig.url
+                    case .http(let transportConfig): command = transportConfig.url
+                    case .sdk: command = "(in-process)"
+                    }
+                    return SDKMessage.McpServerInfo(name: name, command: command)
+                }
+                continuation.yield(.system(SDKMessage.SystemData(
+                    subtype: .`init`,
+                    message: "Session started",
+                    sessionId: capturedSessionId,
+                    tools: initTools,
+                    model: capturedModel,
+                    permissionMode: capturedPermissionMode.rawValue,
+                    mcpServers: initMcpServers,
+                    cwd: capturedCwd
+                )))
+
+                // Emit user message event (Story 17-1 AC8)
+                continuation.yield(.userMessage(SDKMessage.UserMessageData(
+                    sessionId: capturedSessionId,
+                    message: text
+                )))
+
                 var totalUsage = TokenUsage(inputTokens: 0, outputTokens: 0)
                 var totalCostUsd: Double = 0.0
                 var turnCount = 0
@@ -1267,6 +1299,14 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                         }
 
                         if !toolUseBlocks.isEmpty {
+                            // Emit tool progress events (Story 17-1 AC8)
+                            for block in toolUseBlocks {
+                                continuation.yield(.toolProgress(SDKMessage.ToolProgressData(
+                                    toolUseId: block.id,
+                                    toolName: block.name
+                                )))
+                            }
+
                             // Create agent spawner if AgentTool is registered
                             let streamSpawner: SubAgentSpawner? = {
                                 let hasAgentTool = allToolProtocols.contains { $0.name == "Agent" }
@@ -1334,6 +1374,13 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
 
                             // Append tool_result user message
                             messages.append(ToolExecutor.buildToolResultMessage(from: processedResults))
+
+                            // Emit tool use summary (Story 17-1 AC8)
+                            let usedToolNames = toolUseBlocks.map { $0.name }
+                            continuation.yield(.toolUseSummary(SDKMessage.ToolUseSummaryData(
+                                toolUseCount: usedToolNames.count,
+                                tools: Array(Set(usedToolNames))
+                            )))
 
                             // Reset maxTokensRecoveryAttempts
                             maxTokensRecoveryAttempts = 0

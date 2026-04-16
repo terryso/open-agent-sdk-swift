@@ -294,6 +294,8 @@ for await message in stream {
     case .result(let data):
         liveResultData = data
         print("  [LIVE] .result: subtype=\(data.subtype.rawValue), text='\(data.text.prefix(50))'")
+    case .userMessage, .toolProgress, .hookStarted, .hookProgress, .hookResponse, .taskStarted, .taskProgress, .authStatus, .filesPersisted, .localCommandOutput, .promptSuggestion, .toolUseSummary:
+        break
     }
 }
 
