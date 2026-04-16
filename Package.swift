@@ -187,5 +187,10 @@ let package = Package(
             dependencies: ["OpenAgentSDK"],
             path: "Examples/CompatOptions"
         ),
+        .executableTarget(
+            name: "CompatPermissions",
+            dependencies: ["OpenAgentSDK"],
+            path: "Examples/CompatPermissions"
+        ),
     ]
 )
