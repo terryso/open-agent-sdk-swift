@@ -202,5 +202,10 @@ let package = Package(
             dependencies: ["OpenAgentSDK"],
             path: "Examples/CompatThinkingModel"
         ),
+        .executableTarget(
+            name: "CompatSandbox",
+            dependencies: ["OpenAgentSDK"],
+            path: "Examples/CompatSandbox"
+        ),
     ]
 )

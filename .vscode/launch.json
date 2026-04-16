@@ -619,6 +619,46 @@
             "target": "CompatSubagents",
             "configuration": "release",
             "preLaunchTask": "swift: Build Release CompatSubagents"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:open-agent-sdk-swift}",
+            "name": "Debug CompatThinkingModel",
+            "target": "CompatThinkingModel",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug CompatThinkingModel"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:open-agent-sdk-swift}",
+            "name": "Release CompatThinkingModel",
+            "target": "CompatThinkingModel",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release CompatThinkingModel"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:open-agent-sdk-swift}",
+            "name": "Debug CompatSandbox",
+            "target": "CompatSandbox",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug CompatSandbox"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:open-agent-sdk-swift}",
+            "name": "Release CompatSandbox",
+            "target": "CompatSandbox",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release CompatSandbox"
         }
     ]
 }
