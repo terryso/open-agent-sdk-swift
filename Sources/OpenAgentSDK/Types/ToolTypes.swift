@@ -3,6 +3,64 @@ import Foundation
 /// JSON Schema dictionary type for tool input definitions.
 public typealias ToolInputSchema = [String: Any]
 
+// MARK: - ToolAnnotations
+
+/// Hints describing a tool's behavior, matching the Anthropic API tool annotations format.
+///
+/// These hints help the LLM decide when and how to invoke a tool. They are optional
+/// and default to conservative values when not specified.
+///
+/// - Note: Defaults match the TypeScript SDK: `destructiveHint` defaults to `true`,
+///         all others default to `false`.
+public struct ToolAnnotations: Sendable, Equatable {
+    /// If `true`, the tool only reads data without performing side effects.
+    public let readOnlyHint: Bool
+
+    /// If `true`, the tool may perform destructive (irreversible) operations.
+    /// Defaults to `true` to be conservative — tools are assumed destructive unless
+    /// explicitly annotated otherwise.
+    public let destructiveHint: Bool
+
+    /// If `true`, calling the tool with the same inputs multiple times produces
+    /// the same result (no additional side effects).
+    public let idempotentHint: Bool
+
+    /// If `true`, the tool may interact with external entities or services
+    /// beyond the local environment.
+    public let openWorldHint: Bool
+
+    public init(
+        readOnlyHint: Bool = false,
+        destructiveHint: Bool = true,
+        idempotentHint: Bool = false,
+        openWorldHint: Bool = false
+    ) {
+        self.readOnlyHint = readOnlyHint
+        self.destructiveHint = destructiveHint
+        self.idempotentHint = idempotentHint
+        self.openWorldHint = openWorldHint
+    }
+}
+
+// MARK: - ToolContent
+
+/// Represents a typed content item in a tool result, supporting multi-modal responses.
+///
+/// Mirrors the Anthropic API's `content` array format for tool results,
+/// which can contain text, images, and embedded resources.
+public enum ToolContent: Sendable, Equatable {
+    /// A plain text content block.
+    case text(String)
+
+    /// An image content block with raw data and MIME type.
+    case image(data: Data, mimeType: String)
+
+    /// A resource content block referencing an external resource by URI.
+    case resource(uri: String, name: String?)
+}
+
+// MARK: - ToolProtocol
+
 /// Protocol defining a tool that can be executed by the agent.
 public protocol ToolProtocol: Sendable {
     var name: String { get }
@@ -10,31 +68,138 @@ public protocol ToolProtocol: Sendable {
     var inputSchema: ToolInputSchema { get }
     var isReadOnly: Bool { get }
 
+    /// Optional hints describing the tool's behavior for LLM guidance.
+    /// Defaults to `nil` via protocol extension; existing tools are unaffected.
+    var annotations: ToolAnnotations? { get }
+
     func call(input: Any, context: ToolContext) async -> ToolResult
 }
+
+/// Default implementation so existing tool implementations compile without modification.
+extension ToolProtocol {
+    public var annotations: ToolAnnotations? { nil }
+}
+
+// MARK: - ToolResult
 
 /// Result returned from a tool execution.
 public struct ToolResult: Sendable, Equatable {
     public let toolUseId: String
-    public let content: String
+
+    /// The stored plain-text content string (backward compatible).
+    private let _content: String
+
+    /// Optional typed content array for multi-modal tool responses.
+    public let typedContent: [ToolContent]?
+
+    /// Whether the tool execution resulted in an error.
     public let isError: Bool
 
+    /// The text content of the result.
+    ///
+    /// When `typedContent` is set, this returns the concatenation of all `.text` items.
+    /// When `typedContent` is `nil`, returns the stored string.
+    public var content: String {
+        if let typedContent {
+            let textItems = typedContent.compactMap { item -> String? in
+                if case .text(let text) = item { return text }
+                return nil
+            }
+            if !textItems.isEmpty {
+                return textItems.joined()
+            }
+        }
+        return _content
+    }
+
+    /// Creates a `ToolResult` with plain text content (backward compatible).
     public init(toolUseId: String, content: String, isError: Bool) {
         self.toolUseId = toolUseId
-        self.content = content
+        self._content = content
+        self.typedContent = nil
         self.isError = isError
     }
+
+    /// Creates a `ToolResult` with typed content items.
+    ///
+    /// The `content` computed property will derive its value from `.text` items
+    /// in the `typedContent` array. If no `.text` items exist, falls back
+    /// to an empty string.
+    public init(toolUseId: String, typedContent: [ToolContent], isError: Bool) {
+        self.toolUseId = toolUseId
+        self._content = ""
+        self.typedContent = typedContent
+        self.isError = isError
+    }
+
+    /// Creates a `ToolResult` preserving both text content and typed content.
+    ///
+    /// Used by `ToolExecutor` when rewrapping `ToolExecuteResult` into `ToolResult`
+    /// to avoid dropping typed content during the dispatch layer.
+    init(toolUseId: String, content: String, typedContent: [ToolContent]?, isError: Bool) {
+        self.toolUseId = toolUseId
+        self._content = content
+        self.typedContent = typedContent
+        self.isError = isError
+    }
+
+    public static func == (lhs: ToolResult, rhs: ToolResult) -> Bool {
+        lhs.toolUseId == rhs.toolUseId &&
+        lhs.content == rhs.content &&
+        lhs.typedContent == rhs.typedContent &&
+        lhs.isError == rhs.isError
+    }
 }
+
+// MARK: - ToolExecuteResult
 
 /// Structured result returned by tool execution closures that need to
 /// explicitly signal success or error.
 public struct ToolExecuteResult: Sendable, Equatable {
-    public let content: String
+    /// The stored plain-text content string (backward compatible).
+    private let _content: String
+
+    /// Optional typed content array for multi-modal tool responses.
+    public let typedContent: [ToolContent]?
+
+    /// Whether the tool execution resulted in an error.
     public let isError: Bool
 
+    /// The text content of the result.
+    ///
+    /// When `typedContent` is set, this returns the concatenation of all `.text` items.
+    /// When `typedContent` is `nil`, returns the stored string.
+    public var content: String {
+        if let typedContent {
+            let textItems = typedContent.compactMap { item -> String? in
+                if case .text(let text) = item { return text }
+                return nil
+            }
+            if !textItems.isEmpty {
+                return textItems.joined()
+            }
+        }
+        return _content
+    }
+
+    /// Creates a `ToolExecuteResult` with plain text content (backward compatible).
     public init(content: String, isError: Bool) {
-        self.content = content
+        self._content = content
+        self.typedContent = nil
         self.isError = isError
+    }
+
+    /// Creates a `ToolExecuteResult` with typed content items.
+    public init(typedContent: [ToolContent], isError: Bool) {
+        self._content = ""
+        self.typedContent = typedContent
+        self.isError = isError
+    }
+
+    public static func == (lhs: ToolExecuteResult, rhs: ToolExecuteResult) -> Bool {
+        lhs.content == rhs.content &&
+        lhs.typedContent == rhs.typedContent &&
+        lhs.isError == rhs.isError
     }
 }
 
@@ -176,7 +341,8 @@ public struct ToolContext: Sendable {
             maxSkillRecursionDepth: maxSkillRecursionDepth,
             fileCache: fileCache,
             sandbox: sandbox,
-            mcpConnections: mcpConnections
+            mcpConnections: mcpConnections,
+            env: env
         )
     }
 
@@ -203,7 +369,8 @@ public struct ToolContext: Sendable {
             maxSkillRecursionDepth: maxSkillRecursionDepth,
             fileCache: fileCache,
             sandbox: sandbox,
-            mcpConnections: mcpConnections
+            mcpConnections: mcpConnections,
+            env: env
         )
     }
 }

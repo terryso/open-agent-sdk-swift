@@ -243,28 +243,28 @@ final class CompatToolSystemTests: XCTestCase {
         XCTAssertFalse(writeTool.isReadOnly, "readOnlyHint equivalent should be false")
     }
 
-    /// AC3 [P0]: Verify ToolAnnotations type does NOT exist in Swift SDK (compatibility gap).
-    func testToolAnnotations_FullType_DoesNotExist() {
+    /// AC3 [P0]: ToolAnnotations type exists with all four hint fields (RESOLVED gap).
+    func testToolAnnotations_FullType_Exists() {
         // Given: TS SDK has `ToolAnnotations { readOnlyHint, destructiveHint, idempotentHint, openWorldHint }`
-        // When: Checking for equivalent Swift type
-        // Then: Swift SDK only has isReadOnly on ToolProtocol (single Bool)
-        // This test documents the gap -- there is no `ToolAnnotations` struct
+        // When: Swift SDK now has matching ToolAnnotations struct
+        // Then: All four hints are available via tool.annotations
 
-        // Verify that only `isReadOnly: Bool` is the annotation field on ToolProtocol
-        // The other three hints (destructive, idempotent, openWorld) are MISSING
         let tool = defineTool(
             name: "gap_test",
             description: "Test",
-            inputSchema: ["type": "object"]
+            inputSchema: ["type": "object"],
+            annotations: ToolAnnotations(readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false)
         ) { (context: ToolContext) async throws -> String in "ok" }
 
         // isReadOnly exists (readOnlyHint equivalent)
         let _ = tool.isReadOnly // Compiles = PASS
 
-        // COMPATIBILITY GAP: No tool.annotations.destructiveHint
-        // COMPATIBILITY GAP: No tool.annotations.idempotentHint
-        // COMPATIBILITY GAP: No tool.annotations.openWorldHint
-        // These are documented as MISSING in the compatibility report
+        // RESOLVED: ToolAnnotations now available with all four hints
+        XCTAssertNotNil(tool.annotations, "Tool should have annotations")
+        XCTAssertEqual(tool.annotations?.readOnlyHint, true)
+        XCTAssertEqual(tool.annotations?.destructiveHint, false)
+        XCTAssertEqual(tool.annotations?.idempotentHint, true)
+        XCTAssertEqual(tool.annotations?.openWorldHint, false)
     }
 
     /// AC3 [P1]: Built-in tools have correct isReadOnly values.
@@ -306,17 +306,22 @@ final class CompatToolSystemTests: XCTestCase {
         XCTAssertFalse(result.isError)
     }
 
-    /// AC4 [P0]: Swift ToolResult.content is String (not typed content array).
-    func testToolResult_ContentIsString_NotTypedArray() {
+    /// AC4 [P0]: Swift ToolResult.content is String, with optional typedContent for multi-part responses.
+    func testToolResult_ContentIsString_WithOptionalTypedContent() {
         // Given: TS SDK CallToolResult.content is Array<TextBlock | ImageBlock | ResourceBlock>
-        // When: Inspecting Swift ToolResult.content type
-        let result = ToolResult(toolUseId: "tu_1", content: "flat string content", isError: false)
-        _ = result
+        // When: Swift ToolResult now supports both flat String and typed content array
+        let stringResult = ToolResult(toolUseId: "tu_1", content: "flat string content", isError: false)
+        XCTAssertEqual(stringResult.content, "flat string content")
+        XCTAssertNil(stringResult.typedContent, "String-only result has no typedContent")
 
-        // Then: content is a flat String (documented as compatibility gap)
-        // COMPATIBILITY GAP: Swift uses flat String, TS uses typed content array
-        // This means Swift cannot return structured multi-part content (text + image)
-        // result.content is String by type -- this verifies the flat String design
+        // RESOLVED: typedContent now available for multi-part responses
+        let typedResult = ToolResult(
+            toolUseId: "tu_2",
+            typedContent: [.text("hello"), .image(data: Data(), mimeType: "image/png")],
+            isError: false
+        )
+        XCTAssertEqual(typedResult.content, "hello", "content derives from .text items")
+        XCTAssertEqual(typedResult.typedContent?.count, 2, "typedContent has all items")
     }
 
     /// AC4 [P0]: ToolExecuteResult mirrors ToolResult with content + isError.
@@ -359,8 +364,8 @@ final class CompatToolSystemTests: XCTestCase {
         // description field is now present (matches TS SDK)
         XCTAssertNotNil(props?["description"], "BashInput should have 'description' field (matches TS SDK)")
 
-        // COMPATIBILITY GAP: TS SDK also has 'run_in_background' field
-        XCTAssertNil(props?["run_in_background"], "BashInput MISSING: 'run_in_background' field (TS SDK has it)")
+        // COMPATIBILITY GAP (RESOLVED): TS SDK also has 'run_in_background' field -- now present in Swift SDK
+        XCTAssertNotNil(props?["run_in_background"], "BashInput should have 'run_in_background' field (matches TS SDK)")
     }
 
     /// AC5 [P0]: Read tool inputSchema has file_path, offset, and limit fields.
@@ -683,14 +688,14 @@ final class CompatToolSystemTests: XCTestCase {
 
         // AC2: defineTool equivalence
         report.append(CompatEntry(tsField: "tool(name,desc,schema,handler)", swiftField: "defineTool()", status: "PASS", note: "4 overloads"))
-        report.append(CompatEntry(tsField: "ToolAnnotations", swiftField: "ToolProtocol.isReadOnly only", status: "MISSING", note: "Missing: destructiveHint, idempotentHint, openWorldHint"))
+        report.append(CompatEntry(tsField: "ToolAnnotations", swiftField: "ToolAnnotations struct", status: "PASS", note: "All 4 hints available"))
 
         // AC4: ToolResult
-        report.append(CompatEntry(tsField: "CallToolResult.content (Array)", swiftField: "ToolResult.content (String)", status: "MISSING", note: "Content is flat String, not typed array"))
+        report.append(CompatEntry(tsField: "CallToolResult.content (Array)", swiftField: "ToolResult.typedContent", status: "PASS", note: "ToolContent enum with text/image/resource"))
 
         // AC5: Input schemas
-        report.append(CompatEntry(tsField: "BashInput.description", swiftField: "N/A", status: "MISSING", note: "Not in Swift SDK"))
-        report.append(CompatEntry(tsField: "BashInput.run_in_background", swiftField: "N/A", status: "MISSING", note: "Not in Swift SDK"))
+        report.append(CompatEntry(tsField: "BashInput.description", swiftField: "BashInput.description", status: "PASS", note: "Matches TS SDK"))
+        report.append(CompatEntry(tsField: "BashInput.run_in_background", swiftField: "BashInput.runInBackground", status: "PASS", note: "Matches TS SDK"))
         report.append(CompatEntry(tsField: "FileReadInput fields", swiftField: "file_path, offset, limit", status: "PASS", note: nil))
         report.append(CompatEntry(tsField: "FileEditInput fields", swiftField: "file_path, old_string, new_string, replace_all", status: "PASS", note: nil))
 

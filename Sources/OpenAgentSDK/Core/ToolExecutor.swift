@@ -369,6 +369,7 @@ enum ToolExecutor {
                 return ToolResult(
                     toolUseId: block.id,
                     content: execResult.content,
+                    typedContent: execResult.typedContent,
                     isError: execResult.isError
                 )
             }
@@ -420,6 +421,7 @@ enum ToolExecutor {
         return ToolResult(
             toolUseId: block.id,
             content: result.content,
+            typedContent: result.typedContent,
             isError: result.isError
         )
     }
@@ -445,10 +447,40 @@ enum ToolExecutor {
     /// - Returns: A dictionary suitable for appending to the messages array.
     static func buildToolResultMessage(from results: [ToolResult]) -> [String: Any] {
         let contentBlocks: [[String: Any]] = results.map { r in
+            let apiContent: Any
+            if let typedContent = r.typedContent, !typedContent.isEmpty {
+                // Serialize typed content as API content array
+                apiContent = typedContent.map { item -> [String: Any] in
+                    switch item {
+                    case .text(let text):
+                        return ["type": "text", "text": text]
+                    case .image(let data, let mimeType):
+                        return [
+                            "type": "image",
+                            "source": [
+                                "type": "base64",
+                                "media_type": mimeType,
+                                "data": data.base64EncodedString()
+                            ]
+                        ]
+                    case .resource(let uri, let name):
+                        var resource: [String: Any] = [
+                            "type": "resource",
+                            "uri": uri
+                        ]
+                        if let name { resource["name"] = name }
+                        return resource
+                    }
+                }
+            } else {
+                // Plain string content (backward compatible)
+                apiContent = r.content
+            }
+
             var block: [String: Any] = [
                 "type": "tool_result",
                 "tool_use_id": r.toolUseId,
-                "content": r.content
+                "content": apiContent
             ]
             if r.isError {
                 block["is_error"] = true

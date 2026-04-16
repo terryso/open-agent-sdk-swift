@@ -18,19 +18,31 @@ public enum ToolTier: String, Sendable, CaseIterable {
 
 /// Converts a single `ToolProtocol` to the Anthropic API tool format.
 ///
-/// The output dictionary contains exactly three keys:
+/// The output dictionary contains:
 /// - `name`: The tool's name
 /// - `description`: The tool's description
 /// - `input_schema`: The tool's input schema
+/// - `annotations`: The tool's annotations (only when present)
 ///
 /// - Parameter tool: The tool to convert.
 /// - Returns: A dictionary in the Anthropic API tool format.
 public func toApiTool(_ tool: ToolProtocol) -> [String: Any] {
-    return [
+    var result: [String: Any] = [
         "name": tool.name,
         "description": tool.description,
         "input_schema": tool.inputSchema
     ]
+
+    if let annotations = tool.annotations {
+        result["annotations"] = [
+            "readOnlyHint": annotations.readOnlyHint,
+            "destructiveHint": annotations.destructiveHint,
+            "idempotentHint": annotations.idempotentHint,
+            "openWorldHint": annotations.openWorldHint
+        ]
+    }
+
+    return result
 }
 
 /// Converts an array of `ToolProtocol` tools to the Anthropic API tool format.

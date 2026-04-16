@@ -21,6 +21,7 @@ import Foundation
 ///   - description: A human-readable description of the tool.
 ///   - inputSchema: The JSON Schema describing the tool's input format.
 ///   - isReadOnly: Whether the tool only reads data without side effects. Defaults to `false`.
+///   - annotations: Optional hints describing the tool's behavior. Defaults to `nil`.
 ///   - execute: A closure that takes the decoded `Input` and a `ToolContext`,
 ///     returning the tool's output as a `String`.
 /// - Returns: A `ToolProtocol` instance that performs Codable bridging in its `call()` method.
@@ -29,6 +30,7 @@ public func defineTool<Input: Codable>(
     description: String,
     inputSchema: ToolInputSchema,
     isReadOnly: Bool = false,
+    annotations: ToolAnnotations? = nil,
     execute: @Sendable @escaping (Input, ToolContext) async throws -> String
 ) -> ToolProtocol {
     return CodableTool(
@@ -36,6 +38,7 @@ public func defineTool<Input: Codable>(
         description: description,
         inputSchema: inputSchema,
         isReadOnly: isReadOnly,
+        annotations: annotations,
         execute: execute
     )
 }
@@ -53,6 +56,7 @@ public func defineTool<Input: Codable>(
 ///   - description: A human-readable description of the tool.
 ///   - inputSchema: The JSON Schema describing the tool's input format.
 ///   - isReadOnly: Whether the tool only reads data without side effects. Defaults to `false`.
+///   - annotations: Optional hints describing the tool's behavior. Defaults to `nil`.
 ///   - execute: A closure that takes the decoded `Input` and a `ToolContext`,
 ///     returning a ``ToolExecuteResult`` with content and isError fields.
 /// - Returns: A `ToolProtocol` instance that performs Codable bridging in its `call()` method.
@@ -61,6 +65,7 @@ public func defineTool<Input: Codable>(
     description: String,
     inputSchema: ToolInputSchema,
     isReadOnly: Bool = false,
+    annotations: ToolAnnotations? = nil,
     execute: @Sendable @escaping (Input, ToolContext) async throws -> ToolExecuteResult
 ) -> ToolProtocol {
     return StructuredCodableTool(
@@ -68,6 +73,7 @@ public func defineTool<Input: Codable>(
         description: description,
         inputSchema: inputSchema,
         isReadOnly: isReadOnly,
+        annotations: annotations,
         execute: execute
     )
 }
@@ -85,6 +91,7 @@ public func defineTool<Input: Codable>(
 ///   - description: A human-readable description of the tool.
 ///   - inputSchema: The JSON Schema describing the tool's input format (typically empty object).
 ///   - isReadOnly: Whether the tool only reads data without side effects. Defaults to `false`.
+///   - annotations: Optional hints describing the tool's behavior. Defaults to `nil`.
 ///   - execute: A closure that takes a ``ToolContext`` and returns the tool's output as a `String`.
 /// - Returns: A `ToolProtocol` instance that ignores input and invokes the closure with context only.
 public func defineTool(
@@ -92,6 +99,7 @@ public func defineTool(
     description: String,
     inputSchema: ToolInputSchema,
     isReadOnly: Bool = false,
+    annotations: ToolAnnotations? = nil,
     execute: @Sendable @escaping (ToolContext) async throws -> String
 ) -> ToolProtocol {
     return NoInputTool(
@@ -99,6 +107,7 @@ public func defineTool(
         description: description,
         inputSchema: inputSchema,
         isReadOnly: isReadOnly,
+        annotations: annotations,
         execute: execute
     )
 }
@@ -115,6 +124,7 @@ private struct RawInputTool: ToolProtocol, @unchecked Sendable {
     let description: String
     let inputSchema: ToolInputSchema
     let isReadOnly: Bool
+    let annotations: ToolAnnotations?
 
     private let executeClosure: @Sendable ([String: Any], ToolContext) async -> ToolExecuteResult
 
@@ -123,12 +133,14 @@ private struct RawInputTool: ToolProtocol, @unchecked Sendable {
         description: String,
         inputSchema: ToolInputSchema,
         isReadOnly: Bool,
+        annotations: ToolAnnotations?,
         execute: @Sendable @escaping ([String: Any], ToolContext) async -> ToolExecuteResult
     ) {
         self.name = name
         self.description = description
         self.inputSchema = inputSchema
         self.isReadOnly = isReadOnly
+        self.annotations = annotations
         self.executeClosure = execute
     }
 
@@ -142,6 +154,13 @@ private struct RawInputTool: ToolProtocol, @unchecked Sendable {
         }
 
         let result = await executeClosure(dict, context)
+        if let typedContent = result.typedContent {
+            return ToolResult(
+                toolUseId: context.toolUseId,
+                typedContent: typedContent,
+                isError: result.isError
+            )
+        }
         return ToolResult(
             toolUseId: context.toolUseId,
             content: result.content,
@@ -163,6 +182,7 @@ private struct RawInputTool: ToolProtocol, @unchecked Sendable {
 ///   - description: A human-readable description of the tool.
 ///   - inputSchema: The JSON Schema describing the tool's input format.
 ///   - isReadOnly: Whether the tool only reads data without side effects. Defaults to `false`.
+///   - annotations: Optional hints describing the tool's behavior. Defaults to `nil`.
 ///   - execute: A closure that takes a raw `[String: Any]` dictionary and a `ToolContext`,
 ///     returning a ``ToolExecuteResult`` with content and isError fields.
 /// - Returns: A `ToolProtocol` instance that passes raw input to the closure.
@@ -171,6 +191,7 @@ public func defineTool(
     description: String,
     inputSchema: ToolInputSchema,
     isReadOnly: Bool = false,
+    annotations: ToolAnnotations? = nil,
     execute: @Sendable @escaping ([String: Any], ToolContext) async -> ToolExecuteResult
 ) -> ToolProtocol {
     return RawInputTool(
@@ -178,6 +199,7 @@ public func defineTool(
         description: description,
         inputSchema: inputSchema,
         isReadOnly: isReadOnly,
+        annotations: annotations,
         execute: execute
     )
 }
@@ -196,6 +218,7 @@ private struct CodableTool<Input: Codable>: ToolProtocol, @unchecked Sendable {
     let description: String
     let inputSchema: ToolInputSchema
     let isReadOnly: Bool
+    let annotations: ToolAnnotations?
 
     private let executeClosure: @Sendable (Input, ToolContext) async throws -> String
 
@@ -204,12 +227,14 @@ private struct CodableTool<Input: Codable>: ToolProtocol, @unchecked Sendable {
         description: String,
         inputSchema: ToolInputSchema,
         isReadOnly: Bool,
+        annotations: ToolAnnotations?,
         execute: @Sendable @escaping (Input, ToolContext) async throws -> String
     ) {
         self.name = name
         self.description = description
         self.inputSchema = inputSchema
         self.isReadOnly = isReadOnly
+        self.annotations = annotations
         self.executeClosure = execute
     }
 
@@ -276,6 +301,7 @@ private struct StructuredCodableTool<Input: Codable>: ToolProtocol, @unchecked S
     let description: String
     let inputSchema: ToolInputSchema
     let isReadOnly: Bool
+    let annotations: ToolAnnotations?
 
     private let executeClosure: @Sendable (Input, ToolContext) async throws -> ToolExecuteResult
 
@@ -284,12 +310,14 @@ private struct StructuredCodableTool<Input: Codable>: ToolProtocol, @unchecked S
         description: String,
         inputSchema: ToolInputSchema,
         isReadOnly: Bool,
+        annotations: ToolAnnotations?,
         execute: @Sendable @escaping (Input, ToolContext) async throws -> ToolExecuteResult
     ) {
         self.name = name
         self.description = description
         self.inputSchema = inputSchema
         self.isReadOnly = isReadOnly
+        self.annotations = annotations
         self.executeClosure = execute
     }
 
@@ -330,6 +358,13 @@ private struct StructuredCodableTool<Input: Codable>: ToolProtocol, @unchecked S
         // Step 4: Invoke execute closure and map structured result to ToolResult
         do {
             let result = try await executeClosure(decoded, context)
+            if let typedContent = result.typedContent {
+                return ToolResult(
+                    toolUseId: context.toolUseId,
+                    typedContent: typedContent,
+                    isError: result.isError
+                )
+            }
             return ToolResult(
                 toolUseId: context.toolUseId,
                 content: result.content,
@@ -356,6 +391,7 @@ private struct NoInputTool: ToolProtocol, @unchecked Sendable {
     let description: String
     let inputSchema: ToolInputSchema
     let isReadOnly: Bool
+    let annotations: ToolAnnotations?
 
     private let executeClosure: @Sendable (ToolContext) async throws -> String
 
@@ -364,12 +400,14 @@ private struct NoInputTool: ToolProtocol, @unchecked Sendable {
         description: String,
         inputSchema: ToolInputSchema,
         isReadOnly: Bool,
+        annotations: ToolAnnotations?,
         execute: @Sendable @escaping (ToolContext) async throws -> String
     ) {
         self.name = name
         self.description = description
         self.inputSchema = inputSchema
         self.isReadOnly = isReadOnly
+        self.annotations = annotations
         self.executeClosure = execute
     }
 

@@ -7,6 +7,14 @@ private struct BashInput: Codable {
     let command: String
     let timeout: Int?
     let description: String?
+    let runInBackground: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case command
+        case timeout
+        case description
+        case runInBackground = "run_in_background"
+    }
 }
 
 // MARK: - Constants
@@ -17,6 +25,42 @@ private enum BashConstants {
     static let truncationThreshold = 100_000
     static let truncationHead = 50_000
     static let truncationTail = 50_000
+}
+
+// MARK: - Background Process Tracking
+
+/// Thread-safe registry for tracking background bash processes.
+///
+/// Stores running `Process` instances keyed by UUID-based task identifiers.
+/// Background processes are launched and immediately return a task ID;
+/// the process runs to completion independently.
+private final class BackgroundProcessRegistry: @unchecked Sendable {
+    static let shared = BackgroundProcessRegistry()
+    private var processes: [String: Process] = [:]
+    private let lock = NSLock()
+
+    func add(_ process: Process) -> String {
+        let taskId = UUID().uuidString
+        lock.lock()
+        processes[taskId] = process
+        lock.unlock()
+        return taskId
+    }
+
+    func remove(_ taskId: String) {
+        lock.lock()
+        processes.removeValue(forKey: taskId)
+        lock.unlock()
+    }
+
+    func terminate(_ taskId: String) {
+        lock.lock()
+        let process = processes[taskId]
+        lock.unlock()
+        if let process, process.isRunning {
+            process.terminate()
+        }
+    }
 }
 
 // MARK: - Thread-safe data accumulator
@@ -53,6 +97,8 @@ private final class ProcessOutputAccumulator: @unchecked Sendable {
 /// - **Exit codes**: Non-zero exit codes are appended to the output but do NOT
 ///   set `isError: true` (exit codes are normal command output).
 /// - **Working directory**: Uses `ToolContext.cwd` as the process working directory.
+/// - **Background execution**: When `run_in_background` is `true`, launches the process
+///   and returns a `backgroundTaskId` immediately for subsequent management.
 /// - **Cross-platform**: Uses Foundation's `Process` class (works on macOS and Linux).
 ///
 /// - Returns: A `ToolProtocol` instance for the Bash tool.
@@ -77,11 +123,16 @@ public func createBashTool() -> ToolProtocol {
                 "description": [
                     "type": "string",
                     "description": "A short description of what the command does (3-5 words)"
+                ],
+                "run_in_background": [
+                    "type": "boolean",
+                    "description": "If true, run the command in the background and return a background task ID"
                 ]
             ],
             "required": ["command"]
         ],
-        isReadOnly: false
+        isReadOnly: false,
+        annotations: ToolAnnotations(destructiveHint: true)
     ) { (input: BashInput, context: ToolContext) async throws -> ToolExecuteResult in
         let timeoutMs = max(1, min(
             input.timeout ?? BashConstants.defaultTimeoutMs,
@@ -93,10 +144,65 @@ public func createBashTool() -> ToolProtocol {
             try SandboxChecker.checkCommand(input.command, settings: sandbox)
         }
 
+        // Background execution path
+        if input.runInBackground == true {
+            return launchBackgroundProcess(
+                command: input.command,
+                cwd: context.cwd
+            )
+        }
+
         return await executeBashProcess(
             command: input.command,
             cwd: context.cwd,
             timeoutMs: timeoutMs
+        )
+    }
+}
+
+// MARK: - Background Process Launch
+
+/// Launches a bash process in the background and returns immediately with a task ID.
+///
+/// The process runs to completion independently. Callers can use the returned
+/// `backgroundTaskId` for subsequent management.
+///
+/// - Parameters:
+///   - command: The shell command to execute.
+///   - cwd: The working directory for the process.
+/// - Returns: A `ToolExecuteResult` containing the background task ID.
+private func launchBackgroundProcess(
+    command: String,
+    cwd: String
+) -> ToolExecuteResult {
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/bin/bash")
+    process.arguments = ["-c", command]
+    process.currentDirectoryURL = URL(fileURLWithPath: cwd)
+
+    // Discard output for background processes
+    let devNull = FileHandle.nullDevice
+    process.standardOutput = devNull
+    process.standardError = devNull
+
+    let registry = BackgroundProcessRegistry.shared
+    let taskId = registry.add(process)
+
+    process.terminationHandler = { _ in
+        registry.remove(taskId)
+    }
+
+    do {
+        try process.run()
+        return ToolExecuteResult(
+            content: "Background task started with ID: \(taskId)",
+            isError: false
+        )
+    } catch {
+        registry.remove(taskId)
+        return ToolExecuteResult(
+            content: "Error starting background process: \(error.localizedDescription)",
+            isError: true
         )
     }
 }
