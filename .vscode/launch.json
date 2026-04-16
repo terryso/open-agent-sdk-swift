@@ -599,6 +599,26 @@
             "target": "CompatPermissions",
             "configuration": "release",
             "preLaunchTask": "swift: Build Release CompatPermissions"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:open-agent-sdk-swift}",
+            "name": "Debug CompatSubagents",
+            "target": "CompatSubagents",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug CompatSubagents"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:open-agent-sdk-swift}",
+            "name": "Release CompatSubagents",
+            "target": "CompatSubagents",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release CompatSubagents"
         }
     ]
 }

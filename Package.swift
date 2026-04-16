@@ -192,5 +192,10 @@ let package = Package(
             dependencies: ["OpenAgentSDK"],
             path: "Examples/CompatPermissions"
         ),
+        .executableTarget(
+            name: "CompatSubagents",
+            dependencies: ["OpenAgentSDK"],
+            path: "Examples/CompatSubagents"
+        ),
     ]
 )
