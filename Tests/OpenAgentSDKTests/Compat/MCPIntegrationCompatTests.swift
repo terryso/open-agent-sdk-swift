@@ -592,16 +592,15 @@ final class MCPIntegrationCompatTests: XCTestCase {
 
     // MARK: - AC7: AgentMcpServerSpec Verification
 
-    /// AC7 [GAP]: AgentDefinition has no mcpServers property.
+    /// AC7 [PASS] (resolved by Story 17-6): AgentDefinition has mcpServers property with AgentMcpServerSpec.
     func testAgentDefinition_noMcpServersProperty() {
         let def = AgentDefinition(name: "worker")
-        let mirror = Mirror(reflecting: def)
-        let fieldNames = mirror.children.compactMap { $0.label }
-        // TS SDK AgentMcpServerSpec supports:
-        // 1. String reference to parent server name
-        // 2. Inline config record
-        XCTAssertFalse(fieldNames.contains("mcpServers"),
-                       "AgentDefinition has no mcpServers field (TS SDK has AgentMcpServerSpec)")
+        XCTAssertNil(def.mcpServers,
+                     "AgentDefinition.mcpServers defaults to nil")
+
+        let defWithMcp = AgentDefinition(name: "worker", mcpServers: [.reference("my-server")])
+        XCTAssertNotNil(defWithMcp.mcpServers,
+                       "AgentDefinition.mcpServers accepts AgentMcpServerSpec array")
     }
 
     /// AC7 [P0]: AgentDefinition has existing fields (name, description, model, etc).

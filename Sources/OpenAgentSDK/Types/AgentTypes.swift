@@ -678,6 +678,19 @@ public struct AgentDefinition: Sendable {
     /// Optional maximum number of turns for the sub-agent loop.
     /// When nil, defaults to 10.
     public let maxTurns: Int?
+    /// Optional blacklist of tool names the sub-agent is denied from using.
+    /// Takes priority over `tools` (allowedTools) -- if a tool name appears in both
+    /// lists, it is blocked.
+    /// Matches the TypeScript SDK's `disallowedTools` field on agent definitions.
+    public let disallowedTools: [String]?
+    /// Optional MCP server specifications for the sub-agent.
+    /// Supports both referencing parent servers by name and inline configurations.
+    public let mcpServers: [AgentMcpServerSpec]?
+    /// Optional list of skill names available to the sub-agent.
+    public let skills: [String]?
+    /// Optional critical system reminder injected into the sub-agent's prompt.
+    /// Maps to the TypeScript SDK's `criticalSystemReminder_EXPERIMENTAL` field.
+    public let criticalSystemReminderExperimental: String?
 
     public init(
         name: String,
@@ -685,7 +698,11 @@ public struct AgentDefinition: Sendable {
         model: String? = nil,
         systemPrompt: String? = nil,
         tools: [String]? = nil,
-        maxTurns: Int? = nil
+        maxTurns: Int? = nil,
+        disallowedTools: [String]? = nil,
+        mcpServers: [AgentMcpServerSpec]? = nil,
+        skills: [String]? = nil,
+        criticalSystemReminderExperimental: String? = nil
     ) {
         self.name = name
         self.description = description
@@ -693,7 +710,137 @@ public struct AgentDefinition: Sendable {
         self.systemPrompt = systemPrompt
         self.tools = tools
         self.maxTurns = maxTurns
+        self.disallowedTools = disallowedTools
+        self.mcpServers = mcpServers
+        self.skills = skills
+        self.criticalSystemReminderExperimental = criticalSystemReminderExperimental
     }
+}
+
+// MARK: - AgentMcpServerSpec
+
+/// Specification for an MCP server to be made available to a sub-agent.
+///
+/// Supports two modes:
+/// - `.reference(String)`: References a parent agent's MCP server by name for lookup at spawn time.
+/// - `.inline(McpServerConfig)`: Provides a full MCP server configuration directly.
+///
+/// ```swift
+/// let ref = AgentMcpServerSpec.reference("github-mcp")
+/// let inline = AgentMcpServerSpec.inline(.stdio(McpStdioConfig(command: "npx", args: ["my-server"])))
+/// ```
+public enum AgentMcpServerSpec: Sendable, Equatable {
+    /// Reference a parent agent's MCP server by name.
+    /// The server is resolved at spawn time from the parent's `mcpServers` configuration.
+    case reference(String)
+    /// Provide an inline MCP server configuration directly.
+    case inline(McpServerConfig)
+}
+
+// MARK: - Agent Output Types
+
+/// Output from a completed sub-agent execution.
+///
+/// Contains the final result text, usage statistics, and metadata from
+/// a sub-agent that ran to completion.
+public struct AgentCompletedOutput: Sendable, Equatable {
+    /// Unique identifier for the sub-agent.
+    public let agentId: String
+    /// The final response text from the sub-agent.
+    public let content: String
+    /// Total number of tool uses during the sub-agent's execution.
+    public let totalToolUseCount: Int
+    /// Total execution duration in milliseconds.
+    public let totalDurationMs: Int
+    /// Total token count consumed during execution.
+    public let totalTokens: Int
+    /// Token usage breakdown, if available.
+    public let usage: TokenUsage?
+    /// The original prompt that was sent to the sub-agent.
+    public let prompt: String
+
+    public init(
+        agentId: String,
+        content: String,
+        totalToolUseCount: Int,
+        totalDurationMs: Int,
+        totalTokens: Int,
+        usage: TokenUsage? = nil,
+        prompt: String
+    ) {
+        self.agentId = agentId
+        self.content = content
+        self.totalToolUseCount = totalToolUseCount
+        self.totalDurationMs = totalDurationMs
+        self.totalTokens = totalTokens
+        self.usage = usage
+        self.prompt = prompt
+    }
+}
+
+/// Output from a sub-agent that was launched asynchronously in the background.
+///
+/// The sub-agent continues running after the call returns. Use `outputFile`
+/// to retrieve results when the agent completes.
+public struct AsyncLaunchedOutput: Sendable, Equatable {
+    /// Unique identifier for the background sub-agent.
+    public let agentId: String
+    /// Short description of the background task.
+    public let description: String
+    /// The original prompt that was sent to the sub-agent.
+    public let prompt: String
+    /// Path to the output file where results will be written. `nil` if not available.
+    public let outputFile: String?
+    /// Whether the output file can be read for intermediate results.
+    public let canReadOutputFile: Bool
+
+    public init(
+        agentId: String,
+        description: String,
+        prompt: String,
+        outputFile: String? = nil,
+        canReadOutputFile: Bool = false
+    ) {
+        self.agentId = agentId
+        self.description = description
+        self.prompt = prompt
+        self.outputFile = outputFile
+        self.canReadOutputFile = canReadOutputFile
+    }
+}
+
+/// Output indicating that execution has entered a sub-agent context.
+///
+/// Used when a sub-agent is entered synchronously and the parent agent
+/// is waiting for it to complete.
+public struct SubAgentEnteredOutput: Sendable, Equatable {
+    /// Description of the sub-agent being entered.
+    public let description: String
+    /// Status message about the sub-agent entry.
+    public let message: String
+
+    public init(description: String, message: String) {
+        self.description = description
+        self.message = message
+    }
+}
+
+/// Three-state discrimination for sub-agent output.
+///
+/// Represents the different outcomes when spawning a sub-agent:
+/// - `.completed`: The sub-agent ran synchronously to completion.
+/// - `.asyncLaunched`: The sub-agent was launched in the background.
+/// - `.subAgentEntered`: Execution has entered a sub-agent context synchronously.
+///
+/// This type is separate from ``SubAgentResult`` (the internal return type)
+/// and provides richer, public-facing output metadata.
+public enum AgentOutput: Sendable, Equatable {
+    /// The sub-agent completed synchronously with a full result.
+    case completed(AgentCompletedOutput)
+    /// The sub-agent was launched asynchronously in the background.
+    case asyncLaunched(AsyncLaunchedOutput)
+    /// Execution has entered a sub-agent context (synchronous entry).
+    case subAgentEntered(SubAgentEnteredOutput)
 }
 
 // MARK: - Sub-Agent Spawning
@@ -724,4 +871,55 @@ public protocol SubAgentSpawner: Sendable {
         allowedTools: [String]?,
         maxTurns: Int?
     ) async -> SubAgentResult
+
+    /// Enhanced spawn with additional sub-agent configuration parameters.
+    ///
+    /// Default implementation delegates to the original 5-parameter ``spawn(prompt:model:systemPrompt:allowedTools:maxTurns:)``
+    /// for backward compatibility. Concrete implementations can override to provide
+    /// enhanced behavior (e.g., disallowedTools filtering, MCP server resolution).
+    func spawn(
+        prompt: String,
+        model: String?,
+        systemPrompt: String?,
+        allowedTools: [String]?,
+        maxTurns: Int?,
+        disallowedTools: [String]?,
+        mcpServers: [AgentMcpServerSpec]?,
+        skills: [String]?,
+        runInBackground: Bool?,
+        isolation: String?,
+        name: String?,
+        teamName: String?,
+        mode: PermissionMode?,
+        resume: String?
+    ) async -> SubAgentResult
+}
+
+/// Default implementation that delegates to the original 5-parameter spawn,
+/// preserving backward compatibility for existing conformers.
+extension SubAgentSpawner {
+    public func spawn(
+        prompt: String,
+        model: String?,
+        systemPrompt: String?,
+        allowedTools: [String]?,
+        maxTurns: Int?,
+        disallowedTools: [String]?,
+        mcpServers: [AgentMcpServerSpec]?,
+        skills: [String]?,
+        runInBackground: Bool?,
+        isolation: String?,
+        name: String?,
+        teamName: String?,
+        mode: PermissionMode?,
+        resume: String?
+    ) async -> SubAgentResult {
+        return await spawn(
+            prompt: prompt,
+            model: model,
+            systemPrompt: systemPrompt,
+            allowedTools: allowedTools,
+            maxTurns: maxTurns
+        )
+    }
 }

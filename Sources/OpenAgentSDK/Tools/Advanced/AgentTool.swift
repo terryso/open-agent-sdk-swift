@@ -35,6 +35,60 @@ private struct AgentToolInput: Codable {
     let model: String?
     let name: String?
     let maxTurns: Int?
+    /// Whether to launch the sub-agent in the background.
+    let runInBackground: Bool?
+    /// Isolation mode for the sub-agent (e.g., "worktree").
+    let isolation: String?
+    /// Team name for multi-agent coordination.
+    let teamName: String?
+    /// Permission mode raw value string (parsed to PermissionMode at spawn time).
+    let mode: String?
+    /// Resume a previously running sub-agent by ID.
+    let resume: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case prompt
+        case description
+        case subagent_type
+        case model
+        case name
+        case maxTurns
+        case run_in_background
+        case isolation
+        case team_name
+        case mode
+        case resume
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        prompt = try container.decode(String.self, forKey: .prompt)
+        description = try container.decode(String.self, forKey: .description)
+        subagent_type = try container.decodeIfPresent(String.self, forKey: .subagent_type)
+        model = try container.decodeIfPresent(String.self, forKey: .model)
+        name = try container.decodeIfPresent(String.self, forKey: .name)
+        maxTurns = try container.decodeIfPresent(Int.self, forKey: .maxTurns)
+        runInBackground = try container.decodeIfPresent(Bool.self, forKey: .run_in_background)
+        isolation = try container.decodeIfPresent(String.self, forKey: .isolation)
+        teamName = try container.decodeIfPresent(String.self, forKey: .team_name)
+        mode = try container.decodeIfPresent(String.self, forKey: .mode)
+        resume = try container.decodeIfPresent(String.self, forKey: .resume)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(prompt, forKey: .prompt)
+        try container.encode(description, forKey: .description)
+        try container.encodeIfPresent(subagent_type, forKey: .subagent_type)
+        try container.encodeIfPresent(model, forKey: .model)
+        try container.encodeIfPresent(name, forKey: .name)
+        try container.encodeIfPresent(maxTurns, forKey: .maxTurns)
+        try container.encodeIfPresent(runInBackground, forKey: .run_in_background)
+        try container.encodeIfPresent(isolation, forKey: .isolation)
+        try container.encodeIfPresent(teamName, forKey: .team_name)
+        try container.encodeIfPresent(mode, forKey: .mode)
+        try container.encodeIfPresent(resume, forKey: .resume)
+    }
 }
 
 // MARK: - AgentTool Schema
@@ -48,6 +102,11 @@ private nonisolated(unsafe) let agentToolSchema: ToolInputSchema = [
         "model": ["type": "string", "description": "Optional model override for this agent"] as [String: Any],
         "name": ["type": "string", "description": "Name for the spawned agent"] as [String: Any],
         "maxTurns": ["type": "integer", "description": "Optional max turns override for this agent"] as [String: Any],
+        "run_in_background": ["type": "boolean", "description": "Whether to launch the sub-agent in the background"] as [String: Any],
+        "isolation": ["type": "string", "description": "Isolation mode for the sub-agent (e.g., \"worktree\")"] as [String: Any],
+        "team_name": ["type": "string", "description": "Team name for multi-agent coordination"] as [String: Any],
+        "mode": ["type": "string", "description": "Permission mode for the sub-agent (e.g., \"bypassPermissions\")"] as [String: Any],
+        "resume": ["type": "string", "description": "Resume a previously running sub-agent by ID"] as [String: Any],
     ] as [String: Any],
     "required": ["prompt", "description"]
 ]
@@ -83,13 +142,25 @@ public func createAgentTool() -> ToolProtocol {
         let agentType = input.subagent_type ?? "general-purpose"
         let agentDef = BUILTIN_AGENTS[agentType]
 
-        // Spawn the sub-agent
+        // Resolve PermissionMode from string (if provided)
+        let resolvedMode: PermissionMode? = input.mode.flatMap { PermissionMode(rawValue: $0) }
+
+        // Spawn the sub-agent with all parameters
         let result = await spawner.spawn(
             prompt: input.prompt,
             model: input.model ?? agentDef?.model,
             systemPrompt: agentDef?.systemPrompt,
             allowedTools: agentDef?.tools,
-            maxTurns: input.maxTurns ?? agentDef?.maxTurns
+            maxTurns: input.maxTurns ?? agentDef?.maxTurns,
+            disallowedTools: agentDef?.disallowedTools,
+            mcpServers: agentDef?.mcpServers,
+            skills: agentDef?.skills,
+            runInBackground: input.runInBackground,
+            isolation: input.isolation,
+            name: input.name,
+            teamName: input.teamName,
+            mode: resolvedMode,
+            resume: input.resume
         )
 
         // Format output

@@ -56,16 +56,18 @@ final class SubagentSystemCompatTests: XCTestCase {
     }
 
     // ================================================================
-    // AC2 #3: disallowedTools -- MISSING
+    // AC2 #3: disallowedTools -- PASS (resolved by Story 17-6)
     // ================================================================
 
-    /// AC2 #3 [MISSING]: TS `disallowedTools?: string[]` has no equivalent in Swift AgentDefinition.
+    /// AC2 #3 [PASS]: TS `disallowedTools?: string[]` maps to `AgentDefinition.disallowedTools: [String]?`.
     func testAgentDefinition_disallowedTools_missing() {
         let def = AgentDefinition(name: "test")
-        let fields = fieldNames(of: def)
+        XCTAssertNil(def.disallowedTools,
+                     "AgentDefinition.disallowedTools defaults to nil")
 
-        XCTAssertFalse(fields.contains("disallowedTools"),
-                       "GAP: AgentDefinition has no 'disallowedTools' property. TS SDK has disallowedTools?: string[] for denied tool list.")
+        let defWithDisallowed = AgentDefinition(name: "test", disallowedTools: ["Bash", "Write"])
+        XCTAssertEqual(defWithDisallowed.disallowedTools, ["Bash", "Write"],
+                       "AgentDefinition.disallowedTools matches TS disallowedTools")
     }
 
     // ================================================================
@@ -110,30 +112,34 @@ final class SubagentSystemCompatTests: XCTestCase {
     }
 
     // ================================================================
-    // AC2 #6: mcpServers -- MISSING
+    // AC2 #6: mcpServers -- PASS (resolved by Story 17-6)
     // ================================================================
 
-    /// AC2 #6 [MISSING]: TS `mcpServers?: Array<string | { name: string; tools?: string[] }>`
-    /// has no equivalent in Swift AgentDefinition.
+    /// AC2 #6 [PASS]: TS `mcpServers?: Array<string | { name: string; tools?: string[] }>`
+    /// maps to `AgentDefinition.mcpServers: [AgentMcpServerSpec]?`.
     func testAgentDefinition_mcpServers_missing() {
         let def = AgentDefinition(name: "test")
-        let fields = fieldNames(of: def)
+        XCTAssertNil(def.mcpServers,
+                     "AgentDefinition.mcpServers defaults to nil")
 
-        XCTAssertFalse(fields.contains("mcpServers"),
-                       "GAP: AgentDefinition has no 'mcpServers' property. TS SDK has mcpServers?: Array<string | { name: string; tools?: string[] }> for subagent MCP configuration.")
+        let defWithMcp = AgentDefinition(name: "test", mcpServers: [.reference("my-server")])
+        XCTAssertNotNil(defWithMcp.mcpServers,
+                       "AgentDefinition.mcpServers accepts AgentMcpServerSpec array")
     }
 
     // ================================================================
-    // AC2 #7: skills -- MISSING
+    // AC2 #7: skills -- PASS (resolved by Story 17-6)
     // ================================================================
 
-    /// AC2 #7 [MISSING]: TS `skills?: string[]` has no equivalent in Swift AgentDefinition.
+    /// AC2 #7 [PASS]: TS `skills?: string[]` maps to `AgentDefinition.skills: [String]?`.
     func testAgentDefinition_skills_missing() {
         let def = AgentDefinition(name: "test")
-        let fields = fieldNames(of: def)
+        XCTAssertNil(def.skills,
+                     "AgentDefinition.skills defaults to nil")
 
-        XCTAssertFalse(fields.contains("skills"),
-                       "GAP: AgentDefinition has no 'skills' property. TS SDK has skills?: string[] for preloaded skill names.")
+        let defWithSkills = AgentDefinition(name: "test", skills: ["review", "test-gen"])
+        XCTAssertEqual(defWithSkills.skills, ["review", "test-gen"],
+                       "AgentDefinition.skills matches TS skills")
     }
 
     // ================================================================
@@ -153,13 +159,16 @@ final class SubagentSystemCompatTests: XCTestCase {
     // AC2 #9: criticalSystemReminder_EXPERIMENTAL -- MISSING
     // ================================================================
 
-    /// AC2 #9 [MISSING]: TS `criticalSystemReminder_EXPERIMENTAL?: string` has no Swift equivalent.
+    /// AC2 #9 [PASS] (resolved by Story 17-6): TS `criticalSystemReminder_EXPERIMENTAL?: string` maps to
+    /// `AgentDefinition.criticalSystemReminderExperimental: String?`.
     func testAgentDefinition_criticalSystemReminder_missing() {
         let def = AgentDefinition(name: "test")
-        let fields = fieldNames(of: def)
+        XCTAssertNil(def.criticalSystemReminderExperimental,
+                     "AgentDefinition.criticalSystemReminderExperimental defaults to nil")
 
-        XCTAssertFalse(fields.contains("criticalSystemReminder_EXPERIMENTAL"),
-                       "GAP: AgentDefinition has no 'criticalSystemReminder_EXPERIMENTAL' property. TS SDK has this experimental reminder field.")
+        let defWithReminder = AgentDefinition(name: "test", criticalSystemReminderExperimental: "Never delete files")
+        XCTAssertEqual(defWithReminder.criticalSystemReminderExperimental, "Never delete files",
+                       "AgentDefinition.criticalSystemReminderExperimental matches TS criticalSystemReminder_EXPERIMENTAL")
     }
 
     // ================================================================
@@ -175,45 +184,50 @@ final class SubagentSystemCompatTests: XCTestCase {
 
     /// AC2 [P0]: Summary of all AgentDefinition fields.
     func testAgentDefinition_coverageSummary() {
-        // AgentDefinition: 4 PASS + 2 PARTIAL + 4 MISSING + 1 N/A = 11 fields
-        // PASS: tools, prompt/systemPrompt, maxTurns, name (Swift-only, N/A for compat)
+        // AgentDefinition: 7 PASS + 2 PARTIAL + 0 MISSING + 1 N/A = 10 fields
+        // PASS: tools, prompt/systemPrompt, maxTurns, name (Swift-only, N/A for compat),
+        //        disallowedTools, mcpServers, skills, criticalSystemReminderExperimental
         // PARTIAL: description (optional vs required), model (no enum constraint)
-        // MISSING: disallowedTools, mcpServers, skills, criticalSystemReminder_EXPERIMENTAL
-        let passCount = 3  // tools, systemPrompt, maxTurns
+        let passCount = 7  // tools, systemPrompt, maxTurns, disallowedTools, mcpServers, skills, criticalSystemReminderExperimental
         let partialCount = 2  // description, model
-        let missingCount = 4  // disallowedTools, mcpServers, skills, criticalSystemReminder_EXPERIMENTAL
+        let missingCount = 0  // All fields resolved by Story 17-6
         let total = passCount + partialCount + missingCount
 
         XCTAssertEqual(total, 9, "Should verify all 9 TS AgentDefinition fields")
-        XCTAssertEqual(passCount, 3, "3 AgentDefinition fields PASS")
+        XCTAssertEqual(passCount, 7, "7 AgentDefinition fields PASS")
         XCTAssertEqual(partialCount, 2, "2 AgentDefinition fields PARTIAL")
-        XCTAssertEqual(missingCount, 4, "4 AgentDefinition fields MISSING")
+        XCTAssertEqual(missingCount, 0, "0 AgentDefinition fields MISSING (all resolved by Story 17-6)")
     }
 
     // MARK: - AC3: AgentMcpServerSpec Verification
 
     // ================================================================
-    // AC3: AgentMcpServerSpec two modes -- MISSING
+    // AC3: AgentMcpServerSpec two modes -- PASS (resolved by Story 17-6)
     // ================================================================
 
-    /// AC3 [MISSING]: TS supports two MCP spec modes for subagents:
-    /// 1) string reference to parent server name
-    /// 2) inline config record { name: string, tools?: string[] }
-    /// Swift has no AgentMcpServerSpec type.
+    /// AC3 [PASS]: TS supports two MCP spec modes for subagents.
+    /// Swift AgentMcpServerSpec now has .reference(String) and .inline(McpServerConfig) cases.
     func testAgentMcpServerSpec_missing() {
-        // TS SDK: mcpServers?: Array<string | { name: string; tools?: string[] }>
-        // Swift SDK: No equivalent type or field on AgentDefinition
+        // Verify AgentMcpServerSpec exists with both modes
+        let ref = AgentMcpServerSpec.reference("my-server")
+        let inline = AgentMcpServerSpec.inline(.stdio(McpStdioConfig(command: "test", args: [])))
 
-        // Verify no such type exists in AgentDefinition fields
-        let def = AgentDefinition(name: "test")
-        let fields = fieldNames(of: def)
-        XCTAssertFalse(fields.contains("mcpServers"),
-                       "GAP: No mcpServers field on AgentDefinition. TS supports string reference and inline config modes.")
+        if case .reference(let name) = ref {
+            XCTAssertEqual(name, "my-server", "AgentMcpServerSpec.reference holds server name")
+        } else {
+            XCTFail("Expected .reference case")
+        }
 
-        // Verify AgentOptions has mcpServers but AgentDefinition does not
-        let opts = AgentOptions(apiKey: "test-key", model: "test",
-                                mcpServers: ["server": .stdio(McpStdioConfig(command: "test", args: []))])
-        XCTAssertNotNil(opts.mcpServers, "AgentOptions has mcpServers but subagent definitions cannot configure their own")
+        if case .inline = inline {
+            // Inline config mode works
+        } else {
+            XCTFail("Expected .inline case")
+        }
+
+        // Verify mcpServers field exists on AgentDefinition
+        let def = AgentDefinition(name: "test", mcpServers: [ref, inline])
+        XCTAssertNotNil(def.mcpServers, "AgentDefinition.mcpServers accepts AgentMcpServerSpec array")
+        XCTAssertEqual(def.mcpServers?.count, 2, "AgentDefinition.mcpServers holds both reference and inline specs")
     }
 
     // MARK: - AC4: Agent Tool Input Type Verification
@@ -301,77 +315,77 @@ final class SubagentSystemCompatTests: XCTestCase {
     }
 
     // ================================================================
-    // AC4 #7: resume -- MISSING
+    // AC4 #7: resume -- PASS (resolved by Story 17-6)
     // ================================================================
 
-    /// AC4 #7 [MISSING]: TS `resume?: string` has no equivalent in Swift AgentToolInput.
+    /// AC4 #7 [PASS]: TS `resume?: string` maps to AgentToolInput.resume.
     func testAgentToolInput_resume_missing() {
         let schema = agentToolInputSchema
         let properties = schema["properties"] as? [String: [String: Any]] ?? [:]
-        XCTAssertNil(properties["resume"],
-                     "GAP: Agent tool schema has no 'resume' field. TS SDK has resume?: string for resuming subagent conversations.")
+        XCTAssertNotNil(properties["resume"],
+                     "Agent tool schema has 'resume' field matching TS resume?: string")
     }
 
     // ================================================================
-    // AC4 #8: run_in_background -- MISSING
+    // AC4 #8: run_in_background -- PASS (resolved by Story 17-6)
     // ================================================================
 
-    /// AC4 #8 [MISSING]: TS `run_in_background?: boolean` has no Swift equivalent.
+    /// AC4 #8 [PASS]: TS `run_in_background?: boolean` maps to AgentToolInput.run_in_background.
     func testAgentToolInput_runInBackground_missing() {
         let schema = agentToolInputSchema
         let properties = schema["properties"] as? [String: [String: Any]] ?? [:]
-        XCTAssertNil(properties["run_in_background"],
-                     "GAP: Agent tool schema has no 'run_in_background' field. TS SDK has run_in_background?: boolean for async agent launch.")
+        XCTAssertNotNil(properties["run_in_background"],
+                     "Agent tool schema has 'run_in_background' field matching TS run_in_background?: boolean")
     }
 
     // ================================================================
-    // AC4 #9: team_name -- MISSING
+    // AC4 #9: team_name -- PASS (resolved by Story 17-6)
     // ================================================================
 
-    /// AC4 #9 [MISSING]: TS `team_name?: string` has no Swift equivalent.
+    /// AC4 #9 [PASS]: TS `team_name?: string` maps to AgentToolInput.team_name.
     func testAgentToolInput_teamName_missing() {
         let schema = agentToolInputSchema
         let properties = schema["properties"] as? [String: [String: Any]] ?? [:]
-        XCTAssertNil(properties["team_name"],
-                     "GAP: Agent tool schema has no 'team_name' field. TS SDK has team_name?: string for team coordination.")
+        XCTAssertNotNil(properties["team_name"],
+                     "Agent tool schema has 'team_name' field matching TS team_name?: string")
     }
 
     // ================================================================
-    // AC4 #10: mode (PermissionMode) -- MISSING
+    // AC4 #10: mode (PermissionMode) -- PASS (resolved by Story 17-6)
     // ================================================================
 
-    /// AC4 #10 [MISSING]: TS `mode?: PermissionMode` has no Swift equivalent in AgentToolInput.
+    /// AC4 #10 [PASS]: TS `mode?: PermissionMode` maps to AgentToolInput.mode.
     func testAgentToolInput_mode_missing() {
         let schema = agentToolInputSchema
         let properties = schema["properties"] as? [String: [String: Any]] ?? [:]
-        XCTAssertNil(properties["mode"],
-                     "GAP: Agent tool schema has no 'mode' field. TS SDK has mode?: PermissionMode for per-subagent permission control.")
+        XCTAssertNotNil(properties["mode"],
+                     "Agent tool schema has 'mode' field matching TS mode?: PermissionMode")
     }
 
     // ================================================================
-    // AC4 #11: isolation -- MISSING
+    // AC4 #11: isolation -- PASS (resolved by Story 17-6)
     // ================================================================
 
-    /// AC4 #11 [MISSING]: TS `isolation?: "worktree"` has no Swift equivalent.
+    /// AC4 #11 [PASS]: TS `isolation?: "worktree"` maps to AgentToolInput.isolation.
     func testAgentToolInput_isolation_missing() {
         let schema = agentToolInputSchema
         let properties = schema["properties"] as? [String: [String: Any]] ?? [:]
-        XCTAssertNil(properties["isolation"],
-                     "GAP: Agent tool schema has no 'isolation' field. TS SDK has isolation?: 'worktree' for worktree-based isolation.")
+        XCTAssertNotNil(properties["isolation"],
+                     "Agent tool schema has 'isolation' field matching TS isolation?: 'worktree'")
     }
 
     /// AC4 [P0]: Summary of all AgentToolInput fields.
     func testAgentToolInput_coverageSummary() {
-        // AgentToolInput: 6 PASS + 0 PARTIAL + 5 MISSING = 11 fields
-        // PASS: prompt, description, subagent_type, model, name, maxTurns
-        // MISSING: resume, run_in_background, team_name, mode, isolation
-        let passCount = 6
-        let missingCount = 5
+        // AgentToolInput: 11 PASS + 0 PARTIAL + 0 MISSING = 11 fields
+        // PASS: prompt, description, subagent_type, model, name, maxTurns,
+        //       resume, run_in_background, team_name, mode, isolation
+        let passCount = 11
+        let missingCount = 0
         let total = passCount + missingCount
 
         XCTAssertEqual(total, 11, "Should verify all 11 TS AgentInput fields")
-        XCTAssertEqual(passCount, 6, "6 AgentToolInput fields PASS")
-        XCTAssertEqual(missingCount, 5, "5 AgentToolInput fields MISSING")
+        XCTAssertEqual(passCount, 11, "11 AgentToolInput fields PASS")
+        XCTAssertEqual(missingCount, 0, "0 AgentToolInput fields MISSING (all resolved by Story 17-6)")
     }
 
     // MARK: - AC5: Agent Tool Output Type Verification
@@ -392,79 +406,89 @@ final class SubagentSystemCompatTests: XCTestCase {
     }
 
     // ================================================================
-    // AC5 #2: status: "completed" discrimination -- MISSING
+    // AC5 #2: status: "completed" discrimination -- PASS (resolved by Story 17-6)
     // ================================================================
 
-    /// AC5 #2 [MISSING]: TS has `status: "completed"` with agentId, content, totalToolUseCount,
-    /// totalDurationMs, totalTokens, usage, prompt. Swift SubAgentResult has no status field.
+    /// AC5 #2 [PASS]: TS `status: "completed"` maps to `AgentOutput.completed(AgentCompletedOutput)`.
     func testAgentOutput_statusCompleted_missing() {
-        let result = SubAgentResult(text: "Done", toolCalls: [], isError: false)
-        let fields = fieldNames(of: result)
+        let completed = AgentCompletedOutput(
+            agentId: "agent-1",
+            content: "Done",
+            totalToolUseCount: 3,
+            totalDurationMs: 1000,
+            totalTokens: 500,
+            usage: nil,
+            prompt: "test"
+        )
+        let output = AgentOutput.completed(completed)
 
-        XCTAssertFalse(fields.contains("status"),
-                       "GAP: SubAgentResult has no 'status' field. TS SDK has status: 'completed' | 'async_launched' | 'sub_agent_entered' discrimination.")
-        XCTAssertFalse(fields.contains("agentId"),
-                       "GAP: SubAgentResult has no 'agentId' field. TS completed output includes agentId.")
-        XCTAssertFalse(fields.contains("totalToolUseCount"),
-                       "GAP: SubAgentResult has no 'totalToolUseCount' field.")
-        XCTAssertFalse(fields.contains("totalDurationMs"),
-                       "GAP: SubAgentResult has no 'totalDurationMs' field.")
-        XCTAssertFalse(fields.contains("totalTokens"),
-                       "GAP: SubAgentResult has no 'totalTokens' field.")
-        XCTAssertFalse(fields.contains("usage"),
-                       "GAP: SubAgentResult has no 'usage' field.")
+        if case .completed(let c) = output {
+            XCTAssertEqual(c.agentId, "agent-1")
+            XCTAssertEqual(c.content, "Done")
+            XCTAssertEqual(c.totalToolUseCount, 3)
+            XCTAssertEqual(c.totalDurationMs, 1000)
+            XCTAssertEqual(c.totalTokens, 500)
+            XCTAssertEqual(c.prompt, "test")
+        } else {
+            XCTFail("Expected .completed case")
+        }
     }
 
     // ================================================================
-    // AC5 #3: status: "async_launched" discrimination -- MISSING
+    // AC5 #3: status: "async_launched" discrimination -- PASS (resolved by Story 17-6)
     // ================================================================
 
-    /// AC5 #3 [MISSING]: TS has `status: "async_launched"` with agentId, description, prompt,
-    /// outputFile, canReadOutputFile. Swift has no async launch support.
+    /// AC5 #3 [PASS]: TS `status: "async_launched"` maps to `AgentOutput.asyncLaunched(AsyncLaunchedOutput)`.
     func testAgentOutput_statusAsyncLaunched_missing() {
-        let result = SubAgentResult(text: "Done", toolCalls: [], isError: false)
-        let fields = fieldNames(of: result)
+        let launched = AsyncLaunchedOutput(
+            agentId: "agent-2",
+            description: "Background task",
+            prompt: "run",
+            outputFile: "/tmp/out.json",
+            canReadOutputFile: true
+        )
+        let output = AgentOutput.asyncLaunched(launched)
 
-        XCTAssertFalse(fields.contains("outputFile"),
-                       "GAP: SubAgentResult has no 'outputFile' field. TS async_launched includes outputFile path.")
-        XCTAssertFalse(fields.contains("canReadOutputFile"),
-                       "GAP: SubAgentResult has no 'canReadOutputFile' field. TS async_launched includes canReadOutputFile.")
+        if case .asyncLaunched(let l) = output {
+            XCTAssertEqual(l.agentId, "agent-2")
+            XCTAssertEqual(l.outputFile, "/tmp/out.json")
+            XCTAssertTrue(l.canReadOutputFile)
+        } else {
+            XCTFail("Expected .asyncLaunched case")
+        }
     }
 
     // ================================================================
-    // AC5 #4: status: "sub_agent_entered" discrimination -- MISSING
+    // AC5 #4: status: "sub_agent_entered" discrimination -- PASS (resolved by Story 17-6)
     // ================================================================
 
-    /// AC5 #4 [MISSING]: TS has `status: "sub_agent_entered"` with description, message.
-    /// Swift has no sub_agent_entered status.
+    /// AC5 #4 [PASS]: TS `status: "sub_agent_entered"` maps to `AgentOutput.subAgentEntered(SubAgentEnteredOutput)`.
     func testAgentOutput_statusSubAgentEntered_missing() {
-        // TS SDK: { status: "sub_agent_entered", description: string, message: string }
-        // Swift SDK: No equivalent. SubAgentResult only has text/toolCalls/isError.
-        // This is a gap in status discrimination.
-        let result = SubAgentResult(text: "Done", toolCalls: [], isError: false)
-        let fields = fieldNames(of: result)
+        let entered = SubAgentEnteredOutput(description: "Entering Plan agent", message: "Starting")
+        let output = AgentOutput.subAgentEntered(entered)
 
-        // SubAgentResult has exactly 3 fields
-        XCTAssertEqual(fields.count, 3, "SubAgentResult has exactly 3 fields (text, toolCalls, isError)")
-        XCTAssertTrue(fields.contains("text"))
-        XCTAssertTrue(fields.contains("toolCalls"))
-        XCTAssertTrue(fields.contains("isError"))
+        if case .subAgentEntered(let e) = output {
+            XCTAssertEqual(e.description, "Entering Plan agent")
+            XCTAssertEqual(e.message, "Starting")
+        } else {
+            XCTFail("Expected .subAgentEntered case")
+        }
     }
 
     /// AC5 [P0]: Summary of all AgentOutput fields.
     func testAgentOutput_coverageSummary() {
-        // AgentOutput: 3 PASS + 0 PARTIAL + 11 MISSING = 14 fields
-        // PASS: text, toolCalls, isError (basic output)
-        // MISSING: status, agentId, totalToolUseCount, totalDurationMs, totalTokens,
-        //          usage, outputFile, canReadOutputFile (async_launched),
-        //          description (sub_agent_entered), message (sub_agent_entered)
-        let passCount = 3
-        let missingCount = 11
+        // AgentOutput: 14 PASS + 0 PARTIAL + 0 MISSING = 14 fields
+        // PASS: text, toolCalls, isError (basic SubAgentResult output),
+        //       agentId, content, totalToolUseCount, totalDurationMs, totalTokens, usage, prompt (completed),
+        //       outputFile, canReadOutputFile (async_launched),
+        //       description, message (sub_agent_entered)
+        let passCount = 14
+        let missingCount = 0
         let total = passCount + missingCount
 
         XCTAssertEqual(total, 14, "Should verify all 14 TS AgentOutput fields/statuses")
-        XCTAssertEqual(passCount, 3, "3 AgentOutput fields PASS")
-        XCTAssertEqual(missingCount, 11, "11 AgentOutput fields MISSING")
+        XCTAssertEqual(passCount, 14, "14 AgentOutput fields PASS")
+        XCTAssertEqual(missingCount, 0, "0 AgentOutput fields MISSING (all resolved by Story 17-6)")
     }
 
     // MARK: - AC6: Subagent Hook Event Verification

@@ -15,6 +15,15 @@ final class MockSubAgentSpawner: SubAgentSpawner, @unchecked Sendable {
         let systemPrompt: String?
         let allowedTools: [String]?
         let maxTurns: Int?
+        let disallowedTools: [String]?
+        let mcpServers: [AgentMcpServerSpec]?
+        let skills: [String]?
+        let runInBackground: Bool?
+        let isolation: String?
+        let name: String?
+        let teamName: String?
+        let mode: PermissionMode?
+        let resume: String?
     }
 
     init(result: SubAgentResult) {
@@ -33,7 +42,51 @@ final class MockSubAgentSpawner: SubAgentSpawner, @unchecked Sendable {
             model: model,
             systemPrompt: systemPrompt,
             allowedTools: allowedTools,
-            maxTurns: maxTurns
+            maxTurns: maxTurns,
+            disallowedTools: nil,
+            mcpServers: nil,
+            skills: nil,
+            runInBackground: nil,
+            isolation: nil,
+            name: nil,
+            teamName: nil,
+            mode: nil,
+            resume: nil
+        )
+        return result
+    }
+
+    func spawn(
+        prompt: String,
+        model: String?,
+        systemPrompt: String?,
+        allowedTools: [String]?,
+        maxTurns: Int?,
+        disallowedTools: [String]?,
+        mcpServers: [AgentMcpServerSpec]?,
+        skills: [String]?,
+        runInBackground: Bool?,
+        isolation: String?,
+        name: String?,
+        teamName: String?,
+        mode: PermissionMode?,
+        resume: String?
+    ) async -> SubAgentResult {
+        lastCall = SpawnCall(
+            prompt: prompt,
+            model: model,
+            systemPrompt: systemPrompt,
+            allowedTools: allowedTools,
+            maxTurns: maxTurns,
+            disallowedTools: disallowedTools,
+            mcpServers: mcpServers,
+            skills: skills,
+            runInBackground: runInBackground,
+            isolation: isolation,
+            name: name,
+            teamName: teamName,
+            mode: mode,
+            resume: resume
         )
         return result
     }
