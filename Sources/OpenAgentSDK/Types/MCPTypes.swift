@@ -34,3 +34,97 @@ public struct MCPManagedConnection: Sendable {
         self.tools = tools
     }
 }
+
+// MARK: - McpServerStatusEnum
+
+/// Public status values for MCP servers, matching the TypeScript SDK's 5 status values.
+///
+/// This enum is separate from ``MCPConnectionStatus`` (which has 3 internal cases)
+/// to avoid breaking existing consumers while providing the full TS SDK status set.
+public enum McpServerStatusEnum: String, Sendable, Equatable, CaseIterable {
+    /// The server is connected and tools are available.
+    case connected
+    /// The connection has failed.
+    case failed
+    /// The server requires authentication before connecting.
+    case needsAuth
+    /// The server connection is pending (in progress).
+    case pending
+    /// The server has been disabled by the user.
+    case disabled
+}
+
+// MARK: - McpServerInfo
+
+/// Server name and version information for an MCP server.
+///
+/// Corresponds to the TypeScript SDK's server info field on `McpServerStatus`.
+public struct McpServerInfo: Sendable, Equatable {
+    /// The server name reported during MCP handshake.
+    public let name: String
+    /// The server version reported during MCP handshake.
+    public let version: String
+
+    public init(name: String, version: String) {
+        self.name = name
+        self.version = version
+    }
+}
+
+// MARK: - McpServerStatus
+
+/// Public-facing status of an MCP server, matching the TypeScript SDK's `McpServerStatus`.
+///
+/// Provides the server name, connection status, server info, error details,
+/// and the list of available tools. Use ``Agent/mcpServerStatus()`` to obtain instances.
+public struct McpServerStatus: Sendable, Equatable {
+    /// The name of the MCP server.
+    public let name: String
+
+    /// The current connection status.
+    public let status: McpServerStatusEnum
+
+    /// Server name and version reported during MCP handshake, if available.
+    public let serverInfo: McpServerInfo?
+
+    /// Error message if the connection failed, otherwise `nil`.
+    public let error: String?
+
+    /// List of tool names available from this server.
+    public let tools: [String]
+
+    public init(
+        name: String,
+        status: McpServerStatusEnum,
+        serverInfo: McpServerInfo? = nil,
+        error: String? = nil,
+        tools: [String] = []
+    ) {
+        self.name = name
+        self.status = status
+        self.serverInfo = serverInfo
+        self.error = error
+        self.tools = tools
+    }
+}
+
+// MARK: - McpServerUpdateResult
+
+/// Result of dynamically replacing the MCP server set via ``Agent/setMcpServers(_:)``.
+///
+/// Corresponds to the TypeScript SDK's `McpSetServersResult` with added, removed,
+/// and error information.
+public struct McpServerUpdateResult: Sendable, Equatable {
+    /// Names of servers that were newly added.
+    public let added: [String]
+    /// Names of servers that were removed.
+    public let removed: [String]
+    /// Per-server errors encountered during the update (server name -> error message).
+    public let errors: [String: String]
+
+    public init(added: [String] = [], removed: [String] = [], errors: [String: String] = [:]) {
+        self.added = added
+        self.removed = removed
+        self.errors = errors
+    }
+}

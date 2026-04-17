@@ -28,6 +28,12 @@ public actor MCPClientManager {
     /// HTTPClientTransport instances for SSE/HTTP connections, indexed by server name.
     private var httpTransports: [String: HTTPClientTransport] = [:]
 
+    /// Original configurations passed to connectAll(), stored for reconnection.
+    private var originalConfigs: [String: McpServerConfig] = [:]
+
+    /// Set of server names that have been disabled by the user.
+    private var disabledServers: Set<String> = []
+
     // MARK: - Initialization
 
     /// Creates a new MCPClientManager with no connections.
@@ -228,6 +234,11 @@ public actor MCPClientManager {
     ///
     /// - Parameter servers: A dictionary of server names to their configurations.
     public func connectAll(servers: [String: McpServerConfig]) async {
+        // Store original configs for reconnection support
+        for (name, config) in servers {
+            originalConfigs[name] = config
+        }
+
         // Connect concurrently for better performance (AC8)
         await withTaskGroup(of: Void.self) { group in
             for (name, config) in servers {
@@ -242,6 +253,8 @@ public actor MCPClientManager {
                     case .sdk:
                         // SDK servers are handled directly by Agent, not via MCPClientManager
                         break
+                    case .claudeAIProxy(let proxyConfig):
+                        await self.connectClaudeAIProxy(name: name, config: proxyConfig)
                     }
                 }
             }
@@ -287,6 +300,207 @@ public actor MCPClientManager {
         connections.values
             .filter { $0.status == .connected }
             .flatMap { $0.tools }
+    }
+
+    // MARK: - Runtime Management
+
+    /// Returns the public-facing status of all MCP servers.
+    ///
+    /// Converts internal ``MCPManagedConnection`` data to public ``McpServerStatus``
+    /// with the full 5-value status enum matching the TypeScript SDK.
+    ///
+    /// - Returns: A dictionary of server names to their public status.
+    public func getStatus() -> [String: McpServerStatus] {
+        var result: [String: McpServerStatus] = [:]
+
+        // Include all servers: those tracked via originalConfigs and any individually connected
+        let allNames = Set(originalConfigs.keys).union(Set(connections.keys))
+
+        for name in allNames {
+            if disabledServers.contains(name) {
+                result[name] = McpServerStatus(name: name, status: .disabled)
+            } else if let connection = connections[name] {
+                let statusEnum: McpServerStatusEnum
+                switch connection.status {
+                case .connected:
+                    statusEnum = .connected
+                case .error:
+                    statusEnum = .failed
+                case .disconnected:
+                    statusEnum = .pending
+                }
+                let toolNames = connection.tools.map { tool -> String in
+                    tool.name
+                }
+                result[name] = McpServerStatus(
+                    name: name,
+                    status: statusEnum,
+                    error: connection.status == .error ? "Connection failed" : nil,
+                    tools: toolNames
+                )
+            } else {
+                result[name] = McpServerStatus(name: name, status: .pending)
+            }
+        }
+
+        return result
+    }
+
+    /// Reconnects a specific MCP server by disconnecting and re-establishing the connection.
+    ///
+    /// Uses the original configuration stored from the initial `connectAll()` call.
+    ///
+    /// - Parameter name: The server name to reconnect.
+    /// - Throws: An error if the server name is not found in the stored configurations.
+    public func reconnect(name: String) async throws {
+        guard let config = originalConfigs[name] else {
+            throw MCPClientManagerError.serverNotFound(name)
+        }
+
+        // Disconnect existing connection if any
+        await cleanupConnection(name: name)
+        connections.removeValue(forKey: name)
+
+        // Remove from disabled set so it can reconnect
+        disabledServers.remove(name)
+
+        // Reconnect using stored config
+        switch config {
+        case .stdio(let stdioConfig):
+            await connect(name: name, config: stdioConfig)
+        case .sse(let sseConfig):
+            await connect(name: name, config: sseConfig, streaming: true)
+        case .http(let httpConfig):
+            await connect(name: name, config: httpConfig, streaming: false)
+        case .sdk:
+            break
+        case .claudeAIProxy(let proxyConfig):
+            await connectClaudeAIProxy(name: name, config: proxyConfig)
+        }
+    }
+
+    /// Enables or disables a specific MCP server.
+    ///
+    /// When disabled, the server's connection is closed but its configuration is retained
+    /// for potential re-enablement. When enabled, the server is reconnected using its
+    /// stored configuration.
+    ///
+    /// - Parameters:
+    ///   - name: The server name to toggle.
+    ///   - enabled: `true` to enable (reconnect), `false` to disable (disconnect).
+    /// - Throws: An error if the server name is not found in the stored configurations.
+    public func toggle(name: String, enabled: Bool) async throws {
+        guard originalConfigs[name] != nil else {
+            throw MCPClientManagerError.serverNotFound(name)
+        }
+
+        if enabled {
+            disabledServers.remove(name)
+            // Reconnect using stored config
+            try await reconnect(name: name)
+        } else {
+            disabledServers.insert(name)
+            // Disconnect but keep config
+            await cleanupConnection(name: name)
+            connections[name] = MCPManagedConnection(
+                name: name,
+                status: .disconnected,
+                tools: []
+            )
+        }
+    }
+
+    /// Dynamically replaces the full MCP server set.
+    ///
+    /// Compares new server configurations against existing connections:
+    /// - Servers in the new set but not currently connected are added.
+    /// - Servers currently connected but not in the new set are removed.
+    /// - Errors encountered during connection are reported per-server.
+    ///
+    /// - Parameter servers: The new set of MCP server configurations.
+    /// - Returns: A ``McpServerUpdateResult`` with added, removed, and error details.
+    public func setServers(_ servers: [String: McpServerConfig]) async -> McpServerUpdateResult {
+        let existingNames = Set(originalConfigs.keys)
+        let newNames = Set(servers.keys)
+
+        let addedNames = newNames.subtracting(existingNames)
+        let removedNames = existingNames.subtracting(newNames)
+        var errors: [String: String] = [:]
+
+        // Remove servers no longer in the new set
+        for name in removedNames {
+            await cleanupConnection(name: name)
+            connections.removeValue(forKey: name)
+            originalConfigs.removeValue(forKey: name)
+            disabledServers.remove(name)
+        }
+
+        // Detect changed configs (same name, different config)
+        let changedNames = newNames.intersection(existingNames).filter { name in
+            originalConfigs[name] != servers[name]
+        }
+
+        // Treat changed servers as remove + add
+        for name in changedNames {
+            await cleanupConnection(name: name)
+            connections.removeValue(forKey: name)
+            originalConfigs.removeValue(forKey: name)
+            disabledServers.remove(name)
+        }
+
+        let effectiveAdded = addedNames.union(changedNames)
+
+        // Connect new servers
+        for name in effectiveAdded {
+            guard let config = servers[name] else { continue }
+            originalConfigs[name] = config
+
+            switch config {
+            case .stdio(let stdioConfig):
+                await connect(name: name, config: stdioConfig)
+            case .sse(let sseConfig):
+                await connect(name: name, config: sseConfig, streaming: true)
+            case .http(let httpConfig):
+                await connect(name: name, config: httpConfig, streaming: false)
+            case .sdk:
+                break
+            case .claudeAIProxy(let proxyConfig):
+                await connectClaudeAIProxy(name: name, config: proxyConfig)
+            }
+
+            // Check if connection failed
+            if let connection = connections[name], connection.status == .error {
+                errors[name] = "Connection failed"
+            }
+        }
+
+        return McpServerUpdateResult(
+            added: Array(addedNames).sorted(),
+            removed: Array(removedNames).sorted(),
+            errors: errors
+        )
+    }
+
+    // MARK: - ClaudeAI Proxy Connection
+
+    /// Connects to an MCP server via the ClaudeAI proxy.
+    ///
+    /// Uses HTTP transport to the proxy URL with authentication headers
+    /// derived from the proxy configuration's `id` field.
+    ///
+    /// - Parameters:
+    ///   - name: The server name for identification and tool namespacing.
+    ///   - config: The ClaudeAI proxy configuration.
+    private func connectClaudeAIProxy(name: String, config: McpClaudeAIProxyConfig) async {
+        let headers: [String: String] = [
+            "X-ClaudeAI-Server-ID": config.id
+        ]
+        await connectHTTP(
+            name: name,
+            urlString: config.url,
+            headers: headers,
+            streaming: false
+        )
     }
 
     // MARK: - Private Helpers
@@ -396,4 +610,12 @@ private struct MCPClientWrapper: MCPClientProtocol, Sendable {
         default: return .string("\(value)")
         }
     }
+}
+
+// MARK: - MCPClientManagerError
+
+/// Errors thrown by ``MCPClientManager`` runtime management operations.
+public enum MCPClientManagerError: Error, Sendable, Equatable {
+    /// The specified server name was not found in the stored configurations.
+    case serverNotFound(String)
 }

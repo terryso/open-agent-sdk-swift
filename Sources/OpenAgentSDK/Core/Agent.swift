@@ -71,6 +71,10 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
     /// Populated after auto-compact completes; injected into system prompt on subsequent queries.
     private let sessionMemory = SessionMemory()
 
+    /// Stored MCP client manager for runtime management operations.
+    /// Set after the first call to ``assembleFullToolPool()`` or ``setMcpServers(_:)``.
+    private var mcpClientManager: MCPClientManager?
+
     // MARK: - Initialization
 
     /// Create an Agent with the given options.
@@ -147,6 +151,52 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
         self.options.autoDiscoverSkills()
 
         self.client = client
+    }
+
+    /// Create an Agent with a definition and options.
+    ///
+    /// This initializer accepts an ``AgentDefinition`` (typically used for sub-agents)
+    /// alongside standard ``AgentOptions``. Fields from the definition are merged
+    /// into the options where applicable.
+    ///
+    /// - Parameters:
+    ///   - definition: The agent definition providing name and optional overrides.
+    ///   - options: The configuration options for this agent.
+    public init(definition: AgentDefinition, options: AgentOptions) {
+        // Merge definition fields into options
+        var mergedOptions = options
+        if let model = definition.model { mergedOptions.model = model }
+        if let prompt = definition.systemPrompt { mergedOptions.systemPrompt = prompt }
+        if let maxTurns = definition.maxTurns { mergedOptions.maxTurns = maxTurns }
+
+        self.options = mergedOptions
+        self.model = mergedOptions.model
+        self.systemPrompt = mergedOptions.systemPrompt
+        self.maxTurns = mergedOptions.maxTurns
+        self.maxTokens = mergedOptions.maxTokens
+
+        // Configure Logger from agent options if non-default values are provided.
+        if mergedOptions.logLevel != .none || mergedOptions.logOutput != .console {
+            Logger.configure(level: mergedOptions.logLevel, output: mergedOptions.logOutput)
+        }
+
+        // Auto-discover skills from filesystem if skillDirectories or skillNames is specified
+        self.options.autoDiscoverSkills()
+
+        // Create the appropriate client based on provider.
+        let apiKey = mergedOptions.apiKey ?? ""
+        switch mergedOptions.provider {
+        case .openai:
+            self.client = OpenAIClient(
+                apiKey: apiKey,
+                baseURL: mergedOptions.baseURL
+            )
+        case .anthropic:
+            self.client = AnthropicClient(
+                apiKey: apiKey,
+                baseURL: mergedOptions.baseURL
+            )
+        }
     }
 
     // MARK: - Dynamic Permission Switching
@@ -244,6 +294,9 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
             manager = mcpManager
         }
 
+        // Store manager for public MCP runtime management API
+        self.mcpClientManager = manager
+
         let allMCPTools = sdkTools + externalTools
 
         let pool = assembleToolPool(
@@ -255,6 +308,76 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
         )
 
         return (pool, manager)
+    }
+
+    // MARK: - MCP Runtime Management
+
+    /// Returns the status of all configured MCP servers.
+    ///
+    /// If no MCP servers have been configured or connected yet, returns an empty dictionary.
+    /// The returned ``McpServerStatus`` values use the 5-case ``McpServerStatusEnum``
+    /// matching the TypeScript SDK.
+    ///
+    /// - Returns: A dictionary mapping server names to their current status.
+    public func mcpServerStatus() async -> [String: McpServerStatus] {
+        guard let manager = mcpClientManager else {
+            return [:]
+        }
+        return await manager.getStatus()
+    }
+
+    /// Reconnects a specific MCP server.
+    ///
+    /// Disconnects the existing connection and re-establishes it using the original
+    /// configuration. Useful for recovering from transient failures.
+    ///
+    /// - Parameter name: The name of the MCP server to reconnect.
+    /// - Throws: ``MCPClientManagerError/serverNotFound`` if no server with the given name exists,
+    ///           or an error if the reconnection attempt fails.
+    public func reconnectMcpServer(name: String) async throws {
+        guard let manager = mcpClientManager else {
+            throw MCPClientManagerError.serverNotFound(name)
+        }
+        try await manager.reconnect(name: name)
+    }
+
+    /// Enables or disables a specific MCP server.
+    ///
+    /// When disabled, the server's connection is closed but its configuration is retained.
+    /// When enabled, the server is reconnected using its stored configuration.
+    ///
+    /// - Parameters:
+    ///   - name: The name of the MCP server to toggle.
+    ///   - enabled: `true` to enable (reconnect), `false` to disable (disconnect).
+    /// - Throws: ``MCPClientManagerError/serverNotFound`` if no server with the given name exists.
+    public func toggleMcpServer(name: String, enabled: Bool) async throws {
+        guard let manager = mcpClientManager else {
+            throw MCPClientManagerError.serverNotFound(name)
+        }
+        try await manager.toggle(name: name, enabled: enabled)
+    }
+
+    /// Dynamically replaces the full MCP server set.
+    ///
+    /// Compares the new server configurations against existing connections.
+    /// Servers present in the new set but not currently connected are added.
+    /// Servers currently connected but absent from the new set are removed.
+    ///
+    /// - Parameter servers: The new set of MCP server configurations.
+    /// - Returns: A ``McpServerUpdateResult`` listing added, removed, and errored servers.
+    /// - Throws: ``MCPClientManagerError`` if the manager is not initialized.
+    public func setMcpServers(_ servers: [String: McpServerConfig]) async throws -> McpServerUpdateResult {
+        // Ensure a manager exists (create one if needed)
+        if mcpClientManager == nil && !servers.isEmpty {
+            let manager = MCPClientManager()
+            self.mcpClientManager = manager
+        }
+
+        guard let manager = mcpClientManager else {
+            return McpServerUpdateResult()
+        }
+
+        return await manager.setServers(servers)
     }
 
     // MARK: - Internal Helpers (Reserved for Story 1.5)
@@ -927,6 +1050,9 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                         mcpManager = manager
                     }
 
+                    // Store for MCP runtime management methods
+                    self.mcpClientManager = mcpManager
+
                     let mcpTools = sdkTools + externalTools
                     if !mcpTools.isEmpty {
                         allToolProtocols = capturedToolProtocols + mcpTools
@@ -1015,6 +1141,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                     case .sse(let transportConfig): command = transportConfig.url
                     case .http(let transportConfig): command = transportConfig.url
                     case .sdk: command = "(in-process)"
+                    case .claudeAIProxy(let proxyConfig): command = proxyConfig.url
                     }
                     return SDKMessage.McpServerInfo(name: name, command: command)
                 }

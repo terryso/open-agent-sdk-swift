@@ -14,6 +14,9 @@ public enum McpServerConfig: Sendable, Equatable {
     case http(McpHttpConfig)
     /// SDK transport: directly uses an in-process ``InProcessMCPServer`` without MCP protocol overhead.
     case sdk(McpSdkServerConfig)
+    /// ClaudeAI Proxy transport: connects via a ClaudeAI proxy endpoint.
+    /// Corresponds to the TypeScript SDK's `McpClaudeAIProxyServerConfig` (type: "claudeai-proxy").
+    case claudeAIProxy(McpClaudeAIProxyConfig)
 }
 
 /// Configuration for MCP stdio transport.
@@ -84,5 +87,25 @@ public struct McpSdkServerConfig: Sendable, Equatable {
         ObjectIdentifier(lhs.server) == ObjectIdentifier(rhs.server)
             && lhs.name == rhs.name
             && lhs.version == rhs.version
+    }
+}
+
+// MARK: - McpClaudeAIProxyConfig
+
+/// Configuration for the ClaudeAI Proxy MCP transport.
+///
+/// Connects to an MCP server via a ClaudeAI proxy endpoint, using
+/// the proxy URL and a server identifier for authentication.
+/// Corresponds to the TypeScript SDK's `McpClaudeAIProxyServerConfig`
+/// with `type: "claudeai-proxy"`.
+public struct McpClaudeAIProxyConfig: Sendable, Equatable {
+    /// The URL of the ClaudeAI proxy endpoint.
+    public let url: String
+    /// The server identifier used for authentication with the proxy.
+    public let id: String
+
+    public init(url: String, id: String) {
+        self.url = url
+        self.id = id
     }
 }
