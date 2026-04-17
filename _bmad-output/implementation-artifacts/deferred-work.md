@@ -114,3 +114,8 @@
 ## Deferred from: code review of 17-7-session-management-enhancement (2026-04-17)
 
 - **Dev Notes mention `message_id` key but code only checks `uuid`/`id`** — The story Dev Notes (line 145) list `"message_id"` as a third key to check for `resumeSessionAt` matching, but the implementation only checks `"uuid"` and `"id"`. The AC text (AC3) only specifies `"uuid"` and `"id"`, so the code is correct per AC. The Dev Notes are inconsistent with the AC and implementation. Pre-existing documentation inconsistency, not a code bug. [Sources/OpenAgentSDK/Core/Agent.swift:392-393, 989-990]
+
+## Deferred from: code review of 17-10-query-methods-enhancement (2026-04-18)
+
+- **recordFileCheckpoint never called** -- Internal method exists as a hook for file checkpoint tracking but is not wired into any file tool. The `_fileCheckpoints` dictionary will always be empty. By spec design (anti-pattern: "Do NOT implement full file checkpointing in this story"). Deferred to a future story that implements full content restoration. [Sources/OpenAgentSDK/Core/Agent.swift:285]
+- **rewindFiles non-dryRun always returns success:false** -- Content restoration not yet implemented. The method returns `success: false` in non-dryRun mode to signal that actual file restoration did not occur. Callers cannot distinguish "not implemented" from "attempted and failed." Acknowledged limitation, deferred to full checkpointing implementation. [Sources/OpenAgentSDK/Core/Agent.swift:321]

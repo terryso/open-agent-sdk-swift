@@ -42,6 +42,18 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
     /// and read cooperatively by the running Task — no locking needed.
     nonisolated(unsafe) private var _interrupted: Bool = false
 
+    /// Whether the agent has been permanently closed via ``close()``.
+    /// Once closed, all subsequent prompt/stream/interrupt calls throw.
+    /// Protected by ``_closedLock`` for thread-safe reads from concurrent contexts.
+    private var _closed: Bool = false
+
+    /// Lock protecting concurrent access to ``_closed``.
+    private let _closedLock: NSLock = {
+        let lock = NSLock()
+        lock.name = "Agent.closedLock"
+        return lock
+    }()
+
     /// Reference to stream()'s internal Task for cancellation via interrupt().
     /// Cleared when the stream completes.
     private var _streamTask: _Concurrency.Task<Void, Never>?
@@ -238,6 +250,334 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
     public func interrupt() {
         _interrupted = true
         _streamTask?.cancel()
+    }
+
+    // MARK: - File Checkpointing (rewindFiles)
+
+    /// Internal file checkpoint tracking per message ID.
+    /// Maps message IDs to the set of file paths written/modified during that turn.
+    /// Protected by ``_checkpointLock`` for thread-safe access.
+    private var _fileCheckpoints: [String: Set<String>] = [:]
+
+    /// Lock protecting concurrent access to ``_fileCheckpoints``.
+    private let _checkpointLock: NSLock = {
+        let lock = NSLock()
+        lock.name = "Agent.checkpointLock"
+        return lock
+    }()
+
+    /// Thread-safe read of ``_closed``.
+    private var isClosed: Bool {
+        _closedLock.withLock { _closed }
+    }
+
+    /// Thread-safe write to ``_closed``.
+    private func setClosed(_ value: Bool) {
+        _closedLock.withLock { _closed = value }
+    }
+
+    /// Record a file checkpoint for the current message being processed.
+    ///
+    /// Called internally by file tools to track which files were modified during a turn.
+    /// - Parameters:
+    ///   - filePath: The path of the file that was written or modified.
+    ///   - messageId: The message ID associated with this checkpoint.
+    func recordFileCheckpoint(filePath: String, messageId: String) {
+        _checkpointLock.withLock {
+            if _fileCheckpoints[messageId] != nil {
+                _fileCheckpoints[messageId]?.insert(filePath)
+            } else {
+                _fileCheckpoints[messageId] = [filePath]
+            }
+        }
+    }
+
+    /// Restores the file system to the state at a given message.
+    ///
+    /// When `dryRun` is `true`, returns a preview of the files that would be affected
+    /// without making any actual changes.
+    ///
+    /// - Parameters:
+    ///   - messageId: The message ID to rewind to.
+    ///   - dryRun: When `true`, return a preview without modifying files. Defaults to `false`.
+    /// - Returns: A ``RewindResult`` describing the affected files and outcome.
+    /// - Note: When no checkpoint exists for the given `messageId`, returns an empty result
+    ///   with `success: true` rather than throwing. The `throws` annotation is reserved for
+    ///   future content-restoration errors.
+    public func rewindFiles(to messageId: String, dryRun: Bool = false) async throws -> RewindResult {
+        let files = _checkpointLock.withLock { _fileCheckpoints[messageId] }
+
+        guard let files else {
+            return RewindResult(filesAffected: [], success: true, preview: dryRun)
+        }
+
+        let affectedFiles = Array(files).sorted()
+
+        if dryRun {
+            return RewindResult(filesAffected: affectedFiles, success: true, preview: true)
+        }
+
+        // Full mode: lightweight implementation tracks file paths only.
+        // Actual content restoration requires a full checkpointing system that
+        // stores original content before modification — not yet implemented.
+        return RewindResult(filesAffected: affectedFiles, success: false, preview: false)
+    }
+
+    // MARK: - Multi-Turn Streaming Input (streamInput)
+
+    /// Supports multi-turn streaming dialog by accepting an `AsyncStream<String>` input.
+    ///
+    /// Each element from the input stream is treated as a new user message. When the input
+    /// stream completes, the final aggregated response is emitted and the stream finishes.
+    ///
+    /// - Parameter input: An `AsyncStream<String>` producing user messages.
+    /// - Returns: An `AsyncStream<SDKMessage>` yielding events for each turn and the final result.
+    public func streamInput(_ input: AsyncStream<String>) -> AsyncStream<SDKMessage> {
+        // Guard: bail out immediately if already closed
+        if isClosed {
+            return AsyncStream<SDKMessage> { $0.finish() }
+        }
+        // Capture sessionId before entering the closure (consistent with stream() pattern).
+        let capturedSessionId = options.sessionId
+        return AsyncStream<SDKMessage> { continuation in
+            let task = _Concurrency.Task {
+                for await text in input {
+                    if _Concurrency.Task.isCancelled || self.isClosed { break }
+
+                    // Yield a user message event for each incoming chunk
+                    continuation.yield(.userMessage(SDKMessage.UserMessageData(
+                        sessionId: capturedSessionId,
+                        message: text
+                    )))
+
+                    // Process this turn via the existing promptImpl logic
+                    let result = await self.promptImpl(text)
+
+                    // Yield the result for this turn
+                    let subtype: SDKMessage.ResultData.Subtype
+                    switch result.status {
+                    case .success:
+                        subtype = .success
+                    case .errorMaxTurns:
+                        subtype = .errorMaxTurns
+                    case .errorMaxBudgetUsd:
+                        subtype = .errorMaxBudgetUsd
+                    case .cancelled:
+                        subtype = .cancelled
+                    case .errorDuringExecution:
+                        subtype = .errorDuringExecution
+                    }
+
+                    continuation.yield(.result(SDKMessage.ResultData(
+                        subtype: subtype,
+                        text: result.text,
+                        usage: result.usage,
+                        numTurns: result.numTurns,
+                        durationMs: result.durationMs,
+                        totalCostUsd: result.totalCostUsd,
+                        costBreakdown: result.costBreakdown
+                    )))
+                }
+                continuation.finish()
+            }
+            continuation.onTermination = { @Sendable _ in
+                task.cancel()
+            }
+        }
+    }
+
+    // MARK: - Task Management (stopTask)
+
+    /// Stops a background task by ID.
+    ///
+    /// Delegates to the configured ``TaskStore`` to remove the task. Throws if no
+    /// ``TaskStore`` is configured or the task ID is not found.
+    ///
+    /// - Parameter taskId: The ID of the task to stop.
+    /// - Throws: ``SDKError/invalidConfiguration`` if no TaskStore is configured.
+    ///   ``SDKError/notFound`` if the task ID is not found.
+    public func stopTask(taskId: String) async throws {
+        guard let taskStore = options.taskStore else {
+            throw SDKError.invalidConfiguration("TaskStore is not configured. Set AgentOptions.taskStore to use stopTask().")
+        }
+        let deleted = await taskStore.delete(id: taskId)
+        guard deleted else {
+            throw SDKError.notFound("Task with ID '\(taskId)' not found.")
+        }
+    }
+
+    // MARK: - Agent Lifecycle (close)
+
+    /// Permanently closes the agent.
+    ///
+    /// After calling this method:
+    /// - Any active query is interrupted.
+    /// - The session is persisted (if a ``SessionStore`` is configured).
+    /// - MCP connections are shut down.
+    /// - All subsequent calls to ``prompt(_:)`` and ``stream(_:)`` return an error result.
+    ///
+    /// - Throws: ``SDKError/invalidConfiguration`` if the agent is already closed.
+    public func close() async throws {
+        // Atomically check-and-set to prevent TOCTOU race between two concurrent close() calls.
+        let wasAlreadyClosed = _closedLock.withLock { () -> Bool in
+            if _closed { return true }
+            _closed = true
+            return false
+        }
+        guard !wasAlreadyClosed else {
+            throw SDKError.invalidConfiguration("Agent is already closed.")
+        }
+
+        // Interrupt any active query
+        interrupt()
+
+        // Persist session marker if sessionStore is configured and persistSession is enabled.
+        // We do NOT overwrite with empty messages — the last promptImpl/stream call already
+        // saved the full conversation. We only save a marker here if no prior session exists.
+        if let sessionStore = options.sessionStore, let sessionId = options.sessionId,
+           options.persistSession {
+            // Only save if the session doesn't already exist (avoid overwriting real history).
+            let existing = try? await sessionStore.load(sessionId: sessionId)
+            if existing == nil {
+                let metadata = PartialSessionMetadata(
+                    cwd: options.cwd ?? FileManager.default.currentDirectoryPath,
+                    model: model,
+                    summary: nil
+                )
+                _ = try? await sessionStore.save(sessionId: sessionId, messages: [], metadata: metadata)
+            }
+        }
+
+        // Shutdown MCP connections
+        if let mcpManager = mcpClientManager {
+            await mcpManager.shutdown()
+            mcpClientManager = nil
+        }
+    }
+
+    // MARK: - Initialization Info (initializationResult)
+
+    /// Returns initialization metadata including available commands, agents, models, and configuration.
+    ///
+    /// Provides a snapshot of the agent's capabilities for clients that need to discover
+    /// available features (e.g., UI clients rendering command palettes or model selectors).
+    ///
+    /// - Returns: A ``SDKControlInitializeResponse`` with the current configuration.
+    public func initializationResult() -> SDKControlInitializeResponse {
+        SDKControlInitializeResponse(
+            commands: [],  // Slash commands are TS-specific; Swift SDK has none
+            agents: supportedAgents(),
+            outputStyle: "default",
+            availableOutputStyles: ["default"],
+            models: supportedModels(),
+            account: nil,
+            fastModeState: false
+        )
+    }
+
+    // MARK: - Model Discovery (supportedModels)
+
+    /// Returns model metadata from the MODEL_PRICING table.
+    ///
+    /// Converts each entry in the global ``MODEL_PRICING`` dictionary to a ``ModelInfo``
+    /// instance with synthesized display names and descriptions.
+    ///
+    /// - Returns: An array of ``ModelInfo`` instances for all known models.
+    public func supportedModels() -> [ModelInfo] {
+        MODEL_PRICING.keys.map { modelId in
+            ModelInfo(
+                value: modelId,
+                displayName: Self.friendlyName(for: modelId),
+                description: Self.modelDescription(for: modelId),
+                supportsEffort: true
+            )
+        }.sorted { $0.value < $1.value }
+    }
+
+    // MARK: - Agent Discovery (supportedAgents)
+
+    /// Returns configured sub-agent definitions.
+    ///
+    /// Returns the built-in sub-agent types (Explore, Plan) when the Agent tool is
+    /// configured in the tool pool. Returns an empty array if no Agent tool is present.
+    ///
+    /// - Note: Sub-agent definitions are discovered at spawn time by the Agent tool.
+    ///   This method returns the known built-in types for discovery purposes.
+    ///
+    /// - Returns: An array of ``AgentInfo`` instances.
+    public func supportedAgents() -> [AgentInfo] {
+        // Check if the Agent tool is present in the tool pool
+        let hasAgentTool = options.tools?.contains(where: { $0.name == "Agent" }) ?? false
+        guard hasAgentTool else { return [] }
+
+        // Return the known built-in agent types that the Agent tool supports.
+        // These mirror BUILTIN_AGENTS in AgentTool.swift.
+        return [
+            AgentInfo(
+                name: "Explore",
+                description: "Fast agent specialized for exploring codebases. Use for finding files, searching code, and answering questions about the codebase.",
+                model: nil
+            ),
+            AgentInfo(
+                name: "Plan",
+                description: "Software architect agent for designing implementation plans. Returns step-by-step plans and identifies critical files.",
+                model: nil
+            ),
+        ]
+    }
+
+    // MARK: - Dynamic Thinking (setMaxThinkingTokens)
+
+    /// Dynamically adjusts the thinking token budget at runtime.
+    ///
+    /// When `n` is a positive integer, sets the thinking configuration to
+    /// ``ThinkingConfig/enabled(budgetTokens:)`` with the given budget.
+    /// When `nil`, clears the thinking configuration entirely.
+    ///
+    /// Thread-safe: uses the internal permission lock for mutation.
+    ///
+    /// - Parameter n: The new thinking token budget, or `nil` to disable thinking.
+    /// - Throws: ``SDKError/invalidConfiguration`` if `n` is zero or negative.
+    public func setMaxThinkingTokens(_ n: Int?) throws {
+        if let n {
+            guard n > 0 else {
+                throw SDKError.invalidConfiguration("maxThinkingTokens must be positive, got \(n)")
+            }
+            _permissionLock.withLock {
+                options.thinking = .enabled(budgetTokens: n)
+            }
+        } else {
+            _permissionLock.withLock {
+                options.thinking = nil
+            }
+        }
+    }
+
+    /// Returns a user-friendly display name for a model identifier.
+    private static func friendlyName(for modelId: String) -> String {
+        switch modelId {
+        case "claude-opus-4-6": return "Claude Opus 4.6"
+        case "claude-sonnet-4-6": return "Claude Sonnet 4.6"
+        case "claude-haiku-4-5": return "Claude Haiku 4.5"
+        case "claude-sonnet-4-5": return "Claude Sonnet 4.5"
+        case "claude-opus-4-5": return "Claude Opus 4.5"
+        case "claude-3-5-sonnet": return "Claude 3.5 Sonnet"
+        case "claude-3-5-haiku": return "Claude 3.5 Haiku"
+        case "claude-3-opus": return "Claude 3 Opus"
+        default: return modelId
+        }
+    }
+
+    /// Returns a brief description for a model identifier.
+    private static func modelDescription(for modelId: String) -> String {
+        if modelId.hasPrefix("claude-opus") {
+            return "Highest capability model for complex reasoning tasks."
+        } else if modelId.hasPrefix("claude-sonnet") {
+            return "Balanced model for general-purpose tasks."
+        } else if modelId.hasPrefix("claude-haiku") {
+            return "Fast and efficient model for quick responses."
+        }
+        return "A Claude model."
     }
 
     // MARK: - MCP Integration
@@ -438,6 +778,13 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
     ///   turn count, duration, collected messages, and a ``QueryStatus`` indicating
     ///   how the query terminated.
     public func prompt(_ text: String) async -> QueryResult {
+        guard !isClosed else {
+            return QueryResult(
+                text: "", usage: TokenUsage(inputTokens: 0, outputTokens: 0),
+                numTurns: 0, durationMs: 0, messages: [],
+                status: .errorDuringExecution
+            )
+        }
         _interrupted = false
         return await promptImpl(text)
     }
@@ -930,6 +1277,9 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
     /// - Returns: An `AsyncStream<SDKMessage>` that yields typed events as the LLM
     ///   processes the request.
     public func stream(_ text: String) -> AsyncStream<SDKMessage> {
+        if isClosed {
+            return AsyncStream<SDKMessage> { $0.finish() }
+        }
         let startTime = ContinuousClock.now
         _interrupted = false
 

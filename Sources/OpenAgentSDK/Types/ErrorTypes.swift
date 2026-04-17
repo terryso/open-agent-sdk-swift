@@ -38,6 +38,8 @@ public enum SDKError: Error, Equatable, LocalizedError, Sendable {
     case abortError
     /// An invalid configuration was provided.
     case invalidConfiguration(String)
+    /// A requested resource was not found.
+    case notFound(String)
 
     // MARK: - Computed Properties for Associated Value Access
 
@@ -54,7 +56,8 @@ public enum SDKError: Error, Equatable, LocalizedError, Sendable {
              .toolExecutionError(_, let msg),
              .sessionError(let msg),
              .mcpConnectionError(_, let msg),
-             .invalidConfiguration(let msg):
+             .invalidConfiguration(let msg),
+             .notFound(let msg):
             return msg
         case .permissionDenied(_, let reason):
             return reason
@@ -128,6 +131,8 @@ public enum SDKError: Error, Equatable, LocalizedError, Sendable {
             return "Operation aborted"
         case .invalidConfiguration(let message):
             return "Invalid configuration: \(message)"
+        case .notFound(let message):
+            return "Not found: \(message)"
         }
     }
 }
