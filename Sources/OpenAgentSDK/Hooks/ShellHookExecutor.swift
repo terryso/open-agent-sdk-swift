@@ -80,6 +80,17 @@ public enum ShellHookExecutor {
             if let error = input.error { inputDict["error"] = error }
             if let toolInput = input.toolInput { inputDict["toolInput"] = toolInput }
             if let toolOutput = input.toolOutput { inputDict["toolOutput"] = toolOutput }
+            if let transcriptPath = input.transcriptPath { inputDict["transcriptPath"] = transcriptPath }
+            if let permissionMode = input.permissionMode { inputDict["permissionMode"] = permissionMode }
+            if let agentId = input.agentId { inputDict["agentId"] = agentId }
+            if let agentType = input.agentType { inputDict["agentType"] = agentType }
+            if let stopHookActive = input.stopHookActive { inputDict["stopHookActive"] = stopHookActive }
+            if let lastAssistantMessage = input.lastAssistantMessage { inputDict["lastAssistantMessage"] = lastAssistantMessage }
+            if let trigger = input.trigger { inputDict["trigger"] = trigger }
+            if let customInstructions = input.customInstructions { inputDict["customInstructions"] = customInstructions }
+            if let permissionSuggestions = input.permissionSuggestions { inputDict["permissionSuggestions"] = permissionSuggestions }
+            if let isInterrupt = input.isInterrupt { inputDict["isInterrupt"] = isInterrupt }
+            if let agentTranscriptPath = input.agentTranscriptPath { inputDict["agentTranscriptPath"] = agentTranscriptPath }
 
             if let jsonData = try? JSONSerialization.data(withJSONObject: inputDict) {
                 try? stdinPipe.fileHandleForWriting.write(contentsOf: jsonData)
@@ -175,11 +186,25 @@ public enum ShellHookExecutor {
             notification = HookNotification(title: title, body: body, level: HookNotificationLevel(levelStr))
         }
 
+        let systemMessage = dict["systemMessage"] as? String
+        let reason = dict["reason"] as? String
+        let updatedInput = dict["updatedInput"] as? [String: Any]
+        let additionalContext = dict["additionalContext"] as? String
+        let permissionDecisionStr = dict["permissionDecision"] as? String
+        let permissionDecision = permissionDecisionStr.flatMap { PermissionDecision(rawValue: $0) }
+        let updatedMCPToolOutput = dict["updatedMCPToolOutput"]
+
         return HookOutput(
             message: message,
             permissionUpdate: permissionUpdate,
             block: block,
-            notification: notification
+            notification: notification,
+            systemMessage: systemMessage,
+            reason: reason,
+            updatedInput: updatedInput,
+            additionalContext: additionalContext,
+            permissionDecision: permissionDecision,
+            updatedMCPToolOutput: updatedMCPToolOutput
         )
     }
 }

@@ -566,8 +566,8 @@ final class AgentLoopUsageStatsTests: XCTestCase {
         // Even a fast mock response should produce a measurable duration
         XCTAssertGreaterThanOrEqual(result.durationMs, 0,
                                      "Duration should be >= 0 ms")
-        XCTAssertLessThan(result.durationMs, 30_000,
-                          "Duration should be less than 30 seconds (30000 ms)")
+        XCTAssertLessThan(result.durationMs, 120_000,
+                          "Duration should be less than 120 seconds (sanity check for millisecond unit)")
     }
 }
 

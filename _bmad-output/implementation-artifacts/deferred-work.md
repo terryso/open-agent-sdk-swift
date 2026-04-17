@@ -104,3 +104,9 @@
 ## Deferred from: code review of 17-2-agent-options-enhancement (2026-04-16)
 
 - **Compat test `testContinue_missing` checks wrong field name** — Test asserts `XCTAssertFalse(fields.contains("continue"))` checking the TS field name `continue`, while the Swift field is `continueRecentSession`. Test "passes" but doesn't verify the field exists. Pre-existing compat test design pattern (field-by-field name matching). [AgentOptionsCompatTests.swift:430-435]
+
+## Deferred from: code review of 17-4-hook-system-enhancement (2026-04-17)
+
+- **Missing env var injection for new HookInput fields** — ShellHookExecutor only injects 4 HOOK_* env vars (EVENT, TOOL_NAME, SESSION_ID, CWD). The 11 new HookInput fields are only passed via stdin JSON. Consistent with TS SDK which also only injects these 4 base env vars. Pre-existing design choice. [ShellHookExecutor.swift:64-69]
+- **PermissionDecision name collision with ToolExecutor.PermissionDecision** — New public `PermissionDecision` enum in HookTypes.swift shares name with internal nested `ToolExecutor.PermissionDecision`. No functional impact due to scope resolution (nested internal vs top-level public). Pre-existing naming in ToolExecutor. [HookTypes.swift:227, ToolExecutor.swift:53]
+- **camelCase vs snake_case in stdin JSON keys** — All 19 HookInput fields use camelCase in JSON (e.g., `transcriptPath` vs TS SDK's `transcript_path`). Pre-existing design choice from original ShellHookExecutor implementation. Consistent within Swift SDK. [ShellHookExecutor.swift:83-93]

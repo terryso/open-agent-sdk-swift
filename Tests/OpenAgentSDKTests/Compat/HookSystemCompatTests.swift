@@ -17,12 +17,12 @@ import XCTest
 /// associated types compile correctly.
 final class HookSystemBuildCompatTests: XCTestCase {
 
-    /// AC1 [P0]: HookEvent enum exists and has exactly 20 cases.
-    func testHookEvent_has20Cases() {
-        // Exhaustive iteration confirms all 20 cases exist at compile time
+    /// AC1 [P0]: HookEvent enum exists and has exactly 23 cases (20 + 3 new from Story 17-4).
+    func testHookEvent_has23Cases() {
+        // Exhaustive iteration confirms all 23 cases exist at compile time
         let allCases = HookEvent.allCases
-        XCTAssertEqual(allCases.count, 20,
-            "HookEvent must have exactly 20 cases. TS SDK has 18 events (15 matched, 3 missing).")
+        XCTAssertEqual(allCases.count, 23,
+            "HookEvent must have exactly 23 cases. TS SDK has 18 events + 5 Swift extras (now all 18 matched).")
     }
 
     /// AC1 [P0]: HookEvent conforms to CaseIterable (required for iteration).
@@ -196,25 +196,25 @@ final class HookEventCoverageCompatTests: XCTestCase {
             "HookEvent must have configChange case. TS SDK: ConfigChange")
     }
 
-    /// AC2 [GAP]: Setup event does NOT exist in Swift (TS SDK has this).
+    /// AC2 [RESOLVED by Story 17-4]: Setup event now exists in Swift.
     func testHookEvent_setup_gap() {
         let event = HookEvent(rawValue: "setup")
-        XCTAssertNil(event,
-            "[GAP] HookEvent should NOT have setup case. TS SDK has Setup event. Swift has no equivalent.")
+        XCTAssertNotNil(event,
+            "HookEvent must have setup case. TS SDK has Setup event. Resolved by Story 17-4.")
     }
 
-    /// AC2 [GAP]: WorktreeCreate event does NOT exist in Swift (TS SDK has this).
+    /// AC2 [RESOLVED by Story 17-4]: WorktreeCreate event now exists in Swift.
     func testHookEvent_worktreeCreate_gap() {
         let event = HookEvent(rawValue: "worktreeCreate")
-        XCTAssertNil(event,
-            "[GAP] HookEvent should NOT have worktreeCreate case. TS SDK has WorktreeCreate event.")
+        XCTAssertNotNil(event,
+            "HookEvent must have worktreeCreate case. TS SDK has WorktreeCreate event. Resolved by Story 17-4.")
     }
 
-    /// AC2 [GAP]: WorktreeRemove event does NOT exist in Swift (TS SDK has this).
+    /// AC2 [RESOLVED by Story 17-4]: WorktreeRemove event now exists in Swift.
     func testHookEvent_worktreeRemove_gap() {
         let event = HookEvent(rawValue: "worktreeRemove")
-        XCTAssertNil(event,
-            "[GAP] HookEvent should NOT have worktreeRemove case. TS SDK has WorktreeRemove event.")
+        XCTAssertNotNil(event,
+            "HookEvent must have worktreeRemove case. TS SDK has WorktreeRemove event. Resolved by Story 17-4.")
     }
 
     /// AC2 [P0]: Swift has extra events not in TS SDK.
@@ -227,7 +227,7 @@ final class HookEventCoverageCompatTests: XCTestCase {
         }
     }
 
-    /// AC2 [P0]: Coverage summary: 15 of 18 TS events have Swift equivalents.
+    /// AC2 [P0]: Coverage summary: all 18 TS events now have Swift equivalents (Story 17-4).
     func testHookEvent_coverageSummary() {
         let tsEvents: [(String, String)] = [
             ("PreToolUse", "preToolUse"),
@@ -242,12 +242,12 @@ final class HookEventCoverageCompatTests: XCTestCase {
             ("SubagentStop", "subagentStop"),
             ("PreCompact", "preCompact"),
             ("PermissionRequest", "permissionRequest"),
-            ("Setup", "setup"),          // MISSING
+            ("Setup", "setup"),          // RESOLVED by Story 17-4
             ("TeammateIdle", "teammateIdle"),
             ("TaskCompleted", "taskCompleted"),
             ("ConfigChange", "configChange"),
-            ("WorktreeCreate", "worktreeCreate"),  // MISSING
-            ("WorktreeRemove", "worktreeRemove"),  // MISSING
+            ("WorktreeCreate", "worktreeCreate"),  // RESOLVED by Story 17-4
+            ("WorktreeRemove", "worktreeRemove"),  // RESOLVED by Story 17-4
         ]
 
         var passCount = 0
@@ -266,8 +266,8 @@ final class HookEventCoverageCompatTests: XCTestCase {
         print("PASS: \(passCount) | MISSING: \(missingCount) | Total TS events: \(tsEvents.count)")
         print("")
 
-        XCTAssertEqual(passCount, 15, "15 of 18 TS events should have Swift equivalents")
-        XCTAssertEqual(missingCount, 3, "3 TS events should be missing (Setup, WorktreeCreate, WorktreeRemove)")
+        XCTAssertEqual(passCount, 18, "All 18 TS events should have Swift equivalents (resolved by Story 17-4)")
+        XCTAssertEqual(missingCount, 0, "No TS events should be missing after Story 17-4")
     }
 }
 
@@ -299,48 +299,48 @@ final class BaseHookInputCompatTests: XCTestCase {
             "HookInput.event is required and maps to TS SDK event type")
     }
 
-    /// AC3 [GAP]: HookInput does NOT have transcriptPath (TS SDK has transcript_path).
+    /// AC3 [RESOLVED by Story 17-4]: HookInput now has transcriptPath (TS SDK has transcript_path).
     func testHookInput_transcriptPath_gap() {
         let input = HookInput(event: .preToolUse)
         let mirror = Mirror(reflecting: input)
         let fieldNames = Set(mirror.children.map { $0.label ?? "" })
-        XCTAssertFalse(fieldNames.contains("transcriptPath"),
-            "[GAP] HookInput should NOT have transcriptPath yet. TS SDK BaseHookInput has transcript_path.")
+        XCTAssertTrue(fieldNames.contains("transcriptPath"),
+            "HookInput must have transcriptPath. TS SDK BaseHookInput has transcript_path. Resolved by Story 17-4.")
     }
 
-    /// AC3 [GAP]: HookInput does NOT have permissionMode (TS SDK has permission_mode).
+    /// AC3 [RESOLVED by Story 17-4]: HookInput now has permissionMode (TS SDK has permission_mode).
     func testHookInput_permissionMode_gap() {
         let input = HookInput(event: .preToolUse)
         let mirror = Mirror(reflecting: input)
         let fieldNames = Set(mirror.children.map { $0.label ?? "" })
-        XCTAssertFalse(fieldNames.contains("permissionMode"),
-            "[GAP] HookInput should NOT have permissionMode yet. TS SDK BaseHookInput has permission_mode.")
+        XCTAssertTrue(fieldNames.contains("permissionMode"),
+            "HookInput must have permissionMode. TS SDK BaseHookInput has permission_mode. Resolved by Story 17-4.")
     }
 
-    /// AC3 [GAP]: HookInput does NOT have agentId (TS SDK has agent_id).
+    /// AC3 [RESOLVED by Story 17-4]: HookInput now has agentId (TS SDK has agent_id).
     func testHookInput_agentId_gap() {
         let input = HookInput(event: .preToolUse)
         let mirror = Mirror(reflecting: input)
         let fieldNames = Set(mirror.children.map { $0.label ?? "" })
-        XCTAssertFalse(fieldNames.contains("agentId"),
-            "[GAP] HookInput should NOT have agentId yet. TS SDK BaseHookInput has agent_id.")
+        XCTAssertTrue(fieldNames.contains("agentId"),
+            "HookInput must have agentId. TS SDK BaseHookInput has agent_id. Resolved by Story 17-4.")
     }
 
-    /// AC3 [GAP]: HookInput does NOT have agentType (TS SDK has agent_type).
+    /// AC3 [RESOLVED by Story 17-4]: HookInput now has agentType (TS SDK has agent_type).
     func testHookInput_agentType_gap() {
         let input = HookInput(event: .preToolUse)
         let mirror = Mirror(reflecting: input)
         let fieldNames = Set(mirror.children.map { $0.label ?? "" })
-        XCTAssertFalse(fieldNames.contains("agentType"),
-            "[GAP] HookInput should NOT have agentType yet. TS SDK BaseHookInput has agent_type.")
+        XCTAssertTrue(fieldNames.contains("agentType"),
+            "HookInput must have agentType. TS SDK BaseHookInput has agent_type. Resolved by Story 17-4.")
     }
 
-    /// AC3 [P0]: HookInput has exactly 8 fields.
+    /// AC3 [P0]: HookInput has 19 fields (8 original + 4 base + 7 per-event from Story 17-4).
     func testHookInput_fieldCount() {
         let input = HookInput(event: .preToolUse)
         let mirror = Mirror(reflecting: input)
-        XCTAssertEqual(mirror.children.count, 8,
-            "HookInput currently has 8 fields. TS SDK BaseHookInput has 6 fields + per-event extensions.")
+        XCTAssertEqual(mirror.children.count, 19,
+            "HookInput should have 19 fields (8 original + 4 base + 7 per-event from Story 17-4).")
     }
 }
 
@@ -387,13 +387,13 @@ final class ToolEventHookInputCompatTests: XCTestCase {
             "HookInput.error maps to TS SDK PostToolUseFailure.error")
     }
 
-    /// AC4 [GAP]: HookInput does NOT have isInterrupt (TS SDK PostToolUseFailure has is_interrupt).
+    /// AC4 [RESOLVED by Story 17-4]: HookInput now has isInterrupt (TS SDK PostToolUseFailure has is_interrupt).
     func testHookInput_isInterrupt_gap() {
         let input = HookInput(event: .postToolUseFailure, error: "interrupted")
         let mirror = Mirror(reflecting: input)
         let fieldNames = Set(mirror.children.map { $0.label ?? "" })
-        XCTAssertFalse(fieldNames.contains("isInterrupt"),
-            "[GAP] HookInput should NOT have isInterrupt yet. TS SDK PostToolUseFailure has is_interrupt.")
+        XCTAssertTrue(fieldNames.contains("isInterrupt"),
+            "HookInput must have isInterrupt. TS SDK PostToolUseFailure has is_interrupt. Resolved by Story 17-4.")
     }
 }
 
@@ -407,76 +407,76 @@ final class ToolEventHookInputCompatTests: XCTestCase {
 /// TS SDK PermissionRequest: tool_name, tool_input, permission_suggestions
 final class OtherHookInputCompatTests: XCTestCase {
 
-    /// AC5 [GAP]: HookInput does NOT have stopHookActive (TS SDK Stop has stop_hook_active).
+    /// AC5 [RESOLVED by Story 17-4]: HookInput now has stopHookActive (TS SDK Stop has stop_hook_active).
     func testHookInput_stopHookActive_gap() {
         let input = HookInput(event: .stop)
         let mirror = Mirror(reflecting: input)
         let fieldNames = Set(mirror.children.map { $0.label ?? "" })
-        XCTAssertFalse(fieldNames.contains("stopHookActive"),
-            "[GAP] HookInput should NOT have stopHookActive yet. TS SDK StopHookInput has stop_hook_active.")
+        XCTAssertTrue(fieldNames.contains("stopHookActive"),
+            "HookInput must have stopHookActive. TS SDK StopHookInput has stop_hook_active. Resolved by Story 17-4.")
     }
 
-    /// AC5 [GAP]: HookInput does NOT have lastAssistantMessage (TS SDK Stop has last_assistant_message).
+    /// AC5 [RESOLVED by Story 17-4]: HookInput now has lastAssistantMessage (TS SDK Stop has last_assistant_message).
     func testHookInput_lastAssistantMessage_gap() {
         let input = HookInput(event: .stop)
         let mirror = Mirror(reflecting: input)
         let fieldNames = Set(mirror.children.map { $0.label ?? "" })
-        XCTAssertFalse(fieldNames.contains("lastAssistantMessage"),
-            "[GAP] HookInput should NOT have lastAssistantMessage yet. TS SDK StopHookInput/SubagentStopHookInput has last_assistant_message.")
+        XCTAssertTrue(fieldNames.contains("lastAssistantMessage"),
+            "HookInput must have lastAssistantMessage. TS SDK StopHookInput/SubagentStopHookInput has last_assistant_message. Resolved by Story 17-4.")
     }
 
-    /// AC5 [GAP]: HookInput does NOT have agentId for SubagentStart (TS SDK has agent_id).
+    /// AC5 [RESOLVED by Story 17-4]: HookInput now has agentId for SubagentStart (TS SDK has agent_id).
     func testHookInput_subagentStart_agentId_gap() {
         let input = HookInput(event: .subagentStart)
         let mirror = Mirror(reflecting: input)
         let fieldNames = Set(mirror.children.map { $0.label ?? "" })
-        XCTAssertFalse(fieldNames.contains("agentId"),
-            "[GAP] HookInput should NOT have agentId for subagent events. TS SDK SubagentStartHookInput has agent_id.")
+        XCTAssertTrue(fieldNames.contains("agentId"),
+            "HookInput must have agentId for subagent events. TS SDK SubagentStartHookInput has agent_id. Resolved by Story 17-4.")
     }
 
-    /// AC5 [GAP]: HookInput does NOT have agentType for SubagentStart (TS SDK has agent_type).
+    /// AC5 [RESOLVED by Story 17-4]: HookInput now has agentType for SubagentStart (TS SDK has agent_type).
     func testHookInput_subagentStart_agentType_gap() {
         let input = HookInput(event: .subagentStart)
         let mirror = Mirror(reflecting: input)
         let fieldNames = Set(mirror.children.map { $0.label ?? "" })
-        XCTAssertFalse(fieldNames.contains("agentType"),
-            "[GAP] HookInput should NOT have agentType for subagent events. TS SDK SubagentStartHookInput has agent_type.")
+        XCTAssertTrue(fieldNames.contains("agentType"),
+            "HookInput must have agentType for subagent events. TS SDK SubagentStartHookInput has agent_type. Resolved by Story 17-4.")
     }
 
-    /// AC5 [GAP]: HookInput does NOT have agentTranscriptPath for SubagentStop.
+    /// AC5 [RESOLVED by Story 17-4]: HookInput now has agentTranscriptPath for SubagentStop.
     func testHookInput_subagentStop_agentTranscriptPath_gap() {
         let input = HookInput(event: .subagentStop)
         let mirror = Mirror(reflecting: input)
         let fieldNames = Set(mirror.children.map { $0.label ?? "" })
-        XCTAssertFalse(fieldNames.contains("agentTranscriptPath"),
-            "[GAP] HookInput should NOT have agentTranscriptPath. TS SDK SubagentStopHookInput has agent_transcript_path.")
+        XCTAssertTrue(fieldNames.contains("agentTranscriptPath"),
+            "HookInput must have agentTranscriptPath. TS SDK SubagentStopHookInput has agent_transcript_path. Resolved by Story 17-4.")
     }
 
-    /// AC5 [GAP]: HookInput does NOT have trigger field for PreCompact (TS SDK has trigger: manual/auto).
+    /// AC5 [RESOLVED by Story 17-4]: HookInput now has trigger field for PreCompact (TS SDK has trigger: manual/auto).
     func testHookInput_preCompact_trigger_gap() {
         let input = HookInput(event: .preCompact)
         let mirror = Mirror(reflecting: input)
         let fieldNames = Set(mirror.children.map { $0.label ?? "" })
-        XCTAssertFalse(fieldNames.contains("trigger"),
-            "[GAP] HookInput should NOT have trigger. TS SDK PreCompactHookInput has trigger (manual/auto).")
+        XCTAssertTrue(fieldNames.contains("trigger"),
+            "HookInput must have trigger. TS SDK PreCompactHookInput has trigger (manual/auto). Resolved by Story 17-4.")
     }
 
-    /// AC5 [GAP]: HookInput does NOT have customInstructions for PreCompact.
+    /// AC5 [RESOLVED by Story 17-4]: HookInput now has customInstructions for PreCompact.
     func testHookInput_preCompact_customInstructions_gap() {
         let input = HookInput(event: .preCompact)
         let mirror = Mirror(reflecting: input)
         let fieldNames = Set(mirror.children.map { $0.label ?? "" })
-        XCTAssertFalse(fieldNames.contains("customInstructions"),
-            "[GAP] HookInput should NOT have customInstructions. TS SDK PreCompactHookInput has custom_instructions.")
+        XCTAssertTrue(fieldNames.contains("customInstructions"),
+            "HookInput must have customInstructions. TS SDK PreCompactHookInput has custom_instructions. Resolved by Story 17-4.")
     }
 
-    /// AC5 [GAP]: HookInput does NOT have permissionSuggestions for PermissionRequest.
+    /// AC5 [RESOLVED by Story 17-4]: HookInput now has permissionSuggestions for PermissionRequest.
     func testHookInput_permissionRequest_permissionSuggestions_gap() {
         let input = HookInput(event: .permissionRequest, toolName: "Bash", toolInput: "{}")
         let mirror = Mirror(reflecting: input)
         let fieldNames = Set(mirror.children.map { $0.label ?? "" })
-        XCTAssertFalse(fieldNames.contains("permissionSuggestions"),
-            "[GAP] HookInput should NOT have permissionSuggestions. TS SDK PermissionRequestHookInput has permission_suggestions.")
+        XCTAssertTrue(fieldNames.contains("permissionSuggestions"),
+            "HookInput must have permissionSuggestions. TS SDK PermissionRequestHookInput has permission_suggestions. Resolved by Story 17-4.")
     }
 }
 
@@ -636,57 +636,57 @@ final class HookOutputCompatTests: XCTestCase {
             "[GAP] HookOutput uses block: Bool instead of decision: 'approve'|'block'. TS SDK has explicit decision field.")
     }
 
-    /// AC7 [GAP]: HookOutput does NOT have systemMessage (TS SDK has systemMessage).
+    /// AC7 [RESOLVED by Story 17-4]: HookOutput now has systemMessage (TS SDK has systemMessage).
     func testHookOutput_systemMessage_gap() {
         let output = HookOutput()
         let mirror = Mirror(reflecting: output)
         let fieldNames = Set(mirror.children.map { $0.label ?? "" })
-        XCTAssertFalse(fieldNames.contains("systemMessage"),
-            "[GAP] HookOutput should NOT have systemMessage. TS SDK SyncHookJSONOutput has systemMessage.")
+        XCTAssertTrue(fieldNames.contains("systemMessage"),
+            "HookOutput must have systemMessage. TS SDK SyncHookJSONOutput has systemMessage. Resolved by Story 17-4.")
     }
 
-    /// AC7 [GAP]: HookOutput does NOT have reason field (TS SDK has reason).
+    /// AC7 [RESOLVED by Story 17-4]: HookOutput now has reason field (TS SDK has reason).
     func testHookOutput_reason_gap() {
         let output = HookOutput()
         let mirror = Mirror(reflecting: output)
         let fieldNames = Set(mirror.children.map { $0.label ?? "" })
-        XCTAssertFalse(fieldNames.contains("reason"),
-            "[GAP] HookOutput should NOT have reason. TS SDK SyncHookJSONOutput has reason field.")
+        XCTAssertTrue(fieldNames.contains("reason"),
+            "HookOutput must have reason. TS SDK SyncHookJSONOutput has reason field. Resolved by Story 17-4.")
     }
 
-    /// AC7 [GAP]: HookOutput does NOT have updatedInput (TS SDK PreToolUse has updatedInput).
+    /// AC7 [RESOLVED by Story 17-4]: HookOutput now has updatedInput (TS SDK PreToolUse has updatedInput).
     func testHookOutput_updatedInput_gap() {
         let output = HookOutput()
         let mirror = Mirror(reflecting: output)
         let fieldNames = Set(mirror.children.map { $0.label ?? "" })
-        XCTAssertFalse(fieldNames.contains("updatedInput"),
-            "[GAP] HookOutput should NOT have updatedInput. TS SDK PreToolUse hookSpecificOutput has updatedInput.")
+        XCTAssertTrue(fieldNames.contains("updatedInput"),
+            "HookOutput must have updatedInput. TS SDK PreToolUse hookSpecificOutput has updatedInput. Resolved by Story 17-4.")
     }
 
-    /// AC7 [GAP]: HookOutput does NOT have additionalContext (TS SDK multiple variants have this).
+    /// AC7 [RESOLVED by Story 17-4]: HookOutput now has additionalContext (TS SDK multiple variants have this).
     func testHookOutput_additionalContext_gap() {
         let output = HookOutput()
         let mirror = Mirror(reflecting: output)
         let fieldNames = Set(mirror.children.map { $0.label ?? "" })
-        XCTAssertFalse(fieldNames.contains("additionalContext"),
-            "[GAP] HookOutput should NOT have additionalContext. TS SDK hookSpecificOutput variants have additionalContext.")
+        XCTAssertTrue(fieldNames.contains("additionalContext"),
+            "HookOutput must have additionalContext. TS SDK hookSpecificOutput variants have additionalContext. Resolved by Story 17-4.")
     }
 
-    /// AC7 [GAP]: HookOutput does NOT have updatedMCPToolOutput (TS SDK PostToolUse has this).
+    /// AC7 [RESOLVED by Story 17-4]: HookOutput now has updatedMCPToolOutput (TS SDK PostToolUse has this).
     func testHookOutput_updatedMCPToolOutput_gap() {
         let output = HookOutput()
         let mirror = Mirror(reflecting: output)
         let fieldNames = Set(mirror.children.map { $0.label ?? "" })
-        XCTAssertFalse(fieldNames.contains("updatedMCPToolOutput"),
-            "[GAP] HookOutput should NOT have updatedMCPToolOutput. TS SDK PostToolUse hookSpecificOutput has this.")
+        XCTAssertTrue(fieldNames.contains("updatedMCPToolOutput"),
+            "HookOutput must have updatedMCPToolOutput. TS SDK PostToolUse hookSpecificOutput has this. Resolved by Story 17-4.")
     }
 
-    /// AC7 [P0]: HookOutput has exactly 4 fields.
+    /// AC7 [P0]: HookOutput has 10 fields (4 original + 6 new from Story 17-4).
     func testHookOutput_fieldCount() {
         let output = HookOutput()
         let mirror = Mirror(reflecting: output)
-        XCTAssertEqual(mirror.children.count, 4,
-            "HookOutput currently has 4 fields (message, permissionUpdate, block, notification). TS SDK has more.")
+        XCTAssertEqual(mirror.children.count, 10,
+            "HookOutput should have 10 fields (message, permissionUpdate, block, notification, systemMessage, reason, updatedInput, additionalContext, permissionDecision, updatedMCPToolOutput).")
     }
 
     /// AC7 [P0]: PermissionBehavior has allow and deny cases.
@@ -698,11 +698,19 @@ final class HookOutputCompatTests: XCTestCase {
             "PermissionBehavior has allow/deny. TS SDK has allow/deny/ask (missing 'ask').")
     }
 
-    /// AC7 [GAP]: PermissionBehavior does NOT have 'ask' case (TS SDK has ask).
+    /// AC7 [RESOLVED by Story 17-4]: PermissionDecision has 'ask' case (TS SDK has ask).
+    /// Note: PermissionBehavior still does NOT have 'ask' (separate enum for hook output).
+    /// The new PermissionDecision enum covers allow/deny/ask for hook-specific decisions.
     func testPermissionBehavior_ask_gap() {
+        // PermissionBehavior intentionally does NOT have 'ask' - it's for the permission system.
+        // Story 17-4 creates a new PermissionDecision enum with allow/deny/ask for hooks.
         let ask = PermissionBehavior(rawValue: "ask")
         XCTAssertNil(ask,
-            "[GAP] PermissionBehavior should NOT have 'ask' case. TS SDK permissionDecision supports allow/deny/ask.")
+            "PermissionBehavior should NOT have 'ask' case. Use PermissionDecision for hook-specific allow/deny/ask. Resolved by Story 17-4 via PermissionDecision.")
+        // Verify PermissionDecision has ask
+        let decisionAsk = PermissionDecision(rawValue: "ask")
+        XCTAssertNotNil(decisionAsk,
+            "PermissionDecision must have 'ask' case. Resolved by Story 17-4.")
     }
 }
 
@@ -873,12 +881,12 @@ final class HookSystemCompatReportTests: XCTestCase {
             (10, "SubagentStop", "subagentStop", "PASS", "Case exists. Raw value differs (lowercase)."),
             (11, "PreCompact", "preCompact", "PASS", "Case exists. Raw value differs (lowercase)."),
             (12, "PermissionRequest", "permissionRequest", "PASS", "Case exists. Raw value differs (lowercase)."),
-            (13, "Setup", "setup", "MISSING", "No Swift equivalent. TS SDK has Setup event."),
+            (13, "Setup", "setup", "PASS", "Case exists. Resolved by Story 17-4."),
             (14, "TeammateIdle", "teammateIdle", "PASS", "Case exists. Raw value differs (lowercase)."),
             (15, "TaskCompleted", "taskCompleted", "PASS", "Case exists. Raw value differs (lowercase)."),
             (16, "ConfigChange", "configChange", "PASS", "Case exists. Raw value differs (lowercase)."),
-            (17, "WorktreeCreate", "worktreeCreate", "MISSING", "No Swift equivalent. TS SDK has WorktreeCreate event."),
-            (18, "WorktreeRemove", "worktreeRemove", "MISSING", "No Swift equivalent. TS SDK has WorktreeRemove event."),
+            (17, "WorktreeCreate", "worktreeCreate", "PASS", "Case exists. Resolved by Story 17-4."),
+            (18, "WorktreeRemove", "worktreeRemove", "PASS", "Case exists. Resolved by Story 17-4."),
         ]
 
         XCTAssertEqual(tsEvents.count, 18, "Must have exactly 18 TS SDK HookEvent mappings")
@@ -897,8 +905,8 @@ final class HookSystemCompatReportTests: XCTestCase {
         print("Swift extras: permissionDenied, taskCreated, cwdChanged, fileChanged, postCompact")
         print("")
 
-        XCTAssertEqual(passCount, 15, "15 of 18 TS events should have Swift equivalents")
-        XCTAssertEqual(missingCount, 3, "3 TS events should be MISSING")
+        XCTAssertEqual(passCount, 18, "All 18 TS events should have Swift equivalents (resolved by Story 17-4)")
+        XCTAssertEqual(missingCount, 0, "No TS events should be MISSING after Story 17-4")
     }
 
     /// AC9 [P0]: HookInput field-level compatibility summary.
@@ -906,25 +914,25 @@ final class HookSystemCompatReportTests: XCTestCase {
         let fields: [(tsField: String, swiftField: String, status: String)] = [
             // BaseHookInput fields
             ("session_id", "sessionId", "PASS"),
-            ("transcript_path", "N/A", "MISSING"),
+            ("transcript_path", "transcriptPath", "PASS"),
             ("cwd", "cwd", "PASS"),
-            ("permission_mode", "N/A", "MISSING"),
-            ("agent_id", "N/A", "MISSING"),
-            ("agent_type", "N/A", "MISSING"),
+            ("permission_mode", "permissionMode", "PASS"),
+            ("agent_id", "agentId", "PASS"),
+            ("agent_type", "agentType", "PASS"),
             // Tool event fields
             ("tool_name", "toolName", "PASS"),
             ("tool_input", "toolInput", "PASS"),
             ("tool_response", "toolOutput", "PASS"),
             ("tool_use_id", "toolUseId", "PASS"),
             ("error", "error", "PASS"),
-            // Per-event missing fields
-            ("is_interrupt", "N/A", "MISSING"),
-            ("stop_hook_active", "N/A", "MISSING"),
-            ("last_assistant_message", "N/A", "MISSING"),
-            ("agent_transcript_path", "N/A", "MISSING"),
-            ("trigger (manual/auto)", "N/A", "MISSING"),
-            ("custom_instructions", "N/A", "MISSING"),
-            ("permission_suggestions", "N/A", "MISSING"),
+            // Per-event fields (resolved by Story 17-4)
+            ("is_interrupt", "isInterrupt", "PASS"),
+            ("stop_hook_active", "stopHookActive", "PASS"),
+            ("last_assistant_message", "lastAssistantMessage", "PASS"),
+            ("agent_transcript_path", "agentTranscriptPath", "PASS"),
+            ("trigger (manual/auto)", "trigger", "PASS"),
+            ("custom_instructions", "customInstructions", "PASS"),
+            ("permission_suggestions", "permissionSuggestions", "PASS"),
         ]
 
         let passCount = fields.filter { $0.status == "PASS" }.count
@@ -938,22 +946,23 @@ final class HookSystemCompatReportTests: XCTestCase {
         print("Summary: PASS: \(passCount) | MISSING: \(missingCount) | Total: \(fields.count)")
         print("")
 
-        XCTAssertEqual(passCount, 7, "7 fields should have Swift equivalents")
-        XCTAssertEqual(missingCount, 11, "11 fields should be MISSING")
+        XCTAssertEqual(passCount, 18, "All 18 fields should have Swift equivalents (resolved by Story 17-4)")
+        XCTAssertEqual(missingCount, 0, "No fields should be MISSING after Story 17-4")
     }
 
     /// AC9 [P0]: HookOutput field-level compatibility summary.
     func testCompatReport_hookOutputFieldSummary() {
         let fields: [(tsField: String, swiftField: String, status: String)] = [
             ("decision (approve/block)", "block: Bool", "PARTIAL"),
-            ("systemMessage", "N/A", "MISSING"),
-            ("reason", "N/A (message is similar)", "PARTIAL"),
-            ("permissionDecision (allow/deny/ask)", "permissionUpdate", "PARTIAL"),
-            ("updatedInput", "N/A", "MISSING"),
-            ("additionalContext", "N/A", "MISSING"),
-            ("updatedMCPToolOutput", "N/A", "MISSING"),
+            ("systemMessage", "systemMessage", "PASS"),
+            ("reason", "reason", "PASS"),
+            ("permissionDecision (allow/deny/ask)", "permissionDecision", "PASS"),
+            ("updatedInput", "updatedInput", "PASS"),
+            ("additionalContext", "additionalContext", "PASS"),
+            ("updatedMCPToolOutput", "updatedMCPToolOutput", "PASS"),
         ]
 
+        let passCount = fields.filter { $0.status == "PASS" }.count
         let partialCount = fields.filter { $0.status == "PARTIAL" }.count
         let missingCount = fields.filter { $0.status == "MISSING" }.count
 
@@ -962,10 +971,11 @@ final class HookSystemCompatReportTests: XCTestCase {
         for f in fields {
             print("  [\(f.status)] TS: \(f.tsField) -> Swift: \(f.swiftField)")
         }
-        print("Summary: PARTIAL: \(partialCount) | MISSING: \(missingCount) | Total: \(fields.count)")
+        print("Summary: PASS: \(passCount) | PARTIAL: \(partialCount) | MISSING: \(missingCount) | Total: \(fields.count)")
         print("")
 
-        XCTAssertEqual(partialCount, 3, "3 fields should be PARTIAL")
-        XCTAssertEqual(missingCount, 4, "4 fields should be MISSING")
+        XCTAssertEqual(passCount, 6, "6 fields should be PASS (resolved by Story 17-4)")
+        XCTAssertEqual(partialCount, 1, "1 field should be PARTIAL (decision -> block mapping)")
+        XCTAssertEqual(missingCount, 0, "No fields should be MISSING after Story 17-4")
     }
 }

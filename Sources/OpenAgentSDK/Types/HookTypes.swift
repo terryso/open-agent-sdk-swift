@@ -45,6 +45,12 @@ public enum HookEvent: String, Sendable, Equatable, CaseIterable {
     case postCompact
     /// Triggered when a teammate becomes idle.
     case teammateIdle
+    /// Triggered during agent setup initialization.
+    case setup
+    /// Triggered when a worktree is created.
+    case worktreeCreate
+    /// Triggered when a worktree is removed.
+    case worktreeRemove
 }
 
 /// Input data provided to hook handlers.
@@ -71,6 +77,28 @@ public struct HookInput: @unchecked Sendable {
     public let cwd: String?
     /// An error message, if applicable.
     public let error: String?
+    /// Path to the conversation transcript file.
+    public let transcriptPath: String?
+    /// The current permission mode (e.g., "default", "plan").
+    public let permissionMode: String?
+    /// The unique identifier of the agent instance.
+    public let agentId: String?
+    /// The type of agent (e.g., "orchestrator", "researcher").
+    public let agentType: String?
+    /// Whether a stop hook is currently active (Stop event).
+    public let stopHookActive: Bool?
+    /// The last message from the assistant (Stop/SubagentStop events).
+    public let lastAssistantMessage: String?
+    /// The trigger type for compaction ("manual" or "auto", PreCompact event).
+    public let trigger: String?
+    /// Custom instructions for compaction (PreCompact event).
+    public let customInstructions: String?
+    /// Suggested permission decisions (PermissionRequest event).
+    public let permissionSuggestions: [String]?
+    /// Whether the tool failure was caused by an interrupt (PostToolUseFailure event).
+    public let isInterrupt: Bool?
+    /// Path to the sub-agent's transcript file (SubagentStop event).
+    public let agentTranscriptPath: String?
 
     public init(
         event: HookEvent,
@@ -80,7 +108,18 @@ public struct HookInput: @unchecked Sendable {
         toolUseId: String? = nil,
         sessionId: String? = nil,
         cwd: String? = nil,
-        error: String? = nil
+        error: String? = nil,
+        transcriptPath: String? = nil,
+        permissionMode: String? = nil,
+        agentId: String? = nil,
+        agentType: String? = nil,
+        stopHookActive: Bool? = nil,
+        lastAssistantMessage: String? = nil,
+        trigger: String? = nil,
+        customInstructions: String? = nil,
+        permissionSuggestions: [String]? = nil,
+        isInterrupt: Bool? = nil,
+        agentTranscriptPath: String? = nil
     ) {
         self.event = event
         self.toolName = toolName
@@ -90,6 +129,17 @@ public struct HookInput: @unchecked Sendable {
         self.sessionId = sessionId
         self.cwd = cwd
         self.error = error
+        self.transcriptPath = transcriptPath
+        self.permissionMode = permissionMode
+        self.agentId = agentId
+        self.agentType = agentType
+        self.stopHookActive = stopHookActive
+        self.lastAssistantMessage = lastAssistantMessage
+        self.trigger = trigger
+        self.customInstructions = customInstructions
+        self.permissionSuggestions = permissionSuggestions
+        self.isInterrupt = isInterrupt
+        self.agentTranscriptPath = agentTranscriptPath
     }
 }
 
@@ -99,6 +149,8 @@ public struct HookInput: @unchecked Sendable {
 /// updating permissions, blocking operations, or sending notifications.
 ///
 /// - Note: Uses `@unchecked Sendable` for compatibility with dynamic `Any?` values.
+///   The `updatedInput` and `updatedMCPToolOutput` fields are excluded from `Equatable`
+///   comparison because they contain `Any?` values.
 public struct HookOutput: @unchecked Sendable, Equatable {
     /// An optional log or status message from the hook.
     public let message: String?
@@ -108,17 +160,54 @@ public struct HookOutput: @unchecked Sendable, Equatable {
     public let block: Bool
     /// An optional notification to send to the user.
     public let notification: HookNotification?
+    /// An optional system message to inject into the conversation.
+    public let systemMessage: String?
+    /// An optional reason explaining the hook's decision.
+    public let reason: String?
+    /// An optional updated input to replace the original tool input (PreToolUse hooks).
+    public let updatedInput: [String: Any]?
+    /// Additional context to provide alongside the hook result.
+    public let additionalContext: String?
+    /// A permission decision from the hook (allow/deny/ask).
+    public let permissionDecision: PermissionDecision?
+    /// An optional updated MCP tool output (PostToolUse hooks).
+    public let updatedMCPToolOutput: Any?
 
     public init(
         message: String? = nil,
         permissionUpdate: PermissionUpdate? = nil,
         block: Bool = false,
-        notification: HookNotification? = nil
+        notification: HookNotification? = nil,
+        systemMessage: String? = nil,
+        reason: String? = nil,
+        updatedInput: [String: Any]? = nil,
+        additionalContext: String? = nil,
+        permissionDecision: PermissionDecision? = nil,
+        updatedMCPToolOutput: Any? = nil
     ) {
         self.message = message
         self.permissionUpdate = permissionUpdate
         self.block = block
         self.notification = notification
+        self.systemMessage = systemMessage
+        self.reason = reason
+        self.updatedInput = updatedInput
+        self.additionalContext = additionalContext
+        self.permissionDecision = permissionDecision
+        self.updatedMCPToolOutput = updatedMCPToolOutput
+    }
+
+    public static func == (lhs: HookOutput, rhs: HookOutput) -> Bool {
+        lhs.message == rhs.message
+            && lhs.permissionUpdate == rhs.permissionUpdate
+            && lhs.block == rhs.block
+            && lhs.notification == rhs.notification
+            && lhs.systemMessage == rhs.systemMessage
+            && lhs.reason == rhs.reason
+            && lhs.additionalContext == rhs.additionalContext
+            && lhs.permissionDecision == rhs.permissionDecision
+        // Note: updatedInput ([String: Any]?) and updatedMCPToolOutput (Any?)
+        // are excluded from equality comparison because they contain non-Equatable types.
     }
 }
 
@@ -128,6 +217,20 @@ public struct HookOutput: @unchecked Sendable, Equatable {
 public enum PermissionBehavior: String, Sendable, Equatable, CaseIterable {
     case allow = "allow"
     case deny = "deny"
+}
+
+/// Permission decisions returned by hooks.
+///
+/// Unlike `PermissionBehavior` (which is used in the permission system with only
+/// allow/deny), `PermissionDecision` includes an `ask` case for hook-specific
+/// scenarios where the hook defers the decision back to the user.
+public enum PermissionDecision: String, Sendable, Equatable, CaseIterable {
+    /// Allow the operation.
+    case allow = "allow"
+    /// Deny the operation.
+    case deny = "deny"
+    /// Defer the decision back to the user.
+    case ask = "ask"
 }
 
 /// A permission update from a hook.

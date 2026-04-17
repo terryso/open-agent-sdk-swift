@@ -1,13 +1,13 @@
 import XCTest
 @testable import OpenAgentSDK
 
-// MARK: - ShellHookExecutor Tests (Story 8-3)
+// MARK: - ShellHookExecutor Tests (Story 8-3, Story 17-4)
 
-/// ATDD tests for Story 8-3: Shell Hook Execution.
+/// ATDD tests for Story 8-3: Shell Hook Execution + Story 17-4: Hook System Enhancement.
 ///
 /// These tests verify the ShellHookExecutor component and its integration
-/// with HookRegistry. All tests are in the TDD RED PHASE -- they
-/// will FAIL until the implementation is complete (Tasks 1-2 in the story).
+/// with HookRegistry. Story 8-3 tests are GREEN (passing). Story 17-4 tests
+/// are in TDD RED PHASE -- they will FAIL until the implementation is complete.
 ///
 /// Coverage:
 /// - AC1: ShellHookExecutor executes commands via POSIX Process
@@ -20,6 +20,8 @@ import XCTest
 /// - AC8: Shell hooks and function hooks coexist on same event
 /// - AC10: Unit test coverage requirements
 /// - AC12: Matcher filtering for shell hooks
+/// - Story 17-4: parseHookOutput new field parsing
+/// - Story 17-4: stdin JSON includes new HookInput fields
 final class ShellHookExecutorTests: XCTestCase {
 
     // MARK: - AC1: Shell Hook Execution Engine
@@ -474,5 +476,220 @@ final class ShellHookExecutorTests: XCTestCase {
         // Then: completes successfully using Foundation Process
         XCTAssertNotNil(output, "Foundation Process-based execution should work")
         XCTAssertEqual(output?.message, "cross-platform-test")
+    }
+
+    // MARK: - Story 17-4: parseHookOutput New Field Parsing
+
+    /// Story 17-4 AC5 [P0]: ShellHookExecutor parses systemMessage from JSON output.
+    func testExecute_parsesSystemMessage() async {
+        let command = "echo '{\"message\":\"msg\",\"systemMessage\":\"System override active\"}'"
+        let input = HookInput(event: .preToolUse)
+
+        let output = await ShellHookExecutor.execute(
+            command: command,
+            input: input,
+            timeoutMs: 5_000
+        )
+
+        XCTAssertNotNil(output, "Should return non-nil output")
+        XCTAssertEqual(output?.systemMessage, "System override active",
+            "parseHookOutput must parse systemMessage from JSON")
+    }
+
+    /// Story 17-4 AC5 [P0]: ShellHookExecutor parses reason from JSON output.
+    func testExecute_parsesReason() async {
+        let command = "echo '{\"message\":\"msg\",\"reason\":\"Policy violation detected\"}'"
+        let input = HookInput(event: .preToolUse)
+
+        let output = await ShellHookExecutor.execute(
+            command: command,
+            input: input,
+            timeoutMs: 5_000
+        )
+
+        XCTAssertNotNil(output, "Should return non-nil output")
+        XCTAssertEqual(output?.reason, "Policy violation detected",
+            "parseHookOutput must parse reason from JSON")
+    }
+
+    /// Story 17-4 AC5 [P0]: ShellHookExecutor parses updatedInput from JSON output.
+    func testExecute_parsesUpdatedInput() async {
+        let command = "echo '{\"message\":\"msg\",\"updatedInput\":{\"command\":\"safe_command\"}}'"
+        let input = HookInput(event: .preToolUse)
+
+        let output = await ShellHookExecutor.execute(
+            command: command,
+            input: input,
+            timeoutMs: 5_000
+        )
+
+        XCTAssertNotNil(output, "Should return non-nil output")
+        XCTAssertNotNil(output?.updatedInput,
+            "parseHookOutput must parse updatedInput from JSON")
+        XCTAssertEqual(output?.updatedInput?["command"] as? String, "safe_command",
+            "updatedInput should contain the command key")
+    }
+
+    /// Story 17-4 AC5 [P0]: ShellHookExecutor parses additionalContext from JSON output.
+    func testExecute_parsesAdditionalContext() async {
+        let command = "echo '{\"message\":\"msg\",\"additionalContext\":\"Extra context here\"}'"
+        let input = HookInput(event: .preToolUse)
+
+        let output = await ShellHookExecutor.execute(
+            command: command,
+            input: input,
+            timeoutMs: 5_000
+        )
+
+        XCTAssertNotNil(output, "Should return non-nil output")
+        XCTAssertEqual(output?.additionalContext, "Extra context here",
+            "parseHookOutput must parse additionalContext from JSON")
+    }
+
+    /// Story 17-4 AC5 [P0]: ShellHookExecutor parses permissionDecision from JSON output.
+    func testExecute_parsesPermissionDecision() async {
+        let command = "echo '{\"message\":\"msg\",\"permissionDecision\":\"deny\"}'"
+        let input = HookInput(event: .preToolUse)
+
+        let output = await ShellHookExecutor.execute(
+            command: command,
+            input: input,
+            timeoutMs: 5_000
+        )
+
+        XCTAssertNotNil(output, "Should return non-nil output")
+        XCTAssertEqual(output?.permissionDecision, .deny,
+            "parseHookOutput must parse permissionDecision from JSON")
+    }
+
+    /// Story 17-4 AC5 [P0]: ShellHookExecutor parses permissionDecision "ask".
+    func testExecute_parsesPermissionDecision_ask() async {
+        let command = "echo '{\"message\":\"msg\",\"permissionDecision\":\"ask\"}'"
+        let input = HookInput(event: .permissionRequest)
+
+        let output = await ShellHookExecutor.execute(
+            command: command,
+            input: input,
+            timeoutMs: 5_000
+        )
+
+        XCTAssertNotNil(output, "Should return non-nil output")
+        XCTAssertEqual(output?.permissionDecision, .ask,
+            "parseHookOutput must parse permissionDecision 'ask' from JSON")
+    }
+
+    /// Story 17-4 AC5 [P0]: ShellHookExecutor parses updatedMCPToolOutput from JSON output.
+    func testExecute_parsesUpdatedMCPToolOutput() async {
+        let command = "echo '{\"message\":\"msg\",\"updatedMCPToolOutput\":{\"result\":\"modified output\"}}'"
+        let input = HookInput(event: .postToolUse)
+
+        let output = await ShellHookExecutor.execute(
+            command: command,
+            input: input,
+            timeoutMs: 5_000
+        )
+
+        XCTAssertNotNil(output, "Should return non-nil output")
+        XCTAssertNotNil(output?.updatedMCPToolOutput,
+            "parseHookOutput must parse updatedMCPToolOutput from JSON")
+    }
+
+    /// Story 17-4 AC5 [P0]: ShellHookExecutor parses all new fields together.
+    func testExecute_parsesAllNewFields() async {
+        let command = "echo '{\"message\":\"msg\",\"block\":true,\"systemMessage\":\"sys\",\"reason\":\"r\",\"updatedInput\":{\"k\":\"v\"},\"additionalContext\":\"ctx\",\"permissionDecision\":\"allow\",\"updatedMCPToolOutput\":{\"out\":1}}'"
+        let input = HookInput(event: .preToolUse)
+
+        let output = await ShellHookExecutor.execute(
+            command: command,
+            input: input,
+            timeoutMs: 5_000
+        )
+
+        XCTAssertNotNil(output, "Should return non-nil output")
+        XCTAssertEqual(output?.message, "msg")
+        XCTAssertTrue(output?.block ?? false)
+        XCTAssertEqual(output?.systemMessage, "sys")
+        XCTAssertEqual(output?.reason, "r")
+        XCTAssertNotNil(output?.updatedInput)
+        XCTAssertEqual(output?.additionalContext, "ctx")
+        XCTAssertEqual(output?.permissionDecision, .allow)
+        XCTAssertNotNil(output?.updatedMCPToolOutput)
+    }
+
+    /// Story 17-4 AC5 [P1]: ShellHookExecutor stdin JSON includes new HookInput base fields.
+    func testExecute_stdinIncludesTranscriptPath() async {
+        // Given: a command that echoes stdin back as modified JSON
+        let command = "cat | python3 -c \"import sys,json; d=json.load(sys.stdin); print(json.dumps({'message': d.get('transcriptPath','MISSING')}))\""
+        let input = HookInput(
+            event: .preToolUse,
+            transcriptPath: "/path/to/transcript.jsonl"
+        )
+
+        let output = await ShellHookExecutor.execute(
+            command: command,
+            input: input,
+            timeoutMs: 5_000
+        )
+
+        XCTAssertNotNil(output, "Should return non-nil output")
+        XCTAssertEqual(output?.message, "/path/to/transcript.jsonl",
+            "stdin JSON must include transcriptPath")
+    }
+
+    /// Story 17-4 AC5 [P1]: ShellHookExecutor stdin JSON includes permissionMode.
+    func testExecute_stdinIncludesPermissionMode() async {
+        let command = "cat | python3 -c \"import sys,json; d=json.load(sys.stdin); print(json.dumps({'message': d.get('permissionMode','MISSING')}))\""
+        let input = HookInput(
+            event: .preToolUse,
+            permissionMode: "default"
+        )
+
+        let output = await ShellHookExecutor.execute(
+            command: command,
+            input: input,
+            timeoutMs: 5_000
+        )
+
+        XCTAssertNotNil(output, "Should return non-nil output")
+        XCTAssertEqual(output?.message, "default",
+            "stdin JSON must include permissionMode")
+    }
+
+    /// Story 17-4 AC5 [P1]: ShellHookExecutor stdin JSON includes agentId.
+    func testExecute_stdinIncludesAgentId() async {
+        let command = "cat | python3 -c \"import sys,json; d=json.load(sys.stdin); print(json.dumps({'message': d.get('agentId','MISSING')}))\""
+        let input = HookInput(
+            event: .subagentStart,
+            agentId: "agent-456"
+        )
+
+        let output = await ShellHookExecutor.execute(
+            command: command,
+            input: input,
+            timeoutMs: 5_000
+        )
+
+        XCTAssertNotNil(output, "Should return non-nil output")
+        XCTAssertEqual(output?.message, "agent-456",
+            "stdin JSON must include agentId")
+    }
+
+    /// Story 17-4 AC5 [P1]: ShellHookExecutor stdin JSON includes agentType.
+    func testExecute_stdinIncludesAgentType() async {
+        let command = "cat | python3 -c \"import sys,json; d=json.load(sys.stdin); print(json.dumps({'message': d.get('agentType','MISSING')}))\""
+        let input = HookInput(
+            event: .subagentStart,
+            agentType: "orchestrator"
+        )
+
+        let output = await ShellHookExecutor.execute(
+            command: command,
+            input: input,
+            timeoutMs: 5_000
+        )
+
+        XCTAssertNotNil(output, "Should return non-nil output")
+        XCTAssertEqual(output?.message, "orchestrator",
+            "stdin JSON must include agentType")
     }
 }

@@ -493,9 +493,9 @@ final class SubagentSystemCompatTests: XCTestCase {
     // AC6 #3: HookInput subagent-specific fields -- PARTIAL
     // ================================================================
 
-    /// AC6 #3 [PARTIAL]: TS SubagentStartHookInput/SubagentStopHookInput have subagent-specific
+    /// AC6 #3 [RESOLVED by Story 17-4]: TS SubagentStartHookInput/SubagentStopHookInput have subagent-specific
     /// fields (agent_id, agent_type, agent_transcript_path, last_assistant_message).
-    /// Swift HookInput is generic and lacks subagent-specific fields.
+    /// Swift HookInput now has these fields as optional properties.
     func testHookInput_subagentFields_partial() {
         let hookInput = HookInput(event: .subagentStart, toolName: "Agent", sessionId: "session-123")
         let fields = fieldNames(of: hookInput)
@@ -505,29 +505,28 @@ final class SubagentSystemCompatTests: XCTestCase {
         XCTAssertTrue(fields.contains("toolName"), "HookInput has 'toolName' field")
         XCTAssertTrue(fields.contains("sessionId"), "HookInput has 'sessionId' field")
 
-        // Subagent-specific fields that are MISSING
-        XCTAssertFalse(fields.contains("agentId"),
-                       "GAP: HookInput has no 'agentId' field. TS SubagentStartHookInput has agent_id.")
-        XCTAssertFalse(fields.contains("agentType"),
-                       "GAP: HookInput has no 'agentType' field. TS SubagentStartHookInput has agent_type.")
-        XCTAssertFalse(fields.contains("agentTranscriptPath"),
-                       "GAP: HookInput has no 'agentTranscriptPath' field. TS has agent_transcript_path.")
-        XCTAssertFalse(fields.contains("lastAssistantMessage"),
-                       "GAP: HookInput has no 'lastAssistantMessage' field. TS has last_assistant_message.")
+        // Subagent-specific fields now RESOLVED by Story 17-4
+        XCTAssertTrue(fields.contains("agentId"),
+                       "HookInput has 'agentId' field. TS SubagentStartHookInput has agent_id. Resolved by Story 17-4.")
+        XCTAssertTrue(fields.contains("agentType"),
+                       "HookInput has 'agentType' field. TS SubagentStartHookInput has agent_type. Resolved by Story 17-4.")
+        XCTAssertTrue(fields.contains("agentTranscriptPath"),
+                       "HookInput has 'agentTranscriptPath' field. TS has agent_transcript_path. Resolved by Story 17-4.")
+        XCTAssertTrue(fields.contains("lastAssistantMessage"),
+                       "HookInput has 'lastAssistantMessage' field. TS has last_assistant_message. Resolved by Story 17-4.")
     }
 
     /// AC6 [P0]: Summary of subagent hook event verification.
     func testSubagentHooks_coverageSummary() {
-        // Subagent hooks: 2 PASS + 1 PARTIAL = 3 verifications
-        // PASS: SubagentStart event, SubagentStop event
-        // PARTIAL: HookInput for subagent events (generic, no subagent-specific fields)
-        let passCount = 2
-        let partialCount = 1
+        // Subagent hooks: 3 PASS = 3 verifications (all resolved by Story 17-4)
+        // PASS: SubagentStart event, SubagentStop event, HookInput subagent-specific fields
+        let passCount = 3
+        let partialCount = 0
         let total = passCount + partialCount
 
         XCTAssertEqual(total, 3, "Should verify 3 subagent hook aspects")
-        XCTAssertEqual(passCount, 2, "2 subagent hook aspects PASS")
-        XCTAssertEqual(partialCount, 1, "1 subagent hook aspect PARTIAL")
+        XCTAssertEqual(passCount, 3, "3 subagent hook aspects PASS (resolved by Story 17-4)")
+        XCTAssertEqual(partialCount, 0, "0 subagent hook aspects PARTIAL")
     }
 
     // MARK: - SubAgentSpawner Protocol Verification (Task 4)

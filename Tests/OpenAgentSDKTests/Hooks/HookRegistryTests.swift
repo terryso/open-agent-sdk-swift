@@ -40,8 +40,8 @@ final class HookRegistryTests: XCTestCase {
         // Given/When: checking allCases count
         let allCases = HookEvent.allCases
 
-        // Then: exactly 20 cases (matching TS SDK HOOK_EVENTS)
-        XCTAssertEqual(allCases.count, 20, "HookEvent should have 20 lifecycle cases")
+        // Then: exactly 23 cases (20 original + 3 new from Story 17-4)
+        XCTAssertEqual(allCases.count, 23, "HookEvent should have 23 lifecycle cases")
     }
 
     /// AC2 [P0]: register() on different events are independent.
