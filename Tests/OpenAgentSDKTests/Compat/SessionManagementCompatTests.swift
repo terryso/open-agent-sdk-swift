@@ -587,17 +587,23 @@ final class SessionRestoreOptionsCompatTests: XCTestCase {
             "PARTIAL: Swift requires sessionStore+sessionId pair instead of single 'resume' option")
     }
 
-    /// AC5 [GAP]: AgentOptions has NO continue option (TS SDK has continue: true).
+    /// AC5 [RESOLVED]: AgentOptions now has continueRecentSession option (Story 17-2, wired in 17-7).
+    /// TS SDK uses `continue: true` to resume the most recent session.
+    /// Swift uses `continueRecentSession: Bool` (Story 17-2 declaration, Story 17-7 runtime wiring).
     func testAgentOptions_continue_gap() {
-        let options = AgentOptions()
+        let options = AgentOptions(continueRecentSession: true)
         let mirror = Mirror(reflecting: options)
         let fieldNames = Set(mirror.children.compactMap { $0.label })
         // TS SDK: continue: true -- continue most recent session
-        // Swift: No equivalent convenience option
-        XCTAssertFalse(fieldNames.contains("continue"),
-            "[GAP] AgentOptions should NOT have 'continue' field. TS SDK has continue: true option.")
-        XCTAssertFalse(fieldNames.contains("continueSession"),
-            "[GAP] AgentOptions should NOT have 'continueSession' field.")
+        // Swift: Now has AgentOptions.continueRecentSession (Story 17-2, wired in 17-7)
+        XCTAssertTrue(fieldNames.contains("continueRecentSession"),
+            "[RESOLVED] AgentOptions now has 'continueRecentSession' field (Story 17-2, wired 17-7). TS SDK has continue: true option.")
+        XCTAssertTrue(options.continueRecentSession,
+            "continueRecentSession should be settable to true")
+        // Verify default is false (safe default)
+        let defaultOptions = AgentOptions()
+        XCTAssertFalse(defaultOptions.continueRecentSession,
+            "Default continueRecentSession should be false")
     }
 
     /// AC5 [RESOLVED]: AgentOptions now has forkSession option (Story 17-2).
@@ -986,20 +992,20 @@ final class SessionManagementCompatReportTests: XCTestCase {
                 swiftEquivalent: "sessionStore + sessionId", status: "PARTIAL",
                 note: "Requires two fields instead of one 'resume' option"),
             OptionMapping(tsOption: "continue: true",
-                swiftEquivalent: "MISSING", status: "MISSING",
-                note: "No 'resume most recent session' convenience option"),
+                swiftEquivalent: "continueRecentSession: Bool", status: "RESOLVED",
+                note: "AgentOptions.continueRecentSession resolves most recent session (Story 17-2, wired 17-7)"),
             OptionMapping(tsOption: "forkSession: true",
-                swiftEquivalent: "MISSING as option", status: "MISSING",
-                note: "SessionStore.fork() exists as standalone method, not AgentOption"),
+                swiftEquivalent: "forkSession: Bool", status: "RESOLVED",
+                note: "AgentOptions.forkSession wires to SessionStore.fork() (Story 17-2, wired 17-7)"),
             OptionMapping(tsOption: "resumeSessionAt: messageUUID",
-                swiftEquivalent: "MISSING", status: "MISSING",
-                note: "No option to resume at specific message"),
+                swiftEquivalent: "resumeSessionAt: String?", status: "RESOLVED",
+                note: "AgentOptions.resumeSessionAt truncates history at UUID (Story 17-2, wired 17-7)"),
             OptionMapping(tsOption: "sessionId: uuid",
                 swiftEquivalent: "sessionId: String?", status: "PASS",
                 note: "Can set a custom session ID"),
             OptionMapping(tsOption: "persistSession: false",
-                swiftEquivalent: "MISSING", status: "MISSING",
-                note: "No way to disable persistence when sessionStore+sessionId are set"),
+                swiftEquivalent: "persistSession: Bool", status: "RESOLVED",
+                note: "AgentOptions.persistSession gates session save (Story 17-2, wired 17-7)"),
         ]
 
         print("")
@@ -1011,14 +1017,16 @@ final class SessionManagementCompatReportTests: XCTestCase {
 
         let passCount = mappings.filter { $0.status == "PASS" }.count
         let partialCount = mappings.filter { $0.status == "PARTIAL" }.count
+        let resolvedCount = mappings.filter { $0.status == "RESOLVED" }.count
         let missingCount = mappings.filter { $0.status == "MISSING" }.count
 
-        print("Summary: PASS: \(passCount) | PARTIAL: \(partialCount) | MISSING: \(missingCount) | Total: \(mappings.count)")
+        print("Summary: PASS: \(passCount) | PARTIAL: \(partialCount) | RESOLVED: \(resolvedCount) | MISSING: \(missingCount) | Total: \(mappings.count)")
         print("")
 
         XCTAssertEqual(passCount, 1, "1 option fully passes (sessionId)")
         XCTAssertEqual(partialCount, 1, "1 option partial (resume via sessionStore+sessionId)")
-        XCTAssertEqual(missingCount, 4, "4 options missing (continue, forkSession, resumeSessionAt, persistSession)")
+        XCTAssertEqual(resolvedCount, 4, "4 options resolved (continueRecentSession, forkSession, resumeSessionAt, persistSession)")
+        XCTAssertEqual(missingCount, 0, "0 options missing (all resolved by Story 17-7)")
         XCTAssertEqual(mappings.count, 6, "All 6 TS restore options checked")
     }
 
@@ -1027,30 +1035,33 @@ final class SessionManagementCompatReportTests: XCTestCase {
         // Method-level: 2 PASS, 3 PARTIAL, 0 MISSING, 3 EXTRA
         // Field-level (metadata): 6 PASS, 1 PARTIAL, 3 MISSING, 3 EXTRA
         // Field-level (messages): 0 PASS, 2 PARTIAL, 3 MISSING
-        // Options-level: 1 PASS, 1 PARTIAL, 4 MISSING
+        // Options-level: 1 PASS, 1 PARTIAL, 4 RESOLVED (was 4 MISSING, resolved by Story 17-7)
 
         print("")
         print("==============================================")
         print("Story 16-6: Session Management Compat Summary")
+        print("(Updated by Story 17-7: 4 MISSING options resolved)")
         print("==============================================")
         print("Session Functions:    2 PASS | 3 PARTIAL | 0 MISSING | 3 EXTRA (Swift-only)")
         print("Metadata Fields:     6 PASS | 1 PARTIAL | 3 MISSING | 3 EXTRA (Swift-only)")
         print("Message Fields:      0 PASS | 2 PARTIAL | 3 MISSING")
-        print("Restore Options:     1 PASS | 1 PARTIAL | 4 MISSING")
+        print("Restore Options:     1 PASS | 1 PARTIAL | 4 RESOLVED | 0 MISSING")
         print("----------------------------------------------")
-        print("Total:               9 PASS | 7 PARTIAL | 10 MISSING | 6 EXTRA")
+        print("Total:               9 PASS | 7 PARTIAL | 6 MISSING | 4 RESOLVED | 6 EXTRA")
         print("==============================================")
         print("")
 
         // Verify totals
         let totalPass = 2 + 6 + 0 + 1
         let totalPartial = 3 + 1 + 2 + 1
-        let totalMissing = 0 + 3 + 3 + 4
+        let totalMissing = 0 + 3 + 3 + 0  // Options-level now 0 MISSING
+        let totalResolved = 4  // 4 options resolved by Story 17-7
         let totalExtra = 3 + 3 + 0 + 0
 
         XCTAssertEqual(totalPass, 9)
         XCTAssertEqual(totalPartial, 7)
-        XCTAssertEqual(totalMissing, 10)
+        XCTAssertEqual(totalMissing, 6)
+        XCTAssertEqual(totalResolved, 4)
         XCTAssertEqual(totalExtra, 6)
     }
 }

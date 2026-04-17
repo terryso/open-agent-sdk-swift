@@ -355,14 +355,48 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
         // MCP integration: connect MCP servers and merge tools
         let (mcpTools, mcpManager) = await assembleFullToolPool()
 
-        // Session restore: load history if sessionStore and sessionId are configured
+        // Session lifecycle wiring (Story 17-7)
+        // Resolve the active session ID based on continueRecentSession / forkSession options.
+        // Execution order: continueRecentSession → forkSession → session restore → resumeSessionAt
+        var resolvedSessionId = options.sessionId
+        if let sessionStore = options.sessionStore {
+            // continueRecentSession: if no explicit sessionId, resolve most recent session
+            if options.continueRecentSession,
+               resolvedSessionId == nil || resolvedSessionId?.isEmpty == true {
+                if let sessions = try? await sessionStore.list(), let mostRecent = sessions.first {
+                    resolvedSessionId = mostRecent.id
+                }
+                // If no sessions exist, resolvedSessionId stays nil → new session behavior
+            }
+
+            // forkSession: fork the resolved session into a new copy
+            if options.forkSession, let sourceId = resolvedSessionId {
+                if let forkedId = try? await sessionStore.fork(sourceSessionId: sourceId) {
+                    resolvedSessionId = forkedId
+                }
+                // If fork returns nil (source doesn't exist), keep original sessionId
+            }
+        }
+
+        // Session restore: load history if sessionStore and resolvedSessionId are configured
         var messages: [[String: Any]]
-        if let sessionStore = options.sessionStore, let sessionId = options.sessionId {
+        if let sessionStore = options.sessionStore, let sessionId = resolvedSessionId {
             if let sessionData = try? await sessionStore.load(sessionId: sessionId) {
                 messages = sessionData.messages
             } else {
                 messages = []
             }
+
+            // resumeSessionAt: truncate history to the message with matching UUID
+            if let resumeAt = options.resumeSessionAt, !messages.isEmpty {
+                if let truncateIndex = messages.firstIndex(where: { msg in
+                    (msg["uuid"] as? String) == resumeAt || (msg["id"] as? String) == resumeAt
+                }) {
+                    messages = Array(messages[0...truncateIndex])
+                }
+                // If UUID not found, keep full history (no truncation, no error)
+            }
+
             // Append new user message to restored (or empty) history
             messages.append(["role": "user", "content": text])
         } else {
@@ -528,7 +562,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                     await mcpManager.shutdown()
                 }
                 // Session auto-save on error: persist whatever messages we have so far
-                if let sessionStore = options.sessionStore, let sessionId = options.sessionId, options.persistSession {
+                if let sessionStore = options.sessionStore, let sessionId = resolvedSessionId, options.persistSession {
                     let metadata = PartialSessionMetadata(
                         cwd: options.cwd ?? FileManager.default.currentDirectoryPath,
                         model: model,
@@ -751,7 +785,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
         }
 
         // Session auto-save: persist updated messages if sessionStore is configured and persistSession is true
-        if let sessionStore = options.sessionStore, let sessionId = options.sessionId, options.persistSession {
+        if let sessionStore = options.sessionStore, let sessionId = resolvedSessionId, options.persistSession {
             let metadata = PartialSessionMetadata(
                 cwd: options.cwd ?? "",
                 model: model,
@@ -830,6 +864,9 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
         // broke the setPermissionMode()/setCanUseTool() public APIs.
         let capturedSessionStore = options.sessionStore
         let capturedSessionId = options.sessionId
+        let capturedContinueRecentSession = options.continueRecentSession
+        let capturedForkSession = options.forkSession
+        let capturedResumeSessionAt = options.resumeSessionAt
         let capturedHookRegistry = options.hookRegistry
         let capturedSkillRegistry = options.skillRegistry
         let capturedMaxSkillRecursionDepth = options.maxSkillRecursionDepth
@@ -918,13 +955,44 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
 
                 var messages = decodedMessages
 
-                // Session restore: load history if sessionStore and sessionId are configured
-                if let sessionStore = capturedSessionStore, let sessionId = capturedSessionId {
+                // Session lifecycle wiring (Story 17-7)
+                // Resolve the active session ID based on continueRecentSession / forkSession options.
+                // Execution order: continueRecentSession → forkSession → session restore → resumeSessionAt
+                var resolvedSessionId = capturedSessionId
+                if let sessionStore = capturedSessionStore {
+                    // continueRecentSession: if no explicit sessionId, resolve most recent session
+                    if capturedContinueRecentSession,
+                       resolvedSessionId == nil || resolvedSessionId?.isEmpty == true {
+                        if let sessions = try? await sessionStore.list(), let mostRecent = sessions.first {
+                            resolvedSessionId = mostRecent.id
+                        }
+                    }
+
+                    // forkSession: fork the resolved session into a new copy
+                    if capturedForkSession, let sourceId = resolvedSessionId {
+                        if let forkedId = try? await sessionStore.fork(sourceSessionId: sourceId) {
+                            resolvedSessionId = forkedId
+                        }
+                    }
+                }
+
+                // Session restore: load history if sessionStore and resolvedSessionId are configured
+                if let sessionStore = capturedSessionStore, let sessionId = resolvedSessionId {
                     if let sessionData = try? await sessionStore.load(sessionId: sessionId) {
                         messages = sessionData.messages
                     } else {
                         messages = []
                     }
+
+                    // resumeSessionAt: truncate history to the message with matching UUID
+                    if let resumeAt = capturedResumeSessionAt, !messages.isEmpty {
+                        if let truncateIndex = messages.firstIndex(where: { msg in
+                            (msg["uuid"] as? String) == resumeAt || (msg["id"] as? String) == resumeAt
+                        }) {
+                            messages = Array(messages[0...truncateIndex])
+                        }
+                    }
+
                     // Append new user message to restored (or empty) history
                     messages.append(["role": "user", "content": text])
                 }
@@ -1531,7 +1599,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                     await mcpManagerForCleanup.shutdown()
                 }
                 // Session auto-save: persist updated messages if sessionStore is configured and persistSession is true
-                if let sessionStore = capturedSessionStore, let sessionId = capturedSessionId, capturedPersistSession {
+                if let sessionStore = capturedSessionStore, let sessionId = resolvedSessionId, capturedPersistSession {
                     let metadata = PartialSessionMetadata(
                         cwd: capturedCwd,
                         model: capturedModel,
