@@ -126,6 +126,126 @@ final class SandboxSettingsStructTests: XCTestCase {
         XCTAssertEqual(settings.allowedCommands?.count, 0,
                         "allowedCommands should be empty array")
     }
+
+    /// Story 17-9 [P0]: SandboxSettings has all 12 fields (6 original + 6 new).
+    func testSandboxSettings_FieldCount_IncludesNewFields() {
+        let settings = SandboxSettings(
+            allowedReadPaths: ["/a/"],
+            allowedWritePaths: ["/b/"],
+            deniedPaths: ["/c/"],
+            deniedCommands: ["rm"],
+            allowedCommands: ["git"],
+            allowNestedSandbox: true,
+            autoAllowBashIfSandboxed: true,
+            allowUnsandboxedCommands: true,
+            ignoreViolations: ["file": ["/tmp/*"]],
+            enableWeakerNestedSandbox: true,
+            network: SandboxNetworkConfig(),
+            ripgrep: RipgrepConfig(command: "rg")
+        )
+
+        // Verify all 12 fields via reflection
+        let fields = Mirror(reflecting: settings).children.compactMap { $0.label }
+        XCTAssertEqual(fields.count, 12,
+                        "SandboxSettings should have 12 fields, got: \(fields)")
+    }
+
+    /// Story 17-9 [P0]: SandboxSettings backward-compatible no-arg init includes new field defaults.
+    func testSandboxSettings_DefaultInit_IncludesNewFieldDefaults() {
+        let settings = SandboxSettings()
+
+        // Original fields
+        XCTAssertEqual(settings.allowedReadPaths, [])
+        XCTAssertEqual(settings.allowedWritePaths, [])
+        XCTAssertEqual(settings.deniedPaths, [])
+        XCTAssertEqual(settings.deniedCommands, [])
+        XCTAssertNil(settings.allowedCommands)
+        XCTAssertEqual(settings.allowNestedSandbox, false)
+
+        // New fields
+        XCTAssertEqual(settings.autoAllowBashIfSandboxed, false)
+        XCTAssertEqual(settings.allowUnsandboxedCommands, false)
+        XCTAssertNil(settings.ignoreViolations)
+        XCTAssertEqual(settings.enableWeakerNestedSandbox, false)
+        XCTAssertNil(settings.network)
+        XCTAssertNil(settings.ripgrep)
+    }
+
+    /// Story 17-9 [P0]: SandboxNetworkConfig can be constructed with all 7 fields.
+    func testSandboxNetworkConfig_AllFields() {
+        let config = SandboxNetworkConfig(
+            allowedDomains: ["example.com"],
+            allowManagedDomainsOnly: true,
+            allowLocalBinding: true,
+            allowUnixSockets: true,
+            allowAllUnixSockets: true,
+            httpProxyPort: 8080,
+            socksProxyPort: 1080
+        )
+
+        XCTAssertEqual(config.allowedDomains, ["example.com"])
+        XCTAssertEqual(config.allowManagedDomainsOnly, true)
+        XCTAssertEqual(config.allowLocalBinding, true)
+        XCTAssertEqual(config.allowUnixSockets, true)
+        XCTAssertEqual(config.allowAllUnixSockets, true)
+        XCTAssertEqual(config.httpProxyPort, 8080)
+        XCTAssertEqual(config.socksProxyPort, 1080)
+    }
+
+    /// Story 17-9 [P0]: RipgrepConfig can be constructed with command and args.
+    func testRipgrepConfig_CommandAndArgs() {
+        let config = RipgrepConfig(command: "/usr/local/bin/rg", args: ["--hidden"])
+
+        XCTAssertEqual(config.command, "/usr/local/bin/rg")
+        XCTAssertEqual(config.args, ["--hidden"])
+    }
+
+    /// Story 17-9 [P0]: SandboxSettings with autoAllowBashIfSandboxed set to true.
+    func testSandboxSettings_AutoAllowBashIfSandboxed() {
+        let settings = SandboxSettings(autoAllowBashIfSandboxed: true)
+
+        XCTAssertTrue(settings.autoAllowBashIfSandboxed)
+    }
+
+    /// Story 17-9 [P0]: SandboxSettings with ignoreViolations set.
+    func testSandboxSettings_IgnoreViolations() {
+        let violations: [String: [String]] = [
+            "file": ["/tmp/*"],
+            "network": ["localhost"]
+        ]
+        let settings = SandboxSettings(ignoreViolations: violations)
+
+        XCTAssertEqual(settings.ignoreViolations?.count, 2)
+        XCTAssertEqual(settings.ignoreViolations?["file"], ["/tmp/*"])
+    }
+
+    /// Story 17-9 [P0]: SandboxSettings with network config.
+    func testSandboxSettings_NetworkConfig() {
+        let network = SandboxNetworkConfig(allowedDomains: ["api.example.com"])
+        let settings = SandboxSettings(network: network)
+
+        XCTAssertNotNil(settings.network)
+        XCTAssertEqual(settings.network?.allowedDomains, ["api.example.com"])
+    }
+
+    /// Story 17-9 [P0]: SandboxSettings with ripgrep config.
+    func testSandboxSettings_RipgrepConfig() {
+        let rg = RipgrepConfig(command: "rg", args: ["-i"])
+        let settings = SandboxSettings(ripgrep: rg)
+
+        XCTAssertNotNil(settings.ripgrep)
+        XCTAssertEqual(settings.ripgrep?.command, "rg")
+    }
+
+    /// Story 17-9 [P0]: SandboxSettings equality includes new fields.
+    func testSandboxSettings_Equality_IncludesNewFields() {
+        let a = SandboxSettings(deniedCommands: ["rm"], autoAllowBashIfSandboxed: true)
+        let b = SandboxSettings(deniedCommands: ["rm"], autoAllowBashIfSandboxed: true)
+        let c = SandboxSettings(deniedCommands: ["rm"], autoAllowBashIfSandboxed: false)
+
+        XCTAssertEqual(a, b)
+        XCTAssertNotEqual(a, c)
+    }
 }
 
 // MARK: - AC2: Path matching uses normalized prefix matching

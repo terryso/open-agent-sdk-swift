@@ -11,6 +11,115 @@ public enum SandboxOperation: String, Sendable, Equatable {
     case write
 }
 
+/// Network sandbox configuration controlling network access restrictions.
+///
+/// `SandboxNetworkConfig` defines which network operations are permitted
+/// when a sandbox is active. It mirrors the TypeScript SDK's `SandboxNetworkConfig`
+/// type to ensure API surface alignment.
+///
+/// ## Topics
+///
+/// ### Fields
+/// - ``allowedDomains``
+/// - ``allowManagedDomainsOnly``
+/// - ``allowLocalBinding``
+/// - ``allowUnixSockets``
+/// - ``allowAllUnixSockets``
+/// - ``httpProxyPort``
+/// - ``socksProxyPort``
+public struct SandboxNetworkConfig: Sendable, Equatable, CustomStringConvertible {
+
+    /// List of domains allowed for network access. Empty array means no domains
+    /// are explicitly allowed (behavior depends on other settings).
+    public var allowedDomains: [String]
+
+    /// When `true`, only managed (system-controlled) domains are permitted.
+    public var allowManagedDomainsOnly: Bool
+
+    /// When `true`, binding to local addresses is permitted.
+    public var allowLocalBinding: Bool
+
+    /// When `true`, Unix domain socket connections are permitted.
+    public var allowUnixSockets: Bool
+
+    /// When `true`, all Unix domain sockets are permitted (broadens ``allowUnixSockets``).
+    public var allowAllUnixSockets: Bool
+
+    /// Optional HTTP proxy port for routing network traffic through a proxy.
+    public var httpProxyPort: Int?
+
+    /// Optional SOCKS proxy port for routing network traffic through a SOCKS proxy.
+    public var socksProxyPort: Int?
+
+    /// Create network sandbox configuration with optional fields.
+    ///
+    /// - Parameters:
+    ///   - allowedDomains: Domains permitted for access. Defaults to empty.
+    ///   - allowManagedDomainsOnly: Restrict to managed domains only. Defaults to `false`.
+    ///   - allowLocalBinding: Allow local address binding. Defaults to `false`.
+    ///   - allowUnixSockets: Allow Unix domain sockets. Defaults to `false`.
+    ///   - allowAllUnixSockets: Allow all Unix sockets. Defaults to `false`.
+    ///   - httpProxyPort: HTTP proxy port. Defaults to `nil`.
+    ///   - socksProxyPort: SOCKS proxy port. Defaults to `nil`.
+    public init(
+        allowedDomains: [String] = [],
+        allowManagedDomainsOnly: Bool = false,
+        allowLocalBinding: Bool = false,
+        allowUnixSockets: Bool = false,
+        allowAllUnixSockets: Bool = false,
+        httpProxyPort: Int? = nil,
+        socksProxyPort: Int? = nil
+    ) {
+        self.allowedDomains = allowedDomains
+        self.allowManagedDomainsOnly = allowManagedDomainsOnly
+        self.allowLocalBinding = allowLocalBinding
+        self.allowUnixSockets = allowUnixSockets
+        self.allowAllUnixSockets = allowAllUnixSockets
+        self.httpProxyPort = httpProxyPort
+        self.socksProxyPort = socksProxyPort
+    }
+
+    public var description: String {
+        "SandboxNetworkConfig(domains: \(allowedDomains), managedOnly: \(allowManagedDomainsOnly), localBinding: \(allowLocalBinding), unixSockets: \(allowUnixSockets), allUnixSockets: \(allowAllUnixSockets), httpProxy: \(httpProxyPort.map { "\($0)" } ?? "none"), socksProxy: \(socksProxyPort.map { "\($0)" } ?? "none"))"
+    }
+}
+
+/// Configuration for custom ripgrep binary and arguments.
+///
+/// `RipgrepConfig` allows specifying a custom ripgrep executable path
+/// and optional arguments, mirroring the TypeScript SDK's `ripgrep` field.
+///
+/// ## Topics
+///
+/// ### Fields
+/// - ``command``
+/// - ``args``
+public struct RipgrepConfig: Sendable, Equatable, CustomStringConvertible {
+
+    /// Path or name of the ripgrep executable to use.
+    public var command: String
+
+    /// Optional arguments to pass to the ripgrep command.
+    public var args: [String]?
+
+    /// Create ripgrep configuration.
+    ///
+    /// - Parameters:
+    ///   - command: Path or name of the ripgrep executable.
+    ///   - args: Optional arguments for the command. Defaults to `nil`.
+    public init(command: String, args: [String]? = nil) {
+        self.command = command
+        self.args = args
+    }
+
+    public var description: String {
+        if let args {
+            return "RipgrepConfig(command: \(command), args: \(args))"
+        }
+        return "RipgrepConfig(command: \(command))"
+    }
+}
+
 /// Configuration for sandbox restrictions on agent tool execution.
 ///
 /// `SandboxSettings` controls what commands and filesystem paths an agent is
@@ -68,7 +177,41 @@ public struct SandboxSettings: Sendable, Equatable, CustomStringConvertible {
     /// Whether nested sandbox creation is allowed. Defaults to `false`.
     public var allowNestedSandbox: Bool
 
+    /// When `true` and sandbox is active, BashTool skips the `canUseTool`
+    /// authorization check and auto-executes. Commands still run through
+    /// ``SandboxChecker/checkCommand(_:settings:)`` for enforcement.
+    /// Defaults to `false`.
+    public var autoAllowBashIfSandboxed: Bool
+
+    /// When `true`, the model may request unsandboxed execution. This field
+    /// stores the configuration intent; actual runtime escape-hatch behavior
+    /// is additive for future use. Defaults to `false`.
+    public var allowUnsandboxedCommands: Bool
+
+    /// Category-based violation suppression rules. Keys are violation categories
+    /// (e.g., `"file"`, `"network"`, `"command"`) and values are arrays of
+    /// patterns to suppress. Defaults to `nil` (no suppression).
+    public var ignoreViolations: [String: [String]]?
+
+    /// Controls whether nested sandbox environments can use weaker restrictions.
+    /// Different semantics from ``allowNestedSandbox`` which controls whether
+    /// nested sandbox is allowed at all. Defaults to `false`.
+    public var enableWeakerNestedSandbox: Bool
+
+    /// Network sandbox configuration. When `nil`, network restrictions are not
+    /// applied. Defaults to `nil`.
+    public var network: SandboxNetworkConfig?
+
+    /// Custom ripgrep configuration specifying the executable path and optional
+    /// arguments. When `nil`, the default ripgrep behavior is used.
+    /// Defaults to `nil`.
+    public var ripgrep: RipgrepConfig?
+
     /// Create sandbox settings with all fields optional.
+    ///
+    /// All new parameters have backward-compatible defaults. Existing call sites
+    /// remain unbroken when using positional or named parameters for the original
+    /// 6 fields.
     ///
     /// - Parameters:
     ///   - allowedReadPaths: Paths allowed for reading. Defaults to empty (all allowed).
@@ -77,13 +220,25 @@ public struct SandboxSettings: Sendable, Equatable, CustomStringConvertible {
     ///   - deniedCommands: Commands denied in blocklist mode. Defaults to empty.
     ///   - allowedCommands: Commands allowed in allowlist mode. Defaults to `nil` (blocklist mode).
     ///   - allowNestedSandbox: Whether nested sandbox is allowed. Defaults to `false`.
+    ///   - autoAllowBashIfSandboxed: Auto-approve Bash when sandboxed. Defaults to `false`.
+    ///   - allowUnsandboxedCommands: Allow model to request unsandboxed execution. Defaults to `false`.
+    ///   - ignoreViolations: Category-based violation suppression. Defaults to `nil`.
+    ///   - enableWeakerNestedSandbox: Allow weaker nested sandbox restrictions. Defaults to `false`.
+    ///   - network: Network sandbox configuration. Defaults to `nil`.
+    ///   - ripgrep: Custom ripgrep configuration. Defaults to `nil`.
     public init(
         allowedReadPaths: [String] = [],
         allowedWritePaths: [String] = [],
         deniedPaths: [String] = [],
         deniedCommands: [String] = [],
         allowedCommands: [String]? = nil,
-        allowNestedSandbox: Bool = false
+        allowNestedSandbox: Bool = false,
+        autoAllowBashIfSandboxed: Bool = false,
+        allowUnsandboxedCommands: Bool = false,
+        ignoreViolations: [String: [String]]? = nil,
+        enableWeakerNestedSandbox: Bool = false,
+        network: SandboxNetworkConfig? = nil,
+        ripgrep: RipgrepConfig? = nil
     ) {
         self.allowedReadPaths = allowedReadPaths
         self.allowedWritePaths = allowedWritePaths
@@ -91,6 +246,12 @@ public struct SandboxSettings: Sendable, Equatable, CustomStringConvertible {
         self.deniedCommands = deniedCommands
         self.allowedCommands = allowedCommands
         self.allowNestedSandbox = allowNestedSandbox
+        self.autoAllowBashIfSandboxed = autoAllowBashIfSandboxed
+        self.allowUnsandboxedCommands = allowUnsandboxedCommands
+        self.ignoreViolations = ignoreViolations
+        self.enableWeakerNestedSandbox = enableWeakerNestedSandbox
+        self.network = network
+        self.ripgrep = ripgrep
     }
 
     /// A string representation of the sandbox settings for debugging.
@@ -113,6 +274,24 @@ public struct SandboxSettings: Sendable, Equatable, CustomStringConvertible {
         }
         if allowNestedSandbox {
             parts.append("allowNestedSandbox: true")
+        }
+        if autoAllowBashIfSandboxed {
+            parts.append("autoAllowBashIfSandboxed: true")
+        }
+        if allowUnsandboxedCommands {
+            parts.append("allowUnsandboxedCommands: true")
+        }
+        if let ignoreViolations {
+            parts.append("ignoreViolations: \(ignoreViolations)")
+        }
+        if enableWeakerNestedSandbox {
+            parts.append("enableWeakerNestedSandbox: true")
+        }
+        if let network {
+            parts.append("network: \(network)")
+        }
+        if let ripgrep {
+            parts.append("ripgrep: \(ripgrep)")
         }
         return "SandboxSettings(\(parts.joined(separator: ", ")))"
     }

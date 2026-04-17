@@ -1,5 +1,5 @@
 # generated: 2026-04-04
-# last_updated: 2026-04-17 (story 17-8 review)
+# last_updated: 2026-04-17 (story 17-9 create)
 # project: open-agent-sdk-swift
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-04-04
-last_updated: 2026-04-17 (story 17-8 review)
+last_updated: 2026-04-17 (story 17-9 create)
 project_key: NOKEY
 tracking_system: file-system
 story_location: _bmad-output/implementation-artifacts
@@ -208,7 +208,7 @@ development_status:
   17-6-subagent-system-enhancement: done
   17-7-session-management-enhancement: done
   17-8-mcp-integration-enhancement: review
-  17-9-sandbox-config-enhancement: backlog
+  17-9-sandbox-config-enhancement: done
   17-10-query-methods-enhancement: backlog
   17-11-thinking-model-enhancement: backlog
   epic-17-retrospective: optional

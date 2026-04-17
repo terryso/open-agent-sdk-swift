@@ -334,8 +334,17 @@ enum ToolExecutor {
         }
 
         // === Permission Check ===
+        // Step 0: autoAllowBashIfSandboxed bypass
+        // When sandbox is active and autoAllowBashIfSandboxed is true, Bash tool
+        // skips the canUseTool permission check. The command still goes through
+        // SandboxChecker.checkCommand() inside BashTool for enforcement.
+        let autoAllowBash = tool.name == "Bash"
+            && context.sandbox != nil
+            && context.sandbox?.autoAllowBashIfSandboxed == true
+
         // Step 1: Try canUseTool callback (takes priority over permissionMode)
-        if let canUseTool = context.canUseTool {
+        // Skip this check for Bash when autoAllowBashIfSandboxed is enabled
+        if !autoAllowBash, let canUseTool = context.canUseTool {
             if let result = await canUseTool(tool, block.input, context) {
                 if result.behavior == .deny {
                     return ToolResult(
