@@ -213,10 +213,13 @@ public struct HookOutput: @unchecked Sendable, Equatable {
 
 /// Permission behaviors for hook-driven permission updates.
 ///
-/// Use `.allow` to permit tool execution or `.deny` to block it.
+/// Use `.allow` to permit tool execution, `.deny` to block it, or `.ask`
+/// to defer the decision back to the user.
 public enum PermissionBehavior: String, Sendable, Equatable, CaseIterable {
     case allow = "allow"
     case deny = "deny"
+    /// Defer the decision back to the user, matching TS SDK's "ask" behavior.
+    case ask = "ask"
 }
 
 /// Permission decisions returned by hooks.

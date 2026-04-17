@@ -689,25 +689,25 @@ final class HookOutputCompatTests: XCTestCase {
             "HookOutput should have 10 fields (message, permissionUpdate, block, notification, systemMessage, reason, updatedInput, additionalContext, permissionDecision, updatedMCPToolOutput).")
     }
 
-    /// AC7 [P0]: PermissionBehavior has allow and deny cases.
+    /// AC7 [P0]: PermissionBehavior has allow, deny, and ask cases.
     func testPermissionBehavior_cases() {
         let allow = PermissionBehavior.allow
         let deny = PermissionBehavior.deny
+        let ask = PermissionBehavior.ask
         XCTAssertEqual(allow.rawValue, "allow")
-        XCTAssertEqual(deny.rawValue, "deny",
-            "PermissionBehavior has allow/deny. TS SDK has allow/deny/ask (missing 'ask').")
+        XCTAssertEqual(deny.rawValue, "deny")
+        XCTAssertEqual(ask.rawValue, "ask",
+            "PermissionBehavior now has allow/deny/ask matching TS SDK. Resolved by Story 17-5.")
     }
 
-    /// AC7 [RESOLVED by Story 17-4]: PermissionDecision has 'ask' case (TS SDK has ask).
-    /// Note: PermissionBehavior still does NOT have 'ask' (separate enum for hook output).
-    /// The new PermissionDecision enum covers allow/deny/ask for hook-specific decisions.
-    func testPermissionBehavior_ask_gap() {
-        // PermissionBehavior intentionally does NOT have 'ask' - it's for the permission system.
-        // Story 17-4 creates a new PermissionDecision enum with allow/deny/ask for hooks.
+    /// AC7 [RESOLVED by Story 17-5]: PermissionBehavior now has 'ask' case matching TS SDK.
+    /// PermissionDecision also has ask from Story 17-4 for hook-specific decisions.
+    func testPermissionBehavior_ask_resolved() {
+        // Story 17-5 adds 'ask' to PermissionBehavior to match TS SDK.
         let ask = PermissionBehavior(rawValue: "ask")
-        XCTAssertNil(ask,
-            "PermissionBehavior should NOT have 'ask' case. Use PermissionDecision for hook-specific allow/deny/ask. Resolved by Story 17-4 via PermissionDecision.")
-        // Verify PermissionDecision has ask
+        XCTAssertNotNil(ask,
+            "PermissionBehavior must have 'ask' case. Resolved by Story 17-5.")
+        // Verify PermissionDecision also has ask (from Story 17-4)
         let decisionAsk = PermissionDecision(rawValue: "ask")
         XCTAssertNotNil(decisionAsk,
             "PermissionDecision must have 'ask' case. Resolved by Story 17-4.")

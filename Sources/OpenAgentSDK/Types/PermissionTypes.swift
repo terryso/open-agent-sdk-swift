@@ -1,5 +1,24 @@
 import Foundation
 
+// MARK: - PermissionUpdateDestination
+
+/// Destination targets for permission update operations.
+///
+/// Specifies where a ``PermissionUpdateAction`` should be applied, matching the
+/// TypeScript SDK's `PermissionUpdateDestination` type.
+public enum PermissionUpdateDestination: String, Sendable, Equatable, CaseIterable {
+    /// Apply to user-level settings (global to all projects).
+    case userSettings
+    /// Apply to project-level settings (shared across the team).
+    case projectSettings
+    /// Apply to local project settings (personal, not committed).
+    case localSettings
+    /// Apply to the current session only (ephemeral).
+    case session
+    /// Apply as a CLI argument override.
+    case cliArg
+}
+
 /// Permission modes controlling tool execution behavior.
 public enum PermissionMode: String, Sendable, Equatable, CaseIterable {
     case `default`
@@ -10,6 +29,47 @@ public enum PermissionMode: String, Sendable, Equatable, CaseIterable {
     case auto
 }
 
+// MARK: - PermissionUpdateOperation
+
+/// Operations for updating permission rules, matching the TypeScript SDK's
+/// `PermissionUpdate` operation variants.
+///
+/// Each case represents a distinct operation type with its associated payload.
+/// Use ``PermissionUpdateAction`` to pair an operation with an optional
+/// ``PermissionUpdateDestination``.
+public enum PermissionUpdateOperation: Sendable, Equatable {
+    /// Add permission rules with a specified behavior (allow/deny/ask).
+    case addRules(rules: [String], behavior: PermissionBehavior)
+    /// Replace existing permission rules with new ones.
+    case replaceRules(rules: [String], behavior: PermissionBehavior)
+    /// Remove permission rules by pattern.
+    case removeRules(rules: [String])
+    /// Set the overall permission mode.
+    case setMode(mode: PermissionMode)
+    /// Add directories to the allowed list.
+    case addDirectories(directories: [String])
+    /// Remove directories from the allowed list.
+    case removeDirectories(directories: [String])
+}
+
+// MARK: - PermissionUpdateAction
+
+/// A permission update action pairing an operation with an optional destination.
+///
+/// Wraps a ``PermissionUpdateOperation`` with an optional
+/// ``PermissionUpdateDestination`` to specify where the update should be applied.
+public struct PermissionUpdateAction: Sendable, Equatable {
+    /// The operation to perform.
+    public let operation: PermissionUpdateOperation
+    /// Where the update should be applied. `nil` means session-only (ephemeral).
+    public let destination: PermissionUpdateDestination?
+
+    public init(operation: PermissionUpdateOperation, destination: PermissionUpdateDestination? = nil) {
+        self.operation = operation
+        self.destination = destination
+    }
+}
+
 /// Result of a permission check for tool usage.
 /// Note: Uses `@unchecked Sendable` because `updatedInput` holds a dynamic
 /// `Any?` value. Equality comparison excludes `updatedInput` since `Any?`
@@ -18,11 +78,28 @@ public struct CanUseToolResult: @unchecked Sendable, Equatable {
     public let behavior: PermissionBehavior
     public let updatedInput: Any?
     public let message: String?
+    /// Permission updates to apply as a result of this check, matching TS SDK's
+    /// `updatedPermissions` field.
+    public let updatedPermissions: [PermissionUpdateAction]?
+    /// Whether to interrupt the current agent loop, matching TS SDK's `interrupt` field.
+    public let interrupt: Bool?
+    /// The tool use ID associated with this permission check, matching TS SDK's `toolUseID`.
+    public let toolUseID: String?
 
-    public init(behavior: PermissionBehavior, updatedInput: Any? = nil, message: String? = nil) {
+    public init(
+        behavior: PermissionBehavior,
+        updatedInput: Any? = nil,
+        message: String? = nil,
+        updatedPermissions: [PermissionUpdateAction]? = nil,
+        interrupt: Bool? = nil,
+        toolUseID: String? = nil
+    ) {
         self.behavior = behavior
         self.updatedInput = updatedInput
         self.message = message
+        self.updatedPermissions = updatedPermissions
+        self.interrupt = interrupt
+        self.toolUseID = toolUseID
     }
 
     public static func == (lhs: CanUseToolResult, rhs: CanUseToolResult) -> Bool {

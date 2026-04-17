@@ -272,6 +272,19 @@ public struct ToolContext: Sendable {
     /// to set environment variables for child processes. Nil when no custom env is configured.
     public let env: [String: String]?
 
+    /// Suggested permission update operations for the CanUseTool callback,
+    /// matching TS SDK's `suggestions` parameter.
+    public let suggestions: [PermissionUpdateAction]?
+
+    /// A path that was blocked by the permission system, matching TS SDK's `blockedPath`.
+    public let blockedPath: String?
+
+    /// The reason for a permission decision, matching TS SDK's `decisionReason`.
+    public let decisionReason: String?
+
+    /// The ID of the agent making the permission request, matching TS SDK's `agentID`.
+    public let agentId: String?
+
     public init(
         cwd: String,
         toolUseId: String = "",
@@ -294,7 +307,11 @@ public struct ToolContext: Sendable {
         fileCache: FileCache? = nil,
         sandbox: SandboxSettings? = nil,
         mcpConnections: [MCPConnectionInfo]? = nil,
-        env: [String: String]? = nil
+        env: [String: String]? = nil,
+        suggestions: [PermissionUpdateAction]? = nil,
+        blockedPath: String? = nil,
+        decisionReason: String? = nil,
+        agentId: String? = nil
     ) {
         self.cwd = cwd
         self.toolUseId = toolUseId
@@ -318,6 +335,10 @@ public struct ToolContext: Sendable {
         self.sandbox = sandbox
         self.mcpConnections = mcpConnections
         self.env = env
+        self.suggestions = suggestions
+        self.blockedPath = blockedPath
+        self.decisionReason = decisionReason
+        self.agentId = agentId
     }
 
     /// Returns a copy of this context with the toolUseId replaced.
@@ -342,7 +363,11 @@ public struct ToolContext: Sendable {
             fileCache: fileCache,
             sandbox: sandbox,
             mcpConnections: mcpConnections,
-            env: env
+            env: env,
+            suggestions: suggestions,
+            blockedPath: blockedPath,
+            decisionReason: decisionReason,
+            agentId: agentId
         )
     }
 
@@ -370,7 +395,11 @@ public struct ToolContext: Sendable {
             fileCache: fileCache,
             sandbox: sandbox,
             mcpConnections: mcpConnections,
-            env: env
+            env: env,
+            suggestions: suggestions,
+            blockedPath: blockedPath,
+            decisionReason: decisionReason,
+            agentId: agentId
         )
     }
 }

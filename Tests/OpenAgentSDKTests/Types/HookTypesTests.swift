@@ -212,15 +212,17 @@ final class HookTypesTests: XCTestCase {
     func testPermissionBehavior_rawValues() {
         XCTAssertEqual(PermissionBehavior.allow.rawValue, "allow")
         XCTAssertEqual(PermissionBehavior.deny.rawValue, "deny")
+        XCTAssertEqual(PermissionBehavior.ask.rawValue, "ask")
     }
 
     func testPermissionBehavior_allCases() {
-        XCTAssertEqual(PermissionBehavior.allCases.count, 2)
+        XCTAssertEqual(PermissionBehavior.allCases.count, 3)
     }
 
     func testPermissionBehavior_initFromRawValue() {
         XCTAssertEqual(PermissionBehavior(rawValue: "allow"), .allow)
         XCTAssertEqual(PermissionBehavior(rawValue: "deny"), .deny)
+        XCTAssertEqual(PermissionBehavior(rawValue: "ask"), .ask)
         XCTAssertNil(PermissionBehavior(rawValue: "unknown"))
     }
 
