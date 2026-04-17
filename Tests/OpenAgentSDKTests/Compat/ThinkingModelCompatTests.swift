@@ -258,56 +258,68 @@ final class ThinkingModelCompatTests: XCTestCase {
     }
 
     // ================================================================
-    // AC4 #5: supportedEffortLevels -- MISSING
+    // AC4 #5: supportedEffortLevels -- PASS (added in story 17-11)
     // ================================================================
 
-    /// AC4 #5 [MISSING]: TS `supportedEffortLevels?: string[]` has no equivalent in Swift ModelInfo.
-    func testModelInfo_supportedEffortLevels_missing() {
-        let info = ModelInfo(value: "claude-sonnet-4-6", displayName: "Sonnet", description: "Fast")
+    /// AC4 #5 [PASS]: TS `supportedEffortLevels?: string[]` maps to `ModelInfo.supportedEffortLevels: [EffortLevel]?`.
+    func testModelInfo_supportedEffortLevels_present() {
+        let info = ModelInfo(
+            value: "claude-sonnet-4-6", displayName: "Sonnet", description: "Fast",
+            supportedEffortLevels: [.low, .medium, .high, .max]
+        )
         let fields = fieldNames(of: info)
 
-        XCTAssertFalse(fields.contains("supportedEffortLevels"),
-                       "GAP: ModelInfo has no 'supportedEffortLevels' property. TS SDK has supportedEffortLevels?: string[].")
+        XCTAssertTrue(fields.contains("supportedEffortLevels"),
+                       "ModelInfo has 'supportedEffortLevels' property. Maps to TS supportedEffortLevels?: string[].")
+        XCTAssertEqual(info.supportedEffortLevels?.count, 4)
     }
 
     // ================================================================
-    // AC4 #6: supportsAdaptiveThinking -- MISSING
+    // AC4 #6: supportsAdaptiveThinking -- PASS (added in story 17-11)
     // ================================================================
 
-    /// AC4 #6 [MISSING]: TS `supportsAdaptiveThinking?: boolean` has no equivalent in Swift ModelInfo.
-    func testModelInfo_supportsAdaptiveThinking_missing() {
-        let info = ModelInfo(value: "claude-sonnet-4-6", displayName: "Sonnet", description: "Fast")
+    /// AC4 #6 [PASS]: TS `supportsAdaptiveThinking?: boolean` maps to `ModelInfo.supportsAdaptiveThinking: Bool?`.
+    func testModelInfo_supportsAdaptiveThinking_present() {
+        let info = ModelInfo(
+            value: "claude-sonnet-4-6", displayName: "Sonnet", description: "Fast",
+            supportsAdaptiveThinking: true
+        )
         let fields = fieldNames(of: info)
 
-        XCTAssertFalse(fields.contains("supportsAdaptiveThinking"),
-                       "GAP: ModelInfo has no 'supportsAdaptiveThinking' property. TS SDK has supportsAdaptiveThinking?: boolean.")
+        XCTAssertTrue(fields.contains("supportsAdaptiveThinking"),
+                       "ModelInfo has 'supportsAdaptiveThinking' property. Maps to TS supportsAdaptiveThinking?: boolean.")
+        XCTAssertEqual(info.supportsAdaptiveThinking, true)
     }
 
     // ================================================================
-    // AC4 #7: supportsFastMode -- MISSING
+    // AC4 #7: supportsFastMode -- PASS (added in story 17-11)
     // ================================================================
 
-    /// AC4 #7 [MISSING]: TS `supportsFastMode?: boolean` has no equivalent in Swift ModelInfo.
-    func testModelInfo_supportsFastMode_missing() {
-        let info = ModelInfo(value: "claude-sonnet-4-6", displayName: "Sonnet", description: "Fast")
+    /// AC4 #7 [PASS]: TS `supportsFastMode?: boolean` maps to `ModelInfo.supportsFastMode: Bool?`.
+    func testModelInfo_supportsFastMode_present() {
+        let info = ModelInfo(
+            value: "claude-sonnet-4-6", displayName: "Sonnet", description: "Fast",
+            supportsFastMode: true
+        )
         let fields = fieldNames(of: info)
 
-        XCTAssertFalse(fields.contains("supportsFastMode"),
-                       "GAP: ModelInfo has no 'supportsFastMode' property. TS SDK has supportsFastMode?: boolean.")
+        XCTAssertTrue(fields.contains("supportsFastMode"),
+                       "ModelInfo has 'supportsFastMode' property. Maps to TS supportsFastMode?: boolean.")
+        XCTAssertEqual(info.supportsFastMode, true)
     }
 
     /// AC4 [P0]: Summary of ModelInfo verification.
     func testModelInfo_coverageSummary() {
-        // ModelInfo: 4 PASS + 0 PARTIAL + 3 MISSING = 7 fields
-        // PASS: value, displayName, description, supportsEffort
-        // MISSING: supportedEffortLevels, supportsAdaptiveThinking, supportsFastMode
-        let passCount = 4
-        let missingCount = 3
+        // ModelInfo: 7 PASS + 0 PARTIAL + 0 MISSING = 7 fields
+        // PASS: value, displayName, description, supportsEffort,
+        //       supportedEffortLevels, supportsAdaptiveThinking, supportsFastMode
+        let passCount = 7
+        let missingCount = 0
         let total = passCount + missingCount
 
         XCTAssertEqual(total, 7, "Should verify all 7 TS ModelInfo fields")
-        XCTAssertEqual(passCount, 4, "4 ModelInfo fields PASS")
-        XCTAssertEqual(missingCount, 3, "3 ModelInfo fields MISSING")
+        XCTAssertEqual(passCount, 7, "7 ModelInfo fields PASS")
+        XCTAssertEqual(missingCount, 0, "0 ModelInfo fields MISSING")
     }
 
     // MARK: - AC5: ModelUsage / TokenUsage Verification
@@ -732,18 +744,18 @@ final class ThinkingModelCompatTests: XCTestCase {
             FieldMapping(tsField: "ThinkingConfig passed to API", swiftField: "AgentOptions.thinking (NOT wired)", status: "PARTIAL", category: "thinkingConfig"),
 
             // Effort parameter (3 verifications)
-            FieldMapping(tsField: "Options.effort", swiftField: "NO EQUIVALENT", status: "MISSING", category: "effort"),
-            FieldMapping(tsField: "EffortLevel enum", swiftField: "NO EQUIVALENT", status: "MISSING", category: "effort"),
-            FieldMapping(tsField: "effort + thinking interaction", swiftField: "NO EQUIVALENT", status: "MISSING", category: "effort"),
+            FieldMapping(tsField: "Options.effort", swiftField: "AgentOptions.effort: EffortLevel?", status: "PASS", category: "effort"),
+            FieldMapping(tsField: "EffortLevel enum", swiftField: "EffortLevel enum", status: "PASS", category: "effort"),
+            FieldMapping(tsField: "effort + thinking interaction", swiftField: "computeThinkingConfig priority chain", status: "PASS", category: "effort"),
 
             // ModelInfo (7 fields)
             FieldMapping(tsField: "ModelInfo.value", swiftField: "ModelInfo.value: String", status: "PASS", category: "modelInfo"),
             FieldMapping(tsField: "ModelInfo.displayName", swiftField: "ModelInfo.displayName: String", status: "PASS", category: "modelInfo"),
             FieldMapping(tsField: "ModelInfo.description", swiftField: "ModelInfo.description: String", status: "PASS", category: "modelInfo"),
             FieldMapping(tsField: "ModelInfo.supportsEffort", swiftField: "ModelInfo.supportsEffort: Bool", status: "PASS", category: "modelInfo"),
-            FieldMapping(tsField: "ModelInfo.supportedEffortLevels", swiftField: "NO EQUIVALENT", status: "MISSING", category: "modelInfo"),
-            FieldMapping(tsField: "ModelInfo.supportsAdaptiveThinking", swiftField: "NO EQUIVALENT", status: "MISSING", category: "modelInfo"),
-            FieldMapping(tsField: "ModelInfo.supportsFastMode", swiftField: "NO EQUIVALENT", status: "MISSING", category: "modelInfo"),
+            FieldMapping(tsField: "ModelInfo.supportedEffortLevels", swiftField: "ModelInfo.supportedEffortLevels: [EffortLevel]?", status: "PASS", category: "modelInfo"),
+            FieldMapping(tsField: "ModelInfo.supportsAdaptiveThinking", swiftField: "ModelInfo.supportsAdaptiveThinking: Bool?", status: "PASS", category: "modelInfo"),
+            FieldMapping(tsField: "ModelInfo.supportsFastMode", swiftField: "ModelInfo.supportsFastMode: Bool?", status: "PASS", category: "modelInfo"),
 
             // TokenUsage / ModelUsage (8 fields)
             FieldMapping(tsField: "ModelUsage.inputTokens", swiftField: "TokenUsage.inputTokens: Int", status: "PASS", category: "tokenUsage"),
@@ -760,8 +772,8 @@ final class ThinkingModelCompatTests: XCTestCase {
             FieldMapping(tsField: "QueryResult.costBreakdown", swiftField: "QueryResult.costBreakdown: [CostBreakdownEntry]", status: "PASS", category: "tokenUsage"),
 
             // fallbackModel (2 verifications)
-            FieldMapping(tsField: "Options.fallbackModel", swiftField: "NO EQUIVALENT", status: "MISSING", category: "fallbackModel"),
-            FieldMapping(tsField: "Auto-switch on failure", swiftField: "NO EQUIVALENT", status: "MISSING", category: "fallbackModel"),
+            FieldMapping(tsField: "Options.fallbackModel", swiftField: "AgentOptions.fallbackModel: String?", status: "PASS", category: "fallbackModel"),
+            FieldMapping(tsField: "Auto-switch on failure", swiftField: "Agent fallback retry logic", status: "PASS", category: "fallbackModel"),
 
             // switchModel (5 verifications)
             FieldMapping(tsField: "agent.switchModel(model)", swiftField: "Agent.switchModel(_:) throws", status: "PASS", category: "switchModel"),
@@ -782,18 +794,18 @@ final class ThinkingModelCompatTests: XCTestCase {
         let missingCount = allFields.filter { $0.status == "MISSING" }.count
 
         XCTAssertEqual(allFields.count, 37, "Should have exactly 37 thinking/model field verifications")
-        XCTAssertEqual(passCount, 24, "24 items PASS")
+        XCTAssertEqual(passCount, 32, "32 items PASS")
         XCTAssertEqual(partialCount, 3, "3 items PARTIAL")
-        XCTAssertEqual(missingCount, 10, "10 items MISSING")
+        XCTAssertEqual(missingCount, 2, "2 items MISSING")
     }
 
     /// AC9 [P0]: Category-level breakdown summary.
     func testCompatReport_categoryBreakdown() {
         // ThinkingConfig: 5 PASS + 1 PARTIAL = 6
-        // Effort: 3 MISSING = 3
-        // ModelInfo: 4 PASS + 3 MISSING = 7
+        // Effort: 3 PASS = 3
+        // ModelInfo: 7 PASS = 7
         // TokenUsage/ModelUsage: 6 PASS + 2 PARTIAL + 2 MISSING = 10 (includes 2 supplemental CostBreakdownEntry)
-        // fallbackModel: 2 MISSING = 2
+        // fallbackModel: 2 PASS = 2
         // switchModel: 5 PASS = 5
         // Cache tracking: 4 PASS = 4
         // Total: 6 + 3 + 7 + 10 + 2 + 5 + 4 = 37
@@ -805,15 +817,15 @@ final class ThinkingModelCompatTests: XCTestCase {
 
     /// AC9 [P0]: Overall compatibility summary counts.
     func testCompatReport_overallSummary() {
-        // 24 PASS + 3 PARTIAL + 10 MISSING = 37 total verifications
-        let totalPass = 24
+        // 32 PASS + 3 PARTIAL + 2 MISSING = 37 total verifications
+        let totalPass = 32
         let totalPartial = 3
-        let totalMissing = 10
+        let totalMissing = 2
         let total = totalPass + totalPartial + totalMissing
 
         XCTAssertEqual(total, 37, "Total verifications should be 37")
-        XCTAssertEqual(totalPass, 24, "24 items PASS")
+        XCTAssertEqual(totalPass, 32, "32 items PASS")
         XCTAssertEqual(totalPartial, 3, "3 items PARTIAL")
-        XCTAssertEqual(totalMissing, 10, "10 items MISSING")
+        XCTAssertEqual(totalMissing, 2, "2 items MISSING")
     }
 }

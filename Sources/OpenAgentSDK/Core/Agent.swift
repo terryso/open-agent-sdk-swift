@@ -485,11 +485,16 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
     /// - Returns: An array of ``ModelInfo`` instances for all known models.
     public func supportedModels() -> [ModelInfo] {
         MODEL_PRICING.keys.map { modelId in
-            ModelInfo(
+            let is4x = modelId.hasPrefix("claude-opus-4") || modelId.hasPrefix("claude-sonnet-4") || modelId.hasPrefix("claude-haiku-4")
+            let allEffortLevels: [EffortLevel] = [.low, .medium, .high, .max]
+            return ModelInfo(
                 value: modelId,
                 displayName: Self.friendlyName(for: modelId),
                 description: Self.modelDescription(for: modelId),
-                supportsEffort: true
+                supportsEffort: is4x,
+                supportedEffortLevels: is4x ? allEffortLevels : nil,
+                supportsAdaptiveThinking: is4x ? true : nil,
+                supportsFastMode: is4x ? true : nil
             )
         }.sorted { $0.value < $1.value }
     }

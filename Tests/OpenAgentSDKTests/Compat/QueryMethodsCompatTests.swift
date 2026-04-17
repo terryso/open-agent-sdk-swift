@@ -214,17 +214,16 @@ final class QueryMethodsCompatTests: XCTestCase {
         XCTAssertEqual(modelInfo.description, "Fast and capable model", "description field PASS")
         XCTAssertTrue(modelInfo.supportsEffort, "supportsEffort field PASS")
 
-        // Missing TS fields: supportedEffortLevels, supportsAdaptiveThinking, supportsFastMode
-        // These are verified by absence via Mirror
+        // Fields now present after story 17-11 (previously MISSING)
         let mirror = Mirror(reflecting: modelInfo)
         let fieldNames = Set(mirror.children.compactMap { $0.label })
 
-        XCTAssertFalse(fieldNames.contains("supportedEffortLevels"),
-                       "GAP: ModelInfo missing supportedEffortLevels field (TS has it)")
-        XCTAssertFalse(fieldNames.contains("supportsAdaptiveThinking"),
-                       "GAP: ModelInfo missing supportsAdaptiveThinking field (TS has it)")
-        XCTAssertFalse(fieldNames.contains("supportsFastMode"),
-                       "GAP: ModelInfo missing supportsFastMode field (TS has it)")
+        XCTAssertTrue(fieldNames.contains("supportedEffortLevels"),
+                       "supportedEffortLevels field PASS (added in story 17-11)")
+        XCTAssertTrue(fieldNames.contains("supportsAdaptiveThinking"),
+                       "supportsAdaptiveThinking field PASS (added in story 17-11)")
+        XCTAssertTrue(fieldNames.contains("supportsFastMode"),
+                       "supportsFastMode field PASS (added in story 17-11)")
     }
 
     // ================================================================
@@ -724,46 +723,43 @@ final class QueryMethodsCompatTests: XCTestCase {
         XCTAssertEqual(naCount, 1, "1 method N/A")
     }
 
-    /// AC9 [P0]: ModelInfo field-level compatibility (4 PASS, 3 MISSING).
+    /// AC9 [P0]: ModelInfo field-level compatibility (7 PASS, 0 MISSING).
     func testCompatReport_modelInfoFieldCoverage() {
         let modelInfo = ModelInfo(value: "test", displayName: "Test", description: "Test model")
         let mirror = Mirror(reflecting: modelInfo)
         let fieldNames = Set(mirror.children.compactMap { $0.label })
 
         // Fields present in both TS and Swift
-        let passFields = ["value", "displayName", "description", "supportsEffort"]
+        let passFields = ["value", "displayName", "description", "supportsEffort", "supportedEffortLevels", "supportsAdaptiveThinking", "supportsFastMode"]
         for field in passFields {
             XCTAssertTrue(fieldNames.contains(field), "ModelInfo should have \(field) field (PASS)")
         }
 
-        // Fields missing from Swift
-        let missingFields = ["supportedEffortLevels", "supportsAdaptiveThinking", "supportsFastMode"]
-        for field in missingFields {
-            XCTAssertFalse(fieldNames.contains(field), "GAP: ModelInfo missing \(field) field")
-        }
+        // No fields missing from Swift (all TS ModelInfo fields now present)
+        let missingFields: [String] = []
+        XCTAssertEqual(missingFields.count, 0, "0 fields MISSING")
 
-        XCTAssertEqual(passFields.count, 4, "4 fields PASS")
-        XCTAssertEqual(missingFields.count, 3, "3 fields MISSING")
+        XCTAssertEqual(passFields.count, 7, "7 fields PASS")
     }
 
     /// AC9 [P0]: Overall compatibility summary.
     func testCompatReport_overallSummary() {
         // Query methods: 3 PASS + 1 PARTIAL + 12 MISSING = 16
         // Agent methods: 0 PASS + 0 PARTIAL + 4 MISSING + 1 N/A = 5
-        // ModelInfo fields: 4 PASS + 0 PARTIAL + 3 MISSING = 7
+        // ModelInfo fields: 7 PASS + 0 PARTIAL + 0 MISSING = 7
         //
-        // Total: 7 PASS + 1 PARTIAL + 19 MISSING + 1 N/A = 28
+        // Total: 10 PASS + 1 PARTIAL + 16 MISSING + 1 N/A = 28
 
-        let totalPass = 7
+        let totalPass = 10
         let totalPartial = 1
-        let totalMissing = 19
+        let totalMissing = 16
         let totalNA = 1
         let total = totalPass + totalPartial + totalMissing + totalNA
 
         XCTAssertEqual(total, 28, "Total verifications should be 28")
-        XCTAssertEqual(totalPass, 7, "7 items PASS")
+        XCTAssertEqual(totalPass, 10, "10 items PASS")
         XCTAssertEqual(totalPartial, 1, "1 item PARTIAL")
-        XCTAssertEqual(totalMissing, 19, "19 items MISSING")
+        XCTAssertEqual(totalMissing, 16, "16 items MISSING")
         XCTAssertEqual(totalNA, 1, "1 item N/A")
     }
 }

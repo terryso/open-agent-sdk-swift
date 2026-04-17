@@ -136,15 +136,22 @@ let effortOptions = AgentOptions(apiKey: "test-key", model: "claude-sonnet-4-6")
 let effortFields = Mirror(reflecting: effortOptions).children.compactMap { $0.label }
 record("Options.effort", swiftField: effortFields.contains("effort") ? "AgentOptions.effort" : "NO EQUIVALENT",
        status: effortFields.contains("effort") ? "PASS" : "MISSING",
-       note: "TS SDK has effort: 'low' | 'medium' | 'high' | 'max'. Swift has no effort field on AgentOptions.")
+       note: "TS SDK has effort: 'low' | 'medium' | 'high' | 'max'. Swift has EffortLevel enum with .low, .medium, .high, .max.")
 
 // Check for EffortLevel enum
-record("EffortLevel enum", swiftField: "NO EQUIVALENT", status: "MISSING",
-       note: "No EffortLevel enum exists in Swift SDK. TS SDK has effort: 'low' | 'medium' | 'high' | 'max'.")
+let allEffortCases = EffortLevel.allCases
+record("EffortLevel enum", swiftField: "EffortLevel: String, Sendable, Equatable, CaseIterable", status: "PASS",
+       note: "EffortLevel enum exists with cases: \(allEffortCases.map { $0.rawValue }). budgetTokens mapping available.")
 
 // Effort + ThinkingConfig interaction
-record("effort + ThinkingConfig interaction", swiftField: "NO EQUIVALENT", status: "MISSING",
-       note: "No effort parameter, so interaction with ThinkingConfig is not possible. TS SDK supports effort interaction with thinking config.")
+let effortWithThinking = AgentOptions(apiKey: "test-key", model: "claude-sonnet-4-6", thinking: .enabled(budgetTokens: 5000), effort: .high)
+if effortWithThinking.thinking != nil && effortWithThinking.effort != nil {
+    record("effort + ThinkingConfig interaction", swiftField: "AgentOptions.thinking + AgentOptions.effort", status: "PASS",
+           note: "Both effort and thinking can coexist on AgentOptions. Priority: thinking > effort > nil via computeThinkingConfig.")
+} else {
+    record("effort + ThinkingConfig interaction", swiftField: "NO EQUIVALENT", status: "MISSING",
+           note: "Could not set both effort and thinking.")
+}
 
 print("")
 
@@ -167,17 +174,25 @@ let modelWithEffort = ModelInfo(value: "claude-sonnet-4-6", displayName: "Sonnet
 record("ModelInfo.supportsEffort", swiftField: "ModelInfo.supportsEffort: Bool", status: "PASS",
        note: "supportsEffort=\(modelWithEffort.supportsEffort)")
 
-// Check for missing fields
+let modelWithCapabilities = ModelInfo(
+    value: "claude-sonnet-4-6", displayName: "Sonnet 4.6", description: "Fast",
+    supportsEffort: true,
+    supportedEffortLevels: [.low, .medium, .high, .max],
+    supportsAdaptiveThinking: true,
+    supportsFastMode: true
+)
+
+// Check for fields (now present after story 17-11)
 let modelFields = Mirror(reflecting: modelInfo).children.compactMap { $0.label }
-record("ModelInfo.supportedEffortLevels", swiftField: modelFields.contains("supportedEffortLevels") ? "ModelInfo.supportedEffortLevels" : "NO EQUIVALENT",
+record("ModelInfo.supportedEffortLevels", swiftField: modelFields.contains("supportedEffortLevels") ? "ModelInfo.supportedEffortLevels: [EffortLevel]?" : "NO EQUIVALENT",
        status: modelFields.contains("supportedEffortLevels") ? "PASS" : "MISSING",
-       note: "TS SDK has supportedEffortLevels?: string[]. Swift has no equivalent.")
-record("ModelInfo.supportsAdaptiveThinking", swiftField: modelFields.contains("supportsAdaptiveThinking") ? "ModelInfo.supportsAdaptiveThinking" : "NO EQUIVALENT",
+       note: "TS SDK has supportedEffortLevels?: string[]. Swift has [EffortLevel]?. count=\(modelWithCapabilities.supportedEffortLevels?.count ?? 0)")
+record("ModelInfo.supportsAdaptiveThinking", swiftField: modelFields.contains("supportsAdaptiveThinking") ? "ModelInfo.supportsAdaptiveThinking: Bool?" : "NO EQUIVALENT",
        status: modelFields.contains("supportsAdaptiveThinking") ? "PASS" : "MISSING",
-       note: "TS SDK has supportsAdaptiveThinking?: boolean. Swift has no equivalent.")
-record("ModelInfo.supportsFastMode", swiftField: modelFields.contains("supportsFastMode") ? "ModelInfo.supportsFastMode" : "NO EQUIVALENT",
+       note: "TS SDK has supportsAdaptiveThinking?: boolean. Swift has Bool?. value=\(modelWithCapabilities.supportsAdaptiveThinking?.description ?? "nil")")
+record("ModelInfo.supportsFastMode", swiftField: modelFields.contains("supportsFastMode") ? "ModelInfo.supportsFastMode: Bool?" : "NO EQUIVALENT",
        status: modelFields.contains("supportsFastMode") ? "PASS" : "MISSING",
-       note: "TS SDK has supportsFastMode?: boolean. Swift has no equivalent.")
+       note: "TS SDK has supportsFastMode?: boolean. Swift has Bool?. value=\(modelWithCapabilities.supportsFastMode?.description ?? "nil")")
 
 print("")
 
@@ -246,13 +261,13 @@ print("")
 print("=== AC6: fallbackModel Verification ===")
 print("")
 
-let fallbackOptions = AgentOptions(apiKey: "test-key", model: "claude-sonnet-4-6")
+let fallbackOptions = AgentOptions(apiKey: "test-key", model: "claude-sonnet-4-6", fallbackModel: "claude-haiku-4-5")
 let fallbackFields = Mirror(reflecting: fallbackOptions).children.compactMap { $0.label }
-record("Options.fallbackModel", swiftField: fallbackFields.contains("fallbackModel") ? "AgentOptions.fallbackModel" : "NO EQUIVALENT",
+record("Options.fallbackModel", swiftField: fallbackFields.contains("fallbackModel") ? "AgentOptions.fallbackModel: String?" : "NO EQUIVALENT",
        status: fallbackFields.contains("fallbackModel") ? "PASS" : "MISSING",
-       note: "TS SDK has fallbackModel?: string for automatic model fallback on failure.")
-record("Auto-switch on failure", swiftField: "NO EQUIVALENT", status: "MISSING",
-       note: "No fallback behavior exists. Model failures are returned as errors in Swift SDK.")
+       note: "TS SDK has fallbackModel?: string. Swift has AgentOptions.fallbackModel: String?. value=\(fallbackOptions.fallbackModel ?? "nil")")
+record("Auto-switch on failure", swiftField: "Agent.swift fallback retry logic", status: "PASS",
+       note: "Agent prompt loop retries with fallbackModel on primary model failure. Same messages, tools, system prompt. Logs via Logger.shared.info.")
 
 print("")
 
@@ -372,9 +387,9 @@ let thinkingMappings: [FieldMapping] = [
 ]
 
 let effortMappings: [FieldMapping] = [
-    FieldMapping(index: 1, tsField: "Options.effort", swiftEquivalent: "NO EQUIVALENT", status: "MISSING", note: "No effort field on AgentOptions"),
-    FieldMapping(index: 2, tsField: "EffortLevel enum", swiftEquivalent: "NO EQUIVALENT", status: "MISSING", note: "No EffortLevel enum"),
-    FieldMapping(index: 3, tsField: "effort + ThinkingConfig interaction", swiftEquivalent: "NO EQUIVALENT", status: "MISSING", note: "No effort parameter"),
+    FieldMapping(index: 1, tsField: "Options.effort", swiftEquivalent: "AgentOptions.effort: EffortLevel?", status: "PASS", note: "EffortLevel enum with .low, .medium, .high, .max"),
+    FieldMapping(index: 2, tsField: "EffortLevel enum", swiftEquivalent: "EffortLevel: String, CaseIterable", status: "PASS", note: "4 cases with budgetTokens mapping"),
+    FieldMapping(index: 3, tsField: "effort + ThinkingConfig interaction", swiftEquivalent: "AgentOptions.thinking + AgentOptions.effort", status: "PASS", note: "Both coexist, priority: thinking > effort > nil"),
 ]
 
 let modelInfoMappings: [FieldMapping] = [
@@ -382,9 +397,9 @@ let modelInfoMappings: [FieldMapping] = [
     FieldMapping(index: 2, tsField: "ModelInfo.displayName", swiftEquivalent: "ModelInfo.displayName: String", status: "PASS", note: "Direct equivalent"),
     FieldMapping(index: 3, tsField: "ModelInfo.description", swiftEquivalent: "ModelInfo.description: String", status: "PASS", note: "Direct equivalent"),
     FieldMapping(index: 4, tsField: "ModelInfo.supportsEffort", swiftEquivalent: "ModelInfo.supportsEffort: Bool", status: "PASS", note: "Direct equivalent"),
-    FieldMapping(index: 5, tsField: "ModelInfo.supportedEffortLevels", swiftEquivalent: "NO EQUIVALENT", status: "MISSING", note: "No field in Swift"),
-    FieldMapping(index: 6, tsField: "ModelInfo.supportsAdaptiveThinking", swiftEquivalent: "NO EQUIVALENT", status: "MISSING", note: "No field in Swift"),
-    FieldMapping(index: 7, tsField: "ModelInfo.supportsFastMode", swiftEquivalent: "NO EQUIVALENT", status: "MISSING", note: "No field in Swift"),
+    FieldMapping(index: 5, tsField: "ModelInfo.supportedEffortLevels", swiftEquivalent: "ModelInfo.supportedEffortLevels: [EffortLevel]?", status: "PASS", note: "Optional array of EffortLevel"),
+    FieldMapping(index: 6, tsField: "ModelInfo.supportsAdaptiveThinking", swiftEquivalent: "ModelInfo.supportsAdaptiveThinking: Bool?", status: "PASS", note: "Optional boolean"),
+    FieldMapping(index: 7, tsField: "ModelInfo.supportsFastMode", swiftEquivalent: "ModelInfo.supportsFastMode: Bool?", status: "PASS", note: "Optional boolean"),
 ]
 
 let tokenUsageMappings: [FieldMapping] = [
@@ -401,8 +416,8 @@ let tokenUsageMappings: [FieldMapping] = [
 ]
 
 let fallbackMappings: [FieldMapping] = [
-    FieldMapping(index: 1, tsField: "Options.fallbackModel", swiftEquivalent: "NO EQUIVALENT", status: "MISSING", note: "No fallbackModel option"),
-    FieldMapping(index: 2, tsField: "Auto-switch on failure", swiftEquivalent: "NO EQUIVALENT", status: "MISSING", note: "No fallback behavior"),
+    FieldMapping(index: 1, tsField: "Options.fallbackModel", swiftEquivalent: "AgentOptions.fallbackModel: String?", status: "PASS", note: "Automatic model fallback on failure"),
+    FieldMapping(index: 2, tsField: "Auto-switch on failure", swiftEquivalent: "Agent.swift fallback retry logic", status: "PASS", note: "Retries with same messages/tools/system prompt"),
 ]
 
 let switchModelMappings: [FieldMapping] = [

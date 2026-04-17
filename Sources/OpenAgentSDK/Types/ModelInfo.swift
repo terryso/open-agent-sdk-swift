@@ -12,12 +12,36 @@ public struct ModelInfo: Sendable, Equatable {
     public let description: String
     /// Whether the model supports the effort parameter for controlling response quality.
     public let supportsEffort: Bool
+    /// List of effort levels supported by this model.
+    ///
+    /// When `nil`, effort level information is not available for this model.
+    /// Claude 4.x models typically support all four levels: `.low`, `.medium`, `.high`, `.max`.
+    public let supportedEffortLevels: [EffortLevel]?
+    /// Whether the model supports adaptive thinking mode.
+    ///
+    /// When `nil`, adaptive thinking support is unknown. Claude 4.x models support adaptive thinking.
+    public let supportsAdaptiveThinking: Bool?
+    /// Whether the model supports fast mode for reduced-latency responses.
+    ///
+    /// When `nil`, fast mode support is unknown. Claude 4.x models support fast mode.
+    public let supportsFastMode: Bool?
 
-    public init(value: String, displayName: String, description: String, supportsEffort: Bool = false) {
+    public init(
+        value: String,
+        displayName: String,
+        description: String,
+        supportsEffort: Bool = false,
+        supportedEffortLevels: [EffortLevel]? = nil,
+        supportsAdaptiveThinking: Bool? = nil,
+        supportsFastMode: Bool? = nil
+    ) {
         self.value = value
         self.displayName = displayName
         self.description = description
         self.supportsEffort = supportsEffort
+        self.supportedEffortLevels = supportedEffortLevels
+        self.supportsAdaptiveThinking = supportsAdaptiveThinking
+        self.supportsFastMode = supportsFastMode
     }
 }
 
