@@ -235,6 +235,8 @@ final class ContinueRecentSessionWiringTests: XCTestCase {
         ], metadata: metadata)
 
         // Save session B second (it will have a later updatedAt, so it's "most recent")
+        // Ensure at least 10ms gap so updatedAt timestamps differ reliably
+        try await _Concurrency.Task.sleep(for: .milliseconds(10))
         try await store.save(sessionId: sessionB, messages: [
             ["role": "user", "content": "Session B message"],
             ["role": "assistant", "content": [["type": "text", "text": "Session B response"]] as [[String: Any]]]

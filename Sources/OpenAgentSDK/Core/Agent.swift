@@ -84,51 +84,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
     /// but subsequent prompt/stream calls will fail due to missing authentication.
     ///
     /// - Parameter options: The configuration options for this agent.
-    public init(options: AgentOptions) {
-        self.options = options
-        self.model = options.model
-        self.systemPrompt = options.systemPrompt
-        self.maxTurns = options.maxTurns
-        self.maxTokens = options.maxTokens
-
-        // Configure Logger from agent options if non-default values are provided.
-        if options.logLevel != .none || options.logOutput != .console {
-            Logger.configure(level: options.logLevel, output: options.logOutput)
-        }
-
-        // Auto-discover skills from filesystem if skillDirectories or skillNames is specified
-        self.options.autoDiscoverSkills()
-
-        // Soft validation: warn on invalid baseURL or thinking config.
-        if let baseURL = options.baseURL, URL(string: baseURL) == nil {
-            Logger.shared.info("Agent", "invalid_config", data: [
-                "field": "baseURL",
-                "warning": "Invalid baseURL will fall back to provider default"
-            ])
-        }
-        if let thinking = options.thinking, case .enabled(let budget) = thinking, budget <= 0 {
-            Logger.shared.info("Agent", "invalid_config", data: [
-                "field": "thinking.budgetTokens",
-                "value": String(budget),
-                "warning": "budgetTokens must be positive"
-            ])
-        }
-
-        // Create the appropriate client based on provider.
-        // Empty API key fallback — calls will fail naturally if no key was provided.
-        let apiKey = options.apiKey ?? ""
-        switch options.provider {
-        case .openai:
-            self.client = OpenAIClient(
-                apiKey: apiKey,
-                baseURL: options.baseURL
-            )
-        case .anthropic:
-            self.client = AnthropicClient(
-                apiKey: apiKey,
-                baseURL: options.baseURL
-            )
-        }
+    public convenience init(options: AgentOptions) {
+        self.init(mergedOptions: options, client: nil)
     }
 
     /// Create an Agent with the given options and a pre-configured ``LLMClient``.
@@ -140,17 +97,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
     /// - Parameters:
     ///   - options: The configuration options for this agent.
     ///   - client: A pre-configured ``LLMClient`` instance to use for API calls.
-    public init(options: AgentOptions, client: any LLMClient) {
-        self.options = options
-        self.model = options.model
-        self.systemPrompt = options.systemPrompt
-        self.maxTurns = options.maxTurns
-        self.maxTokens = options.maxTokens
-
-        // Auto-discover skills from filesystem if skillDirectories or skillNames is specified
-        self.options.autoDiscoverSkills()
-
-        self.client = client
+    public convenience init(options: AgentOptions, client: any LLMClient) {
+        self.init(mergedOptions: options, client: client)
     }
 
     /// Create an Agent with a definition and options.
@@ -162,13 +110,21 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
     /// - Parameters:
     ///   - definition: The agent definition providing name and optional overrides.
     ///   - options: The configuration options for this agent.
-    public init(definition: AgentDefinition, options: AgentOptions) {
-        // Merge definition fields into options
+    public convenience init(definition: AgentDefinition, options: AgentOptions) {
         var mergedOptions = options
         if let model = definition.model { mergedOptions.model = model }
         if let prompt = definition.systemPrompt { mergedOptions.systemPrompt = prompt }
         if let maxTurns = definition.maxTurns { mergedOptions.maxTurns = maxTurns }
+        self.init(mergedOptions: mergedOptions, client: nil)
+    }
 
+    /// Shared designated initializer that all public convenience initializers delegate to.
+    ///
+    /// - Parameters:
+    ///   - mergedOptions: The fully resolved options (definition fields already merged if applicable).
+    ///   - prebuiltClient: An optional pre-configured ``LLMClient``. When `nil`, a client
+    ///     is created from the options based on the provider.
+    private init(mergedOptions: AgentOptions, client prebuiltClient: (any LLMClient)?) {
         self.options = mergedOptions
         self.model = mergedOptions.model
         self.systemPrompt = mergedOptions.systemPrompt
@@ -183,19 +139,38 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
         // Auto-discover skills from filesystem if skillDirectories or skillNames is specified
         self.options.autoDiscoverSkills()
 
+        // Soft validation: warn on invalid baseURL or thinking config.
+        if let baseURL = mergedOptions.baseURL, URL(string: baseURL) == nil {
+            Logger.shared.info("Agent", "invalid_config", data: [
+                "field": "baseURL",
+                "warning": "Invalid baseURL will fall back to provider default"
+            ])
+        }
+        if let thinking = mergedOptions.thinking, case .enabled(let budget) = thinking, budget <= 0 {
+            Logger.shared.info("Agent", "invalid_config", data: [
+                "field": "thinking.budgetTokens",
+                "value": String(budget),
+                "warning": "budgetTokens must be positive"
+            ])
+        }
+
         // Create the appropriate client based on provider.
-        let apiKey = mergedOptions.apiKey ?? ""
-        switch mergedOptions.provider {
-        case .openai:
-            self.client = OpenAIClient(
-                apiKey: apiKey,
-                baseURL: mergedOptions.baseURL
-            )
-        case .anthropic:
-            self.client = AnthropicClient(
-                apiKey: apiKey,
-                baseURL: mergedOptions.baseURL
-            )
+        if let prebuiltClient {
+            self.client = prebuiltClient
+        } else {
+            let apiKey = mergedOptions.apiKey ?? ""
+            switch mergedOptions.provider {
+            case .openai:
+                self.client = OpenAIClient(
+                    apiKey: apiKey,
+                    baseURL: mergedOptions.baseURL
+                )
+            case .anthropic:
+                self.client = AnthropicClient(
+                    apiKey: apiKey,
+                    baseURL: mergedOptions.baseURL
+                )
+            }
         }
     }
 
@@ -367,13 +342,15 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
     /// - Returns: A ``McpServerUpdateResult`` listing added, removed, and errored servers.
     /// - Throws: ``MCPClientManagerError`` if the manager is not initialized.
     public func setMcpServers(_ servers: [String: McpServerConfig]) async throws -> McpServerUpdateResult {
-        // Ensure a manager exists (create one if needed)
-        if mcpClientManager == nil && !servers.isEmpty {
-            let manager = MCPClientManager()
-            self.mcpClientManager = manager
+        // Shutdown existing manager to avoid leaking connections
+        if let existing = mcpClientManager {
+            await existing.shutdown()
         }
 
-        guard let manager = mcpClientManager else {
+        let manager = MCPClientManager()
+        self.mcpClientManager = manager
+
+        guard !servers.isEmpty else {
             return McpServerUpdateResult()
         }
 

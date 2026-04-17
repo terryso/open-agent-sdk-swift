@@ -258,8 +258,14 @@ public actor SessionStore {
             }
         }
 
-        // Sort by updatedAt descending (most recently updated first)
-        sessions.sort { $0.updatedAt > $1.updatedAt }
+        // Sort by updatedAt descending (most recently updated first).
+        // Use createdAt and id as tiebreakers for deterministic ordering
+        // when two sessions share the same updatedAt timestamp.
+        sessions.sort { a, b in
+            if a.updatedAt != b.updatedAt { return a.updatedAt > b.updatedAt }
+            if a.createdAt != b.createdAt { return a.createdAt > b.createdAt }
+            return a.id > b.id
+        }
         return sessions
     }
 
