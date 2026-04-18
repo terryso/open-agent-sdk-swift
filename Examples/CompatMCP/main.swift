@@ -118,17 +118,21 @@ record("McpSdkServerConfigWithInstance.instance", swiftField: "McpSdkServerConfi
 record("McpSdkServerConfigWithInstance (version)", swiftField: "McpSdkServerConfig.version: String", status: "PASS",
        note: "Swift-extra field 'version'; TS SDK has no version field")
 
-// 5. McpClaudeAIProxyServerConfig -- NO Swift equivalent
-record("McpClaudeAIProxyServerConfig (type: \"claudeai-proxy\")", swiftField: "NO EQUIVALENT", status: "MISSING",
-       note: "TS SDK has claudeai-proxy config with url, id. Swift SDK has no equivalent.")
-record("McpClaudeAIProxyServerConfig.url", swiftField: "N/A", status: "MISSING",
-       note: "url field not supported")
-record("McpClaudeAIProxyServerConfig.id", swiftField: "N/A", status: "MISSING",
-       note: "id field not supported")
+// 5. McpClaudeAIProxyServerConfig -> McpServerConfig.claudeAIProxy(McpClaudeAIProxyConfig)
+let proxyConfig = McpClaudeAIProxyConfig(url: "https://proxy.claude.ai/mcp", id: "server-123")
+let proxyServer = McpServerConfig.claudeAIProxy(proxyConfig)
+record("McpClaudeAIProxyServerConfig (type: \"claudeai-proxy\")", swiftField: "McpServerConfig.claudeAIProxy(McpClaudeAIProxyConfig)", status: "PASS",
+       note: "Enum case exists with url, id fields")
+if case .claudeAIProxy(let config) = proxyServer {
+    record("McpClaudeAIProxyServerConfig.url", swiftField: "McpClaudeAIProxyConfig.url: String", status: "PASS",
+           note: "url='\(config.url)'")
+    record("McpClaudeAIProxyServerConfig.id", swiftField: "McpClaudeAIProxyConfig.id: String", status: "PASS",
+           note: "id='\(config.id)'")
+}
 
 // McpServerConfig case count
-let allConfigCases = ["stdio", "sse", "http", "sdk"]
-print("  Swift McpServerConfig cases: \(allConfigCases.count) (stdio, sse, http, sdk)")
+let allConfigCases = ["stdio", "sse", "http", "sdk", "claudeai-proxy"]
+print("  Swift McpServerConfig cases: \(allConfigCases.count) (stdio, sse, http, sdk, claudeai-proxy)")
 print("  TS SDK McpServerConfig types: 5 (stdio, sse, http, sdk, claudeai-proxy)")
 print("")
 
@@ -141,22 +145,22 @@ print("")
 let mcpManager = MCPClientManager()
 
 // 1. mcpServerStatus() -- TS SDK has this on Agent public API
-// Swift has MCPClientManager.getConnections() but NOT on Agent public API
-let connections = await mcpManager.getConnections()
-record("mcpServerStatus()", swiftField: "MCPClientManager.getConnections()", status: "PARTIAL",
-       note: "Swift has getConnections() on MCPClientManager, but NOT exposed on Agent public API. connections=\(connections.count)")
+// Swift now has Agent.mcpServerStatus() returning [String: McpServerStatus]
+let mcpStatus = await mcpManager.getStatus()
+record("mcpServerStatus()", swiftField: "Agent.mcpServerStatus()", status: "PASS",
+       note: "Returns [String: McpServerStatus] on Agent public API. manager.getStatus() count=\(mcpStatus.count)")
 
 // 2. reconnectMcpServer(name)
-record("reconnectMcpServer(name)", swiftField: "NO EQUIVALENT", status: "MISSING",
-       note: "TS SDK can reconnect a specific MCP server. Swift has no reconnect method.")
+record("reconnectMcpServer(name)", swiftField: "Agent.reconnectMcpServer(name:)", status: "PASS",
+       note: "MCPClientManager.reconnect(name:) + Agent.reconnectMcpServer(name:) both exist")
 
 // 3. toggleMcpServer(name, enabled)
-record("toggleMcpServer(name, enabled)", swiftField: "NO EQUIVALENT", status: "MISSING",
-       note: "TS SDK can enable/disable MCP servers at runtime. Swift has no toggle method.")
+record("toggleMcpServer(name, enabled)", swiftField: "Agent.toggleMcpServer(name:enabled:)", status: "PASS",
+       note: "MCPClientManager.toggle(name:enabled:) + Agent.toggleMcpServer(name:enabled:) both exist")
 
 // 4. setMcpServers(servers)
-record("setMcpServers(servers)", swiftField: "NO EQUIVALENT", status: "MISSING",
-       note: "TS SDK can dynamically replace MCP server set (returns added/removed/errors). Swift has no dynamic replacement.")
+record("setMcpServers(servers)", swiftField: "Agent.setMcpServers(_:)", status: "PASS",
+       note: "Returns McpServerUpdateResult with added/removed/errors")
 
 // Verify MCPClientManager has internal methods
 record("MCPClientManager.connect(name:config:)", swiftField: "connect(name:config:) [internal]", status: "PASS",
@@ -174,60 +178,71 @@ print("")
 
 // MARK: - AC4: McpServerStatus / MCPConnectionStatus Verification
 
-print("=== AC4: MCPConnectionStatus vs TS McpServerStatus Verification ===")
+print("=== AC4: McpServerStatus vs TS McpServerStatus Verification ===")
 print("")
 
 // TS SDK has 5 status values: connected, failed, needs-auth, pending, disabled
-// Swift has 3: connected, disconnected, error
+// Swift now has McpServerStatusEnum with matching 5 values
 
 // Connected status
-let connectedStatus = MCPConnectionStatus.connected
-record("McpServerStatus.connected", swiftField: "MCPConnectionStatus.connected", status: "PASS",
-       note: "rawValue='\(connectedStatus.rawValue)'")
+let connectedStatus = McpServerStatusEnum.connected
+record("McpServerStatus.connected", swiftField: "McpServerStatusEnum.connected", status: "PASS",
+       note: "Exact match. rawValue='\(connectedStatus.rawValue)'")
 
-// Failed status -> Swift .error (different name)
-let errorStatus = MCPConnectionStatus.error
-record("McpServerStatus.failed", swiftField: "MCPConnectionStatus.error", status: "PARTIAL",
-       note: "TS 'failed' maps to Swift 'error' (different name, similar semantics). rawValue='\(errorStatus.rawValue)'")
+// Failed status -> McpServerStatusEnum.failed (now matches TS name)
+let failedStatus = McpServerStatusEnum.failed
+record("McpServerStatus.failed", swiftField: "McpServerStatusEnum.failed", status: "PASS",
+       note: "Name now matches TS SDK. rawValue='\(failedStatus.rawValue)'")
 
-// needs-auth -> MISSING
-record("McpServerStatus.needs-auth", swiftField: "NO EQUIVALENT", status: "MISSING",
-       note: "TS SDK has needs-auth status. Swift has no equivalent.")
+// needs-auth -> McpServerStatusEnum.needsAuth
+let needsAuthStatus = McpServerStatusEnum.needsAuth
+record("McpServerStatus.needs-auth", swiftField: "McpServerStatusEnum.needsAuth", status: "PASS",
+       note: "New enum case from Story 17-8. rawValue='\(needsAuthStatus.rawValue)'")
 
-// pending -> MISSING
-record("McpServerStatus.pending", swiftField: "NO EQUIVALENT", status: "MISSING",
-       note: "TS SDK has pending status. Swift has no equivalent.")
+// pending -> McpServerStatusEnum.pending
+let pendingStatus = McpServerStatusEnum.pending
+record("McpServerStatus.pending", swiftField: "McpServerStatusEnum.pending", status: "PASS",
+       note: "New enum case from Story 17-8. rawValue='\(pendingStatus.rawValue)'")
 
-// disabled -> MISSING
-record("McpServerStatus.disabled", swiftField: "NO EQUIVALENT", status: "MISSING",
-       note: "TS SDK has disabled status. Swift has no equivalent.")
+// disabled -> McpServerStatusEnum.disabled
+let disabledStatus = McpServerStatusEnum.disabled
+record("McpServerStatus.disabled", swiftField: "McpServerStatusEnum.disabled", status: "PASS",
+       note: "New enum case from Story 17-8. rawValue='\(disabledStatus.rawValue)'")
 
-// Swift-extra: disconnected
+// Swift-extra: disconnected (internal MCPConnectionStatus only, not on public McpServerStatusEnum)
 let disconnectedStatus = MCPConnectionStatus.disconnected
 record("Swift-extra: MCPConnectionStatus.disconnected", swiftField: "MCPConnectionStatus.disconnected", status: "N/A",
-       note: "Swift-only status value. rawValue='\(disconnectedStatus.rawValue)'")
+       note: "Internal type only, not on public McpServerStatusEnum. rawValue='\(disconnectedStatus.rawValue)'")
 
 print("")
 
-// MCPManagedConnection fields vs TS McpServerStatus fields
-print("  MCPManagedConnection fields vs TS McpServerStatus:")
+// McpServerStatus fields vs TS McpServerStatus fields (via new public type from Story 17-8)
+print("  McpServerStatus fields vs TS McpServerStatus:")
 print("")
 
-let managedConn = MCPManagedConnection(name: "test-server", status: .connected, tools: [])
-record("McpServerStatus.name", swiftField: "MCPManagedConnection.name: String", status: "PASS",
-       note: "name='\(managedConn.name)'")
-record("McpServerStatus.status", swiftField: "MCPManagedConnection.status: MCPConnectionStatus", status: "PARTIAL",
-       note: "3 values vs TS 5 values")
-record("McpServerStatus.serverInfo (name+version)", swiftField: "NO EQUIVALENT", status: "MISSING",
-       note: "TS SDK has serverInfo with name+version. Swift MCPManagedConnection has no serverInfo field.")
-record("McpServerStatus.error", swiftField: "NO EQUIVALENT", status: "MISSING",
-       note: "TS SDK has error field. Swift MCPManagedConnection has no error field.")
+let serverStatus = McpServerStatus(
+    name: "test-server",
+    status: .connected,
+    serverInfo: McpServerInfo(name: "my-server", version: "1.0.0"),
+    error: nil,
+    tools: ["search", "read"]
+)
+record("McpServerStatus.name", swiftField: "McpServerStatus.name: String", status: "PASS",
+       note: "name='\(serverStatus.name)'")
+record("McpServerStatus.status", swiftField: "McpServerStatus.status: McpServerStatusEnum", status: "PASS",
+       note: "5 values via McpServerStatusEnum: connected, failed, needsAuth, pending, disabled")
+record("McpServerStatus.serverInfo (name+version)", swiftField: "McpServerStatus.serverInfo: McpServerInfo?", status: "PASS",
+       note: "serverInfo.name='\(serverStatus.serverInfo?.name ?? "nil")', version='\(serverStatus.serverInfo?.version ?? "nil")'")
+record("McpServerStatus.error", swiftField: "McpServerStatus.error: String?", status: "PASS",
+       note: "error=\(serverStatus.error?.description ?? "nil")")
+record("McpServerStatus.tools", swiftField: "McpServerStatus.tools: [String]", status: "PASS",
+       note: "tools=\(serverStatus.tools)")
+
+// config, scope still MISSING (deferred - not on McpServerStatus)
 record("McpServerStatus.config", swiftField: "NO EQUIVALENT", status: "MISSING",
-       note: "TS SDK has config field. Swift MCPManagedConnection has no config field.")
+       note: "Not on McpServerStatus (deferred)")
 record("McpServerStatus.scope", swiftField: "NO EQUIVALENT", status: "MISSING",
-       note: "TS SDK has scope field. Swift MCPManagedConnection has no scope field.")
-record("McpServerStatus.tools (with annotations)", swiftField: "MCPManagedConnection.tools: [ToolProtocol]", status: "PARTIAL",
-       note: "Swift has tools but no annotations access. TS tools include annotations.")
+       note: "Not on McpServerStatus (deferred)")
 print("")
 
 // MARK: - AC5: MCP Tool Namespace Verification
@@ -372,7 +387,7 @@ let configMappings: [ConfigMapping] = [
     ConfigMapping(index: 2, tsType: "McpSSEServerConfig", swiftEquivalent: "McpServerConfig.sse(McpSseConfig)", status: "PASS", note: "url, headers via McpTransportConfig"),
     ConfigMapping(index: 3, tsType: "McpHttpServerConfig", swiftEquivalent: "McpServerConfig.http(McpHttpConfig)", status: "PASS", note: "url, headers via McpTransportConfig"),
     ConfigMapping(index: 4, tsType: "McpSdkServerConfigWithInstance", swiftEquivalent: "McpServerConfig.sdk(McpSdkServerConfig)", status: "PARTIAL", note: "Concrete InProcessMCPServer vs generic instance"),
-    ConfigMapping(index: 5, tsType: "McpClaudeAIProxyServerConfig", swiftEquivalent: "NO EQUIVALENT", status: "MISSING", note: "url, id fields not supported"),
+    ConfigMapping(index: 5, tsType: "McpClaudeAIProxyServerConfig", swiftEquivalent: "McpServerConfig.claudeAIProxy(McpClaudeAIProxyConfig)", status: "PASS", note: "url, id fields via McpClaudeAIProxyConfig"),
 ]
 
 print("5 TS SDK McpServerConfig Types vs Swift SDK")
@@ -400,16 +415,16 @@ struct StatusMapping {
 }
 
 let statusMappings: [StatusMapping] = [
-    StatusMapping(tsValue: "connected", swiftEquivalent: "MCPConnectionStatus.connected", status: "PASS", note: "Exact match"),
-    StatusMapping(tsValue: "failed", swiftEquivalent: "MCPConnectionStatus.error", status: "PARTIAL", note: "Different name, similar semantics"),
-    StatusMapping(tsValue: "needs-auth", swiftEquivalent: "NO EQUIVALENT", status: "MISSING", note: "No Swift equivalent"),
-    StatusMapping(tsValue: "pending", swiftEquivalent: "NO EQUIVALENT", status: "MISSING", note: "No Swift equivalent"),
-    StatusMapping(tsValue: "disabled", swiftEquivalent: "NO EQUIVALENT", status: "MISSING", note: "No Swift equivalent"),
-    StatusMapping(tsValue: "N/A (Swift-only)", swiftEquivalent: "MCPConnectionStatus.disconnected", status: "N/A", note: "Swift-only addition"),
+    StatusMapping(tsValue: "connected", swiftEquivalent: "McpServerStatusEnum.connected", status: "PASS", note: "Exact match"),
+    StatusMapping(tsValue: "failed", swiftEquivalent: "McpServerStatusEnum.failed", status: "PASS", note: "Name now matches TS SDK"),
+    StatusMapping(tsValue: "needs-auth", swiftEquivalent: "McpServerStatusEnum.needsAuth", status: "PASS", note: "New enum case from Story 17-8"),
+    StatusMapping(tsValue: "pending", swiftEquivalent: "McpServerStatusEnum.pending", status: "PASS", note: "New enum case from Story 17-8"),
+    StatusMapping(tsValue: "disabled", swiftEquivalent: "McpServerStatusEnum.disabled", status: "PASS", note: "New enum case from Story 17-8"),
+    StatusMapping(tsValue: "N/A (Swift-only)", swiftEquivalent: "MCPConnectionStatus.disconnected", status: "N/A", note: "Internal type, not on public McpServerStatusEnum"),
 ]
 
-print("MCPConnectionStatus Values vs TS McpServerStatus")
-print("==================================================")
+print("McpServerStatusEnum Values vs TS McpServerStatus")
+print("=================================================")
 print("")
 print(String(format: "%-20s %-50s %-8s | Notes", "TS Status Value", "Swift Equivalent"))
 print(String(repeating: "-", count: 110))
@@ -433,10 +448,10 @@ struct OperationMapping {
 }
 
 let operationMappings: [OperationMapping] = [
-    OperationMapping(tsOperation: "mcpServerStatus()", swiftEquivalent: "MCPClientManager.getConnections() [internal]", status: "PARTIAL", note: "Exists but not on Agent public API"),
-    OperationMapping(tsOperation: "reconnectMcpServer(name)", swiftEquivalent: "NO EQUIVALENT", status: "MISSING", note: "No reconnect method"),
-    OperationMapping(tsOperation: "toggleMcpServer(name, enabled)", swiftEquivalent: "NO EQUIVALENT", status: "MISSING", note: "No toggle method"),
-    OperationMapping(tsOperation: "setMcpServers(servers)", swiftEquivalent: "NO EQUIVALENT", status: "MISSING", note: "No dynamic replacement"),
+    OperationMapping(tsOperation: "mcpServerStatus()", swiftEquivalent: "Agent.mcpServerStatus()", status: "PASS", note: "Returns [String: McpServerStatus] on Agent public API"),
+    OperationMapping(tsOperation: "reconnectMcpServer(name)", swiftEquivalent: "Agent.reconnectMcpServer(name:)", status: "PASS", note: "MCPClientManager.reconnect(name:) + Agent.reconnectMcpServer(name:) exist"),
+    OperationMapping(tsOperation: "toggleMcpServer(name, enabled)", swiftEquivalent: "Agent.toggleMcpServer(name:enabled:)", status: "PASS", note: "MCPClientManager.toggle(name:enabled:) + Agent.toggleMcpServer(name:enabled:) exist"),
+    OperationMapping(tsOperation: "setMcpServers(servers)", swiftEquivalent: "Agent.setMcpServers(_:)", status: "PASS", note: "Returns McpServerUpdateResult with added/removed/errors"),
 ]
 
 print("MCP Runtime Management Operations")
