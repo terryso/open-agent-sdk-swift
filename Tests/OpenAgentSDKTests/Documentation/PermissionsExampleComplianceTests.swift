@@ -9,18 +9,21 @@ final class PermissionsExampleComplianceTests: XCTestCase {
 
     // MARK: - Helper: Resolve project root
 
-    /// Walk upward from the test bundle to find the directory containing Package.swift.
+    /// Walk upward from this test file to find the directory containing Package.swift.
     private func projectRoot() -> String {
         let fileManager = FileManager.default
-        var dir = fileManager.currentDirectoryPath
+        let testFileDir = URL(fileURLWithPath: #file).deletingLastPathComponent().path
+        var dir = testFileDir
         for _ in 0..<10 {
             let packagePath = dir + "/Package.swift"
             if fileManager.fileExists(atPath: packagePath) {
                 return dir
             }
-            dir = dir + "/.."
+            let parent = URL(fileURLWithPath: dir).deletingLastPathComponent().path
+            if parent == dir { break }
+            dir = parent
         }
-        return fileManager.currentDirectoryPath
+        return testFileDir
     }
 
     private func examplesDir() -> String {

@@ -8,19 +8,21 @@ final class DocCComplianceTests: XCTestCase {
 
     // MARK: - Helper: Resolve project root
 
-    /// Walk upward from the test bundle to find the directory containing Package.swift.
+    /// Walk upward from this test file to find the directory containing Package.swift.
     private func projectRoot() -> String {
         let fileManager = FileManager.default
-        // Start from the test file's directory or current working directory
-        var dir = fileManager.currentDirectoryPath
+        let testFileDir = URL(fileURLWithPath: #file).deletingLastPathComponent().path
+        var dir = testFileDir
         for _ in 0..<10 {
             let packagePath = dir + "/Package.swift"
             if fileManager.fileExists(atPath: packagePath) {
                 return dir
             }
-            dir = dir + "/.."
+            let parent = URL(fileURLWithPath: dir).deletingLastPathComponent().path
+            if parent == dir { break }
+            dir = parent
         }
-        return fileManager.currentDirectoryPath
+        return testFileDir
     }
 
     private func sourcesDir() -> String {
@@ -85,7 +87,7 @@ final class DocCComplianceTests: XCTestCase {
         XCTAssertNotNil(content, "Package.swift should be readable")
 
         XCTAssertTrue(
-            content!.contains("swift-docc-plugin"),
+            content?.contains("swift-docc-plugin") ?? false,
             "Package.swift should contain swift-docc-plugin as a dependency"
         )
     }
