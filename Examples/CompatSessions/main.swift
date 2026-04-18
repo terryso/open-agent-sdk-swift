@@ -312,22 +312,25 @@ record("Options.resume: sessionId",
        swiftField: "AgentOptions.sessionStore + sessionId", status: "PARTIAL",
        note: "Requires two fields (sessionStore+sessionId) instead of single 'resume' option")
 
-// continue: true -- MISSING
+// continue: true -- PASS (Story 17-2 declaration, Story 17-7 wiring)
 let optionsMirror = Mirror(reflecting: AgentOptions())
 let optionFields = Set(optionsMirror.children.compactMap { $0.label })
+let continueOptions = AgentOptions(continueRecentSession: true)
 record("Options.continue: true",
-       swiftField: optionFields.contains("continue") ? "exists" : "MISSING", status: "MISSING",
-       note: "No 'resume most recent session' convenience option")
+       swiftField: "AgentOptions.continueRecentSession: Bool", status: "PASS",
+       note: "Resolves most recent session via SessionStore.list(). continueRecentSession=\(continueOptions.continueRecentSession)")
 
-// forkSession: true -- MISSING as option
+// forkSession: true -- PASS (Story 17-2 declaration, Story 17-7 wiring)
+let forkOptions = AgentOptions(forkSession: true)
 record("Options.forkSession: true",
-       swiftField: optionFields.contains("forkSession") ? "exists" : "MISSING", status: "MISSING",
-       note: "SessionStore.fork() exists as standalone method, not as AgentOption")
+       swiftField: "AgentOptions.forkSession: Bool", status: "PASS",
+       note: "Wires to SessionStore.fork() before restore. forkSession=\(forkOptions.forkSession)")
 
-// resumeSessionAt: messageUUID -- MISSING
+// resumeSessionAt: messageUUID -- PASS (Story 17-2 declaration, Story 17-7 wiring)
+let resumeAtOptions = AgentOptions(resumeSessionAt: "msg-uuid-001")
 record("Options.resumeSessionAt: messageUUID",
-       swiftField: optionFields.contains("resumeSessionAt") ? "exists" : "MISSING", status: "MISSING",
-       note: "No option to resume at specific message")
+       swiftField: "AgentOptions.resumeSessionAt: String?", status: "PASS",
+       note: "Truncates history at matching UUID after restore. resumeSessionAt=\(resumeAtOptions.resumeSessionAt ?? "nil")")
 
 // sessionId: uuid -- PASS
 var sessionIdOptions = AgentOptions()
@@ -336,10 +339,11 @@ record("Options.sessionId: uuid",
        swiftField: "AgentOptions.sessionId: String?", status: "PASS",
        note: "Can set custom session ID: '\(sessionIdOptions.sessionId ?? "nil")'")
 
-// persistSession: false -- MISSING
+// persistSession: false -- PASS (Story 17-2 declaration, Story 17-7 wiring)
+let persistOptions = AgentOptions()
 record("Options.persistSession: false",
-       swiftField: optionFields.contains("persistSession") ? "exists" : "MISSING", status: "MISSING",
-       note: "No way to disable persistence when sessionStore+sessionId are set")
+       swiftField: "AgentOptions.persistSession: Bool", status: "PASS",
+       note: "Gates session save in all 3 code paths. Defaults to true. persistSession=\(persistOptions.persistSession)")
 
 print("")
 
@@ -599,20 +603,20 @@ let optMappings: [OptionMapping] = [
         swiftEquivalent: "sessionStore + sessionId", status: "PARTIAL",
         note: "Requires two fields instead of one 'resume' option"),
     OptionMapping(tsOption: "continue: true",
-        swiftEquivalent: "MISSING", status: "MISSING",
-        note: "No 'resume most recent session' convenience option"),
+        swiftEquivalent: "continueRecentSession: Bool", status: "PASS",
+        note: "Resolves most recent session via SessionStore.list()"),
     OptionMapping(tsOption: "forkSession: true",
-        swiftEquivalent: "MISSING as option", status: "MISSING",
-        note: "SessionStore.fork() exists as standalone method, not AgentOption"),
+        swiftEquivalent: "forkSession: Bool", status: "PASS",
+        note: "Wires to SessionStore.fork() before restore"),
     OptionMapping(tsOption: "resumeSessionAt: messageUUID",
-        swiftEquivalent: "MISSING", status: "MISSING",
-        note: "No option to resume at specific message"),
+        swiftEquivalent: "resumeSessionAt: String?", status: "PASS",
+        note: "Truncates history at matching UUID after restore"),
     OptionMapping(tsOption: "sessionId: uuid",
         swiftEquivalent: "sessionId: String?", status: "PASS",
         note: "Can set a custom session ID"),
     OptionMapping(tsOption: "persistSession: false",
-        swiftEquivalent: "MISSING", status: "MISSING",
-        note: "No way to disable persistence when sessionStore+sessionId are set"),
+        swiftEquivalent: "persistSession: Bool", status: "PASS",
+        note: "Gates session save. Defaults to true."),
 ]
 
 print("Session Restore Options Compatibility")
