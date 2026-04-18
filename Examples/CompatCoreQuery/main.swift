@@ -149,13 +149,24 @@ if let systemData = streamedSystemData, systemData.subtype == .`init` {
     record("SDKSystemMessage message", swiftField: "SystemData.message", status: hasMessage ? "PASS" : "MISSING",
            note: "message='\(systemData.message)'")
 
-    // Known gaps: SystemData does not expose session_id, tools, model as typed fields
-    record("session_id", swiftField: "Not exposed on SystemData", status: "MISSING",
-           note: "TS SDK: SDKSystemMessage(init) includes session_id. Swift: embedded in message string")
-    record("tools", swiftField: "Not exposed on SystemData", status: "MISSING",
-           note: "TS SDK: SDKSystemMessage(init) includes tools: Tool[]. Swift: not available")
-    record("model (on SystemData)", swiftField: "Not exposed on SystemData", status: "MISSING",
-           note: "TS SDK: SDKSystemMessage(init) includes model. Swift: not available on SystemData")
+    // SystemData fields added by Story 17-1
+    record("session_id", swiftField: "SystemData.sessionId", status: "PASS",
+           note: systemData.sessionId.map { "sessionId='\($0)'" } ?? "Field exists (type-level PASS), value may be nil in some streams")
+
+    record("tools", swiftField: "SystemData.tools ([ToolInfo]?)", status: "PASS",
+           note: systemData.tools.map { "\($0.count) tool(s)" } ?? "Field exists (type-level PASS), value may be nil")
+
+    record("model (on SystemData)", swiftField: "SystemData.model", status: "PASS",
+           note: systemData.model.map { "model='\($0)'" } ?? "Field exists (type-level PASS), value may be nil")
+
+    record("permissionMode", swiftField: "SystemData.permissionMode", status: "PASS",
+           note: systemData.permissionMode.map { "permissionMode='\($0)'" } ?? "Field exists (type-level PASS), value may be nil")
+
+    record("mcpServers", swiftField: "SystemData.mcpServers ([McpServerInfo]?)", status: "PASS",
+           note: systemData.mcpServers.map { "\($0.count) MCP server(s)" } ?? "Field exists (type-level PASS), value may be nil")
+
+    record("cwd", swiftField: "SystemData.cwd", status: "PASS",
+           note: systemData.cwd.map { "cwd='\($0)'" } ?? "Field exists (type-level PASS), value may be nil")
 } else {
     record("SystemData init", swiftField: "SystemData", status: "MISSING",
            note: "No .system(.init) message received in stream")
@@ -366,14 +377,21 @@ record("errors: [String]", swiftField: "Not exposed on ResultData/QueryResult", 
 print("")
 print("=== Known Gaps Documentation ===")
 
-record("structuredOutput", swiftField: "Not available", status: "MISSING",
-       note: "TS SDK: SDKResultMessage includes structuredOutput. Swift: no equivalent")
-record("permissionDenials", swiftField: "Not available", status: "MISSING",
-       note: "TS SDK: SDKResultMessage includes permissionDenials. Swift: no equivalent")
+// ResultData fields added by Story 17-1 (type-level verification)
+record("structuredOutput", swiftField: "ResultData.structuredOutput (SendableStructuredOutput?)", status: "PASS",
+       note: "Field exists on ResultData (type-level PASS)")
+record("permissionDenials", swiftField: "ResultData.permissionDenials ([SDKPermissionDenial]?)", status: "PASS",
+       note: "Field exists on ResultData (type-level PASS)")
+record("modelUsage", swiftField: "ResultData.modelUsage ([ModelUsageEntry]?)", status: "PASS",
+       note: "Field exists on ResultData (type-level PASS)")
+
+// Still genuinely missing
 record("durationApiMs", swiftField: "Not separate (merged into durationMs)", status: "MISSING",
        note: "TS SDK has separate durationApiMs. Swift only has durationMs (total wall-clock)")
-record("AsyncIterable input", swiftField: "agent.stream() accepts String only", status: "MISSING",
-       note: "TS SDK supports prompt: string | AsyncIterable<SDKUserMessage>")
+
+// streamInput added by Story 17-10
+record("AsyncIterable input", swiftField: "agent.streamInput(_ input: AsyncStream<String>)", status: "PASS",
+       note: "TS SDK: prompt: string | AsyncIterable<SDKUserMessage>. Swift: streamInput() accepts AsyncStream<String>")
 
 // MARK: - AC8: Compatibility Report
 

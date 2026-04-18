@@ -1,7 +1,7 @@
 // CoreQueryCompatTests.swift
-// Story 16.1: Core Query API Compatibility Verification
-// ATDD RED PHASE: Tests verify TS SDK <-> Swift SDK type-level API compatibility
-// TDD Phase: RED (tests verify expected contract; known gaps expected to FAIL)
+// Story 16.1: Core Query API Compatibility Verification (updated by Story 18.1)
+// ATDD tests verify TS SDK <-> Swift SDK type-level API compatibility
+// TDD Phase: GREEN (Epic 17 resolved most gaps; updated to reflect new PASS entries)
 //
 // These tests verify that Swift SDK types match the TypeScript SDK's core query API
 // contract at the type level (field names, types, enum cases exist).
@@ -517,13 +517,24 @@ final class CompatReportTests: XCTestCase {
         report.append(("AbortController.abort()", "Agent.interrupt() / Task.cancel()", "PASS"))
         report.append(("(Swift-only) cancelled", "QueryResult.isCancelled", "N/A"))
 
-        // Known gaps
-        report.append(("session_id", "SystemData.message (embedded)", "MISSING"))
-        report.append(("tools", "Not exposed on SystemData", "MISSING"))
-        report.append(("model (on SystemData)", "Not exposed on SystemData", "MISSING"))
+        // SystemData fields (added by Story 17-1)
+        report.append(("session_id", "SystemData.sessionId", "PASS"))
+        report.append(("tools", "SystemData.tools ([ToolInfo]?)", "PASS"))
+        report.append(("model (on SystemData)", "SystemData.model", "PASS"))
+        report.append(("permissionMode", "SystemData.permissionMode", "PASS"))
+        report.append(("mcpServers", "SystemData.mcpServers ([McpServerInfo]?)", "PASS"))
+        report.append(("cwd", "SystemData.cwd", "PASS"))
+
+        // ResultData fields (added by Story 17-1)
+        report.append(("structuredOutput", "ResultData.structuredOutput (SendableStructuredOutput?)", "PASS"))
+        report.append(("permissionDenials", "ResultData.permissionDenials ([SDKPermissionDenial]?)", "PASS"))
+        report.append(("modelUsage", "ResultData.modelUsage ([ModelUsageEntry]?)", "PASS"))
+
+        // Agent query methods (added by Story 17-10)
+        report.append(("AsyncIterable input", "agent.streamInput(_ input: AsyncStream<String>)", "PASS"))
+
+        // Known gaps (genuinely not implemented)
         report.append(("errors", "Not exposed on ResultData", "MISSING"))
-        report.append(("structuredOutput", "Not available", "MISSING"))
-        report.append(("permissionDenials", "Not available", "MISSING"))
         report.append(("durationApiMs", "Not separate (merged into durationMs)", "MISSING"))
 
         // Verify report has entries
@@ -545,8 +556,8 @@ final class CompatReportTests: XCTestCase {
         print("============================================")
         print("")
 
-        // Verify majority of core fields pass
-        XCTAssertTrue(passCount >= 12,
-            "At least 12 core fields should PASS for basic API compatibility")
+        // Verify majority of core fields pass (now 22 PASS entries)
+        XCTAssertTrue(passCount >= 20,
+            "At least 20 core fields should PASS for full API compatibility (got \(passCount))")
     }
 }
