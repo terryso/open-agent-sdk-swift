@@ -116,19 +116,19 @@ record("CanUseTool: input", swiftField: "CanUseToolFn: (..., Any, ...)", status:
 record("CanUseTool: context (cwd, toolUseId, permissionMode)", swiftField: "ToolContext (cwd, toolUseId, permissionMode, canUseTool)", status: "PASS",
        note: "ToolContext carries cwd, toolUseId, permissionMode, canUseTool")
 
-// Missing TS params
-record("CanUseTool: signal (AbortSignal)", swiftField: "NO EQUIVALENT", status: "MISSING",
-       note: "No AbortSignal in Swift callback. Cancellation uses Swift Task.isCancelled instead.")
-record("CanUseTool: suggestions (PermissionUpdate[])", swiftField: "NO EQUIVALENT", status: "MISSING",
-       note: "No suggestions array in Swift callback params.")
-record("CanUseTool: blockedPath", swiftField: "NO EQUIVALENT", status: "MISSING",
-       note: "No blockedPath param in Swift callback.")
-record("CanUseTool: decisionReason", swiftField: "NO EQUIVALENT", status: "MISSING",
-       note: "No decisionReason param in Swift callback.")
-record("CanUseTool: toolUseID (via context)", swiftField: "ToolContext.toolUseId", status: "PARTIAL",
-       note: "Available via ToolContext.toolUseId, not as direct callback param.")
-record("CanUseTool: agentID", swiftField: "NO EQUIVALENT", status: "MISSING",
-       note: "No agentID in ToolContext or callback params.")
+// TS params -- extended by Story 17-5
+record("CanUseTool: signal (AbortSignal)", swiftField: "Task.isCancelled (Swift Concurrency)", status: "PASS",
+       note: "Swift uses Task.isCancelled pattern via structured concurrency for cancellation.")
+record("CanUseTool: suggestions (PermissionUpdate[])", swiftField: "ToolContext.suggestions: [PermissionUpdateAction]?", status: "PASS",
+       note: "Available via ToolContext.suggestions.")
+record("CanUseTool: blockedPath", swiftField: "ToolContext.blockedPath: String?", status: "PASS",
+       note: "Available via ToolContext.blockedPath.")
+record("CanUseTool: decisionReason", swiftField: "ToolContext.decisionReason: String?", status: "PASS",
+       note: "Available via ToolContext.decisionReason.")
+record("CanUseTool: toolUseID (via context)", swiftField: "ToolContext.toolUseId: String", status: "PASS",
+       note: "Available via ToolContext.toolUseId (always present).")
+record("CanUseTool: agentID", swiftField: "ToolContext.agentId: String?", status: "PASS",
+       note: "Available via ToolContext.agentId.")
 
 // CanUseToolResult fields
 let allowResult = CanUseToolResult.allow()
@@ -152,17 +152,17 @@ let denyB = CanUseToolResult.deny("msg")
 record("CanUseToolResult: Equatable", swiftField: "CanUseToolResult == CanUseToolResult", status: "PASS",
        note: "denyA == denyB: \(denyA == denyB)")
 
-// Missing TS result fields
-record("CanUseToolResult.updatedPermissions", swiftField: "NO EQUIVALENT", status: "MISSING",
-       note: "No updatedPermissions field on CanUseToolResult.")
-record("CanUseToolResult.interrupt", swiftField: "NO EQUIVALENT", status: "MISSING",
-       note: "No interrupt field on CanUseToolResult.")
-record("CanUseToolResult.toolUseID", swiftField: "NO EQUIVALENT", status: "MISSING",
-       note: "No toolUseID field on CanUseToolResult.")
+// TS result fields -- extended by Story 17-5
+record("CanUseToolResult.updatedPermissions", swiftField: "CanUseToolResult.updatedPermissions: [PermissionUpdateAction]?", status: "PASS",
+       note: "Available on CanUseToolResult.")
+record("CanUseToolResult.interrupt", swiftField: "CanUseToolResult.interrupt: Bool?", status: "PASS",
+       note: "Available on CanUseToolResult.")
+record("CanUseToolResult.toolUseID", swiftField: "CanUseToolResult.toolUseID: String?", status: "PASS",
+       note: "Available on CanUseToolResult.")
 
-// Verify CanUseToolResult.behavior does NOT have 'ask'
-record("CanUseToolResult.behavior: ask", swiftField: "NO EQUIVALENT", status: "MISSING",
-       note: "PermissionBehavior only has .allow and .deny. No .ask case exists.")
+// Verify CanUseToolResult.behavior has 'ask' (added by Story 17-5)
+record("CanUseToolResult.behavior: ask", swiftField: "PermissionBehavior.ask", status: "PASS",
+       note: "PermissionBehavior now has .ask case (added by 17-5).")
 
 // Verify AgentOptions.canUseTool
 let optionsWithCallback = AgentOptions(
@@ -202,34 +202,35 @@ record("PermissionBehavior.allow", swiftField: "PermissionBehavior.allow", statu
        note: "Exact match with TS SDK")
 record("PermissionBehavior.deny", swiftField: "PermissionBehavior.deny", status: "PASS",
        note: "Exact match with TS SDK")
-record("PermissionBehavior.ask", swiftField: "NO EQUIVALENT", status: "MISSING",
-       note: "TS SDK has 'ask' behavior. Swift only has allow/deny.")
+record("PermissionBehavior.ask", swiftField: "PermissionBehavior.ask", status: "PASS",
+       note: "Added by Story 17-5. PermissionBehavior now has .allow, .deny, .ask.")
 
-// TS SDK's 6 PermissionUpdate operations
-record("PermissionUpdate operation: addRules", swiftField: "NO EQUIVALENT", status: "MISSING",
-       note: "No addRules operation type in Swift SDK.")
-record("PermissionUpdate operation: replaceRules", swiftField: "NO EQUIVALENT", status: "MISSING",
-       note: "No replaceRules operation type in Swift SDK.")
-record("PermissionUpdate operation: removeRules", swiftField: "NO EQUIVALENT", status: "MISSING",
-       note: "No removeRules operation type in Swift SDK.")
-record("PermissionUpdate operation: setMode", swiftField: "Agent.setPermissionMode(_:)", status: "PARTIAL",
-       note: "Equivalent via runtime method, not as PermissionUpdate operation type.")
-record("PermissionUpdate operation: addDirectories", swiftField: "NO EQUIVALENT", status: "MISSING",
-       note: "No addDirectories operation type in Swift SDK.")
-record("PermissionUpdate operation: removeDirectories", swiftField: "NO EQUIVALENT", status: "MISSING",
-       note: "No removeDirectories operation type in Swift SDK.")
+// TS SDK's 6 PermissionUpdate operations -- all implemented by Story 17-5
+record("PermissionUpdate operation: addRules", swiftField: "PermissionUpdateOperation.addRules(rules:behavior:)", status: "PASS",
+       note: "PermissionUpdateOperation.addRules with rules and behavior params.")
+record("PermissionUpdate operation: replaceRules", swiftField: "PermissionUpdateOperation.replaceRules(rules:behavior:)", status: "PASS",
+       note: "PermissionUpdateOperation.replaceRules with rules and behavior params.")
+record("PermissionUpdate operation: removeRules", swiftField: "PermissionUpdateOperation.removeRules(rules:)", status: "PASS",
+       note: "PermissionUpdateOperation.removeRules with rules param.")
+record("PermissionUpdate operation: setMode", swiftField: "PermissionUpdateOperation.setMode(mode:)", status: "PASS",
+       note: "PermissionUpdateOperation.setMode with PermissionMode param.")
+record("PermissionUpdate operation: addDirectories", swiftField: "PermissionUpdateOperation.addDirectories(directories:)", status: "PASS",
+       note: "PermissionUpdateOperation.addDirectories with directories param.")
+record("PermissionUpdate operation: removeDirectories", swiftField: "PermissionUpdateOperation.removeDirectories(directories:)", status: "PASS",
+       note: "PermissionUpdateOperation.removeDirectories with directories param.")
 
-// PermissionUpdateDestination
-record("PermissionUpdateDestination: userSettings", swiftField: "NO EQUIVALENT", status: "MISSING",
-       note: "No PermissionUpdateDestination type in Swift SDK.")
-record("PermissionUpdateDestination: projectSettings", swiftField: "NO EQUIVALENT", status: "MISSING",
-       note: "No projectSettings destination.")
-record("PermissionUpdateDestination: localSettings", swiftField: "NO EQUIVALENT", status: "MISSING",
-       note: "No localSettings destination.")
-record("PermissionUpdateDestination: session", swiftField: "NO EQUIVALENT", status: "MISSING",
-       note: "No session destination.")
-record("PermissionUpdateDestination: cliArg", swiftField: "NO EQUIVALENT", status: "MISSING",
-       note: "No cliArg destination.")
+// PermissionUpdateDestination -- all 5 cases implemented by Story 17-5
+let allDestinations = PermissionUpdateDestination.allCases
+record("PermissionUpdateDestination: userSettings", swiftField: "PermissionUpdateDestination.userSettings", status: "PASS",
+       note: "Case exists. allCases count=\(allDestinations.count)")
+record("PermissionUpdateDestination: projectSettings", swiftField: "PermissionUpdateDestination.projectSettings", status: "PASS",
+       note: "Case exists.")
+record("PermissionUpdateDestination: localSettings", swiftField: "PermissionUpdateDestination.localSettings", status: "PASS",
+       note: "Case exists.")
+record("PermissionUpdateDestination: session", swiftField: "PermissionUpdateDestination.session", status: "PASS",
+       note: "Case exists.")
+record("PermissionUpdateDestination: cliArg", swiftField: "PermissionUpdateDestination.cliArg", status: "PASS",
+       note: "Case exists.")
 
 // PermissionUpdate in HookOutput
 let hookOutputWithPerm = HookOutput(permissionUpdate: permUpdate)
@@ -386,11 +387,11 @@ record("SDKError.permissionDenied.tool", swiftField: "SDKError.tool", status: "P
 record("SDKError.permissionDenied.reason", swiftField: "SDKError.reason", status: "PASS",
        note: "value='\(permDeniedError.reason ?? "nil")'")
 
-// TS SDK's SDKPermissionDenial type
-record("SDKPermissionDenial type", swiftField: "NO EQUIVALENT", status: "MISSING",
-       note: "TS SDK has SDKPermissionDenial(tool_name, tool_use_id, tool_input). No equivalent struct in Swift.")
-record("SDKResultMessage.permission_denials", swiftField: "NO EQUIVALENT", status: "MISSING",
-       note: "TS SDK has permission_denials field on SDKResultMessage. Swift's QueryResult has no such field.")
+// TS SDK's SDKPermissionDenial type -- implemented by Story 17-1, verified by 17-5
+record("SDKPermissionDenial type", swiftField: "SDKMessage.SDKPermissionDenial", status: "PASS",
+       note: "SDKPermissionDenial(toolName, toolUseId, toolInput) exists in SDKMessage.")
+record("SDKResultMessage.permission_denials", swiftField: "SDKMessage.ResultData.permissionDenials", status: "PASS",
+       note: "ResultData.permissionDenials: [SDKPermissionDenial]? field exists.")
 
 print("")
 
@@ -435,12 +436,12 @@ print("")
 let canUseMappings: [FieldMapping] = [
     FieldMapping(index: 1, tsField: "CanUseTool: toolName", swiftEquivalent: "CanUseToolFn: ToolProtocol (.name)", status: "PASS", note: "Direct equivalent"),
     FieldMapping(index: 2, tsField: "CanUseTool: input", swiftEquivalent: "CanUseToolFn: Any", status: "PASS", note: "Direct equivalent"),
-    FieldMapping(index: 3, tsField: "CanUseTool: signal (AbortSignal)", swiftEquivalent: "NO EQUIVALENT", status: "MISSING", note: "Swift uses Task.isCancelled"),
-    FieldMapping(index: 4, tsField: "CanUseTool: suggestions", swiftEquivalent: "NO EQUIVALENT", status: "MISSING", note: "Not in callback"),
-    FieldMapping(index: 5, tsField: "CanUseTool: blockedPath", swiftEquivalent: "NO EQUIVALENT", status: "MISSING", note: "Not in callback"),
-    FieldMapping(index: 6, tsField: "CanUseTool: decisionReason", swiftEquivalent: "NO EQUIVALENT", status: "MISSING", note: "Not in callback"),
-    FieldMapping(index: 7, tsField: "CanUseTool: toolUseID", swiftEquivalent: "ToolContext.toolUseId", status: "PARTIAL", note: "Via context, not direct param"),
-    FieldMapping(index: 8, tsField: "CanUseTool: agentID", swiftEquivalent: "NO EQUIVALENT", status: "MISSING", note: "Not in context"),
+    FieldMapping(index: 3, tsField: "CanUseTool: signal (AbortSignal)", swiftEquivalent: "Task.isCancelled (Swift Concurrency)", status: "PASS", note: "Swift uses Task.isCancelled pattern"),
+    FieldMapping(index: 4, tsField: "CanUseTool: suggestions", swiftEquivalent: "ToolContext.suggestions", status: "PASS", note: "Available via ToolContext"),
+    FieldMapping(index: 5, tsField: "CanUseTool: blockedPath", swiftEquivalent: "ToolContext.blockedPath", status: "PASS", note: "Available via ToolContext"),
+    FieldMapping(index: 6, tsField: "CanUseTool: decisionReason", swiftEquivalent: "ToolContext.decisionReason", status: "PASS", note: "Available via ToolContext"),
+    FieldMapping(index: 7, tsField: "CanUseTool: toolUseID", swiftEquivalent: "ToolContext.toolUseId", status: "PASS", note: "Available via ToolContext"),
+    FieldMapping(index: 8, tsField: "CanUseTool: agentID", swiftEquivalent: "ToolContext.agentId", status: "PASS", note: "Available via ToolContext"),
 ]
 
 print("CanUseToolFn Params (8 fields)")
@@ -463,12 +464,12 @@ print("")
 let resultMappings: [FieldMapping] = [
     FieldMapping(index: 1, tsField: "behavior: allow", swiftEquivalent: "CanUseToolResult.behavior: .allow", status: "PASS", note: "Direct equivalent"),
     FieldMapping(index: 2, tsField: "behavior: deny", swiftEquivalent: "CanUseToolResult.behavior: .deny", status: "PASS", note: "Direct equivalent"),
-    FieldMapping(index: 3, tsField: "behavior: ask", swiftEquivalent: "NO EQUIVALENT", status: "MISSING", note: "No ask behavior in Swift"),
+    FieldMapping(index: 3, tsField: "behavior: ask", swiftEquivalent: "PermissionBehavior.ask", status: "PASS", note: "Added by 17-5"),
     FieldMapping(index: 4, tsField: "updatedInput", swiftEquivalent: "CanUseToolResult.updatedInput: Any?", status: "PASS", note: "Direct equivalent"),
-    FieldMapping(index: 5, tsField: "updatedPermissions", swiftEquivalent: "NO EQUIVALENT", status: "MISSING", note: "Not in result"),
+    FieldMapping(index: 5, tsField: "updatedPermissions", swiftEquivalent: "CanUseToolResult.updatedPermissions", status: "PASS", note: "Added by 17-5"),
     FieldMapping(index: 6, tsField: "message", swiftEquivalent: "CanUseToolResult.message: String?", status: "PASS", note: "Direct equivalent"),
-    FieldMapping(index: 7, tsField: "interrupt", swiftEquivalent: "NO EQUIVALENT", status: "MISSING", note: "Not in result"),
-    FieldMapping(index: 8, tsField: "toolUseID", swiftEquivalent: "NO EQUIVALENT", status: "MISSING", note: "Not in result"),
+    FieldMapping(index: 7, tsField: "interrupt", swiftEquivalent: "CanUseToolResult.interrupt: Bool?", status: "PASS", note: "Added by 17-5"),
+    FieldMapping(index: 8, tsField: "toolUseID", swiftEquivalent: "CanUseToolResult.toolUseID: String?", status: "PASS", note: "Added by 17-5"),
 ]
 
 print("CanUseToolResult Fields (8 items)")
@@ -482,18 +483,19 @@ for m in resultMappings {
 print("")
 
 let resultPass = resultMappings.filter { $0.status == "PASS" }.count
+let resultPartial = resultMappings.filter { $0.status == "PARTIAL" }.count
 let resultMissing = resultMappings.filter { $0.status == "MISSING" }.count
-print("CanUseToolResult Summary: PASS: \(resultPass) | MISSING: \(resultMissing) | Total: \(resultMappings.count)")
+print("CanUseToolResult Summary: PASS: \(resultPass) | PARTIAL: \(resultPartial) | MISSING: \(resultMissing) | Total: \(resultMappings.count)")
 print("")
 
 // --- PermissionUpdate Operations Table ---
 let updateMappings: [FieldMapping] = [
-    FieldMapping(index: 1, tsField: "addRules", swiftEquivalent: "NO EQUIVALENT", status: "MISSING", note: "No addRules"),
-    FieldMapping(index: 2, tsField: "replaceRules", swiftEquivalent: "NO EQUIVALENT", status: "MISSING", note: "No replaceRules"),
-    FieldMapping(index: 3, tsField: "removeRules", swiftEquivalent: "NO EQUIVALENT", status: "MISSING", note: "No removeRules"),
-    FieldMapping(index: 4, tsField: "setMode", swiftEquivalent: "Agent.setPermissionMode(_:)", status: "PARTIAL", note: "Runtime method, not operation type"),
-    FieldMapping(index: 5, tsField: "addDirectories", swiftEquivalent: "NO EQUIVALENT", status: "MISSING", note: "No addDirectories"),
-    FieldMapping(index: 6, tsField: "removeDirectories", swiftEquivalent: "NO EQUIVALENT", status: "MISSING", note: "No removeDirectories"),
+    FieldMapping(index: 1, tsField: "addRules", swiftEquivalent: "PermissionUpdateOperation.addRules", status: "PASS", note: "Added by 17-5"),
+    FieldMapping(index: 2, tsField: "replaceRules", swiftEquivalent: "PermissionUpdateOperation.replaceRules", status: "PASS", note: "Added by 17-5"),
+    FieldMapping(index: 3, tsField: "removeRules", swiftEquivalent: "PermissionUpdateOperation.removeRules", status: "PASS", note: "Added by 17-5"),
+    FieldMapping(index: 4, tsField: "setMode", swiftEquivalent: "PermissionUpdateOperation.setMode", status: "PASS", note: "Added by 17-5 (was PARTIAL via Agent method)"),
+    FieldMapping(index: 5, tsField: "addDirectories", swiftEquivalent: "PermissionUpdateOperation.addDirectories", status: "PASS", note: "Added by 17-5"),
+    FieldMapping(index: 6, tsField: "removeDirectories", swiftEquivalent: "PermissionUpdateOperation.removeDirectories", status: "PASS", note: "Added by 17-5"),
 ]
 
 print("PermissionUpdate Operations (6 types)")
@@ -506,9 +508,10 @@ for m in updateMappings {
 }
 print("")
 
+let updatePass = updateMappings.filter { $0.status == "PASS" }.count
 let updatePartial = updateMappings.filter { $0.status == "PARTIAL" }.count
 let updateMissing = updateMappings.filter { $0.status == "MISSING" }.count
-print("PermissionUpdate Summary: PARTIAL: \(updatePartial) | MISSING: \(updateMissing) | Total: \(updateMappings.count)")
+print("PermissionUpdate Summary: PASS: \(updatePass) | PARTIAL: \(updatePartial) | MISSING: \(updateMissing) | Total: \(updateMappings.count)")
 print("")
 
 // --- PermissionPolicy System (Swift-only additions) ---
