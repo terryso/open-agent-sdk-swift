@@ -694,7 +694,12 @@ final class CompatToolSystemTests: XCTestCase {
 
         // AC2: defineTool equivalence
         report.append(CompatEntry(tsField: "tool(name,desc,schema,handler)", swiftField: "defineTool()", status: "PASS", note: "4 overloads"))
-        report.append(CompatEntry(tsField: "ToolAnnotations", swiftField: "ToolAnnotations struct", status: "PASS", note: "All 4 hints available"))
+
+        // AC1: ToolAnnotations -- all 4 hints individually tracked (Story 17-3)
+        report.append(CompatEntry(tsField: "ToolAnnotations.readOnlyHint", swiftField: "ToolAnnotations.readOnlyHint", status: "PASS", note: nil))
+        report.append(CompatEntry(tsField: "ToolAnnotations.destructiveHint", swiftField: "ToolAnnotations.destructiveHint", status: "PASS", note: nil))
+        report.append(CompatEntry(tsField: "ToolAnnotations.idempotentHint", swiftField: "ToolAnnotations.idempotentHint", status: "PASS", note: nil))
+        report.append(CompatEntry(tsField: "ToolAnnotations.openWorldHint", swiftField: "ToolAnnotations.openWorldHint", status: "PASS", note: nil))
 
         // AC4: ToolResult
         report.append(CompatEntry(tsField: "CallToolResult.content (Array)", swiftField: "ToolResult.typedContent", status: "PASS", note: "ToolContent enum with text/image/resource"))

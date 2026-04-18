@@ -151,13 +151,21 @@ print("=== AC3: ToolAnnotations Compatibility ===")
 record("ToolAnnotations.readOnlyHint", swiftField: "ToolProtocol.isReadOnly: Bool", status: "PASS",
        note: "readOnlyHint equivalent exists on ToolProtocol")
 
-// Document missing annotations
-record("ToolAnnotations.destructiveHint", swiftField: "N/A", status: "MISSING",
-       note: "No destructiveHint equivalent in Swift SDK. Recommended addition: add to ToolProtocol")
-record("ToolAnnotations.idempotentHint", swiftField: "N/A", status: "MISSING",
-       note: "No idempotentHint equivalent in Swift SDK. Recommended addition: add to ToolProtocol")
-record("ToolAnnotations.openWorldHint", swiftField: "N/A", status: "MISSING",
-       note: "No openWorldHint equivalent in Swift SDK. Recommended addition: add to ToolProtocol")
+// Verify all 4 ToolAnnotations hint fields via defineTool with annotations (Story 17-3)
+let annotatedTool = defineTool(
+    name: "annotated",
+    description: "Tool with annotations",
+    inputSchema: ["type": "object"],
+    annotations: ToolAnnotations(readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false)
+) { (context: ToolContext) async throws -> String in "ok" }
+
+let ann = annotatedTool.annotations
+record("ToolAnnotations.destructiveHint", swiftField: "ToolAnnotations.destructiveHint: Bool", status: "PASS",
+       note: "destructiveHint=\(ann?.destructiveHint ?? true)")
+record("ToolAnnotations.idempotentHint", swiftField: "ToolAnnotations.idempotentHint: Bool", status: "PASS",
+       note: "idempotentHint=\(ann?.idempotentHint ?? false)")
+record("ToolAnnotations.openWorldHint", swiftField: "ToolAnnotations.openWorldHint: Bool", status: "PASS",
+       note: "openWorldHint=\(ann?.openWorldHint ?? false)")
 
 // Verify built-in tools have correct isReadOnly values
 let coreTools = getAllBaseTools(tier: .core)
@@ -192,8 +200,14 @@ _ = toolResult.isError
 
 record("CallToolResult.toolUseId", swiftField: "ToolResult.toolUseId: String", status: "PASS",
        note: "Swift has extra toolUseId field (not in TS SDK)")
-record("CallToolResult.content (Array)", swiftField: "ToolResult.content: String", status: "MISSING",
-       note: "Swift uses flat String, TS uses typed Array<TextBlock | ImageBlock | ResourceBlock>")
+// RESOLVED (Story 17-3): ToolResult now supports typedContent array
+let typedResult = ToolResult(
+    toolUseId: "tu_typed",
+    typedContent: [.text("hello"), .image(data: Data(), mimeType: "image/png"), .resource(uri: "file:///test", name: "test")],
+    isError: false
+)
+record("CallToolResult.content (Array)", swiftField: "ToolResult.typedContent: [ToolContent]", status: "PASS",
+       note: "ToolContent enum with .text, .image, .resource. typedContent count=\(typedResult.typedContent?.count ?? 0), derived content=\(typedResult.content)")
 record("CallToolResult.isError", swiftField: "ToolResult.isError: Bool", status: "PASS")
 
 let execResult = ToolExecuteResult(content: "done", isError: false)
@@ -222,8 +236,9 @@ record("BashInput.timeout", swiftField: "BashTool 'timeout' property", status: "
        note: bashProps?["timeout"] != nil ? "Present" : "Missing")
 record("BashInput.description", swiftField: "BashTool 'description' property", status: "PASS",
        note: bashProps?["description"] != nil ? "Present" : "Missing")
-record("BashInput.run_in_background", swiftField: "N/A", status: "MISSING",
-       note: "TS SDK BashInput has 'run_in_background' field. Swift SDK does not.")
+// RESOLVED (Story 17-3): BashInput.runInBackground with CodingKey "run_in_background"
+record("BashInput.run_in_background", swiftField: "BashInput.runInBackground: Bool?", status: "PASS",
+       note: bashProps?["run_in_background"] != nil ? "Present in inputSchema" : "Missing")
 
 // FileReadInput
 let readTool = createReadTool()
