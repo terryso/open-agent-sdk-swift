@@ -813,8 +813,10 @@ final class MessageTypesCompatReportTests: XCTestCase {
         print("#\tTS SDK Type\t\t\t\tTS type field\t\tSwift Equivalent\t\t\t\tStatus")
         print(String(repeating: "-", count: 130))
         for m in mappings {
-            print("\(m.index)\t\(m.tsType)\t\(m.tsTypeField)\t\(m.swiftEquivalent)\t[\(m.status)]")
-            print("\tNote: \(m.note)")
+            if m.status != "PASS" {
+                print("\(m.index)\t\(m.tsType)\t\(m.tsTypeField)\t\(m.swiftEquivalent)\t[\(m.status)]")
+                print("\tNote: \(m.note)")
+            }
         }
         print("")
         print("Summary: PASS: \(passCount) | PARTIAL: \(partialCount) | MISSING: \(missingCount) | Total: \(mappings.count)")

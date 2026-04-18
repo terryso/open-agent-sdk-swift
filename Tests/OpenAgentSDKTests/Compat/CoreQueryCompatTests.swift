@@ -549,7 +549,9 @@ final class CompatReportTests: XCTestCase {
         print("=== Core Query API Compatibility Report ===")
         print("TS SDK Field                  | Swift SDK Field                                | Status")
         for entry in report {
-            print("  \(entry.tsField)  ->  \(entry.swiftField)  [\(entry.status)]")
+            if entry.status != "PASS" {
+                print("  \(entry.tsField)  ->  \(entry.swiftField)  [\(entry.status)]")
+            }
         }
         print("PASS: \(passCount) | MISSING: \(missingCount) | N/A: \(naCount) | Total: \(report.count)")
         print("============================================")

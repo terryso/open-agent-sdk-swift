@@ -159,9 +159,6 @@ final class PermissionUpdateOperationCompatTests: XCTestCase {
 
         print("")
         print("=== PermissionUpdateOperation Coverage Summary ===")
-        for (name, _) in ops {
-            print("  [PASS] \(name)")
-        }
         print("Summary: \(ops.count) operations")
         print("")
 
@@ -346,7 +343,9 @@ final class PermissionSystemCompatReportTests: XCTestCase {
         print("=== Permission System Compatibility Report (Story 17-5) ===")
         print("TS SDK Permission Features vs Swift SDK")
         for g in gaps {
-            print("  \(g.index)\t\(g.tsFeature)\t[\(g.status)]\t\(g.note)")
+            if g.status != "PASS" {
+                print("  \(g.index)\t\(g.tsFeature)\t[\(g.status)]\t\(g.note)")
+            }
         }
         print("")
         print("Summary: RESOLVED: \(resolvedCount) | MISSING: \(missingCount) | Total: \(gaps.count)")

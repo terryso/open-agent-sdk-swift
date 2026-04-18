@@ -900,7 +900,9 @@ final class HookSystemCompatReportTests: XCTestCase {
         print("=== Hook System Compatibility Report (AC9) ===")
         print("TS SDK 18 HookEvents vs Swift SDK HookEvent")
         for m in tsEvents {
-            print("  \(m.index)\t\(m.tsEvent)\t\(m.rawValue)\t[\(m.status)]\t\(m.note)")
+            if m.status != "PASS" {
+                print("  \(m.index)\t\(m.tsEvent)\t\(m.rawValue)\t[\(m.status)]\t\(m.note)")
+            }
         }
         print("")
         print("Summary: PASS: \(passCount) | MISSING: \(missingCount) | Total: \(tsEvents.count)")
@@ -943,7 +945,9 @@ final class HookSystemCompatReportTests: XCTestCase {
         print("")
         print("=== HookInput Field Compatibility ===")
         for f in fields {
-            print("  [\(f.status)] TS: \(f.tsField) -> Swift: \(f.swiftField)")
+            if f.status != "PASS" {
+                print("  [\(f.status)] TS: \(f.tsField) -> Swift: \(f.swiftField)")
+            }
         }
         print("Summary: PASS: \(passCount) | MISSING: \(missingCount) | Total: \(fields.count)")
         print("")
@@ -971,7 +975,9 @@ final class HookSystemCompatReportTests: XCTestCase {
         print("")
         print("=== HookOutput Field Compatibility ===")
         for f in fields {
-            print("  [\(f.status)] TS: \(f.tsField) -> Swift: \(f.swiftField)")
+            if f.status != "PASS" {
+                print("  [\(f.status)] TS: \(f.tsField) -> Swift: \(f.swiftField)")
+            }
         }
         print("Summary: PASS: \(passCount) | PARTIAL: \(partialCount) | MISSING: \(missingCount) | Total: \(fields.count)")
         print("")

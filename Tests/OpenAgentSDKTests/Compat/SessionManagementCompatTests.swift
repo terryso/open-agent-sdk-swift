@@ -886,8 +886,10 @@ final class SessionManagementCompatReportTests: XCTestCase {
         print("=== Session Management Compatibility Report (AC7) ===")
         print("TS SDK Session Functions vs Swift SDK SessionStore")
         for m in mappings {
-            print("  \(m.index)\t\(m.tsFunction)")
-            print("  \t-> \(m.swiftEquivalent) [\(m.status)] \(m.note)")
+            if m.status != "PASS" {
+                print("  \(m.index)\t\(m.tsFunction)")
+                print("  \t-> \(m.swiftEquivalent) [\(m.status)] \(m.note)")
+            }
         }
 
         let passCount = mappings.filter { $0.status == "PASS" }.count
@@ -933,7 +935,9 @@ final class SessionManagementCompatReportTests: XCTestCase {
         print("")
         print("=== SessionMetadata Field Compatibility ===")
         for m in mappings {
-            print("  [\(m.status)] TS: \(m.tsField) -> Swift: \(m.swiftField)")
+            if m.status != "PASS" {
+                print("  [\(m.status)] TS: \(m.tsField) -> Swift: \(m.swiftField)")
+            }
         }
 
         let passCount = mappings.filter { $0.status == "PASS" }.count
@@ -973,7 +977,9 @@ final class SessionManagementCompatReportTests: XCTestCase {
         print("")
         print("=== SessionMessage Element Field Compatibility ===")
         for m in mappings {
-            print("  [\(m.status)] TS: \(m.tsField) -> Swift: \(m.swiftField)")
+            if m.status != "PASS" {
+                print("  [\(m.status)] TS: \(m.tsField) -> Swift: \(m.swiftField)")
+            }
         }
         print("Summary: PASS: \(passCount) | MISSING: \(missingCount) | Total: \(mappings.count)")
         print("Note: Swift now has typed SessionMessage struct (added by Spec 19)")
@@ -1016,8 +1022,10 @@ final class SessionManagementCompatReportTests: XCTestCase {
         print("")
         print("=== Session Restore Options Compatibility ===")
         for m in mappings {
-            print("  [\(m.status)] TS: \(m.tsOption) -> Swift: \(m.swiftEquivalent)")
-            print("       \(m.note)")
+            if m.status != "PASS" {
+                print("  [\(m.status)] TS: \(m.tsOption) -> Swift: \(m.swiftEquivalent)")
+                print("       \(m.note)")
+            }
         }
 
         let passCount = mappings.filter { $0.status == "PASS" }.count

@@ -427,7 +427,9 @@ final class CoreQueryCompatE2ETests: XCTestCase {
         // Print report
         print("\n=== E2E Compatibility Report ===")
         for entry in report {
-            print("[\(entry.status)] \(entry.ac): \(entry.test)")
+            if entry.status != "PASS" {
+                print("[\(entry.status)] \(entry.ac): \(entry.test)")
+            }
         }
         print("================================\n")
 
