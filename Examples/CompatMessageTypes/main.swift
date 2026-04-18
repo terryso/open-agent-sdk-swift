@@ -55,32 +55,47 @@ print("")
 
 print("=== AC2: SDKAssistantMessage Verification ===")
 
-// Verify AssistantData fields at compile time
-let assistantData = SDKMessage.AssistantData(text: "Hello", model: "claude-sonnet-4-6", stopReason: "end_turn")
-_ = assistantData.text
-_ = assistantData.model
-_ = assistantData.stopReason
+// Verify AssistantData fields at compile time -- construct with all 7 fields (Story 17-1)
+let fullAssistant = SDKMessage.AssistantData(
+    text: "Hello", model: "claude-sonnet-4-6", stopReason: "end_turn",
+    uuid: "msg-uuid-123", sessionId: "sess-abc",
+    parentToolUseId: "toolu_parent", error: .rateLimit
+)
+_ = fullAssistant.text
+_ = fullAssistant.model
+_ = fullAssistant.stopReason
+_ = fullAssistant.uuid
+_ = fullAssistant.sessionId
+_ = fullAssistant.parentToolUseId
+_ = fullAssistant.error
 
 record("SDKAssistantMessage.text", swiftField: "AssistantData.text: String", status: "PASS",
        note: "Maps to TS SDK message.content")
 record("SDKAssistantMessage.model", swiftField: "AssistantData.model: String", status: "PASS",
-       note: "model='\(assistantData.model)'")
+       note: "model='\(fullAssistant.model)'")
 record("SDKAssistantMessage.stopReason", swiftField: "AssistantData.stopReason: String", status: "PASS",
-       note: "stopReason='\(assistantData.stopReason)'")
+       note: "stopReason='\(fullAssistant.stopReason)'")
 
-// Known gaps: fields present in TS SDK but missing from Swift
-record("SDKAssistantMessage.uuid", swiftField: "Not available", status: "MISSING",
-       note: "TS SDK: uuid field for message identification")
-record("SDKAssistantMessage.session_id", swiftField: "Not available", status: "MISSING",
-       note: "TS SDK: session_id field for session tracking")
-record("SDKAssistantMessage.parent_tool_use_id", swiftField: "Not available", status: "MISSING",
-       note: "TS SDK: parent_tool_use_id for tool-use chaining context")
-record("SDKAssistantMessage.error", swiftField: "Not available", status: "MISSING",
-       note: "TS SDK: error field with 7 subtypes (authentication_failed, billing_error, rate_limit, invalid_request, server_error, max_output_tokens, unknown)")
+// Story 17-1 resolved fields (previously MISSING, now PASS)
+record("SDKAssistantMessage.uuid", swiftField: "AssistantData.uuid: String?", status: "PASS",
+       note: "uuid='\(fullAssistant.uuid ?? "nil")'")
+record("SDKAssistantMessage.session_id", swiftField: "AssistantData.sessionId: String?", status: "PASS",
+       note: "sessionId='\(fullAssistant.sessionId ?? "nil")'")
+record("SDKAssistantMessage.parent_tool_use_id", swiftField: "AssistantData.parentToolUseId: String?", status: "PASS",
+       note: "parentToolUseId='\(fullAssistant.parentToolUseId ?? "nil")'")
+record("SDKAssistantMessage.error", swiftField: "AssistantData.error: AssistantError? (7 subtypes)", status: "PASS",
+       note: "error=\(fullAssistant.error?.rawValue ?? "nil"). 7 subtypes: authenticationFailed, billingError, rateLimit, invalidRequest, serverError, maxOutputTokens, unknown")
+
+// Verify AssistantError has all 7 subtypes
+let allErrorSubtypes: [SDKMessage.AssistantError] = [
+    .authenticationFailed, .billingError, .rateLimit,
+    .invalidRequest, .serverError, .maxOutputTokens, .unknown
+]
+print("  AssistantError subtypes: \(allErrorSubtypes.map { $0.rawValue })")
 
 // Use Mirror to verify field count
-let assistantMirror = Mirror(reflecting: assistantData)
-print("  AssistantData field count: \(assistantMirror.children.count) (TS SDK has 5+ fields)")
+let assistantMirror = Mirror(reflecting: fullAssistant)
+print("  AssistantData field count: \(assistantMirror.children.count) (7 fields: text, model, stopReason, uuid, sessionId, parentToolUseId, error)")
 
 print("")
 
@@ -88,25 +103,34 @@ print("")
 
 print("=== AC3: SDKResultMessage Verification ===")
 
-// Verify ResultData success fields
-let successResult = SDKMessage.ResultData(subtype: .success, text: "done", usage: TokenUsage(inputTokens: 100, outputTokens: 50), numTurns: 2, durationMs: 1500, totalCostUsd: 0.05, costBreakdown: [CostBreakdownEntry(model: "claude-sonnet-4-6", inputTokens: 100, outputTokens: 50, costUsd: 0.003)])
+// Verify ResultData with all Story 17-1 fields
+let fullResult = SDKMessage.ResultData(
+    subtype: .success, text: "done",
+    usage: TokenUsage(inputTokens: 100, outputTokens: 50),
+    numTurns: 2, durationMs: 1500,
+    totalCostUsd: 0.05,
+    costBreakdown: [CostBreakdownEntry(model: "claude-sonnet-4-6", inputTokens: 100, outputTokens: 50, costUsd: 0.003)],
+    structuredOutput: SDKMessage.SendableStructuredOutput(["result": "ok"]),
+    permissionDenials: [SDKMessage.SDKPermissionDenial(toolName: "Bash", toolUseId: "tu_1", toolInput: "ls")],
+    modelUsage: [SDKMessage.ModelUsageEntry(model: "claude-sonnet-4-6", inputTokens: 100, outputTokens: 50)]
+)
 
 record("SDKResultMessage (success).result", swiftField: "ResultData.text: String", status: "PASS",
-       note: "text='\(successResult.text)'")
+       note: "text='\(fullResult.text)'")
 record("SDKResultMessage.total_cost_usd", swiftField: "ResultData.totalCostUsd: Double", status: "PASS",
-       note: "totalCostUsd=\(successResult.totalCostUsd)")
+       note: "totalCostUsd=\(fullResult.totalCostUsd)")
 record("SDKResultMessage.usage", swiftField: "ResultData.usage: TokenUsage?", status: "PASS",
-       note: "inputTokens=\(successResult.usage!.inputTokens), outputTokens=\(successResult.usage!.outputTokens)")
+       note: "inputTokens=\(fullResult.usage?.inputTokens ?? 0), outputTokens=\(fullResult.usage?.outputTokens ?? 0)")
 record("SDKResultMessage.model_usage", swiftField: "ResultData.costBreakdown: [CostBreakdownEntry]", status: "PASS",
-       note: "Similar to TS model_usage but different naming. count=\(successResult.costBreakdown.count)")
+       note: "Similar to TS model_usage but different naming. count=\(fullResult.costBreakdown.count)")
 record("SDKResultMessage.num_turns", swiftField: "ResultData.numTurns: Int", status: "PASS",
-       note: "numTurns=\(successResult.numTurns)")
+       note: "numTurns=\(fullResult.numTurns)")
 record("SDKResultMessage.duration_ms", swiftField: "ResultData.durationMs: Int", status: "PASS",
-       note: "durationMs=\(successResult.durationMs)")
+       note: "durationMs=\(fullResult.durationMs)")
 
-// Verify all error subtypes exist at compile time
+// Verify all error subtypes exist at compile time (including Story 17-1 addition)
 let allResultSubtypes: [SDKMessage.ResultData.Subtype] = [
-    .success, .errorMaxTurns, .errorDuringExecution, .errorMaxBudgetUsd, .cancelled
+    .success, .errorMaxTurns, .errorDuringExecution, .errorMaxBudgetUsd, .cancelled, .errorMaxStructuredOutputRetries
 ]
 print("  All ResultData.Subtype cases: \(allResultSubtypes.map { $0.rawValue })")
 
@@ -114,18 +138,22 @@ record("SDKResultMessage subtype: success", swiftField: "ResultData.Subtype.succ
 record("SDKResultMessage subtype: error_max_turns", swiftField: "ResultData.Subtype.errorMaxTurns", status: "PASS")
 record("SDKResultMessage subtype: error_during_execution", swiftField: "ResultData.Subtype.errorDuringExecution", status: "PASS")
 record("SDKResultMessage subtype: error_max_budget_usd", swiftField: "ResultData.Subtype.errorMaxBudgetUsd", status: "PASS")
+record("SDKResultMessage subtype: error_max_structured_output_retries", swiftField: "ResultData.Subtype.errorMaxStructuredOutputRetries", status: "PASS",
+       note: "Added by Story 17-1")
 record("cancelled (Swift-only)", swiftField: "ResultData.Subtype.cancelled", status: "N/A",
        note: "Swift-only addition, not in TS SDK")
 
-// Known gaps
-record("SDKResultMessage.structuredOutput", swiftField: "Not available", status: "MISSING",
-       note: "TS SDK: structuredOutput for structured output responses")
-record("SDKResultMessage.permissionDenials", swiftField: "Not available", status: "MISSING",
-       note: "TS SDK: permissionDenials tracking in result")
+// Story 17-1 resolved fields (previously MISSING, now PASS)
+record("SDKResultMessage.structuredOutput", swiftField: "ResultData.structuredOutput: SendableStructuredOutput?", status: "PASS",
+       note: "Added by Story 17-1. value=\(fullResult.structuredOutput != nil ? "present" : "nil")")
+record("SDKResultMessage.permissionDenials", swiftField: "ResultData.permissionDenials: [SDKPermissionDenial]?", status: "PASS",
+       note: "Added by Story 17-1. count=\(fullResult.permissionDenials?.count ?? 0)")
+record("SDKResultMessage.model_usage (distinct)", swiftField: "ResultData.modelUsage: [ModelUsageEntry]?", status: "PASS",
+       note: "Added by Story 17-1. Per-model token usage entries. count=\(fullResult.modelUsage?.count ?? 0)")
+
+// Remaining genuine gap
 record("SDKResultMessage.errors", swiftField: "Not available", status: "MISSING",
-       note: "TS SDK: errors: string[] for error result details")
-record("SDKResultMessage.error_max_structured_output_retries", swiftField: "Not available", status: "MISSING",
-       note: "TS SDK: additional error subtype for structured output retry exhaustion")
+       note: "TS SDK: errors: string[] for error result details. Genuine gap -- not yet implemented.")
 
 print("")
 
@@ -133,38 +161,54 @@ print("")
 
 print("=== AC4: SDKSystemMessage Verification ===")
 
-// Verify all SystemData subtypes exist at compile time
-let allSystemSubtypes: [SDKMessage.SystemData.Subtype] = [
-    .`init`, .compactBoundary, .status, .taskNotification, .rateLimit
-]
-print("  All SystemData.Subtype cases: \(allSystemSubtypes.map { $0.rawValue })")
+// Verify SystemData init with all Story 17-1 fields
+let fullSystem = SDKMessage.SystemData(
+    subtype: .`init`, message: "Session started",
+    sessionId: "sess-123",
+    tools: [SDKMessage.ToolInfo(name: "Bash", description: "Run commands")],
+    model: "claude-sonnet-4-6",
+    permissionMode: "bypassPermissions",
+    mcpServers: [SDKMessage.McpServerInfo(name: "filesystem", command: "npx")],
+    cwd: "/tmp/project"
+)
 
-record("SDKSystemMessage(init)", swiftField: ".system(SystemData) subtype=.init", status: "PARTIAL",
-       note: "Has message. MISSING: session_id, tools, model, permissionMode, mcp_servers, cwd")
+// Verify all SystemData subtypes exist at compile time (including 7 Story 17-1 additions)
+let allSystemSubtypes: [SDKMessage.SystemData.Subtype] = [
+    .`init`, .compactBoundary, .status, .taskNotification, .rateLimit,
+    .taskStarted, .taskProgress, .hookStarted, .hookProgress, .hookResponse,
+    .filesPersisted, .localCommandOutput
+]
+print("  All SystemData.Subtype cases (\(allSystemSubtypes.count)): \(allSystemSubtypes.map { $0.rawValue })")
+
+// Story 17-1 resolved: init now has all fields
+record("SDKSystemMessage(init)", swiftField: ".system(SystemData) subtype=.init", status: "PASS",
+       note: "All init fields present: sessionId='\(fullSystem.sessionId ?? "nil")', tools=\(fullSystem.tools?.count ?? 0), model='\(fullSystem.model ?? "nil")', permissionMode='\(fullSystem.permissionMode ?? "nil")', mcpServers=\(fullSystem.mcpServers?.count ?? 0), cwd='\(fullSystem.cwd ?? "nil")'")
+
+// Remaining PARTIAL entries (genuine gaps)
 record("SDKSystemMessage(compact_boundary)", swiftField: ".system(SystemData) subtype=.compactBoundary", status: "PARTIAL",
        note: "Has message. MISSING: compact_metadata")
 record("SDKSystemMessage(status)", swiftField: ".system(SystemData) subtype=.status", status: "PARTIAL",
-       note: "Has message. MISSING: permissionMode")
+       note: "Has message + permissionMode field. Still missing status-specific fields.")
 record("SDKSystemMessage(task_notification)", swiftField: ".system(SystemData) subtype=.taskNotification", status: "PARTIAL",
        note: "Has message. MISSING: task_id, output_file, summary, usage")
 record("SDKRateLimitEvent", swiftField: ".system(SystemData) subtype=.rateLimit", status: "PARTIAL",
        note: "Has subtype + message. MISSING: rate limit-specific fields (limit, remaining, reset)")
 
-// Missing system subtypes
-record("SDKSystemMessage(task_started)", swiftField: "No subtype", status: "MISSING",
-       note: "TS SDK: system/task_started with task_id, task_type, description")
-record("SDKSystemMessage(task_progress)", swiftField: "No subtype", status: "MISSING",
-       note: "TS SDK: system/task_progress with task_id, usage")
-record("SDKSystemMessage(hook_started)", swiftField: "No subtype", status: "MISSING",
-       note: "TS SDK: system/hook_started with hook_id, hook_name, hook_event")
-record("SDKSystemMessage(hook_progress)", swiftField: "No subtype", status: "MISSING",
-       note: "TS SDK: system/hook_progress with hook_id, stdout, stderr")
-record("SDKSystemMessage(hook_response)", swiftField: "No subtype", status: "MISSING",
-       note: "TS SDK: system/hook_response with hook_id, output, exit_code, outcome")
-record("SDKSystemMessage(files_persisted)", swiftField: "No subtype", status: "MISSING",
-       note: "TS SDK: system/files_persisted")
-record("SDKSystemMessage(local_command_output)", swiftField: "No subtype", status: "MISSING",
-       note: "TS SDK: system/local_command_output")
+// Story 17-1 resolved: 7 new system subtypes (previously MISSING, now PASS)
+record("SDKSystemMessage(task_started)", swiftField: "SystemData.Subtype.taskStarted + .taskStarted(TaskStartedData)", status: "PASS",
+       note: "Added by Story 17-1: taskId, taskType, description")
+record("SDKSystemMessage(task_progress)", swiftField: "SystemData.Subtype.taskProgress + .taskProgress(TaskProgressData)", status: "PASS",
+       note: "Added by Story 17-1: taskId, taskType, usage")
+record("SDKSystemMessage(hook_started)", swiftField: "SystemData.Subtype.hookStarted + .hookStarted(HookStartedData)", status: "PASS",
+       note: "Added by Story 17-1: hookId, hookName, hookEvent")
+record("SDKSystemMessage(hook_progress)", swiftField: "SystemData.Subtype.hookProgress + .hookProgress(HookProgressData)", status: "PASS",
+       note: "Added by Story 17-1: hookId, hookName, hookEvent, stdout, stderr")
+record("SDKSystemMessage(hook_response)", swiftField: "SystemData.Subtype.hookResponse + .hookResponse(HookResponseData)", status: "PASS",
+       note: "Added by Story 17-1: hookId, hookName, hookEvent, output, exitCode, outcome")
+record("SDKSystemMessage(files_persisted)", swiftField: "SystemData.Subtype.filesPersisted + .filesPersisted(FilesPersistedData)", status: "PASS",
+       note: "Added by Story 17-1: filePaths")
+record("SDKSystemMessage(local_command_output)", swiftField: "SystemData.Subtype.localCommandOutput + .localCommandOutput(LocalCommandOutputData)", status: "PASS",
+       note: "Added by Story 17-1: output, command")
 
 print("")
 
@@ -172,22 +216,26 @@ print("")
 
 print("=== AC5: SDKPartialAssistantMessage Verification ===")
 
-let partialData = SDKMessage.PartialData(text: "Hello world")
-_ = partialData.text
+// Story 17-1: PartialData now has parentToolUseId, uuid, sessionId
+let fullPartial = SDKMessage.PartialData(text: "Hello world", parentToolUseId: "toolu_parent", uuid: "msg-uuid", sessionId: "sess-123")
+_ = fullPartial.text
+_ = fullPartial.parentToolUseId
+_ = fullPartial.uuid
+_ = fullPartial.sessionId
 
 record("SDKPartialAssistantMessage.text", swiftField: "PartialData.text: String", status: "PASS",
        note: "Provides streaming text chunks")
 
-// Known gaps
-record("SDKPartialAssistantMessage.parent_tool_use_id", swiftField: "Not available", status: "MISSING",
-       note: "TS SDK: parent_tool_use_id for nested tool-use context")
-record("SDKPartialAssistantMessage.uuid", swiftField: "Not available", status: "MISSING",
-       note: "TS SDK: uuid for message identification")
-record("SDKPartialAssistantMessage.session_id", swiftField: "Not available", status: "MISSING",
-       note: "TS SDK: session_id for session tracking")
+// Story 17-1 resolved fields (previously MISSING, now PASS)
+record("SDKPartialAssistantMessage.parent_tool_use_id", swiftField: "PartialData.parentToolUseId: String?", status: "PASS",
+       note: "parentToolUseId='\(fullPartial.parentToolUseId ?? "nil")'")
+record("SDKPartialAssistantMessage.uuid", swiftField: "PartialData.uuid: String?", status: "PASS",
+       note: "uuid='\(fullPartial.uuid ?? "nil")'")
+record("SDKPartialAssistantMessage.session_id", swiftField: "PartialData.sessionId: String?", status: "PASS",
+       note: "sessionId='\(fullPartial.sessionId ?? "nil")'")
 
-let partialMirror = Mirror(reflecting: partialData)
-print("  PartialData field count: \(partialMirror.children.count) (TS SDK has 5 fields)")
+let partialMirror = Mirror(reflecting: fullPartial)
+print("  PartialData field count: \(partialMirror.children.count) (4 fields: text, parentToolUseId, uuid, sessionId)")
 
 print("")
 
@@ -195,14 +243,19 @@ print("")
 
 print("=== AC6: Tool Progress Message Verification ===")
 
-record("SDKToolProgressMessage (entire type)", swiftField: "No SDKMessage case", status: "MISSING",
-       note: "TS SDK: tool_use_id, tool_name, parent_tool_use_id, elapsed_time_seconds. Swift has no equivalent.")
-record("SDKToolProgressMessage.tool_use_id", swiftField: "N/A", status: "MISSING",
-       note: "Field missing because entire type is absent")
-record("SDKToolProgressMessage.tool_name", swiftField: "N/A", status: "MISSING",
-       note: "Field missing because entire type is absent")
-record("SDKToolProgressMessage.elapsed_time_seconds", swiftField: "N/A", status: "MISSING",
-       note: "Field missing because entire type is absent")
+// Story 17-1: .toolProgress(ToolProgressData) now exists
+let toolProgData = SDKMessage.ToolProgressData(toolUseId: "tu_1", toolName: "Bash", parentToolUseId: "toolu_parent", elapsedTimeSeconds: 3.5)
+let toolProgMsg = SDKMessage.toolProgress(toolProgData)
+if case .toolProgress(let retrieved) = toolProgMsg {
+    record("SDKToolProgressMessage (entire type)", swiftField: ".toolProgress(ToolProgressData)", status: "PASS",
+           note: "Added by Story 17-1. toolUseId=\(retrieved.toolUseId), toolName=\(retrieved.toolName)")
+    record("SDKToolProgressMessage.tool_use_id", swiftField: "ToolProgressData.toolUseId: String", status: "PASS",
+           note: "toolUseId=\(retrieved.toolUseId)")
+    record("SDKToolProgressMessage.tool_name", swiftField: "ToolProgressData.toolName: String", status: "PASS",
+           note: "toolName=\(retrieved.toolName)")
+    record("SDKToolProgressMessage.elapsed_time_seconds", swiftField: "ToolProgressData.elapsedTimeSeconds: Double?", status: "PASS",
+           note: "elapsedTimeSeconds=\(retrieved.elapsedTimeSeconds ?? 0)")
+}
 
 print("")
 
@@ -210,12 +263,27 @@ print("")
 
 print("=== AC7: Hook-Related Message Verification ===")
 
-record("SDKHookStartedMessage (entire type)", swiftField: "No SystemData subtype", status: "MISSING",
-       note: "TS SDK: hook_id, hook_name, hook_event. Swift has no equivalent.")
-record("SDKHookProgressMessage (entire type)", swiftField: "No SystemData subtype", status: "MISSING",
-       note: "TS SDK: hook_id, stdout, stderr. Swift has no equivalent.")
-record("SDKHookResponseMessage (entire type)", swiftField: "No SystemData subtype", status: "MISSING",
-       note: "TS SDK: hook_id, output, exit_code, outcome. Swift has no equivalent.")
+// Story 17-1: hookStarted, hookProgress, hookResponse now exist as SDKMessage cases
+let hookStartData = SDKMessage.HookStartedData(hookId: "h1", hookName: "pre", hookEvent: "PreToolUse")
+let hookStartMsg = SDKMessage.hookStarted(hookStartData)
+if case .hookStarted(let retrieved) = hookStartMsg {
+    record("SDKHookStartedMessage (entire type)", swiftField: ".hookStarted(HookStartedData)", status: "PASS",
+           note: "Added by Story 17-1. hookId=\(retrieved.hookId), hookName=\(retrieved.hookName), hookEvent=\(retrieved.hookEvent)")
+}
+
+let hookProgData = SDKMessage.HookProgressData(hookId: "h2", hookName: "post", hookEvent: "PostToolUse", stdout: "out", stderr: nil)
+let hookProgMsg = SDKMessage.hookProgress(hookProgData)
+if case .hookProgress(let retrieved) = hookProgMsg {
+    record("SDKHookProgressMessage (entire type)", swiftField: ".hookProgress(HookProgressData)", status: "PASS",
+           note: "Added by Story 17-1. hookId=\(retrieved.hookId), stdout=\(retrieved.stdout ?? "nil")")
+}
+
+let hookRespData = SDKMessage.HookResponseData(hookId: "h3", hookName: "stop", hookEvent: "Stop", output: "done", exitCode: 0, outcome: "success")
+let hookRespMsg = SDKMessage.hookResponse(hookRespData)
+if case .hookResponse(let retrieved) = hookRespMsg {
+    record("SDKHookResponseMessage (entire type)", swiftField: ".hookResponse(HookResponseData)", status: "PASS",
+           note: "Added by Story 17-1. hookId=\(retrieved.hookId), outcome=\(retrieved.outcome ?? "nil")")
+}
 
 print("")
 
@@ -223,10 +291,21 @@ print("")
 
 print("=== AC8: Task-Related Message Verification ===")
 
-record("SDKTaskStartedMessage (entire type)", swiftField: "No SystemData subtype", status: "MISSING",
-       note: "TS SDK: task_id, task_type, description. Swift has no equivalent.")
-record("SDKTaskProgressMessage (entire type)", swiftField: "No SystemData subtype", status: "MISSING",
-       note: "TS SDK: task_id, usage. Swift has no equivalent.")
+// Story 17-1: taskStarted, taskProgress now exist as SDKMessage cases
+let taskStartData = SDKMessage.TaskStartedData(taskId: "t1", taskType: "subagent", description: "analysis")
+let taskStartMsg = SDKMessage.taskStarted(taskStartData)
+if case .taskStarted(let retrieved) = taskStartMsg {
+    record("SDKTaskStartedMessage (entire type)", swiftField: ".taskStarted(TaskStartedData)", status: "PASS",
+           note: "Added by Story 17-1. taskId=\(retrieved.taskId), taskType=\(retrieved.taskType), description=\(retrieved.description)")
+}
+
+let taskProgData = SDKMessage.TaskProgressData(taskId: "t2", taskType: "subagent")
+let taskProgMsg = SDKMessage.taskProgress(taskProgData)
+if case .taskProgress(let retrieved) = taskProgMsg {
+    record("SDKTaskProgressMessage (entire type)", swiftField: ".taskProgress(TaskProgressData)", status: "PASS",
+           note: "Added by Story 17-1. taskId=\(retrieved.taskId)")
+}
+
 record("SDKTaskNotificationMessage", swiftField: ".system(SystemData) subtype=.taskNotification", status: "PARTIAL",
        note: "Type exists but missing typed fields: task_id, output_file, summary, usage")
 
@@ -236,18 +315,48 @@ print("")
 
 print("=== AC9: Other Message Type Verification ===")
 
-record("SDKUserMessage (entire type)", swiftField: "No SDKMessage case", status: "MISSING",
-       note: "TS SDK: user message type. Swift has no equivalent.")
-record("SDKAuthStatusMessage (entire type)", swiftField: "No SDKMessage case", status: "MISSING",
-       note: "TS SDK: auth_status message type. Swift has no equivalent.")
-record("SDKFilesPersistedEvent (entire type)", swiftField: "No SystemData subtype", status: "MISSING",
-       note: "TS SDK: system/files_persisted. Swift has no equivalent.")
-record("SDKPromptSuggestionMessage (entire type)", swiftField: "No SDKMessage case", status: "MISSING",
-       note: "TS SDK: prompt_suggestion message type. Swift has no equivalent.")
-record("SDKToolUseSummaryMessage (entire type)", swiftField: "No SDKMessage case", status: "MISSING",
-       note: "TS SDK: tool_use_summary message type. Swift has no equivalent.")
-record("SDKLocalCommandOutputMessage (entire type)", swiftField: "No SystemData subtype", status: "MISSING",
-       note: "TS SDK: system/local_command_output. Swift has no equivalent.")
+// Story 17-1: all previously MISSING types now exist
+let userMsgData = SDKMessage.UserMessageData(message: "Hello")
+let userMsg = SDKMessage.userMessage(userMsgData)
+if case .userMessage(let retrieved) = userMsg {
+    record("SDKUserMessage (entire type)", swiftField: ".userMessage(UserMessageData)", status: "PASS",
+           note: "Added by Story 17-1. message=\(retrieved.message)")
+}
+
+let authData = SDKMessage.AuthStatusData(status: "authenticated", message: "API key valid")
+let authMsg = SDKMessage.authStatus(authData)
+if case .authStatus(let retrieved) = authMsg {
+    record("SDKAuthStatusMessage (entire type)", swiftField: ".authStatus(AuthStatusData)", status: "PASS",
+           note: "Added by Story 17-1. status=\(retrieved.status)")
+}
+
+let filesData = SDKMessage.FilesPersistedData(filePaths: ["/tmp/a.swift"])
+let filesMsg = SDKMessage.filesPersisted(filesData)
+if case .filesPersisted(let retrieved) = filesMsg {
+    record("SDKFilesPersistedEvent (entire type)", swiftField: ".filesPersisted(FilesPersistedData)", status: "PASS",
+           note: "Added by Story 17-1. filePaths=\(retrieved.filePaths)")
+}
+
+let promptSuggData = SDKMessage.PromptSuggestionData(suggestions: ["Run tests"])
+let promptSuggMsg = SDKMessage.promptSuggestion(promptSuggData)
+if case .promptSuggestion(let retrieved) = promptSuggMsg {
+    record("SDKPromptSuggestionMessage (entire type)", swiftField: ".promptSuggestion(PromptSuggestionData)", status: "PASS",
+           note: "Added by Story 17-1. suggestions=\(retrieved.suggestions)")
+}
+
+let toolSummData = SDKMessage.ToolUseSummaryData(toolUseCount: 5, tools: ["Bash"])
+let toolSummMsg = SDKMessage.toolUseSummary(toolSummData)
+if case .toolUseSummary(let retrieved) = toolSummMsg {
+    record("SDKToolUseSummaryMessage (entire type)", swiftField: ".toolUseSummary(ToolUseSummaryData)", status: "PASS",
+           note: "Added by Story 17-1. toolUseCount=\(retrieved.toolUseCount), tools=\(retrieved.tools)")
+}
+
+let localCmdData = SDKMessage.LocalCommandOutputData(output: "Build OK", command: "swift build")
+let localCmdMsg = SDKMessage.localCommandOutput(localCmdData)
+if case .localCommandOutput(let retrieved) = localCmdMsg {
+    record("SDKLocalCommandOutputMessage (entire type)", swiftField: ".localCommandOutput(LocalCommandOutputData)", status: "PASS",
+           note: "Added by Story 17-1. output=\(retrieved.output), command=\(retrieved.command)")
+}
 
 print("")
 
@@ -309,6 +418,10 @@ if let assistant = liveAssistantData {
            note: "model='\(assistant.model)'")
     record("LIVE .assistant.stopReason present", swiftField: "AssistantData.stopReason", status: !assistant.stopReason.isEmpty ? "PASS" : "MISSING",
            note: "stopReason='\(assistant.stopReason)'")
+    record("LIVE .assistant.uuid", swiftField: "AssistantData.uuid: String?", status: "PASS",
+           note: "uuid=\(assistant.uuid ?? "nil") (optional field, may be nil in live response)")
+    record("LIVE .assistant.sessionId", swiftField: "AssistantData.sessionId: String?", status: "PASS",
+           note: "sessionId=\(assistant.sessionId ?? "nil") (optional field, may be nil in live response)")
 }
 
 print("")
@@ -360,65 +473,65 @@ struct MessageTypeMapping {
 
 let mappings: [MessageTypeMapping] = [
     MessageTypeMapping(index: 1, tsType: "SDKAssistantMessage", tsTypeField: "assistant",
-        swiftEquivalent: ".assistant(AssistantData)", status: "PARTIAL",
-        note: "Has text/model/stopReason. MISSING: uuid, session_id, parent_tool_use_id, error"),
+        swiftEquivalent: ".assistant(AssistantData)", status: "PASS",
+        note: "All fields present: text, model, stopReason, uuid, sessionId, parentToolUseId, error(7 subtypes)"),
     MessageTypeMapping(index: 2, tsType: "SDKUserMessage", tsTypeField: "user",
-        swiftEquivalent: "NO EQUIVALENT", status: "MISSING",
-        note: "Entire type missing. TS SDK has SDKUserMessage."),
+        swiftEquivalent: ".userMessage(UserMessageData)", status: "PASS",
+        note: "Added by Story 17-1: uuid, sessionId, message, parentToolUseId, isSynthetic, toolUseResult"),
     MessageTypeMapping(index: 3, tsType: "SDKResultMessage", tsTypeField: "result",
-        swiftEquivalent: ".result(ResultData)", status: "PARTIAL",
-        note: "Has subtype/text/usage/numTurns/durationMs/totalCostUsd/costBreakdown. MISSING: structuredOutput, permissionDenials, errors[]"),
+        swiftEquivalent: ".result(ResultData)", status: "PASS",
+        note: "All fields present: subtype(6), text, usage, numTurns, durationMs, totalCostUsd, costBreakdown, structuredOutput, permissionDenials, modelUsage"),
     MessageTypeMapping(index: 4, tsType: "SDKSystemMessage(init)", tsTypeField: "system/init",
-        swiftEquivalent: ".system(SystemData) subtype=.init", status: "PARTIAL",
-        note: "Has message. MISSING: session_id, tools, model, permissionMode, mcp_servers, cwd"),
+        swiftEquivalent: ".system(SystemData) subtype=.init", status: "PASS",
+        note: "All init fields present: message, sessionId, tools, model, permissionMode, mcpServers, cwd"),
     MessageTypeMapping(index: 5, tsType: "SDKPartialAssistantMessage", tsTypeField: "stream_event",
-        swiftEquivalent: ".partialMessage(PartialData)", status: "PARTIAL",
-        note: "Has text. MISSING: parent_tool_use_id, uuid, session_id"),
+        swiftEquivalent: ".partialMessage(PartialData)", status: "PASS",
+        note: "All fields present: text, parentToolUseId, uuid, sessionId"),
     MessageTypeMapping(index: 6, tsType: "SDKCompactBoundaryMessage", tsTypeField: "system/compact_boundary",
         swiftEquivalent: ".system(SystemData) subtype=.compactBoundary", status: "PARTIAL",
         note: "Has message. MISSING: compact_metadata"),
     MessageTypeMapping(index: 7, tsType: "SDKStatusMessage", tsTypeField: "system/status",
         swiftEquivalent: ".system(SystemData) subtype=.status", status: "PARTIAL",
-        note: "Has message. MISSING: permissionMode"),
+        note: "Has message + permissionMode field. Still missing status-specific fields."),
     MessageTypeMapping(index: 8, tsType: "SDKTaskNotificationMessage", tsTypeField: "system/task_notification",
         swiftEquivalent: ".system(SystemData) subtype=.taskNotification", status: "PARTIAL",
         note: "Has message. MISSING: task_id, output_file, summary, usage"),
     MessageTypeMapping(index: 9, tsType: "SDKTaskStartedMessage", tsTypeField: "system/task_started",
-        swiftEquivalent: "NO SUBTYPE", status: "MISSING",
-        note: "Entire subtype missing. TS SDK has task_id, task_type, description."),
+        swiftEquivalent: ".taskStarted(TaskStartedData) + SystemData.Subtype.taskStarted", status: "PASS",
+        note: "Added by Story 17-1: taskId, taskType, description"),
     MessageTypeMapping(index: 10, tsType: "SDKTaskProgressMessage", tsTypeField: "system/task_progress",
-        swiftEquivalent: "NO SUBTYPE", status: "MISSING",
-        note: "Entire subtype missing. TS SDK has task_id, usage."),
+        swiftEquivalent: ".taskProgress(TaskProgressData) + SystemData.Subtype.taskProgress", status: "PASS",
+        note: "Added by Story 17-1: taskId, taskType, usage"),
     MessageTypeMapping(index: 11, tsType: "SDKToolProgressMessage", tsTypeField: "tool_progress",
-        swiftEquivalent: "NO CASE", status: "MISSING",
-        note: "Entire type missing. TS SDK has tool_use_id, tool_name, parent_tool_use_id, elapsed_time_seconds."),
+        swiftEquivalent: ".toolProgress(ToolProgressData)", status: "PASS",
+        note: "Added by Story 17-1: toolUseId, toolName, parentToolUseId, elapsedTimeSeconds"),
     MessageTypeMapping(index: 12, tsType: "SDKHookStartedMessage", tsTypeField: "system/hook_started",
-        swiftEquivalent: "NO SUBTYPE", status: "MISSING",
-        note: "Entire subtype missing. TS SDK has hook_id, hook_name, hook_event."),
+        swiftEquivalent: ".hookStarted(HookStartedData) + SystemData.Subtype.hookStarted", status: "PASS",
+        note: "Added by Story 17-1: hookId, hookName, hookEvent"),
     MessageTypeMapping(index: 13, tsType: "SDKHookProgressMessage", tsTypeField: "system/hook_progress",
-        swiftEquivalent: "NO SUBTYPE", status: "MISSING",
-        note: "Entire subtype missing. TS SDK has hook_id, stdout, stderr."),
+        swiftEquivalent: ".hookProgress(HookProgressData) + SystemData.Subtype.hookProgress", status: "PASS",
+        note: "Added by Story 17-1: hookId, hookName, hookEvent, stdout, stderr"),
     MessageTypeMapping(index: 14, tsType: "SDKHookResponseMessage", tsTypeField: "system/hook_response",
-        swiftEquivalent: "NO SUBTYPE", status: "MISSING",
-        note: "Entire subtype missing. TS SDK has hook_id, output, exit_code, outcome."),
+        swiftEquivalent: ".hookResponse(HookResponseData) + SystemData.Subtype.hookResponse", status: "PASS",
+        note: "Added by Story 17-1: hookId, hookName, hookEvent, output, exitCode, outcome"),
     MessageTypeMapping(index: 15, tsType: "SDKAuthStatusMessage", tsTypeField: "auth_status",
-        swiftEquivalent: "NO CASE", status: "MISSING",
-        note: "Entire type missing."),
+        swiftEquivalent: ".authStatus(AuthStatusData)", status: "PASS",
+        note: "Added by Story 17-1: status, message"),
     MessageTypeMapping(index: 16, tsType: "SDKFilesPersistedEvent", tsTypeField: "system/files_persisted",
-        swiftEquivalent: "NO SUBTYPE", status: "MISSING",
-        note: "Entire subtype missing."),
+        swiftEquivalent: ".filesPersisted(FilesPersistedData) + SystemData.Subtype.filesPersisted", status: "PASS",
+        note: "Added by Story 17-1: filePaths"),
     MessageTypeMapping(index: 17, tsType: "SDKRateLimitEvent", tsTypeField: "rate_limit_event",
         swiftEquivalent: ".system(SystemData) subtype=.rateLimit", status: "PARTIAL",
         note: "Has subtype + message. MISSING: rate limit-specific fields."),
     MessageTypeMapping(index: 18, tsType: "SDKLocalCommandOutputMessage", tsTypeField: "system/local_command_output",
-        swiftEquivalent: "NO SUBTYPE", status: "MISSING",
-        note: "Entire subtype missing."),
+        swiftEquivalent: ".localCommandOutput(LocalCommandOutputData) + SystemData.Subtype.localCommandOutput", status: "PASS",
+        note: "Added by Story 17-1: output, command"),
     MessageTypeMapping(index: 19, tsType: "SDKPromptSuggestionMessage", tsTypeField: "prompt_suggestion",
-        swiftEquivalent: "NO CASE", status: "MISSING",
-        note: "Entire type missing."),
+        swiftEquivalent: ".promptSuggestion(PromptSuggestionData)", status: "PASS",
+        note: "Added by Story 17-1: suggestions"),
     MessageTypeMapping(index: 20, tsType: "SDKToolUseSummaryMessage", tsTypeField: "tool_use_summary",
-        swiftEquivalent: "NO CASE", status: "MISSING",
-        note: "Entire type missing."),
+        swiftEquivalent: ".toolUseSummary(ToolUseSummaryData)", status: "PASS",
+        note: "Added by Story 17-1: toolUseCount, tools"),
 ]
 
 print("TS SDK 20 Message Types vs Swift SDK")
