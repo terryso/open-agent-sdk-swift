@@ -123,15 +123,15 @@ let inputMirror = Mirror(reflecting: baseInput)
 let inputFields = inputMirror.children.map { $0.label ?? "unknown" }
 print("  HookInput fields: \(inputFields)")
 
-// Missing fields from TS SDK BaseHookInput
-record("BaseHookInput.transcript_path", swiftField: "N/A", status: "MISSING",
-       note: "TS SDK has transcript_path field. Swift has no equivalent.")
-record("BaseHookInput.permission_mode", swiftField: "N/A", status: "MISSING",
-       note: "TS SDK has permission_mode field. Swift has no equivalent.")
-record("BaseHookInput.agent_id", swiftField: "N/A", status: "MISSING",
-       note: "TS SDK has agent_id field. Swift has no equivalent.")
-record("BaseHookInput.agent_type", swiftField: "N/A", status: "MISSING",
-       note: "TS SDK has agent_type field. Swift has no equivalent.")
+// Fields from TS SDK BaseHookInput (resolved by Story 17-4)
+record("BaseHookInput.transcript_path", swiftField: "HookInput.transcriptPath: String?", status: "PASS",
+       note: "transcriptPath='\(baseInput.transcriptPath ?? "nil")'")
+record("BaseHookInput.permission_mode", swiftField: "HookInput.permissionMode: String?", status: "PASS",
+       note: "permissionMode='\(baseInput.permissionMode ?? "nil")'")
+record("BaseHookInput.agent_id", swiftField: "HookInput.agentId: String?", status: "PASS",
+       note: "agentId='\(baseInput.agentId ?? "nil")'")
+record("BaseHookInput.agent_type", swiftField: "HookInput.agentType: String?", status: "PASS",
+       note: "agentType='\(baseInput.agentType ?? "nil")'")
 
 print("")
 
@@ -193,8 +193,20 @@ let failureInput = HookInput(
 
 record("PostToolUseFailure.error", swiftField: "HookInput.error: String?", status: "PASS",
        note: "error='\(failureInput.error ?? "nil")'")
-record("PostToolUseFailure.is_interrupt", swiftField: "N/A", status: "MISSING",
-       note: "TS SDK has is_interrupt: boolean. Swift has no equivalent field.")
+// is_interrupt field (resolved by Story 17-4)
+let failureInputWithInterrupt = HookInput(
+    event: .postToolUseFailure,
+    toolName: nil,
+    toolInput: nil,
+    toolOutput: nil,
+    toolUseId: nil,
+    sessionId: nil,
+    cwd: nil,
+    error: "Command failed with exit code 1",
+    isInterrupt: true
+)
+record("PostToolUseFailure.is_interrupt", swiftField: "HookInput.isInterrupt: Bool?", status: "PASS",
+       note: "isInterrupt=\(failureInputWithInterrupt.isInterrupt?.description ?? "nil")")
 
 print("")
 
@@ -202,35 +214,63 @@ print("")
 
 print("=== AC5: Other HookInput Type Verification ===")
 
-// Stop event fields (stop_hook_active, last_assistant_message)
-record("StopHookInput.stop_hook_active", swiftField: "N/A", status: "MISSING",
-       note: "TS SDK has stop_hook_active: boolean. Swift uses generic HookInput.")
-record("StopHookInput.last_assistant_message", swiftField: "N/A", status: "MISSING",
-       note: "TS SDK has last_assistant_message: string. Swift has no equivalent.")
+// Stop event fields (resolved by Story 17-4)
+let stopInput = HookInput(
+    event: .stop,
+    stopHookActive: true,
+    lastAssistantMessage: "Final response"
+)
+record("StopHookInput.stop_hook_active", swiftField: "HookInput.stopHookActive: Bool?", status: "PASS",
+       note: "stopHookActive=\(stopInput.stopHookActive?.description ?? "nil")")
+record("StopHookInput.last_assistant_message", swiftField: "HookInput.lastAssistantMessage: String?", status: "PASS",
+       note: "lastAssistantMessage='\(stopInput.lastAssistantMessage ?? "nil")'")
 
-// SubagentStart fields (agent_id, agent_type)
-record("SubagentStartHookInput.agent_id", swiftField: "N/A", status: "MISSING",
-       note: "TS SDK has agent_id field. Swift uses generic HookInput without agent_id.")
-record("SubagentStartHookInput.agent_type", swiftField: "N/A", status: "MISSING",
-       note: "TS SDK has agent_type field. Swift uses generic HookInput without agent_type.")
+// SubagentStart fields (agent_id, agent_type resolved by Story 17-4)
+let subagentStartInput = HookInput(
+    event: .subagentStart,
+    agentId: "agent-001",
+    agentType: "researcher"
+)
+record("SubagentStartHookInput.agent_id", swiftField: "HookInput.agentId: String?", status: "PASS",
+       note: "agentId='\(subagentStartInput.agentId ?? "nil")'")
+record("SubagentStartHookInput.agent_type", swiftField: "HookInput.agentType: String?", status: "PASS",
+       note: "agentType='\(subagentStartInput.agentType ?? "nil")'")
 
-// SubagentStop fields (agent_id, agent_transcript_path, agent_type, last_assistant_message)
-record("SubagentStopHookInput.agent_transcript_path", swiftField: "N/A", status: "MISSING",
-       note: "TS SDK has agent_transcript_path field. Swift has no equivalent.")
-record("SubagentStopHookInput.agent_type", swiftField: "N/A", status: "MISSING",
-       note: "TS SDK has agent_type field. Swift has no equivalent.")
-record("SubagentStopHookInput.last_assistant_message", swiftField: "N/A", status: "MISSING",
-       note: "TS SDK has last_assistant_message field. Swift has no equivalent.")
+// SubagentStop fields (resolved by Story 17-4)
+let subagentStopInput = HookInput(
+    event: .subagentStop,
+    agentId: "agent-001",
+    agentType: "researcher",
+    lastAssistantMessage: "Sub-agent done",
+    agentTranscriptPath: "/path/to/agent/transcript"
+)
+record("SubagentStopHookInput.agent_transcript_path", swiftField: "HookInput.agentTranscriptPath: String?", status: "PASS",
+       note: "agentTranscriptPath='\(subagentStopInput.agentTranscriptPath ?? "nil")'")
+record("SubagentStopHookInput.agent_type", swiftField: "HookInput.agentType: String?", status: "PASS",
+       note: "agentType='\(subagentStopInput.agentType ?? "nil")'")
+record("SubagentStopHookInput.last_assistant_message", swiftField: "HookInput.lastAssistantMessage: String?", status: "PASS",
+       note: "lastAssistantMessage='\(subagentStopInput.lastAssistantMessage ?? "nil")'")
 
-// PreCompact fields (trigger, custom_instructions)
-record("PreCompactHookInput.trigger (manual/auto)", swiftField: "N/A", status: "MISSING",
-       note: "TS SDK has trigger field with manual/auto enum. Swift has no equivalent.")
-record("PreCompactHookInput.custom_instructions", swiftField: "N/A", status: "MISSING",
-       note: "TS SDK has custom_instructions field. Swift has no equivalent.")
+// PreCompact fields (resolved by Story 17-4)
+let preCompactInput = HookInput(
+    event: .preCompact,
+    trigger: "manual",
+    customInstructions: "Be concise"
+)
+record("PreCompactHookInput.trigger (manual/auto)", swiftField: "HookInput.trigger: String?", status: "PASS",
+       note: "trigger='\(preCompactInput.trigger ?? "nil")'")
+record("PreCompactHookInput.custom_instructions", swiftField: "HookInput.customInstructions: String?", status: "PASS",
+       note: "customInstructions='\(preCompactInput.customInstructions ?? "nil")'")
 
-// PermissionRequest fields (permission_suggestions)
-record("PermissionRequestHookInput.permission_suggestions", swiftField: "N/A", status: "MISSING",
-       note: "TS SDK has permission_suggestions field. Swift has no equivalent.")
+// PermissionRequest fields (resolved by Story 17-4)
+let permRequestInput = HookInput(
+    event: .permissionRequest,
+    toolName: "bash",
+    toolInput: ["command": "rm -rf /"],
+    permissionSuggestions: ["allow", "deny"]
+)
+record("PermissionRequestHookInput.permission_suggestions", swiftField: "HookInput.permissionSuggestions: [String]?", status: "PASS",
+       note: "permissionSuggestions=\(permRequestInput.permissionSuggestions?.description ?? "nil")")
 
 print("")
 
@@ -314,20 +354,35 @@ record("HookOutput.message", swiftField: "HookOutput.message: String?", status: 
        note: "message='\(hookOutput.message ?? "nil")'")
 record("HookOutput.permissionUpdate", swiftField: "HookOutput.permissionUpdate: PermissionUpdate?", status: "PASS",
        note: "permissionUpdate.tool='\(hookOutput.permissionUpdate?.tool ?? "nil")'")
+record("HookOutput.permissionDecision (allow/deny/ask)", swiftField: "HookOutput.permissionDecision: PermissionDecision?", status: "PASS",
+       note: "permissionDecision='\(fullOutput.permissionDecision?.rawValue ?? "nil")' (resolved by Story 17-4 + 17-5)")
 record("HookOutput.notification", swiftField: "HookOutput.notification: HookNotification?", status: "PASS",
        note: "notification.title='\(hookOutput.notification?.title ?? "nil")'")
 
-// Missing HookOutput fields
-record("HookOutput.systemMessage", swiftField: "N/A", status: "MISSING",
-       note: "TS SDK SyncHookJSONOutput has systemMessage field. Swift has no equivalent.")
-record("HookOutput.reason", swiftField: "N/A (message is similar)", status: "PARTIAL",
-       note: "TS SDK has reason field. Swift message serves similar purpose but no direct equivalent.")
-record("HookOutput.updatedInput", swiftField: "N/A", status: "MISSING",
-       note: "TS SDK has updatedInput for modifying tool input. Swift has no equivalent.")
-record("HookOutput.additionalContext", swiftField: "N/A", status: "MISSING",
-       note: "TS SDK has additionalContext for PreToolUse/UserPromptSubmit etc. Swift has no equivalent.")
-record("HookOutput.updatedMCPToolOutput", swiftField: "N/A", status: "MISSING",
-       note: "TS SDK has updatedMCPToolOutput for PostToolUse. Swift has no equivalent.")
+// HookOutput fields resolved by Story 17-4
+let fullOutput = HookOutput(
+    message: "Modified",
+    permissionUpdate: nil,
+    block: false,
+    notification: nil,
+    systemMessage: "System context added",
+    reason: "Safety check passed",
+    updatedInput: ["command": "ls -la"],
+    additionalContext: "Extra context",
+    permissionDecision: .allow,
+    updatedMCPToolOutput: ["result": "ok"]
+)
+
+record("HookOutput.systemMessage", swiftField: "HookOutput.systemMessage: String?", status: "PASS",
+       note: "systemMessage='\(fullOutput.systemMessage ?? "nil")'")
+record("HookOutput.reason", swiftField: "HookOutput.reason: String?", status: "PASS",
+       note: "reason='\(fullOutput.reason ?? "nil")' (dedicated field, resolved by Story 17-4)")
+record("HookOutput.updatedInput", swiftField: "HookOutput.updatedInput: [String: Any]?", status: "PASS",
+       note: "updatedInput exists for modifying tool input (resolved by Story 17-4)")
+record("HookOutput.additionalContext", swiftField: "HookOutput.additionalContext: String?", status: "PASS",
+       note: "additionalContext='\(fullOutput.additionalContext ?? "nil")' (resolved by Story 17-4)")
+record("HookOutput.updatedMCPToolOutput", swiftField: "HookOutput.updatedMCPToolOutput: Any?", status: "PASS",
+       note: "updatedMCPToolOutput exists for PostToolUse (resolved by Story 17-4)")
 
 // Verify PermissionBehavior cases
 let allBehaviors = PermissionBehavior.allCases
@@ -335,8 +390,8 @@ record("PermissionBehavior.allow", swiftField: "PermissionBehavior.allow", statu
        note: "rawValue='\(PermissionBehavior.allow.rawValue)'")
 record("PermissionBehavior.deny", swiftField: "PermissionBehavior.deny", status: "PASS",
        note: "rawValue='\(PermissionBehavior.deny.rawValue)'")
-record("PermissionBehavior.ask (TS SDK)", swiftField: "N/A", status: "MISSING",
-       note: "TS SDK has 'ask' permissionDecision. Swift PermissionBehavior has only allow/deny.")
+record("PermissionBehavior.ask (TS SDK)", swiftField: "PermissionBehavior.ask", status: "PASS",
+       note: "rawValue='\(PermissionBehavior.ask.rawValue)' (resolved by Story 17-5)")
 
 // HookOutput field count
 let outputMirror = Mirror(reflecting: hookOutput)
@@ -449,12 +504,12 @@ let eventMappings: [EventMapping] = [
     EventMapping(index: 10, tsEvent: "SubagentStop", swiftEquivalent: "HookEvent.subagentStop", status: "PASS", note: "rawValue match"),
     EventMapping(index: 11, tsEvent: "PreCompact", swiftEquivalent: "HookEvent.preCompact", status: "PASS", note: "rawValue match"),
     EventMapping(index: 12, tsEvent: "PermissionRequest", swiftEquivalent: "HookEvent.permissionRequest", status: "PASS", note: "rawValue match"),
-    EventMapping(index: 13, tsEvent: "Setup", swiftEquivalent: "NO EQUIVALENT", status: "MISSING", note: "No Swift HookEvent case"),
+    EventMapping(index: 13, tsEvent: "Setup", swiftEquivalent: "HookEvent.setup", status: "PASS", note: "rawValue match (resolved by Story 17-4)"),
     EventMapping(index: 14, tsEvent: "TeammateIdle", swiftEquivalent: "HookEvent.teammateIdle", status: "PASS", note: "rawValue match"),
     EventMapping(index: 15, tsEvent: "TaskCompleted", swiftEquivalent: "HookEvent.taskCompleted", status: "PASS", note: "rawValue match"),
     EventMapping(index: 16, tsEvent: "ConfigChange", swiftEquivalent: "HookEvent.configChange", status: "PASS", note: "rawValue match"),
-    EventMapping(index: 17, tsEvent: "WorktreeCreate", swiftEquivalent: "NO EQUIVALENT", status: "MISSING", note: "No Swift HookEvent case"),
-    EventMapping(index: 18, tsEvent: "WorktreeRemove", swiftEquivalent: "NO EQUIVALENT", status: "MISSING", note: "No Swift HookEvent case"),
+    EventMapping(index: 17, tsEvent: "WorktreeCreate", swiftEquivalent: "HookEvent.worktreeCreate", status: "PASS", note: "rawValue match (resolved by Story 17-4)"),
+    EventMapping(index: 18, tsEvent: "WorktreeRemove", swiftEquivalent: "HookEvent.worktreeRemove", status: "PASS", note: "rawValue match (resolved by Story 17-4)"),
 ]
 
 print("18 TS SDK HookEvents vs Swift SDK HookEvent")
@@ -483,25 +538,25 @@ struct InputFieldMapping {
 let inputFieldMappings: [InputFieldMapping] = [
     // Base fields
     InputFieldMapping(tsField: "session_id", swiftField: "sessionId: String?", status: "PASS", note: "BaseHookInput"),
-    InputFieldMapping(tsField: "transcript_path", swiftField: "N/A", status: "MISSING", note: "BaseHookInput"),
+    InputFieldMapping(tsField: "transcript_path", swiftField: "transcriptPath: String?", status: "PASS", note: "BaseHookInput (resolved by Story 17-4)"),
     InputFieldMapping(tsField: "cwd", swiftField: "cwd: String?", status: "PASS", note: "BaseHookInput"),
-    InputFieldMapping(tsField: "permission_mode", swiftField: "N/A", status: "MISSING", note: "BaseHookInput"),
-    InputFieldMapping(tsField: "agent_id", swiftField: "N/A", status: "MISSING", note: "BaseHookInput"),
-    InputFieldMapping(tsField: "agent_type", swiftField: "N/A", status: "MISSING", note: "BaseHookInput"),
+    InputFieldMapping(tsField: "permission_mode", swiftField: "permissionMode: String?", status: "PASS", note: "BaseHookInput (resolved by Story 17-4)"),
+    InputFieldMapping(tsField: "agent_id", swiftField: "agentId: String?", status: "PASS", note: "BaseHookInput (resolved by Story 17-4)"),
+    InputFieldMapping(tsField: "agent_type", swiftField: "agentType: String?", status: "PASS", note: "BaseHookInput (resolved by Story 17-4)"),
     // Tool event fields
     InputFieldMapping(tsField: "tool_name", swiftField: "toolName: String?", status: "PASS", note: "PreToolUse/PostToolUse"),
     InputFieldMapping(tsField: "tool_input", swiftField: "toolInput: Any?", status: "PASS", note: "PreToolUse/PostToolUse"),
     InputFieldMapping(tsField: "tool_response", swiftField: "toolOutput: Any?", status: "PASS", note: "PostToolUse"),
     InputFieldMapping(tsField: "tool_use_id", swiftField: "toolUseId: String?", status: "PASS", note: "PreToolUse/PostToolUse"),
     InputFieldMapping(tsField: "error", swiftField: "error: String?", status: "PASS", note: "PostToolUseFailure"),
-    // Per-event gap fields
-    InputFieldMapping(tsField: "is_interrupt", swiftField: "N/A", status: "MISSING", note: "PostToolUseFailure"),
-    InputFieldMapping(tsField: "stop_hook_active", swiftField: "N/A", status: "MISSING", note: "Stop"),
-    InputFieldMapping(tsField: "last_assistant_message", swiftField: "N/A", status: "MISSING", note: "Stop/SubagentStop"),
-    InputFieldMapping(tsField: "agent_transcript_path", swiftField: "N/A", status: "MISSING", note: "SubagentStop"),
-    InputFieldMapping(tsField: "trigger (manual/auto)", swiftField: "N/A", status: "MISSING", note: "PreCompact"),
-    InputFieldMapping(tsField: "custom_instructions", swiftField: "N/A", status: "MISSING", note: "PreCompact"),
-    InputFieldMapping(tsField: "permission_suggestions", swiftField: "N/A", status: "MISSING", note: "PermissionRequest"),
+    // Per-event gap fields (resolved by Story 17-4)
+    InputFieldMapping(tsField: "is_interrupt", swiftField: "isInterrupt: Bool?", status: "PASS", note: "PostToolUseFailure (resolved by Story 17-4)"),
+    InputFieldMapping(tsField: "stop_hook_active", swiftField: "stopHookActive: Bool?", status: "PASS", note: "Stop (resolved by Story 17-4)"),
+    InputFieldMapping(tsField: "last_assistant_message", swiftField: "lastAssistantMessage: String?", status: "PASS", note: "Stop/SubagentStop (resolved by Story 17-4)"),
+    InputFieldMapping(tsField: "agent_transcript_path", swiftField: "agentTranscriptPath: String?", status: "PASS", note: "SubagentStop (resolved by Story 17-4)"),
+    InputFieldMapping(tsField: "trigger (manual/auto)", swiftField: "trigger: String?", status: "PASS", note: "PreCompact (resolved by Story 17-4)"),
+    InputFieldMapping(tsField: "custom_instructions", swiftField: "customInstructions: String?", status: "PASS", note: "PreCompact (resolved by Story 17-4)"),
+    InputFieldMapping(tsField: "permission_suggestions", swiftField: "permissionSuggestions: [String]?", status: "PASS", note: "PermissionRequest (resolved by Story 17-4)"),
 ]
 
 print("HookInput Field Compatibility")
@@ -529,12 +584,12 @@ struct OutputFieldMapping {
 
 let outputFieldMappings: [OutputFieldMapping] = [
     OutputFieldMapping(tsField: "decision (approve/block)", swiftField: "block: Bool", status: "PARTIAL", note: "block only, no approve"),
-    OutputFieldMapping(tsField: "systemMessage", swiftField: "N/A", status: "MISSING", note: "No Swift equivalent"),
-    OutputFieldMapping(tsField: "reason", swiftField: "N/A (message similar)", status: "PARTIAL", note: "message serves similar purpose"),
-    OutputFieldMapping(tsField: "permissionDecision (allow/deny/ask)", swiftField: "permissionUpdate: PermissionUpdate?", status: "PARTIAL", note: "allow/deny only, missing ask"),
-    OutputFieldMapping(tsField: "updatedInput", swiftField: "N/A", status: "MISSING", note: "No Swift equivalent"),
-    OutputFieldMapping(tsField: "additionalContext", swiftField: "N/A", status: "MISSING", note: "No Swift equivalent"),
-    OutputFieldMapping(tsField: "updatedMCPToolOutput", swiftField: "N/A", status: "MISSING", note: "PostToolUse specific"),
+    OutputFieldMapping(tsField: "systemMessage", swiftField: "systemMessage: String?", status: "PASS", note: "Resolved by Story 17-4"),
+    OutputFieldMapping(tsField: "reason", swiftField: "reason: String?", status: "PASS", note: "Dedicated field (resolved by Story 17-4)"),
+    OutputFieldMapping(tsField: "permissionDecision (allow/deny/ask)", swiftField: "permissionDecision: PermissionDecision?", status: "PASS", note: "allow/deny/ask (resolved by Stories 17-4 + 17-5)"),
+    OutputFieldMapping(tsField: "updatedInput", swiftField: "updatedInput: [String: Any]?", status: "PASS", note: "Resolved by Story 17-4"),
+    OutputFieldMapping(tsField: "additionalContext", swiftField: "additionalContext: String?", status: "PASS", note: "Resolved by Story 17-4"),
+    OutputFieldMapping(tsField: "updatedMCPToolOutput", swiftField: "updatedMCPToolOutput: Any?", status: "PASS", note: "Resolved by Story 17-4"),
 ]
 
 print("HookOutput Field Compatibility")
