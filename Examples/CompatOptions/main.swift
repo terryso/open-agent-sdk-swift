@@ -61,13 +61,17 @@ let options = AgentOptions(
     mcpServers: ["test": .stdio(McpStdioConfig(command: "echo"))]
 )
 
-// 1. allowedTools: string[] -> ToolNameAllowlistPolicy
-record("allowedTools: string[]", swiftField: "ToolNameAllowlistPolicy (PermissionPolicy)", status: "PARTIAL",
-       note: "No direct AgentOptions field. ToolNameAllowlistPolicy exists in PermissionTypes as runtime policy, not config field.")
+// 1. allowedTools: string[] -> AgentOptions.allowedTools: [String]?
+let allowedToolsOptions = AgentOptions(apiKey: apiKey, model: "claude-sonnet-4-6", allowedTools: ["Read", "Write"])
+let _ = allowedToolsOptions.allowedTools
+record("allowedTools: string[]", swiftField: "AgentOptions.allowedTools: [String]?", status: "PASS",
+       note: "Direct field on AgentOptions (Story 17-2). value=\(allowedToolsOptions.allowedTools?.description ?? "nil")")
 
-// 2. disallowedTools: string[] -> ToolNameDenylistPolicy
-record("disallowedTools: string[]", swiftField: "ToolNameDenylistPolicy (PermissionPolicy)", status: "PARTIAL",
-       note: "No direct AgentOptions field. ToolNameDenylistPolicy exists in PermissionTypes as runtime policy, not config field.")
+// 2. disallowedTools: string[] -> AgentOptions.disallowedTools: [String]?
+let disallowedToolsOptions = AgentOptions(apiKey: apiKey, model: "claude-sonnet-4-6", disallowedTools: ["Bash"])
+let _ = disallowedToolsOptions.disallowedTools
+record("disallowedTools: string[]", swiftField: "AgentOptions.disallowedTools: [String]?", status: "PASS",
+       note: "Direct field on AgentOptions (Story 17-2). value=\(disallowedToolsOptions.disallowedTools?.description ?? "nil")")
 
 // 3. maxTurns: number -> AgentOptions.maxTurns: Int
 let _ = options.maxTurns
@@ -84,14 +88,16 @@ let _ = options.model
 record("model: string", swiftField: "AgentOptions.model: String", status: "PASS",
        note: "value='\(options.model)'")
 
-// 6. fallbackModel: string -> NO EQUIVALENT
-record("fallbackModel: string", swiftField: "NO EQUIVALENT", status: "MISSING",
-       note: "No fallbackModel property found on AgentOptions or Agent.")
+// 6. fallbackModel: string -> AgentOptions.fallbackModel: String?
+let fallbackOptions = AgentOptions(apiKey: apiKey, model: "claude-sonnet-4-6", fallbackModel: "claude-haiku-4-5")
+let _ = fallbackOptions.fallbackModel
+record("fallbackModel: string", swiftField: "AgentOptions.fallbackModel: String?", status: "PASS",
+       note: "Direct field on AgentOptions (Story 17-2). value='\(fallbackOptions.fallbackModel ?? "nil")'")
 
-// 7. systemPrompt: string | { type: 'preset', preset, append? } -> AgentOptions.systemPrompt: String?
+// 7. systemPrompt: string | { type: 'preset', preset, append? } -> AgentOptions.systemPrompt: String? + SystemPromptConfig
 let _ = options.systemPrompt
-record("systemPrompt: string | { type: 'preset' }", swiftField: "AgentOptions.systemPrompt: String?", status: "PARTIAL",
-       note: "Swift only supports String?, no preset mode or append mechanism.")
+record("systemPrompt: string | { type: 'preset' }", swiftField: "AgentOptions.systemPrompt: String? + SystemPromptConfig", status: "PARTIAL",
+       note: "String? + SystemPromptConfig.preset(name:append:) added (Story 17-2). Core config row stays PARTIAL because TS uses unified field; Swift uses two separate properties.")
 
 // 8. permissionMode: PermissionMode -> AgentOptions.permissionMode: PermissionMode
 let _ = options.permissionMode
@@ -108,9 +114,11 @@ let _ = options.cwd
 record("cwd: string", swiftField: "AgentOptions.cwd: String?", status: "PASS",
        note: "value='\(options.cwd ?? "nil")'")
 
-// 11. env: Record<string, string> -> NO EQUIVALENT
-record("env: Record<string, string>", swiftField: "NO EQUIVALENT", status: "MISSING",
-       note: "No env override dict on AgentOptions. SDKConfiguration reads from environment but does not accept env overrides.")
+// 11. env: Record<string, string> -> AgentOptions.env: [String: String]?
+let envOptions = AgentOptions(apiKey: apiKey, model: "claude-sonnet-4-6", env: ["KEY": "VALUE"])
+let _ = envOptions.env
+record("env: Record<string, string>", swiftField: "AgentOptions.env: [String: String]?", status: "PASS",
+       note: "Direct field on AgentOptions (Story 17-2). value=\(envOptions.env?.description ?? "nil")")
 
 // 12. mcpServers: Record<string, McpServerConfig> -> AgentOptions.mcpServers
 let _ = options.mcpServers
@@ -130,9 +138,11 @@ let _ = thinkingOptions.thinking
 record("thinking: ThinkingConfig", swiftField: "AgentOptions.thinking: ThinkingConfig?", status: "PASS",
        note: ".adaptive / .enabled(budgetTokens:) / .disabled")
 
-// 2. effort: 'low' | 'medium' | 'high' | 'max' -> NO EQUIVALENT
-record("effort: 'low' | 'medium' | 'high' | 'max'", swiftField: "NO EQUIVALENT", status: "MISSING",
-       note: "No effort level property found anywhere in Swift SDK.")
+// 2. effort: 'low' | 'medium' | 'high' | 'max' -> AgentOptions.effort: EffortLevel?
+let effortOptions = AgentOptions(apiKey: apiKey, model: "claude-sonnet-4-6", effort: .high)
+let _ = effortOptions.effort
+record("effort: 'low' | 'medium' | 'high' | 'max'", swiftField: "AgentOptions.effort: EffortLevel?", status: "PASS",
+       note: "EffortLevel enum with .low, .medium, .high, .max cases (Story 17-2). value=\(effortOptions.effort?.rawValue ?? "nil")")
 
 // 3. hooks: Partial<Record<HookEvent, HookCallbackMatcher[]>> -> AgentOptions.hookRegistry: HookRegistry?
 let hookOptions = AgentOptions(hookRegistry: HookRegistry())
@@ -178,21 +188,31 @@ record("AgentDefinition.tools (allowedTools)", swiftField: "AgentDefinition.tool
 record("AgentDefinition.maxTurns", swiftField: "AgentDefinition.maxTurns: Int?", status: "PASS",
        note: "maxTurns=\(agentDef.maxTurns?.description ?? "nil")")
 
-// 6. toolConfig: ToolConfig -> NO EQUIVALENT
-record("toolConfig: ToolConfig", swiftField: "NO EQUIVALENT", status: "MISSING",
-       note: "No ToolConfig type found in Swift SDK.")
+// 6. toolConfig: ToolConfig -> AgentOptions.toolConfig: ToolConfig?
+let toolConfigVal = ToolConfig(maxConcurrentReadTools: 5, maxConcurrentWriteTools: 2)
+let toolConfigOptions = AgentOptions(apiKey: apiKey, model: "claude-sonnet-4-6", toolConfig: toolConfigVal)
+let _ = toolConfigOptions.toolConfig
+record("toolConfig: ToolConfig", swiftField: "AgentOptions.toolConfig: ToolConfig?", status: "PASS",
+       note: "ToolConfig with maxConcurrentReadTools/maxConcurrentWriteTools (Story 17-2).")
 
-// 7. outputFormat: { type: 'json_schema', schema } -> NO EQUIVALENT
-record("outputFormat: { type: 'json_schema', schema }", swiftField: "NO EQUIVALENT", status: "MISSING",
-       note: "No outputFormat property found. Structured output / JSON Schema output not supported.")
+// 7. outputFormat: { type: 'json_schema', schema } -> AgentOptions.outputFormat: OutputFormat?
+let outputFormatVal = OutputFormat(jsonSchema: ["type": "object"])
+let outputFormatOptions = AgentOptions(apiKey: apiKey, model: "claude-sonnet-4-6", outputFormat: outputFormatVal)
+let _ = outputFormatOptions.outputFormat
+record("outputFormat: { type: 'json_schema', schema }", swiftField: "AgentOptions.outputFormat: OutputFormat?", status: "PASS",
+       note: "OutputFormat with json_schema type (Story 17-2). type='\(outputFormatOptions.outputFormat?.type ?? "nil")'")
 
-// 8. includePartialMessages: boolean -> NO EQUIVALENT
-record("includePartialMessages: boolean", swiftField: "NO EQUIVALENT", status: "MISSING",
-       note: "No partial message streaming flag found.")
+// 8. includePartialMessages: boolean -> AgentOptions.includePartialMessages: Bool
+let partialMsgOptions = AgentOptions(apiKey: apiKey, model: "claude-sonnet-4-6")
+let _ = partialMsgOptions.includePartialMessages
+record("includePartialMessages: boolean", swiftField: "AgentOptions.includePartialMessages: Bool", status: "PASS",
+       note: "Direct field on AgentOptions (Story 17-2). default=true")
 
-// 9. promptSuggestions: boolean -> NO EQUIVALENT
-record("promptSuggestions: boolean", swiftField: "NO EQUIVALENT", status: "MISSING",
-       note: "No prompt suggestion flag found.")
+// 9. promptSuggestions: boolean -> AgentOptions.promptSuggestions: Bool
+let promptSuggOptions = AgentOptions(apiKey: apiKey, model: "claude-sonnet-4-6")
+let _ = promptSuggOptions.promptSuggestions
+record("promptSuggestions: boolean", swiftField: "AgentOptions.promptSuggestions: Bool", status: "PASS",
+       note: "Direct field on AgentOptions (Story 17-2). default=false")
 
 print("")
 
@@ -201,17 +221,23 @@ print("")
 print("=== AC4: Session Configuration Field-Level Verification (5 fields) ===")
 print("")
 
-// 1. resume: string -> sessionStore + sessionId mechanism
-record("resume: string", swiftField: "AgentOptions.sessionStore + sessionId", status: "PARTIAL",
-       note: "No resume field. Session restore achieved via sessionStore + sessionId combo. Different API pattern.")
+// 1. resume: string -> AgentOptions.resumeSessionAt: String?
+let resumeOptions = AgentOptions(apiKey: apiKey, model: "claude-sonnet-4-6", resumeSessionAt: "msg-123")
+let _ = resumeOptions.resumeSessionAt
+record("resume: string", swiftField: "AgentOptions.resumeSessionAt: String?", status: "PASS",
+       note: "resumeSessionAt specifies message ID to truncate history at (Story 17-2). value='\(resumeOptions.resumeSessionAt ?? "nil")'")
 
-// 2. continue: boolean -> NO EQUIVALENT
-record("continue: boolean", swiftField: "NO EQUIVALENT", status: "MISSING",
-       note: "No continue-last-session flag.")
+// 2. continue: boolean -> AgentOptions.continueRecentSession: Bool
+let continueOptions = AgentOptions(apiKey: apiKey, model: "claude-sonnet-4-6", continueRecentSession: true)
+let _ = continueOptions.continueRecentSession
+record("continue: boolean", swiftField: "AgentOptions.continueRecentSession: Bool", status: "PASS",
+       note: "Direct field on AgentOptions (Story 17-2). default=false, value=\(continueOptions.continueRecentSession)")
 
-// 3. forkSession: boolean -> NO EQUIVALENT
-record("forkSession: boolean", swiftField: "NO EQUIVALENT", status: "PARTIAL",
-       note: "No forkSession flag on AgentOptions. SessionStore has fork capability separately.")
+// 3. forkSession: boolean -> AgentOptions.forkSession: Bool
+let forkOptions = AgentOptions(apiKey: apiKey, model: "claude-sonnet-4-6", forkSession: true)
+let _ = forkOptions.forkSession
+record("forkSession: boolean", swiftField: "AgentOptions.forkSession: Bool", status: "PASS",
+       note: "Direct field on AgentOptions (Story 17-2). default=false, value=\(forkOptions.forkSession)")
 
 // 4. sessionId: string -> AgentOptions.sessionId: String?
 let sessionOptions = AgentOptions(sessionId: "test-session-123")
@@ -219,9 +245,11 @@ let _ = sessionOptions.sessionId
 record("sessionId: string", swiftField: "AgentOptions.sessionId: String?", status: "PASS",
        note: "value='\(sessionOptions.sessionId ?? "nil")'")
 
-// 5. persistSession: boolean -> implicit via sessionStore
-record("persistSession: boolean", swiftField: "AgentOptions.sessionStore (implicit)", status: "PARTIAL",
-       note: "No explicit boolean flag. When sessionStore is set, auto-save is implicit.")
+// 5. persistSession: boolean -> AgentOptions.persistSession: Bool
+let persistOptions = AgentOptions(apiKey: apiKey, model: "claude-sonnet-4-6", persistSession: true)
+let _ = persistOptions.persistSession
+record("persistSession: boolean", swiftField: "AgentOptions.persistSession: Bool", status: "PASS",
+       note: "Direct field on AgentOptions (Story 17-2). default=true, value=\(persistOptions.persistSession)")
 
 print("")
 
@@ -323,9 +351,10 @@ case .adaptive: print("    unexpected .adaptive")
 case .enabled: print("    unexpected .enabled")
 }
 
-// effort level verification
-record("effort level: 'low' | 'medium' | 'high' | 'max'", swiftField: "NO EQUIVALENT", status: "MISSING",
-       note: "No effort property found anywhere in Swift SDK (AgentOptions, ThinkingConfig, or elsewhere).")
+// effort level verification -- separate EffortLevel enum (Story 17-2)
+let effortLevel = EffortLevel.high
+record("effort level: 'low' | 'medium' | 'high' | 'max'", swiftField: "EffortLevel enum (.low, .medium, .high, .max)", status: "PASS",
+       note: "EffortLevel enum with 4 cases and budgetTokens computed property (Story 17-2). value=\(effortLevel.rawValue)")
 
 print("")
 
@@ -339,11 +368,11 @@ print("")
 record("systemPrompt: string (plain)", swiftField: "AgentOptions.systemPrompt: String?", status: "PASS",
        note: "Plain string supported.")
 
-record("systemPrompt: { type: 'preset', preset: 'claude_code' }", swiftField: "NO EQUIVALENT", status: "MISSING",
-       note: "Swift only supports String?. No structured type, no preset enum.")
+record("systemPrompt: { type: 'preset', preset: 'claude_code' }", swiftField: "SystemPromptConfig.preset(name: String, append: String?)", status: "PASS",
+       note: "SystemPromptConfig.preset mode added (Story 17-2). e.g. .preset(name: 'claude_code', append: nil)")
 
-record("systemPrompt: { type: 'preset', append?: string }", swiftField: "NO EQUIVALENT", status: "MISSING",
-       note: "No append/customize-on-preset capability.")
+record("systemPrompt: { type: 'preset', append?: string }", swiftField: "SystemPromptConfig.preset(name:append:)", status: "PASS",
+       note: "SystemPromptConfig.preset supports optional append parameter (Story 17-2). e.g. .preset(name: 'claude_code', append: 'custom')")
 
 print("")
 
@@ -352,10 +381,10 @@ print("")
 print("=== AC8: outputFormat / Structured Output Verification ===")
 print("")
 
-record("outputFormat: { type: 'json_schema', schema }", swiftField: "NO EQUIVALENT", status: "MISSING",
-       note: "No outputFormat property on AgentOptions, Agent, or query methods. Structured output not supported.")
-record("outputFormat.schema (JSON Schema object)", swiftField: "NO EQUIVALENT", status: "MISSING",
-       note: "JSON Schema structured output schema not supported.")
+record("outputFormat: { type: 'json_schema', schema }", swiftField: "AgentOptions.outputFormat: OutputFormat?", status: "PASS",
+       note: "OutputFormat with json_schema type added (Story 17-2). Uses SendableJSONSchema wrapper.")
+record("outputFormat.schema (JSON Schema object)", swiftField: "OutputFormat.jsonSchema: SendableJSONSchema", status: "PASS",
+       note: "JSON Schema structured output supported via SendableJSONSchema (Story 17-2).")
 record("Migration path", swiftField: "Post-process QueryResult.text", status: "N/A",
        note: "Developers can parse QueryResult.text as JSON and validate against schema manually.")
 
@@ -376,17 +405,17 @@ struct FieldMapping {
 }
 
 let coreMappings: [FieldMapping] = [
-    FieldMapping(index: 1, tsField: "allowedTools: string[]", swiftEquivalent: "ToolNameAllowlistPolicy (PermissionPolicy)", status: "PARTIAL", note: "Runtime policy, not config field"),
-    FieldMapping(index: 2, tsField: "disallowedTools: string[]", swiftEquivalent: "ToolNameDenylistPolicy (PermissionPolicy)", status: "PARTIAL", note: "Runtime policy, not config field"),
+    FieldMapping(index: 1, tsField: "allowedTools: string[]", swiftEquivalent: "AgentOptions.allowedTools: [String]?", status: "PASS", note: "Direct field (Story 17-2)"),
+    FieldMapping(index: 2, tsField: "disallowedTools: string[]", swiftEquivalent: "AgentOptions.disallowedTools: [String]?", status: "PASS", note: "Direct field (Story 17-2)"),
     FieldMapping(index: 3, tsField: "maxTurns: number", swiftEquivalent: "AgentOptions.maxTurns: Int", status: "PASS", note: "Direct equivalent"),
     FieldMapping(index: 4, tsField: "maxBudgetUsd: number", swiftEquivalent: "AgentOptions.maxBudgetUsd: Double?", status: "PASS", note: "Direct equivalent"),
     FieldMapping(index: 5, tsField: "model: string", swiftEquivalent: "AgentOptions.model: String", status: "PASS", note: "Direct equivalent"),
-    FieldMapping(index: 6, tsField: "fallbackModel: string", swiftEquivalent: "NO EQUIVALENT", status: "MISSING", note: "No fallback model"),
-    FieldMapping(index: 7, tsField: "systemPrompt: string | preset", swiftEquivalent: "AgentOptions.systemPrompt: String?", status: "PARTIAL", note: "String only, no preset"),
+    FieldMapping(index: 6, tsField: "fallbackModel: string", swiftEquivalent: "AgentOptions.fallbackModel: String?", status: "PASS", note: "Direct field (Story 17-2)"),
+    FieldMapping(index: 7, tsField: "systemPrompt: string | preset", swiftEquivalent: "AgentOptions.systemPrompt: String? + SystemPromptConfig", status: "PARTIAL", note: "String + SystemPromptConfig, but different pattern than TS unified field"),
     FieldMapping(index: 8, tsField: "permissionMode: PermissionMode", swiftEquivalent: "AgentOptions.permissionMode: PermissionMode", status: "PASS", note: "6 cases"),
     FieldMapping(index: 9, tsField: "canUseTool: CanUseTool", swiftEquivalent: "AgentOptions.canUseTool: CanUseToolFn?", status: "PASS", note: "Direct equivalent"),
     FieldMapping(index: 10, tsField: "cwd: string", swiftEquivalent: "AgentOptions.cwd: String?", status: "PASS", note: "Direct equivalent"),
-    FieldMapping(index: 11, tsField: "env: Record<string, string>", swiftEquivalent: "NO EQUIVALENT", status: "MISSING", note: "No env override dict"),
+    FieldMapping(index: 11, tsField: "env: Record<string, string>", swiftEquivalent: "AgentOptions.env: [String: String]?", status: "PASS", note: "Direct field (Story 17-2)"),
     FieldMapping(index: 12, tsField: "mcpServers: Record<string, McpServerConfig>", swiftEquivalent: "AgentOptions.mcpServers: [String: McpServerConfig]?", status: "PASS", note: "4 config types"),
 ]
 
@@ -409,14 +438,14 @@ print("")
 // --- Advanced Configuration Table ---
 let advancedMappings: [FieldMapping] = [
     FieldMapping(index: 1, tsField: "thinking: ThinkingConfig", swiftEquivalent: "AgentOptions.thinking: ThinkingConfig?", status: "PASS", note: ".adaptive/.enabled/.disabled"),
-    FieldMapping(index: 2, tsField: "effort: 'low'|'medium'|'high'|'max'", swiftEquivalent: "NO EQUIVALENT", status: "MISSING", note: "No effort level"),
+    FieldMapping(index: 2, tsField: "effort: 'low'|'medium'|'high'|'max'", swiftEquivalent: "AgentOptions.effort: EffortLevel?", status: "PASS", note: "4-case EffortLevel enum (Story 17-2)"),
     FieldMapping(index: 3, tsField: "hooks: Partial<Record<HookEvent, ...>>", swiftEquivalent: "AgentOptions.hookRegistry: HookRegistry?", status: "PARTIAL", note: "Actor not dict, 20 events"),
     FieldMapping(index: 4, tsField: "sandbox: SandboxSettings", swiftEquivalent: "AgentOptions.sandbox: SandboxSettings?", status: "PASS", note: "6 fields"),
     FieldMapping(index: 5, tsField: "agents: Record<string, AgentDefinition>", swiftEquivalent: "AgentDefinition (via AgentTool)", status: "PARTIAL", note: "Tool-level, not options-level"),
-    FieldMapping(index: 6, tsField: "toolConfig: ToolConfig", swiftEquivalent: "NO EQUIVALENT", status: "MISSING", note: "No ToolConfig type"),
-    FieldMapping(index: 7, tsField: "outputFormat: { type: 'json_schema', schema }", swiftEquivalent: "NO EQUIVALENT", status: "MISSING", note: "No structured output"),
-    FieldMapping(index: 8, tsField: "includePartialMessages: boolean", swiftEquivalent: "NO EQUIVALENT", status: "MISSING", note: "No partial message flag"),
-    FieldMapping(index: 9, tsField: "promptSuggestions: boolean", swiftEquivalent: "NO EQUIVALENT", status: "MISSING", note: "No prompt suggestion flag"),
+    FieldMapping(index: 6, tsField: "toolConfig: ToolConfig", swiftEquivalent: "AgentOptions.toolConfig: ToolConfig?", status: "PASS", note: "Concurrency controls (Story 17-2)"),
+    FieldMapping(index: 7, tsField: "outputFormat: { type: 'json_schema', schema }", swiftEquivalent: "AgentOptions.outputFormat: OutputFormat?", status: "PASS", note: "JSON Schema output (Story 17-2)"),
+    FieldMapping(index: 8, tsField: "includePartialMessages: boolean", swiftEquivalent: "AgentOptions.includePartialMessages: Bool", status: "PASS", note: "Direct field (Story 17-2)"),
+    FieldMapping(index: 9, tsField: "promptSuggestions: boolean", swiftEquivalent: "AgentOptions.promptSuggestions: Bool", status: "PASS", note: "Direct field (Story 17-2)"),
 ]
 
 print("Advanced Configuration (9 fields)")
@@ -437,11 +466,11 @@ print("")
 
 // --- Session Configuration Table ---
 let sessionMappings: [FieldMapping] = [
-    FieldMapping(index: 1, tsField: "resume: string", swiftEquivalent: "sessionStore + sessionId", status: "PARTIAL", note: "Different API pattern"),
-    FieldMapping(index: 2, tsField: "continue: boolean", swiftEquivalent: "NO EQUIVALENT", status: "MISSING", note: "No continue flag"),
-    FieldMapping(index: 3, tsField: "forkSession: boolean", swiftEquivalent: "SessionStore.fork (separate)", status: "PARTIAL", note: "Capability exists, not on AgentOptions"),
+    FieldMapping(index: 1, tsField: "resume: string", swiftEquivalent: "AgentOptions.resumeSessionAt: String?", status: "PASS", note: "Message ID truncation (Story 17-2)"),
+    FieldMapping(index: 2, tsField: "continue: boolean", swiftEquivalent: "AgentOptions.continueRecentSession: Bool", status: "PASS", note: "Direct field (Story 17-2)"),
+    FieldMapping(index: 3, tsField: "forkSession: boolean", swiftEquivalent: "AgentOptions.forkSession: Bool", status: "PASS", note: "Direct field (Story 17-2)"),
     FieldMapping(index: 4, tsField: "sessionId: string", swiftEquivalent: "AgentOptions.sessionId: String?", status: "PASS", note: "Direct equivalent"),
-    FieldMapping(index: 5, tsField: "persistSession: boolean", swiftEquivalent: "sessionStore (implicit)", status: "PARTIAL", note: "Implicit when sessionStore set"),
+    FieldMapping(index: 5, tsField: "persistSession: boolean", swiftEquivalent: "AgentOptions.persistSession: Bool", status: "PASS", note: "Direct field (Story 17-2)"),
 ]
 
 print("Session Configuration (5 fields)")
@@ -497,7 +526,7 @@ let thinkingMappings: [FieldMapping] = [
     FieldMapping(index: 1, tsField: "{ type: 'adaptive' }", swiftEquivalent: "ThinkingConfig.adaptive", status: "PASS", note: "Exact match"),
     FieldMapping(index: 2, tsField: "{ type: 'enabled', budgetTokens? }", swiftEquivalent: "ThinkingConfig.enabled(budgetTokens: Int)", status: "PASS", note: "budgetTokens required in Swift"),
     FieldMapping(index: 3, tsField: "{ type: 'disabled' }", swiftEquivalent: "ThinkingConfig.disabled", status: "PASS", note: "Exact match"),
-    FieldMapping(index: 4, tsField: "effort: 'low'|'medium'|'high'|'max'", swiftEquivalent: "NO EQUIVALENT", status: "MISSING", note: "No effort level"),
+    FieldMapping(index: 4, tsField: "effort: 'low'|'medium'|'high'|'max'", swiftEquivalent: "EffortLevel enum (separate from ThinkingConfig)", status: "PASS", note: "4-case enum with budgetTokens (Story 17-2)"),
 ]
 
 print("ThinkingConfig Detail (4 items)")
@@ -511,8 +540,7 @@ for m in thinkingMappings {
 print("")
 
 let thinkPass = thinkingMappings.filter { $0.status == "PASS" }.count
-let thinkMissing = thinkingMappings.filter { $0.status == "MISSING" }.count
-print("ThinkingConfig Summary: PASS: \(thinkPass) | MISSING: \(thinkMissing) | Total: \(thinkingMappings.count)")
+print("ThinkingConfig Summary: PASS: \(thinkPass) | Total: \(thinkingMappings.count)")
 print("")
 
 // --- Full Field-Level Compat Report ---

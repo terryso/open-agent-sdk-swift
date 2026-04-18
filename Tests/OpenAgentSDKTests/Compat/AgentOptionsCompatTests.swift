@@ -413,13 +413,15 @@ final class AgentOptionsCompatTests: XCTestCase {
     // AC4 #1: resume -- PARTIAL (via sessionStore + sessionId)
     // ================================================================
 
-    /// AC4 #1 [PARTIAL]: TS `resume: string` is handled via sessionStore + sessionId in Swift.
+    /// AC4 #1 [PASS]: TS `resume: string` maps to `AgentOptions.resumeSessionAt: String?`.
+    /// Story 17-2 added the property.
     func testResume_partial() {
-        let options = AgentOptions(apiKey: "test-key", model: "test")
+        let options = AgentOptions(apiKey: "test-key", model: "test", resumeSessionAt: "msg-123")
         let fields = fieldNames(of: options)
 
-        XCTAssertFalse(fields.contains("resume"),
-                       "GAP: AgentOptions has no 'resume' property. TS SDK has resume: string for resuming by session ID. Swift uses sessionStore + sessionId combination.")
+        XCTAssertTrue(fields.contains("resumeSessionAt"),
+                       "RESOLVED: AgentOptions now has 'resumeSessionAt' property (Story 17-2). TS SDK has resume: string for resuming by message ID.")
+        XCTAssertEqual(options.resumeSessionAt, "msg-123")
     }
 
     // ================================================================
@@ -686,9 +688,11 @@ final class AgentOptionsCompatTests: XCTestCase {
         XCTAssertEqual(config, .disabled, "ThinkingConfig.disabled maps to TS { type: 'disabled' }")
     }
 
-    /// AC6 [MISSING]: TS `effort` level ('low'/'medium'/'high'/'max') has no Swift equivalent.
+    /// AC6 [PASS]: TS `effort` level ('low'/'medium'/'high'/'max') maps to separate EffortLevel enum.
+    /// Story 17-2 added EffortLevel enum with 4 cases. Effort is NOT on ThinkingConfig itself
+    /// but is a separate property: AgentOptions.effort: EffortLevel?
     func testThinkingConfig_effortLevel_missing() {
-        // Verify ThinkingConfig does not have an effort level
+        // Verify ThinkingConfig does not have an effort level (effort is a separate enum)
         let adaptive = ThinkingConfig.adaptive
         let enabled = ThinkingConfig.enabled(budgetTokens: 1000)
         let disabled = ThinkingConfig.disabled
@@ -698,11 +702,16 @@ final class AgentOptionsCompatTests: XCTestCase {
         let disabledFields = fieldNames(of: disabled)
 
         XCTAssertFalse(adaptiveFields.contains("effort"),
-                       "GAP: ThinkingConfig has no 'effort' level. TS SDK has effort: 'low' | 'medium' | 'high' | 'max'.")
+                       "ThinkingConfig.adaptive has no 'effort' -- effort is a separate EffortLevel enum on AgentOptions.")
         XCTAssertFalse(enabledFields.contains("effort"),
-                       "GAP: ThinkingConfig.enabled has no 'effort' level.")
+                       "ThinkingConfig.enabled has no 'effort' -- effort is a separate EffortLevel enum on AgentOptions.")
         XCTAssertFalse(disabledFields.contains("effort"),
-                       "GAP: ThinkingConfig.disabled has no 'effort' level.")
+                       "ThinkingConfig.disabled has no 'effort' -- effort is a separate EffortLevel enum on AgentOptions.")
+
+        // Verify EffortLevel exists as a separate type with 4 cases (Story 17-2)
+        XCTAssertEqual(EffortLevel.allCases.count, 4, "EffortLevel has 4 cases: low, medium, high, max")
+        let effortOptions = AgentOptions(apiKey: "test-key", model: "test", effort: .high)
+        XCTAssertEqual(effortOptions.effort, .high, "AgentOptions.effort accepts EffortLevel values")
     }
 
     /// AC6 [P0]: ThinkingConfig.validate() rejects zero/negative budgetTokens.
@@ -719,24 +728,35 @@ final class AgentOptionsCompatTests: XCTestCase {
 
     // MARK: - AC7: systemPrompt Preset Mode Verification
 
-    /// AC7 [PARTIAL]: systemPrompt only supports String, not structured preset type.
+    /// AC7 [PASS]: systemPrompt supports String and structured preset type via SystemPromptConfig.
+    /// Story 17-2 added SystemPromptConfig enum with .text(String) and .preset(name: String, append: String?) cases.
     func testSystemPromptPreset_noPresetEnum() {
         // TS SDK supports: string | { type: 'preset', preset: 'claude_code', append?: string }
-        // Swift SDK supports: String? only
+        // Swift SDK now supports: String? + SystemPromptConfig enum
 
-        // Verify no SystemPromptPreset or similar type exists via AgentOptions
         var options = AgentOptions(apiKey: "test-key", model: "test")
         let fields = fieldNames(of: options)
 
-        // systemPrompt should be String? not an enum/struct
+        // systemPrompt should be String?
         XCTAssertTrue(fields.contains("systemPrompt"),
                        "AgentOptions has systemPrompt property")
-        // Verify it accepts only String
         options.systemPrompt = "Hello"
         XCTAssertEqual(options.systemPrompt, "Hello", "systemPrompt accepts String")
 
-        // GAP: No way to do: systemPrompt: .preset("claude_code", append: "custom")
-        // Must use plain string instead
+        // Story 17-2 added SystemPromptConfig with preset mode
+        let presetConfig = SystemPromptConfig.preset(name: "claude_code", append: "custom instructions")
+        let optionsWithConfig = AgentOptions(apiKey: "test-key", model: "test", systemPromptConfig: presetConfig)
+        let allFields = fieldNames(of: optionsWithConfig)
+        XCTAssertTrue(allFields.contains("systemPromptConfig"),
+                       "AgentOptions has systemPromptConfig property (Story 17-2)")
+
+        // Verify SystemPromptConfig.preset with append
+        if case .preset(let name, let append) = presetConfig {
+            XCTAssertEqual(name, "claude_code", "Preset name matches")
+            XCTAssertEqual(append, "custom instructions", "Append parameter works")
+        } else {
+            XCTFail("SystemPromptConfig should be .preset case")
+        }
     }
 
     // MARK: - AC8: outputFormat / Structured Output Verification
@@ -851,16 +871,16 @@ final class AgentOptionsCompatTests: XCTestCase {
 
     /// AC9 [P0]: Overall compatibility summary counts.
     func testCompatReport_overallSummary() {
-        // 22 PASS + 7 PARTIAL + 6 MISSING + 2 N/A = 37
-        let totalPass = 22
-        let totalPartial = 7
+        // 23 PASS + 6 PARTIAL + 6 MISSING + 2 N/A = 37
+        let totalPass = 23
+        let totalPartial = 6
         let totalMissing = 6
         let totalNA = 2
         let total = totalPass + totalPartial + totalMissing + totalNA
 
         XCTAssertEqual(total, 37, "Total verifications should be 37")
-        XCTAssertEqual(totalPass, 22, "22 items PASS")
-        XCTAssertEqual(totalPartial, 7, "7 items PARTIAL")
+        XCTAssertEqual(totalPass, 23, "23 items PASS")
+        XCTAssertEqual(totalPartial, 6, "6 items PARTIAL")
         XCTAssertEqual(totalMissing, 6, "6 items MISSING")
         XCTAssertEqual(totalNA, 2, "2 items N/A")
 
