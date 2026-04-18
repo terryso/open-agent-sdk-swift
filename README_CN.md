@@ -441,7 +441,7 @@ API 文档和指南通过 Swift-DocC 提供：
 - [工具系统](Sources/OpenAgentSDK/Documentation.docc/ToolSystem.md) — 工具协议、自定义工具、层级
 - [多 Agent 编排](Sources/OpenAgentSDK/Documentation.docc/MultiAgent.md) — 子 Agent、团队、任务
 - [MCP、会话与钩子](Sources/OpenAgentSDK/Documentation.docc/MCPSessionHooks.md) — MCP 集成、持久化、钩子系统
-- [可运行示例](Examples/README.md) — 19 个完整示例，含逐步教程
+- [可运行示例](Examples/README.md) — 31 个完整示例，含逐步教程（19 个功能演示 + 12 个兼容性验证）
 
 ## 系统要求
 

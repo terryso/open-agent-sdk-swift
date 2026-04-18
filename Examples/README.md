@@ -517,6 +517,192 @@ let agent = createAgent(options: AgentOptions(
 ))
 ```
 
+---
+
+## Compat Verification Examples
+
+These 12 examples verify that the Swift SDK's API surface is fully compatible with the [open-agent-sdk-typescript](https://github.com/codeany-ai/open-agent-sdk-typescript). Each example runs a structured compat report comparing TypeScript SDK fields to their Swift equivalents, printing PASS/MISSING status for every field.
+
+> **Note:** Compat examples are verification tools, not typical usage demos. They're useful for SDK maintainers and contributors to track API parity.
+
+### 20. CompatCoreQuery — Core Query API Compat
+
+Verifies Swift SDK's `prompt()`/`stream()` API covers all TypeScript SDK core usage patterns.
+
+```bash
+swift run CompatCoreQuery
+```
+
+**What you'll learn:**
+- TypeScript SDK `query()` vs Swift `prompt()`/`stream()` mapping
+- Blocking and streaming query patterns
+- `QueryResult` field parity (text, usage, turns, cost, status)
+
+---
+
+### 21. CompatToolSystem — Tool System Compat
+
+Verifies Swift SDK's tool definition and execution matches TypeScript SDK's tool system.
+
+```bash
+swift run CompatToolSystem
+```
+
+**What you'll learn:**
+- `defineTool()` API parity with TypeScript's `tool()` function
+- Tool input schema, `ToolContext`, and `ToolExecuteResult` compatibility
+- Tool registration and execution lifecycle
+
+---
+
+### 22. CompatMessageTypes — Message Types Compat
+
+Verifies Swift SDK's `SDKMessage` covers all 20 TypeScript SDK message subtypes.
+
+```bash
+swift run CompatMessageTypes
+```
+
+**What you'll learn:**
+- Full `SDKMessage` enum parity (partialMessage, toolUse, toolResult, result, system, etc.)
+- Streaming event type coverage
+- Message data field mapping
+
+---
+
+### 23. CompatHooks — Hook System Compat
+
+Verifies Swift SDK's hook system supports all 18 TypeScript SDK `HookEvents` with matching Input/Output types.
+
+```bash
+swift run CompatHooks
+```
+
+**What you'll learn:**
+- All lifecycle event types (preToolUse, postToolUse, sessionStart, sessionEnd, etc.)
+- `HookDefinition` matcher and handler API parity
+- `HookInput`/`HookOutput` field coverage
+
+---
+
+### 24. CompatMCP — MCP Integration Compat
+
+Verifies Swift SDK supports all TypeScript SDK MCP server configuration types and runtime management.
+
+```bash
+swift run CompatMCP
+```
+
+**What you'll learn:**
+- Server config types: stdio, SSE, HTTP, in-process
+- `McpStdioConfig`, `McpSseConfig` field parity
+- Runtime MCP server lifecycle management
+
+---
+
+### 25. CompatSessions — Session Management Compat
+
+Verifies Swift SDK's session API covers all TypeScript SDK session operations.
+
+```bash
+swift run CompatSessions
+```
+
+**What you'll learn:**
+- `SessionStore` operations: save, load, fork, list, rename, tag, delete
+- Session configuration options parity
+- Session ID management and auto-restore
+
+---
+
+### 26. CompatQueryMethods — Query Object Methods Compat
+
+Verifies Swift SDK provides all TypeScript SDK Query object runtime control methods.
+
+```bash
+swift run CompatQueryMethods
+```
+
+**What you'll learn:**
+- Runtime controls: abort, interrupt, status check
+- Query lifecycle methods mapping
+- Partial result retrieval compatibility
+
+---
+
+### 27. CompatOptions — Agent Options Compat
+
+Verifies Swift SDK's `AgentOptions`/`SDKConfiguration` covers all TypeScript SDK Options fields.
+
+```bash
+swift run CompatOptions
+```
+
+**What you'll learn:**
+- All `AgentOptions` fields and their TypeScript equivalents
+- Configuration inheritance and defaults
+- Environment variable mapping
+
+---
+
+### 28. CompatPermissions — Permission System Compat
+
+Verifies Swift SDK's permission system covers all TypeScript SDK permission types and operations.
+
+```bash
+swift run CompatPermissions
+```
+
+**What you'll learn:**
+- Permission mode parity (bypassPermissions, acceptEdits, default, etc.)
+- Custom authorization callback API
+- Policy composition compatibility
+
+---
+
+### 29. CompatSubagents — Subagent System Compat
+
+Verifies Swift SDK's subagent system covers TypeScript SDK's `AgentDefinition` and Agent tool usage.
+
+```bash
+swift run CompatSubagents
+```
+
+**What you'll learn:**
+- `createAgentTool()` and agent spawning API parity
+- Sub-agent type support (Explore, Plan, etc.)
+- Team/task coordination field coverage
+
+---
+
+### 30. CompatThinkingModel — Thinking & Model Config Compat
+
+Verifies Swift SDK's `ThinkingConfig` and model configuration are fully compatible with TypeScript SDK.
+
+```bash
+swift run CompatThinkingModel
+```
+
+**What you'll learn:**
+- `ThinkingConfig` options (budget tokens, type)
+- `ModelInfo` fields and model switching parity
+- Extended thinking and reasoning control
+
+---
+
+### 31. CompatSandbox — Sandbox Configuration Compat
+
+Verifies Swift SDK's sandbox configuration covers all TypeScript SDK sandbox options.
+
+```bash
+swift run CompatSandbox
+```
+
+**What you'll learn:**
+- `SandboxSettings` full field coverage (paths, commands, network, ripgrep)
+- `SandboxNetworkConfig` and `RipgrepConfig` parity
+- Path traversal protection and shell filtering options
+
 ## Example Dependencies
 
 | Example                  | Requires MCP dependency | Extra setup              |
@@ -540,6 +726,19 @@ let agent = createAgent(options: AgentOptions(
 | ContextInjectionExample  | No                     | None                     |
 | MultiTurnExample         | No                     | None                     |
 | OpenAICompatExample      | No                     | None                     |
+| PolyvLiveExample         | No                     | Skill directory with SKILL.md |
+| CompatCoreQuery          | No                     | None                     |
+| CompatToolSystem         | No                     | None                     |
+| CompatMessageTypes       | No                     | None                     |
+| CompatHooks              | No                     | None                     |
+| CompatMCP                | No                     | None                     |
+| CompatSessions           | No                     | None                     |
+| CompatQueryMethods       | No                     | None                     |
+| CompatOptions            | No                     | None                     |
+| CompatPermissions        | No                     | None                     |
+| CompatSubagents          | No                     | None                     |
+| CompatThinkingModel      | No                     | None                     |
+| CompatSandbox            | No                     | None                     |
 
 All examples are defined as executable targets in `Package.swift` — no additional configuration needed.
 
@@ -552,6 +751,7 @@ BasicAgent → StreamingAgent → CustomTools → CustomSystemPromptExample
     → SessionsAndHooks → SkillsExample → SandboxExample
     → LoggerExample → ModelSwitchingExample → QueryAbortExample
     → ContextInjectionExample → MultiTurnExample → OpenAICompatExample
+    → PolyvLiveExample
 ```
 
 1. **Start here:** BasicAgent, StreamingAgent — understand the core prompt/stream APIs
@@ -561,11 +761,12 @@ BasicAgent → StreamingAgent → CustomTools → CustomSystemPromptExample
 5. **Security:** PermissionsExample — control what tools agents can use
 6. **MCP integration:** MCPIntegration, AdvancedMCPExample — connect external tool servers
 7. **Persistence:** SessionsAndHooks — save sessions and hook into lifecycle events
-8. **Skills:** SkillsExample — register and execute built-in/custom skills
+8. **Skills:** SkillsExample, PolyvLiveExample — register and execute built-in/custom skills, use SKILL.md auto-discovery
 9. **Sandbox & Logging:** SandboxExample, LoggerExample — restrict operations and capture logs
 10. **Advanced controls:** ModelSwitchingExample, QueryAbortExample — runtime model switching and query cancellation
 11. **Context & multi-turn:** ContextInjectionExample, MultiTurnExample — file caching, context injection, multi-turn conversations
 12. **OpenAI compat:** OpenAICompatExample — use DeepSeek, Qwen, Ollama, and other OpenAI-compatible APIs
+13. **SDK compat verification:** Compat* examples — verify TypeScript SDK API parity (for SDK contributors)
 
 ## Troubleshooting
 

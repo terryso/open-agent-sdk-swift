@@ -517,6 +517,192 @@ let agent = createAgent(options: AgentOptions(
 ))
 ```
 
+---
+
+## 兼容性验证示例
+
+以下 12 个示例验证 Swift SDK 的 API 与 [open-agent-sdk-typescript](https://github.com/codeany-ai/open-agent-sdk-typescript) 完全兼容。每个示例运行结构化的兼容性报告，对比 TypeScript SDK 字段与 Swift 等效项，打印每个字段的 PASS/MISSING 状态。
+
+> **注意：** Compat 示例是验证工具，不是典型用法演示。适合 SDK 维护者和贡献者追踪 API 对齐情况。
+
+### 20. CompatCoreQuery — 核心 Query API 兼容性
+
+验证 Swift SDK 的 `prompt()`/`stream()` API 覆盖 TypeScript SDK 所有核心用法模式。
+
+```bash
+swift run CompatCoreQuery
+```
+
+**你将学到：**
+- TypeScript SDK `query()` 与 Swift `prompt()`/`stream()` 的映射关系
+- 阻塞式和流式查询模式
+- `QueryResult` 字段对齐（text、usage、turns、cost、status）
+
+---
+
+### 21. CompatToolSystem — 工具系统兼容性
+
+验证 Swift SDK 的工具定义和执行与 TypeScript SDK 的工具系统匹配。
+
+```bash
+swift run CompatToolSystem
+```
+
+**你将学到：**
+- `defineTool()` API 与 TypeScript `tool()` 函数的对齐
+- 工具输入 schema、`ToolContext` 和 `ToolExecuteResult` 兼容性
+- 工具注册和执行生命周期
+
+---
+
+### 22. CompatMessageTypes — 消息类型兼容性
+
+验证 Swift SDK 的 `SDKMessage` 覆盖 TypeScript SDK 全部 20 种消息子类型。
+
+```bash
+swift run CompatMessageTypes
+```
+
+**你将学到：**
+- 完整的 `SDKMessage` 枚举对齐（partialMessage、toolUse、toolResult、result、system 等）
+- 流式事件类型覆盖
+- 消息数据字段映射
+
+---
+
+### 23. CompatHooks — 钩子系统兼容性
+
+验证 Swift SDK 的钩子系统支持 TypeScript SDK 全部 18 种 `HookEvents`，Input/Output 类型一致。
+
+```bash
+swift run CompatHooks
+```
+
+**你将学到：**
+- 所有生命周期事件类型（preToolUse、postToolUse、sessionStart、sessionEnd 等）
+- `HookDefinition` 匹配器和处理程序 API 对齐
+- `HookInput`/`HookOutput` 字段覆盖
+
+---
+
+### 24. CompatMCP — MCP 集成兼容性
+
+验证 Swift SDK 支持 TypeScript SDK 所有 MCP 服务器配置类型和运行时管理。
+
+```bash
+swift run CompatMCP
+```
+
+**你将学到：**
+- 服务器配置类型：stdio、SSE、HTTP、进程内
+- `McpStdioConfig`、`McpSseConfig` 字段对齐
+- 运行时 MCP 服务器生命周期管理
+
+---
+
+### 25. CompatSessions — 会话管理兼容性
+
+验证 Swift SDK 的会话 API 覆盖 TypeScript SDK 所有会话操作。
+
+```bash
+swift run CompatSessions
+```
+
+**你将学到：**
+- `SessionStore` 操作：save、load、fork、list、rename、tag、delete
+- 会话配置选项对齐
+- Session ID 管理和自动恢复
+
+---
+
+### 26. CompatQueryMethods — Query 对象方法兼容性
+
+验证 Swift SDK 提供 TypeScript SDK Query 对象的所有运行时控制方法。
+
+```bash
+swift run CompatQueryMethods
+```
+
+**你将学到：**
+- 运行时控制：abort、interrupt、status check
+- 查询生命周期方法映射
+- 部分结果获取兼容性
+
+---
+
+### 27. CompatOptions — Agent Options 兼容性
+
+验证 Swift SDK 的 `AgentOptions`/`SDKConfiguration` 覆盖 TypeScript SDK 所有 Options 字段。
+
+```bash
+swift run CompatOptions
+```
+
+**你将学到：**
+- 所有 `AgentOptions` 字段及其 TypeScript 等效项
+- 配置继承和默认值
+- 环境变量映射
+
+---
+
+### 28. CompatPermissions — 权限系统兼容性
+
+验证 Swift SDK 的权限系统覆盖 TypeScript SDK 所有权限类型和操作。
+
+```bash
+swift run CompatPermissions
+```
+
+**你将学到：**
+- 权限模式对齐（bypassPermissions、acceptEdits、default 等）
+- 自定义授权回调 API
+- 策略组合兼容性
+
+---
+
+### 29. CompatSubagents — 子 Agent 系统兼容性
+
+验证 Swift SDK 的子 Agent 系统覆盖 TypeScript SDK 的 `AgentDefinition` 和 Agent 工具用法。
+
+```bash
+swift run CompatSubagents
+```
+
+**你将学到：**
+- `createAgentTool()` 和 Agent 生成 API 对齐
+- 子 Agent 类型支持（Explore、Plan 等）
+- Team/Task 协调字段覆盖
+
+---
+
+### 30. CompatThinkingModel — Thinking 与模型配置兼容性
+
+验证 Swift SDK 的 `ThinkingConfig` 和模型配置与 TypeScript SDK 完全兼容。
+
+```bash
+swift run CompatThinkingModel
+```
+
+**你将学到：**
+- `ThinkingConfig` 选项（budget tokens、type）
+- `ModelInfo` 字段和模型切换对齐
+- 扩展思维和推理控制
+
+---
+
+### 31. CompatSandbox — 沙盒配置兼容性
+
+验证 Swift SDK 的沙盒配置覆盖 TypeScript SDK 所有沙盒选项。
+
+```bash
+swift run CompatSandbox
+```
+
+**你将学到：**
+- `SandboxSettings` 完整字段覆盖（路径、命令、网络、ripgrep）
+- `SandboxNetworkConfig` 和 `RipgrepConfig` 对齐
+- 路径遍历防护和 Shell 过滤选项
+
 ## 示例依赖
 
 | 示例                     | 需要 MCP 依赖          | 额外配置                  |
@@ -540,6 +726,19 @@ let agent = createAgent(options: AgentOptions(
 | ContextInjectionExample  | 否                     | 无                        |
 | MultiTurnExample         | 否                     | 无                        |
 | OpenAICompatExample      | 否                     | 无                        |
+| PolyvLiveExample         | 否                     | 包含 SKILL.md 的技能目录  |
+| CompatCoreQuery          | 否                     | 无                        |
+| CompatToolSystem         | 否                     | 无                        |
+| CompatMessageTypes       | 否                     | 无                        |
+| CompatHooks              | 否                     | 无                        |
+| CompatMCP                | 否                     | 无                        |
+| CompatSessions           | 否                     | 无                        |
+| CompatQueryMethods       | 否                     | 无                        |
+| CompatOptions            | 否                     | 无                        |
+| CompatPermissions        | 否                     | 无                        |
+| CompatSubagents          | 否                     | 无                        |
+| CompatThinkingModel      | 否                     | 无                        |
+| CompatSandbox            | 否                     | 无                        |
 
 所有示例都已作为可执行目标定义在 `Package.swift` 中 — 无需额外配置。
 
@@ -552,6 +751,7 @@ BasicAgent → StreamingAgent → CustomTools → CustomSystemPromptExample
     → SessionsAndHooks → SkillsExample → SandboxExample
     → LoggerExample → ModelSwitchingExample → QueryAbortExample
     → ContextInjectionExample → MultiTurnExample → OpenAICompatExample
+    → PolyvLiveExample
 ```
 
 1. **从这里开始：** BasicAgent、StreamingAgent — 理解核心 prompt/stream API
@@ -561,11 +761,12 @@ BasicAgent → StreamingAgent → CustomTools → CustomSystemPromptExample
 5. **安全控制：** PermissionsExample — 控制 Agent 可以使用哪些工具
 6. **MCP 集成：** MCPIntegration、AdvancedMCPExample — 连接外部工具服务器
 7. **持久化：** SessionsAndHooks — 保存会话和注册生命周期钩子
-8. **技能系统：** SkillsExample — 注册和执行内置/自定义技能
+8. **技能系统：** SkillsExample、PolyvLiveExample — 注册和执行内置/自定义技能，使用 SKILL.md 自动发现
 9. **沙盒与日志：** SandboxExample、LoggerExample — 限制操作范围和捕获日志
 10. **高级控制：** ModelSwitchingExample、QueryAbortExample — 运行时模型切换和查询中断
 11. **上下文与多轮对话：** ContextInjectionExample、MultiTurnExample — 文件缓存、上下文注入、多轮对话
 12. **OpenAI 兼容：** OpenAICompatExample — 使用 DeepSeek、Qwen、Ollama 等 OpenAI 兼容 API
+13. **SDK 兼容性验证：** Compat* 示例 — 验证 TypeScript SDK API 对齐（适合 SDK 贡献者）
 
 ## 常见问题
 
