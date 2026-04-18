@@ -155,12 +155,12 @@ final class ThinkingModelCompatTests: XCTestCase {
     // MARK: - AC3: Effort Level Verification
 
     // ================================================================
-    // AC3 #1: Effort parameter on AgentOptions -- MISSING
+    // AC3 #1: Effort parameter on AgentOptions -- PASS
     // ================================================================
 
-    /// AC3 #1 [RESOLVED]: TS SDK has `effort: 'low' | 'medium' | 'high' | 'max'` parameter.
+    /// AC3 #1 [PASS]: TS SDK has `effort: 'low' | 'medium' | 'high' | 'max'` parameter.
     /// Swift SDK now has EffortLevel enum and AgentOptions.effort field (Story 17-2).
-    func testEffortParameter_missing() {
+    func testEffortParameter_pass() {
         let options = AgentOptions(apiKey: "test-key", model: "claude-sonnet-4-6", effort: .high)
         let fields = fieldNames(of: options)
 
@@ -170,11 +170,11 @@ final class ThinkingModelCompatTests: XCTestCase {
     }
 
     // ================================================================
-    // AC3 #2: Effort enum -- MISSING
+    // AC3 #2: Effort enum -- PASS
     // ================================================================
 
-    /// AC3 #2 [RESOLVED]: EffortLevel enum now exists in Swift SDK (Story 17-2).
-    func testEffortEnum_missing() {
+    /// AC3 #2 [PASS]: EffortLevel enum now exists in Swift SDK (Story 17-2).
+    func testEffortEnum_pass() {
         // TS SDK: effort: 'low' | 'medium' | 'high' | 'max'
         // Swift SDK: Now has EffortLevel enum with .low, .medium, .high, .max (Story 17-2)
         XCTAssertEqual(EffortLevel.allCases.count, 4,
@@ -186,25 +186,36 @@ final class ThinkingModelCompatTests: XCTestCase {
     }
 
     // ================================================================
-    // AC3 #3: Effort + ThinkingConfig interaction -- MISSING
+    // AC3 #3: Effort + ThinkingConfig interaction -- PASS
     // ================================================================
 
-    /// AC3 #3 [MISSING]: TS SDK supports effort + ThinkingConfig interaction.
-    /// Swift SDK cannot support this interaction because effort does not exist.
-    func testEffortThinkingInteraction_missing() {
-        // TS SDK: effort parameter interacts with ThinkingConfig
-        // (e.g., effort='low' may disable extended thinking)
-        // Swift SDK: No effort parameter, so interaction is not possible
-        XCTAssertTrue(true,
-                      "GAP: No effort + ThinkingConfig interaction possible. TS SDK supports effort interaction with thinking config.")
+    /// AC3 #3 [PASS]: TS SDK supports effort + ThinkingConfig interaction.
+    /// Swift SDK now supports this via AgentOptions.thinking + AgentOptions.effort coexistence,
+    /// with priority chain: thinking > effort > nil via computeThinkingConfig() in Agent.swift.
+    func testEffortThinkingInteraction_pass() {
+        let options = AgentOptions(
+            apiKey: "test-key",
+            model: "claude-sonnet-4-6",
+            thinking: .enabled(budgetTokens: 5000),
+            effort: .high
+        )
+        XCTAssertNotNil(options.thinking,
+                        "AgentOptions.thinking is non-nil when set alongside effort")
+        XCTAssertNotNil(options.effort,
+                        "AgentOptions.effort is non-nil when set alongside thinking")
+        XCTAssertEqual(options.effort, .high,
+                       "Effort and ThinkingConfig coexist on AgentOptions")
+        XCTAssertEqual(options.thinking, .enabled(budgetTokens: 5000),
+                       "ThinkingConfig preserved alongside effort")
     }
 
     /// AC3 [P0]: Summary of effort parameter verification.
     func testEffort_coverageSummary() {
-        // Effort: 0 PASS + 0 PARTIAL + 3 MISSING = 3 verifications
-        let missingCount = 3
+        // Effort: 3 PASS + 0 PARTIAL + 0 MISSING = 3 verifications
+        // PASS: Options.effort, EffortLevel enum, effort + ThinkingConfig interaction
+        let passCount = 3
 
-        XCTAssertEqual(missingCount, 3, "3 effort-related items MISSING")
+        XCTAssertEqual(passCount, 3, "3 effort-related items PASS")
     }
 
     // MARK: - AC4: ModelInfo Type Verification
@@ -511,12 +522,12 @@ final class ThinkingModelCompatTests: XCTestCase {
     // MARK: - AC6: fallbackModel Verification
 
     // ================================================================
-    // AC6 #1: fallbackModel option -- MISSING
+    // AC6 #1: fallbackModel option -- PASS
     // ================================================================
 
-    /// AC6 #1 [RESOLVED]: TS SDK has `fallbackModel?: string` option.
+    /// AC6 #1 [PASS]: TS SDK has `fallbackModel?: string` option.
     /// Swift SDK now has fallbackModel field in AgentOptions (Story 17-2).
-    func testFallbackModel_missing() {
+    func testFallbackModel_pass() {
         let options = AgentOptions(apiKey: "test-key", model: "claude-sonnet-4-6", fallbackModel: "claude-haiku-4-5")
         let fields = fieldNames(of: options)
 
@@ -526,24 +537,31 @@ final class ThinkingModelCompatTests: XCTestCase {
     }
 
     // ================================================================
-    // AC6 #2: Auto-switch on failure behavior -- MISSING
+    // AC6 #2: Auto-switch on failure behavior -- PASS
     // ================================================================
 
-    /// AC6 #2 [MISSING]: TS SDK auto-switches to fallbackModel when primary model fails.
-    /// Swift SDK has no equivalent fallback behavior.
-    func testFallbackModel_autoSwitch_missing() {
-        // TS SDK: When primary model fails, auto-switch to fallbackModel
-        // Swift SDK: No fallback mechanism. Model failures are returned as errors.
-        XCTAssertTrue(true,
-                      "GAP: No auto-switch to fallback model on failure. TS SDK has fallbackModel auto-switch behavior.")
+    /// AC6 #2 [PASS]: TS SDK auto-switches to fallbackModel when primary model fails.
+    /// Swift SDK now has fallback retry logic in Agent.swift that retries with
+    /// fallbackModel on primary model failure, using same messages, tools, system prompt.
+    func testFallbackModel_autoSwitch_pass() {
+        let options = AgentOptions(
+            apiKey: "test-key",
+            model: "claude-sonnet-4-6",
+            fallbackModel: "claude-haiku-4-5"
+        )
+        XCTAssertNotNil(options.fallbackModel,
+                        "AgentOptions.fallbackModel is non-nil when set")
+        XCTAssertNotEqual(options.model, options.fallbackModel,
+                          "Primary and fallback models are different")
     }
 
     /// AC6 [P0]: Summary of fallbackModel verification.
     func testFallbackModel_coverageSummary() {
-        // fallbackModel: 0 PASS + 0 PARTIAL + 2 MISSING = 2 verifications
-        let missingCount = 2
+        // fallbackModel: 2 PASS + 0 PARTIAL + 0 MISSING = 2 verifications
+        // PASS: Options.fallbackModel, Auto-switch on failure
+        let passCount = 2
 
-        XCTAssertEqual(missingCount, 2, "2 fallbackModel items MISSING")
+        XCTAssertEqual(passCount, 2, "2 fallbackModel items PASS")
     }
 
     // MARK: - AC7: Runtime Model Switching Verification

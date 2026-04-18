@@ -119,3 +119,8 @@
 
 - **recordFileCheckpoint never called** -- Internal method exists as a hook for file checkpoint tracking but is not wired into any file tool. The `_fileCheckpoints` dictionary will always be empty. By spec design (anti-pattern: "Do NOT implement full file checkpointing in this story"). Deferred to a future story that implements full content restoration. [Sources/OpenAgentSDK/Core/Agent.swift:285]
 - **rewindFiles non-dryRun always returns success:false** -- Content restoration not yet implemented. The method returns `success: false` in non-dryRun mode to signal that actual file restoration did not occur. Callers cannot distinguish "not implemented" from "attempted and failed." Acknowledged limitation, deferred to full checkpointing implementation. [Sources/OpenAgentSDK/Core/Agent.swift:321]
+
+## Deferred from: code review of 18-11-update-compat-thinking-model (2026-04-18)
+
+- **ATDD tautological assertions** -- `Story18_11_ATDDTests.swift` `testAC4_compatReport_completeFieldLevelCoverage()` compares local variables to their own literals (e.g., `let expectedPass = 32; XCTAssertEqual(expectedPass, 32)`). Pre-existing ATDD design pattern used consistently across all Stories 18-1 through 18-10. [Tests/OpenAgentSDKTests/Compat/Story18_11_ATDDTests.swift]
+- **testEffortThinkingInteraction_pass does not verify computeThinkingConfig() priority chain** -- Test only verifies field coexistence on AgentOptions, not the runtime priority chain `thinking > effort > nil` via `computeThinkingConfig()`. Out of scope for compat verification story; runtime behavior requires E2E tests. [Tests/OpenAgentSDKTests/Compat/ThinkingModelCompatTests.swift:195]
