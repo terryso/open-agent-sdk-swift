@@ -619,13 +619,13 @@ final class SubagentSystemCompatTests: XCTestCase {
             // AgentDefinition (9 TS fields)
             FieldMapping(tsField: "AgentDefinition.description", swiftField: "AgentDefinition.description (optional)", status: "PARTIAL", category: "agentDefinition"),
             FieldMapping(tsField: "AgentDefinition.tools", swiftField: "AgentDefinition.tools", status: "PASS", category: "agentDefinition"),
-            FieldMapping(tsField: "AgentDefinition.disallowedTools", swiftField: "NO EQUIVALENT", status: "MISSING", category: "agentDefinition"),
+            FieldMapping(tsField: "AgentDefinition.disallowedTools", swiftField: "AgentDefinition.disallowedTools: [String]?", status: "PASS", category: "agentDefinition"),
             FieldMapping(tsField: "AgentDefinition.prompt", swiftField: "AgentDefinition.systemPrompt", status: "PASS", category: "agentDefinition"),
             FieldMapping(tsField: "AgentDefinition.model", swiftField: "AgentDefinition.model (String, no enum)", status: "PARTIAL", category: "agentDefinition"),
-            FieldMapping(tsField: "AgentDefinition.mcpServers", swiftField: "NO EQUIVALENT", status: "MISSING", category: "agentDefinition"),
-            FieldMapping(tsField: "AgentDefinition.skills", swiftField: "NO EQUIVALENT", status: "MISSING", category: "agentDefinition"),
+            FieldMapping(tsField: "AgentDefinition.mcpServers", swiftField: "AgentDefinition.mcpServers: [AgentMcpServerSpec]?", status: "PASS", category: "agentDefinition"),
+            FieldMapping(tsField: "AgentDefinition.skills", swiftField: "AgentDefinition.skills: [String]?", status: "PASS", category: "agentDefinition"),
             FieldMapping(tsField: "AgentDefinition.maxTurns", swiftField: "AgentDefinition.maxTurns", status: "PASS", category: "agentDefinition"),
-            FieldMapping(tsField: "AgentDefinition.criticalSystemReminder_EXPERIMENTAL", swiftField: "NO EQUIVALENT", status: "MISSING", category: "agentDefinition"),
+            FieldMapping(tsField: "AgentDefinition.criticalSystemReminder_EXPERIMENTAL", swiftField: "AgentDefinition.criticalSystemReminderExperimental: String?", status: "PASS", category: "agentDefinition"),
 
             // AgentToolInput (11 TS fields)
             FieldMapping(tsField: "AgentInput.prompt", swiftField: "AgentToolInput.prompt", status: "PASS", category: "agentToolInput"),
@@ -634,48 +634,48 @@ final class SubagentSystemCompatTests: XCTestCase {
             FieldMapping(tsField: "AgentInput.model", swiftField: "AgentToolInput.model", status: "PASS", category: "agentToolInput"),
             FieldMapping(tsField: "AgentInput.name", swiftField: "AgentToolInput.name", status: "PASS", category: "agentToolInput"),
             FieldMapping(tsField: "AgentInput.max_turns", swiftField: "AgentToolInput.maxTurns", status: "PASS", category: "agentToolInput"),
-            FieldMapping(tsField: "AgentInput.resume", swiftField: "NO EQUIVALENT", status: "MISSING", category: "agentToolInput"),
-            FieldMapping(tsField: "AgentInput.run_in_background", swiftField: "NO EQUIVALENT", status: "MISSING", category: "agentToolInput"),
-            FieldMapping(tsField: "AgentInput.team_name", swiftField: "NO EQUIVALENT", status: "MISSING", category: "agentToolInput"),
-            FieldMapping(tsField: "AgentInput.mode", swiftField: "NO EQUIVALENT", status: "MISSING", category: "agentToolInput"),
-            FieldMapping(tsField: "AgentInput.isolation", swiftField: "NO EQUIVALENT", status: "MISSING", category: "agentToolInput"),
+            FieldMapping(tsField: "AgentInput.resume", swiftField: "AgentToolInput.resume", status: "PASS", category: "agentToolInput"),
+            FieldMapping(tsField: "AgentInput.run_in_background", swiftField: "AgentToolInput.run_in_background", status: "PASS", category: "agentToolInput"),
+            FieldMapping(tsField: "AgentInput.team_name", swiftField: "AgentToolInput.team_name", status: "PASS", category: "agentToolInput"),
+            FieldMapping(tsField: "AgentInput.mode", swiftField: "AgentToolInput.mode", status: "PASS", category: "agentToolInput"),
+            FieldMapping(tsField: "AgentInput.isolation", swiftField: "AgentToolInput.isolation", status: "PASS", category: "agentToolInput"),
 
             // AgentOutput / SubAgentResult (14 TS fields/statuses)
             FieldMapping(tsField: "AgentOutput.text", swiftField: "SubAgentResult.text", status: "PASS", category: "agentOutput"),
             FieldMapping(tsField: "AgentOutput.toolCalls", swiftField: "SubAgentResult.toolCalls", status: "PASS", category: "agentOutput"),
             FieldMapping(tsField: "AgentOutput.isError", swiftField: "SubAgentResult.isError", status: "PASS", category: "agentOutput"),
-            FieldMapping(tsField: "AgentOutput.status", swiftField: "NO EQUIVALENT", status: "MISSING", category: "agentOutput"),
-            FieldMapping(tsField: "AgentOutput.agentId", swiftField: "NO EQUIVALENT", status: "MISSING", category: "agentOutput"),
-            FieldMapping(tsField: "AgentOutput.totalToolUseCount", swiftField: "NO EQUIVALENT", status: "MISSING", category: "agentOutput"),
-            FieldMapping(tsField: "AgentOutput.totalDurationMs", swiftField: "NO EQUIVALENT", status: "MISSING", category: "agentOutput"),
-            FieldMapping(tsField: "AgentOutput.totalTokens", swiftField: "NO EQUIVALENT", status: "MISSING", category: "agentOutput"),
-            FieldMapping(tsField: "AgentOutput.usage", swiftField: "NO EQUIVALENT", status: "MISSING", category: "agentOutput"),
-            FieldMapping(tsField: "AgentOutput.outputFile", swiftField: "NO EQUIVALENT", status: "MISSING", category: "agentOutput"),
-            FieldMapping(tsField: "AgentOutput.canReadOutputFile", swiftField: "NO EQUIVALENT", status: "MISSING", category: "agentOutput"),
-            FieldMapping(tsField: "AgentOutput.status=completed", swiftField: "NO EQUIVALENT", status: "MISSING", category: "agentOutput"),
-            FieldMapping(tsField: "AgentOutput.status=async_launched", swiftField: "NO EQUIVALENT", status: "MISSING", category: "agentOutput"),
-            FieldMapping(tsField: "AgentOutput.status=sub_agent_entered", swiftField: "NO EQUIVALENT", status: "MISSING", category: "agentOutput"),
+            FieldMapping(tsField: "AgentOutput.status=completed", swiftField: "AgentOutput.completed(AgentCompletedOutput)", status: "PASS", category: "agentOutput"),
+            FieldMapping(tsField: "AgentOutput.status=async_launched", swiftField: "AgentOutput.asyncLaunched(AsyncLaunchedOutput)", status: "PASS", category: "agentOutput"),
+            FieldMapping(tsField: "AgentOutput.status=sub_agent_entered", swiftField: "AgentOutput.subAgentEntered(SubAgentEnteredOutput)", status: "PASS", category: "agentOutput"),
+            FieldMapping(tsField: "AgentOutput.agentId", swiftField: "AgentCompletedOutput.agentId", status: "PASS", category: "agentOutput"),
+            FieldMapping(tsField: "AgentOutput.totalToolUseCount", swiftField: "AgentCompletedOutput.totalToolUseCount", status: "PASS", category: "agentOutput"),
+            FieldMapping(tsField: "AgentOutput.totalDurationMs", swiftField: "AgentCompletedOutput.totalDurationMs", status: "PASS", category: "agentOutput"),
+            FieldMapping(tsField: "AgentOutput.totalTokens", swiftField: "AgentCompletedOutput.totalTokens", status: "PASS", category: "agentOutput"),
+            FieldMapping(tsField: "AgentOutput.usage", swiftField: "AgentCompletedOutput.usage: TokenUsage?", status: "PASS", category: "agentOutput"),
+            FieldMapping(tsField: "AgentOutput.outputFile", swiftField: "AsyncLaunchedOutput.outputFile: String?", status: "PASS", category: "agentOutput"),
+            FieldMapping(tsField: "AgentOutput.canReadOutputFile", swiftField: "AsyncLaunchedOutput.canReadOutputFile: Bool", status: "PASS", category: "agentOutput"),
+            FieldMapping(tsField: "AgentOutput.prompt", swiftField: "AgentCompletedOutput.prompt / AsyncLaunchedOutput.prompt", status: "PASS", category: "agentOutput"),
 
             // Subagent hooks (3 verifications)
             FieldMapping(tsField: "HookEvent.SubagentStart", swiftField: "HookEvent.subagentStart", status: "PASS", category: "hooks"),
             FieldMapping(tsField: "HookEvent.SubagentStop", swiftField: "HookEvent.subagentStop", status: "PASS", category: "hooks"),
             FieldMapping(tsField: "SubagentHookInput fields", swiftField: "HookInput (generic)", status: "PARTIAL", category: "hooks"),
 
-            // SubAgentSpawner (9 TS params, 5 covered)
+            // SubAgentSpawner (9 TS params)
             FieldMapping(tsField: "Spawner.prompt", swiftField: "spawn(prompt:)", status: "PASS", category: "spawner"),
             FieldMapping(tsField: "Spawner.model", swiftField: "spawn(model:)", status: "PASS", category: "spawner"),
             FieldMapping(tsField: "Spawner.systemPrompt", swiftField: "spawn(systemPrompt:)", status: "PASS", category: "spawner"),
             FieldMapping(tsField: "Spawner.tools (allowedTools)", swiftField: "spawn(allowedTools:)", status: "PASS", category: "spawner"),
             FieldMapping(tsField: "Spawner.maxTurns", swiftField: "spawn(maxTurns:)", status: "PASS", category: "spawner"),
-            FieldMapping(tsField: "Spawner.disallowedTools", swiftField: "NO EQUIVALENT", status: "MISSING", category: "spawner"),
-            FieldMapping(tsField: "Spawner.mcpServers", swiftField: "NO EQUIVALENT", status: "MISSING", category: "spawner"),
-            FieldMapping(tsField: "Spawner.skills", swiftField: "NO EQUIVALENT", status: "MISSING", category: "spawner"),
-            FieldMapping(tsField: "Spawner.runInBackground", swiftField: "NO EQUIVALENT", status: "MISSING", category: "spawner"),
+            FieldMapping(tsField: "Spawner.disallowedTools", swiftField: "spawn(disallowedTools:)", status: "PASS", category: "spawner"),
+            FieldMapping(tsField: "Spawner.mcpServers", swiftField: "spawn(mcpServers:)", status: "PASS", category: "spawner"),
+            FieldMapping(tsField: "Spawner.skills", swiftField: "spawn(skills:)", status: "PASS", category: "spawner"),
+            FieldMapping(tsField: "Spawner.runInBackground", swiftField: "spawn(runInBackground:)", status: "PASS", category: "spawner"),
 
             // Builtin agents (3 verifications)
             FieldMapping(tsField: "BuiltinAgents.Explore", swiftField: "BUILTIN_AGENTS[Explore]", status: "PASS", category: "builtins"),
             FieldMapping(tsField: "BuiltinAgents.Plan", swiftField: "BUILTIN_AGENTS[Plan]", status: "PASS", category: "builtins"),
-            FieldMapping(tsField: "registerAgents()", swiftField: "NO EQUIVALENT", status: "MISSING", category: "builtins"),
+            FieldMapping(tsField: "registerAgents()", swiftField: "NO EQUIVALENT (design difference)", status: "N/A", category: "builtins"),
         ]
 
         let passCount = allFields.filter { $0.status == "PASS" }.count
@@ -683,20 +683,20 @@ final class SubagentSystemCompatTests: XCTestCase {
         let missingCount = allFields.filter { $0.status == "MISSING" }.count
 
         XCTAssertEqual(allFields.count, 49, "Should have exactly 49 subagent system field verifications")
-        XCTAssertEqual(passCount, 21, "21 items PASS")
+        XCTAssertEqual(passCount, 45, "45 items PASS")
         XCTAssertEqual(partialCount, 3, "3 items PARTIAL")
-        XCTAssertEqual(missingCount, 25, "25 items MISSING")
+        XCTAssertEqual(missingCount, 0, "0 items MISSING")
     }
 
     /// AC8 [P0]: Category-level breakdown summary.
     func testCompatReport_categoryBreakdown() {
-        // AgentDefinition: 3 PASS + 2 PARTIAL + 4 MISSING = 9
-        // AgentToolInput: 6 PASS + 0 PARTIAL + 5 MISSING = 11
-        // AgentOutput: 3 PASS + 0 PARTIAL + 11 MISSING = 14
+        // AgentDefinition: 7 PASS + 2 PARTIAL + 0 MISSING = 9
+        // AgentToolInput: 11 PASS + 0 PARTIAL + 0 MISSING = 11
+        // AgentOutput: 14 PASS + 0 PARTIAL + 0 MISSING = 14
         // Hooks: 2 PASS + 1 PARTIAL = 3
-        // Spawner: 5 PASS + 0 PARTIAL + 4 MISSING = 9
-        // Builtins: 2 PASS + 0 PARTIAL + 1 MISSING = 3
-        // Total: 22 PASS + 3 PARTIAL + 24 MISSING = 49
+        // Spawner: 9 PASS + 0 PARTIAL + 0 MISSING = 9
+        // Builtins: 2 PASS + 0 PARTIAL + 1 N/A = 3
+        // Total: 45 PASS + 3 PARTIAL + 0 MISSING + 1 N/A = 49 (N/A excluded from PASS/PARTIAL/MISSING)
         let grandTotal = 9 + 11 + 14 + 3 + 9 + 3
 
         XCTAssertEqual(grandTotal, 49, "Total subagent system verifications should be 49")
@@ -704,16 +704,17 @@ final class SubagentSystemCompatTests: XCTestCase {
 
     /// AC8 [P0]: Overall compatibility summary counts.
     func testCompatReport_overallSummary() {
-        // 21 PASS + 3 PARTIAL + 25 MISSING = 49
-        let totalPass = 21
+        // 45 PASS + 3 PARTIAL + 0 MISSING = 48 (1 N/A excluded: registerAgents design difference)
+        // Total with N/A = 49
+        let totalPass = 45
         let totalPartial = 3
-        let totalMissing = 25
+        let totalMissing = 0
         let total = totalPass + totalPartial + totalMissing
 
-        XCTAssertEqual(total, 49, "Total verifications should be 49")
-        XCTAssertEqual(totalPass, 21, "21 items PASS")
+        XCTAssertEqual(total, 48, "Total PASS+PARTIAL+MISSING should be 48 (plus 1 N/A = 49)")
+        XCTAssertEqual(totalPass, 45, "45 items PASS")
         XCTAssertEqual(totalPartial, 3, "3 items PARTIAL")
-        XCTAssertEqual(totalMissing, 25, "25 items MISSING")
+        XCTAssertEqual(totalMissing, 0, "0 items MISSING")
 
         // Coverage rate is derived from the counts above; no separate assertion needed.
     }
