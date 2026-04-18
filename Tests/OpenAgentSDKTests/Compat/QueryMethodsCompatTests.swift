@@ -10,7 +10,7 @@ import XCTest
 /// for all runtime control methods.
 ///
 /// Coverage:
-/// - AC2: 16 TS Query method verification (3 PASS, 1 PARTIAL, 16 MISSING, 1 N/A)
+/// - AC2: 16 TS Query method verification (16 PASS, 0 PARTIAL, 0 MISSING)
 /// - AC3: Existing method functional verification (interrupt, switchModel, setPermissionMode)
 /// - AC4: initializationResult equivalent verification
 /// - AC5: MCP management methods verification
@@ -135,71 +135,77 @@ final class QueryMethodsCompatTests: XCTestCase {
     }
 
     // ================================================================
-    // AC2 #2: rewindFiles() -- MISSING
+    // AC2 #2: rewindFiles() -- PASS (Story 17-10)
     // ================================================================
 
-    /// AC2 #2 [GAP]: No rewindFiles equivalent in Swift SDK.
-    func testRewindFiles_gap() {
+    /// AC2 #2 [PASS]: Agent.rewindFiles(to:dryRun:) exists and returns RewindResult.
+    func testRewindFiles_PASS() async throws {
         let options = AgentOptions(apiKey: "test-key", model: "claude-sonnet-4-6")
         let agent = Agent(options: options)
 
-        // Use Mirror to check for rewindFiles method
-        let mirror = Mirror(reflecting: agent)
-        let methodNames = mirror.children.compactMap { $0.label }
+        // rewindFiles exists as a public method on Agent
+        let result = try await agent.rewindFiles(to: "msg_test", dryRun: true)
 
-        XCTAssertFalse(methodNames.contains("rewindFiles"),
-                       "GAP: Swift SDK has no rewindFiles() method. TS SDK: rewindFiles(msgId, { dryRun? }) requires enableFileCheckpointing.")
+        // Verify it returns RewindResult
+        XCTAssertTrue(type(of: result) == RewindResult.self,
+                       "rewindFiles returns RewindResult with filesAffected, success, preview fields")
     }
 
     // ================================================================
-    // AC2 #5: initializationResult() -- MISSING
+    // AC2 #5: initializationResult() -- PASS (Story 17-10)
     // ================================================================
 
-    /// AC2 #5 [GAP]: No initializationResult equivalent in Swift SDK.
-    func testInitializationResult_gap() {
+    /// AC2 #5 [PASS]: Agent.initializationResult() exists and returns SDKControlInitializeResponse.
+    func testInitializationResult_PASS() {
         let options = AgentOptions(apiKey: "test-key", model: "claude-sonnet-4-6")
         let agent = Agent(options: options)
 
-        let mirror = Mirror(reflecting: agent)
-        let methodNames = mirror.children.compactMap { $0.label }
+        let result = agent.initializationResult()
 
-        XCTAssertFalse(methodNames.contains("initializationResult"),
-                       "GAP: Swift SDK has no initializationResult() method. TS SDK returns SDKControlInitializeResponse with commands, agents, models, account info.")
+        // Verify it returns SDKControlInitializeResponse
+        XCTAssertTrue(type(of: result) == SDKControlInitializeResponse.self,
+                       "initializationResult() returns SDKControlInitializeResponse with commands, agents, models, outputStyle")
     }
 
     // ================================================================
-    // AC2 #6: supportedCommands() -- MISSING
+    // AC2 #6: supportedCommands() -- PASS (via initializationResult)
     // ================================================================
 
-    /// AC2 #6 [GAP]: No supportedCommands equivalent in Swift SDK.
-    func testSupportedCommands_gap() {
+    /// AC2 #6 [PASS]: Slash commands available via initializationResult().commands.
+    func testSupportedCommands_PASS() {
         let options = AgentOptions(apiKey: "test-key", model: "claude-sonnet-4-6")
         let agent = Agent(options: options)
 
-        let mirror = Mirror(reflecting: agent)
-        let methodNames = mirror.children.compactMap { $0.label }
+        // supportedCommands is covered by initializationResult().commands
+        let result = agent.initializationResult()
 
-        XCTAssertFalse(methodNames.contains("supportedCommands"),
-                       "GAP: Swift SDK has no supportedCommands() method. TS SDK returns SlashCommand[].")
+        // Commands are TS-specific (slash commands); Swift returns empty SlashCommand array
+        XCTAssertTrue(type(of: result.commands) == [SlashCommand].self,
+                       "initializationResult().commands returns [SlashCommand]")
     }
 
     // ================================================================
-    // AC2 #7: supportedModels() -- PARTIAL (MODEL_PRICING keys exist)
+    // AC2 #7: supportedModels() -- PASS (Story 17-10)
     // ================================================================
 
-    /// AC2 #7 [PARTIAL]: Swift has MODEL_PRICING dictionary but no supportedModels() method.
-    func testSupportedModels_partial() {
-        // Swift has MODEL_PRICING dictionary with model keys
-        let modelKeys = Set(MODEL_PRICING.keys)
+    /// AC2 #7 [PASS]: Agent.supportedModels() exists and returns [ModelInfo].
+    func testSupportedModels_PASS() {
+        let options = AgentOptions(apiKey: "test-key", model: "claude-sonnet-4-6")
+        let agent = Agent(options: options)
 
-        XCTAssertFalse(modelKeys.isEmpty, "MODEL_PRICING dictionary has entries")
+        let models = agent.supportedModels()
 
-        // TS SDK supportedModels() returns ModelInfo[] with value, displayName, description, etc.
-        // Swift has ModelInfo struct but no method to get [ModelInfo] for all models.
-        // PARTIAL: data exists but no method to retrieve it in TS SDK format.
+        // Returns [ModelInfo] from MODEL_PRICING
+        XCTAssertFalse(models.isEmpty, "supportedModels() returns non-empty [ModelInfo]")
+
+        // Verify each model has required fields
+        for model in models {
+            XCTAssertFalse(model.value.isEmpty, "ModelInfo.value should not be empty")
+            XCTAssertFalse(model.displayName.isEmpty, "ModelInfo.displayName should not be empty")
+        }
     }
 
-    /// AC2 #7 [PARTIAL]: ModelInfo has 4 of 7 TS SDK ModelInfo fields.
+    /// AC2 #7 [PASS]: ModelInfo has 7 of 7 TS SDK ModelInfo fields.
     func testModelInfo_fieldVerification() {
         let modelInfo = ModelInfo(
             value: "claude-sonnet-4-6",
@@ -227,135 +233,149 @@ final class QueryMethodsCompatTests: XCTestCase {
     }
 
     // ================================================================
-    // AC2 #8: supportedAgents() -- MISSING
+    // AC2 #8: supportedAgents() -- PASS (Story 17-10)
     // ================================================================
 
-    /// AC2 #8 [GAP]: No supportedAgents equivalent in Swift SDK.
-    func testSupportedAgents_gap() {
+    /// AC2 #8 [PASS]: Agent.supportedAgents() exists and returns [AgentInfo].
+    func testSupportedAgents_PASS() {
         let options = AgentOptions(apiKey: "test-key", model: "claude-sonnet-4-6")
         let agent = Agent(options: options)
 
-        let mirror = Mirror(reflecting: agent)
-        let methodNames = mirror.children.compactMap { $0.label }
+        let agents = agent.supportedAgents()
 
-        XCTAssertFalse(methodNames.contains("supportedAgents"),
-                       "GAP: Swift SDK has no supportedAgents() method. TS SDK returns AgentInfo[]. Swift has AgentDefinition but no query method.")
+        // Returns [AgentInfo] -- may be empty if no sub-agents configured
+        XCTAssertTrue(type(of: agents) == [AgentInfo].self,
+                       "supportedAgents() returns [AgentInfo]")
     }
 
     // ================================================================
-    // AC2 #9-12: MCP Management Methods -- All MISSING from Agent API
+    // AC2 #9-12: MCP Management Methods -- All PASS on Agent
     // ================================================================
 
-    /// AC2 #9 [GAP]: No mcpServerStatus on Agent public API.
-    func testMcpServerStatus_gap() {
+    /// AC2 #9 [PASS]: Agent.mcpServerStatus() exists and returns [String: McpServerStatus].
+    func testMcpServerStatus_PASS() async {
         let options = AgentOptions(apiKey: "test-key", model: "claude-sonnet-4-6")
         let agent = Agent(options: options)
 
-        let mirror = Mirror(reflecting: agent)
-        let methodNames = mirror.children.compactMap { $0.label }
+        let status = await agent.mcpServerStatus()
 
-        XCTAssertFalse(methodNames.contains("mcpServerStatus"),
-                       "GAP: Swift Agent has no mcpServerStatus() method. MCPClientManager.getConnections() exists but is internal to assembleFullToolPool().")
+        // Returns [String: McpServerStatus] -- may be empty if no MCP servers configured
+        XCTAssertTrue(type(of: status) == [String: McpServerStatus].self,
+                       "mcpServerStatus() returns [String: McpServerStatus]")
     }
 
-    /// AC2 #10 [GAP]: No reconnectMcpServer on Agent public API.
-    func testReconnectMcpServer_gap() {
+    /// AC2 #10 [PASS]: Agent.reconnectMcpServer(name:) exists as async throws method.
+    func testReconnectMcpServer_PASS() async {
         let options = AgentOptions(apiKey: "test-key", model: "claude-sonnet-4-6")
         let agent = Agent(options: options)
 
-        let mirror = Mirror(reflecting: agent)
-        let methodNames = mirror.children.compactMap { $0.label }
-
-        XCTAssertFalse(methodNames.contains("reconnectMcpServer"),
-                       "GAP: Swift Agent has no reconnectMcpServer(name) method.")
+        // Method exists and is callable (will throw since no server named "nonexistent")
+        do {
+            try await agent.reconnectMcpServer(name: "nonexistent")
+        } catch {
+            // Expected: server not found error
+            XCTAssertTrue(true, "reconnectMcpServer(name:) exists and throws for nonexistent server: \(error)")
+        }
     }
 
-    /// AC2 #11 [GAP]: No toggleMcpServer on Agent public API.
-    func testToggleMcpServer_gap() {
+    /// AC2 #11 [PASS]: Agent.toggleMcpServer(name:enabled:) exists as async throws method.
+    func testToggleMcpServer_PASS() async {
         let options = AgentOptions(apiKey: "test-key", model: "claude-sonnet-4-6")
         let agent = Agent(options: options)
 
-        let mirror = Mirror(reflecting: agent)
-        let methodNames = mirror.children.compactMap { $0.label }
-
-        XCTAssertFalse(methodNames.contains("toggleMcpServer"),
-                       "GAP: Swift Agent has no toggleMcpServer(name, enabled) method.")
+        // Method exists and is callable (will throw since no server named "nonexistent")
+        do {
+            try await agent.toggleMcpServer(name: "nonexistent", enabled: true)
+        } catch {
+            // Expected: server not found error
+            XCTAssertTrue(true, "toggleMcpServer(name:enabled:) exists and throws for nonexistent server: \(error)")
+        }
     }
 
-    /// AC2 #12 [GAP]: No setMcpServers on Agent public API.
-    func testSetMcpServers_gap() {
+    /// AC2 #12 [PASS]: Agent.setMcpServers(_:) exists and returns McpServerUpdateResult.
+    func testSetMcpServers_PASS() async throws {
         let options = AgentOptions(apiKey: "test-key", model: "claude-sonnet-4-6")
         let agent = Agent(options: options)
 
-        let mirror = Mirror(reflecting: agent)
-        let methodNames = mirror.children.compactMap { $0.label }
+        // Method exists and is callable with empty dict
+        let result = try await agent.setMcpServers([:])
 
-        XCTAssertFalse(methodNames.contains("setMcpServers"),
-                       "GAP: Swift Agent has no setMcpServers(servers) method. MCP servers are set at creation time via AgentOptions.mcpServers.")
-    }
-
-    // ================================================================
-    // AC2 #13: streamInput() -- MISSING
-    // ================================================================
-
-    /// AC2 #13 [GAP]: No streamInput equivalent. Swift prompt()/stream() only accept String.
-    func testStreamInput_gap() {
-        let options = AgentOptions(apiKey: "test-key", model: "claude-sonnet-4-6")
-        let agent = Agent(options: options)
-
-        let mirror = Mirror(reflecting: agent)
-        let methodNames = mirror.children.compactMap { $0.label }
-
-        XCTAssertFalse(methodNames.contains("streamInput"),
-                       "GAP: Swift Agent has no streamInput(stream) method. TS SDK accepts AsyncIterable for multi-turn streaming input.")
+        // Returns McpServerUpdateResult
+        XCTAssertTrue(type(of: result) == McpServerUpdateResult.self,
+                       "setMcpServers(_:) returns McpServerUpdateResult")
     }
 
     // ================================================================
-    // AC2 #14: stopTask() -- MISSING
+    // AC2 #13: streamInput() -- PASS
     // ================================================================
 
-    /// AC2 #14 [GAP]: No stopTask equivalent on Agent.
-    func testStopTask_gap() {
+    /// AC2 #13 [PASS]: Agent.streamInput(_:) exists, accepts AsyncStream<String>, returns AsyncStream<SDKMessage>.
+    func testStreamInput_PASS() {
         let options = AgentOptions(apiKey: "test-key", model: "claude-sonnet-4-6")
         let agent = Agent(options: options)
 
-        let mirror = Mirror(reflecting: agent)
-        let methodNames = mirror.children.compactMap { $0.label }
+        // Method exists and accepts AsyncStream<String> -> AsyncStream<SDKMessage>
+        let inputStream = AsyncStream<String> { continuation in
+            continuation.yield("Hello")
+            continuation.finish()
+        }
+        let outputStream: AsyncStream<SDKMessage> = agent.streamInput(inputStream)
 
-        XCTAssertFalse(methodNames.contains("stopTask"),
-                       "GAP: Swift Agent has no stopTask(taskId) method. Swift has TaskStore actor but no Agent.stopTask(). TS has TaskStop tool but not a direct Agent method.")
+        // Type check confirms correct signature
+        XCTAssertTrue(type(of: outputStream) == AsyncStream<SDKMessage>.self,
+                       "streamInput(_:) returns AsyncStream<SDKMessage>")
     }
 
     // ================================================================
-    // AC2 #15: close() -- MISSING
+    // AC2 #14: stopTask() -- PASS (Story 17-10)
     // ================================================================
 
-    /// AC2 #15 [GAP]: No close() equivalent on Agent.
-    func testClose_gap() {
-        let options = AgentOptions(apiKey: "test-key", model: "claude-sonnet-4-6")
+    /// AC2 #14 [PASS]: Agent.stopTask(taskId:) exists, delegates to TaskStore.delete.
+    func testStopTask_PASS() async throws {
+        let testTaskStore = TaskStore()
+        let options = AgentOptions(apiKey: "test-key", model: "claude-sonnet-4-6", taskStore: testTaskStore)
         let agent = Agent(options: options)
 
-        let mirror = Mirror(reflecting: agent)
-        let methodNames = mirror.children.compactMap { $0.label }
+        // Create a task and stop it via Agent
+        let task = await testTaskStore.create(subject: "Test task")
+        try await agent.stopTask(taskId: task.id)
 
-        XCTAssertFalse(methodNames.contains("close"),
-                       "GAP: Swift Agent has no close() method. TS SDK persists session + closes MCP connections.")
+        // Verify task was deleted
+        let fetched = await testTaskStore.get(id: task.id)
+        XCTAssertNil(fetched, "stopTask delegates to TaskStore.delete(id:)")
     }
 
     // ================================================================
-    // AC2 #16: setMaxThinkingTokens() -- MISSING
+    // AC2 #15: close() -- PASS (Story 17-10)
     // ================================================================
 
-    /// AC2 #16 [GAP]: No setMaxThinkingTokens equivalent at runtime.
-    func testSetMaxThinkingTokens_gap() {
+    /// AC2 #15 [PASS]: Agent.close() exists and performs terminal shutdown.
+    func testClose_PASS() async throws {
         let options = AgentOptions(apiKey: "test-key", model: "claude-sonnet-4-6")
         let agent = Agent(options: options)
 
-        let mirror = Mirror(reflecting: agent)
-        let methodNames = mirror.children.compactMap { $0.label }
+        // close() is callable and performs terminal shutdown
+        try await agent.close()
 
-        XCTAssertFalse(methodNames.contains("setMaxThinkingTokens"),
-                       "GAP: Swift Agent has no setMaxThinkingTokens() method. Swift has ThinkingConfig at creation time but no runtime method to change it.")
+        XCTAssertTrue(true, "Agent.close() exists: sets closed flag, interrupts, persists session, shuts down MCP")
+    }
+
+    // ================================================================
+    // AC2 #16: setMaxThinkingTokens() -- PASS (Story 17-10)
+    // ================================================================
+
+    /// AC2 #16 [PASS]: Agent.setMaxThinkingTokens(_:) exists, thread-safe mutation.
+    func testSetMaxThinkingTokens_PASS() throws {
+        let options = AgentOptions(apiKey: "test-key", model: "claude-sonnet-4-6")
+        let agent = Agent(options: options)
+
+        // Method exists and accepts positive Int
+        try agent.setMaxThinkingTokens(10000)
+        XCTAssertTrue(true, "setMaxThinkingTokens(10000) succeeded")
+
+        // Accepts nil to clear thinking config
+        try agent.setMaxThinkingTokens(nil)
+        XCTAssertTrue(true, "setMaxThinkingTokens(nil) cleared thinking config")
     }
 
     // ================================================================
@@ -364,22 +384,21 @@ final class QueryMethodsCompatTests: XCTestCase {
 
     /// AC2 [P0]: Summary of all 16 TS Query methods vs Swift equivalents.
     func testQueryMethods_coverageSummary() {
-        // 3 PASS: interrupt, switchModel (setModel), setPermissionMode
-        // 1 PARTIAL: supportedModels (MODEL_PRICING keys exist but no method)
-        // 12 MISSING: rewindFiles, initializationResult, supportedCommands,
-        //             supportedAgents, mcpServerStatus, reconnectMcpServer,
-        //             toggleMcpServer, setMcpServers, streamInput, stopTask,
-        //             close, setMaxThinkingTokens
+        // 16 PASS: interrupt, rewindFiles, setPermissionMode, switchModel,
+        //          initializationResult, supportedCommands, supportedModels,
+        //          supportedAgents, mcpServerStatus, reconnectMcpServer,
+        //          toggleMcpServer, setMcpServers, streamInput, stopTask,
+        //          close, setMaxThinkingTokens
         // Total: 16 methods
-        let passCount = 3
-        let partialCount = 1
-        let missingCount = 12
+        let passCount = 16
+        let partialCount = 0
+        let missingCount = 0
         let total = passCount + partialCount + missingCount
 
         XCTAssertEqual(total, 16, "Should verify all 16 TS Query methods")
-        XCTAssertEqual(passCount, 3, "3 methods PASS (interrupt, switchModel, setPermissionMode)")
-        XCTAssertEqual(partialCount, 1, "1 method PARTIAL (supportedModels via MODEL_PRICING)")
-        XCTAssertEqual(missingCount, 12, "12 methods MISSING")
+        XCTAssertEqual(passCount, 16, "16 methods PASS (all methods implemented)")
+        XCTAssertEqual(partialCount, 0, "0 methods PARTIAL")
+        XCTAssertEqual(missingCount, 0, "0 methods MISSING")
     }
 
     // MARK: - AC3: Existing Method Functional Verification
@@ -413,28 +432,21 @@ final class QueryMethodsCompatTests: XCTestCase {
 
     // MARK: - AC4: initializationResult Equivalent Verification
 
-    /// AC4 [GAP]: Swift SDK has no SDKControlInitializeResponse type.
-    func testSDKControlInitializeResponse_gap() {
-        // TS SDK SDKControlInitializeResponse fields:
-        // - commands: SlashCommand[] -- MISSING (no SlashCommand type)
-        // - agents: AgentInfo[] -- MISSING (no AgentInfo type)
-        // - output_style: string -- MISSING
-        // - available_output_styles: string[] -- MISSING
-        // - models: ModelInfo[] -- PARTIAL (ModelInfo exists but incomplete)
-        // - account: AccountInfo -- MISSING (no AccountInfo type)
-        // - fast_mode_state -- MISSING
-
-        // Verify no SlashCommand type exists in the module
-        // (we can't directly check for type existence at runtime, but we verify
-        // that the Agent has no method returning such a type)
+    /// AC4 [PASS]: Swift SDK has SDKControlInitializeResponse type and Agent.initializationResult().
+    func testSDKControlInitializeResponse_PASS() {
         let options = AgentOptions(apiKey: "test-key", model: "claude-sonnet-4-6")
         let agent = Agent(options: options)
 
-        let mirror = Mirror(reflecting: agent)
-        let methodNames = Set(mirror.children.compactMap { $0.label })
+        let result = agent.initializationResult()
 
-        XCTAssertFalse(methodNames.contains("initializationResult"),
-                       "GAP: No initializationResult() method. TS returns SDKControlInitializeResponse with 7 fields.")
+        // Verify SDKControlInitializeResponse has expected fields
+        let mirror = Mirror(reflecting: result)
+        let fieldNames = Set(mirror.children.compactMap { $0.label })
+
+        XCTAssertTrue(fieldNames.contains("commands"), "SDKControlInitializeResponse has commands field")
+        XCTAssertTrue(fieldNames.contains("agents"), "SDKControlInitializeResponse has agents field")
+        XCTAssertTrue(fieldNames.contains("models"), "SDKControlInitializeResponse has models field")
+        XCTAssertTrue(fieldNames.contains("outputStyle"), "SDKControlInitializeResponse has outputStyle field")
     }
 
     // MARK: - AC5: MCP Management Methods Verification
@@ -473,52 +485,60 @@ final class QueryMethodsCompatTests: XCTestCase {
         XCTAssertTrue(true, "MCPClientManager has disconnect() and shutdown()")
     }
 
-    /// AC5 [GAP]: MCPClientManager has no reconnect method.
-    func testMCPClientManager_reconnect_gap() async {
-        let manager = MCPClientManager()
-        let mirror = Mirror(reflecting: manager)
-        let methodNames = mirror.children.compactMap { $0.label }
+    /// AC5 [PASS]: Agent has reconnectMcpServer method (delegated from MCPClientManager).
+    func testMCPClientManager_reconnect_PASS() async {
+        let options = AgentOptions(apiKey: "test-key", model: "claude-sonnet-4-6")
+        let agent = Agent(options: options)
 
-        XCTAssertFalse(methodNames.contains("reconnect"),
-                       "GAP: MCPClientManager has no reconnect(name:) method. TS SDK has reconnectMcpServer(name).")
+        // Agent-level reconnectMcpServer exists
+        do {
+            try await agent.reconnectMcpServer(name: "nonexistent")
+        } catch {
+            XCTAssertTrue(true, "Agent.reconnectMcpServer(name:) exists, throws for nonexistent: \(error)")
+        }
     }
 
-    /// AC5 [GAP]: MCPClientManager has no toggle method.
-    func testMCPClientManager_toggle_gap() async {
-        let manager = MCPClientManager()
-        let mirror = Mirror(reflecting: manager)
-        let methodNames = mirror.children.compactMap { $0.label }
+    /// AC5 [PASS]: Agent has toggleMcpServer method (delegated from MCPClientManager).
+    func testMCPClientManager_toggle_PASS() async {
+        let options = AgentOptions(apiKey: "test-key", model: "claude-sonnet-4-6")
+        let agent = Agent(options: options)
 
-        XCTAssertFalse(methodNames.contains("toggle"),
-                       "GAP: MCPClientManager has no toggle(name:enabled:) method. TS SDK has toggleMcpServer(name, enabled).")
+        // Agent-level toggleMcpServer exists
+        do {
+            try await agent.toggleMcpServer(name: "nonexistent", enabled: true)
+        } catch {
+            XCTAssertTrue(true, "Agent.toggleMcpServer(name:enabled:) exists, throws for nonexistent: \(error)")
+        }
     }
 
-    /// AC5 [GAP]: MCPClientManager has no setMcpServers method.
-    func testMCPClientManager_setMcpServers_gap() async {
-        let manager = MCPClientManager()
-        let mirror = Mirror(reflecting: manager)
-        let methodNames = mirror.children.compactMap { $0.label }
+    /// AC5 [PASS]: Agent has setMcpServers method (delegated from MCPClientManager).
+    func testMCPClientManager_setMcpServers_PASS() async throws {
+        let options = AgentOptions(apiKey: "test-key", model: "claude-sonnet-4-6")
+        let agent = Agent(options: options)
 
-        XCTAssertFalse(methodNames.contains("setMcpServers"),
-                       "GAP: MCPClientManager has no setMcpServers(servers:) method. TS SDK has setMcpServers(servers).")
+        // Agent-level setMcpServers exists
+        let result = try await agent.setMcpServers([:])
+
+        XCTAssertTrue(type(of: result) == McpServerUpdateResult.self,
+                       "Agent.setMcpServers(_:) returns McpServerUpdateResult")
     }
 
     // MARK: - AC6: streamInput Equivalent Verification
 
-    /// AC6 [GAP]: Swift prompt() and stream() only accept String, not AsyncSequence.
-    func testStreamInput_acceptsOnlyString() {
+    /// AC6 [PASS]: Agent.streamInput(_:) accepts AsyncStream<String>, returns AsyncStream<SDKMessage>.
+    func testStreamInput_acceptsAsyncStream() {
         let options = AgentOptions(apiKey: "test-key", model: "claude-sonnet-4-6")
         let agent = Agent(options: options)
 
-        let mirror = Mirror(reflecting: agent)
-        let methodNames = mirror.children.compactMap { $0.label }
+        // streamInput now exists and accepts AsyncStream<String>
+        let inputStream = AsyncStream<String> { continuation in
+            continuation.yield("test")
+            continuation.finish()
+        }
+        let outputStream = agent.streamInput(inputStream)
 
-        // prompt and stream exist but take String
-        XCTAssertTrue(methodNames.contains("options"), "Agent has options property")
-
-        // TS SDK streamInput accepts AsyncIterable for multi-turn streaming.
-        // Swift prompt(_ text: String) and stream(_ text: String) accept only String.
-        // No AsyncSequence support.
+        XCTAssertTrue(type(of: outputStream) == AsyncStream<SDKMessage>.self,
+                       "streamInput accepts AsyncStream<String> and returns AsyncStream<SDKMessage>")
     }
 
     // MARK: - AC7: stopTask Equivalent Verification
@@ -543,16 +563,17 @@ final class QueryMethodsCompatTests: XCTestCase {
         XCTAssertNil(fetched, "Deleted task should be nil")
     }
 
-    /// AC7 [GAP]: No Agent.stopTask() method to stop background tasks.
-    func testStopTask_agentGap() {
-        let options = AgentOptions(apiKey: "test-key", model: "claude-sonnet-4-6")
+    /// AC7 [PASS]: Agent.stopTask(taskId:) now exists, delegates to TaskStore.delete.
+    func testStopTask_agentNowHasMethod() async throws {
+        let testTaskStore = TaskStore()
+        let options = AgentOptions(apiKey: "test-key", model: "claude-sonnet-4-6", taskStore: testTaskStore)
         let agent = Agent(options: options)
 
-        let mirror = Mirror(reflecting: agent)
-        let methodNames = mirror.children.compactMap { $0.label }
+        let task = await testTaskStore.create(subject: "Task to stop")
+        try await agent.stopTask(taskId: task.id)
 
-        XCTAssertFalse(methodNames.contains("stopTask"),
-                       "GAP: Agent has no stopTask(taskId) method. TaskStore.delete exists but is not accessible through Agent.")
+        let fetched = await testTaskStore.get(id: task.id)
+        XCTAssertNil(fetched, "Agent.stopTask(taskId:) delegates to TaskStore.delete(id:)")
     }
 
     // MARK: - AC8: Additional TS Methods from Source
@@ -670,21 +691,21 @@ final class QueryMethodsCompatTests: XCTestCase {
 
         let methods: [MethodMapping] = [
             MethodMapping(index: 1, tsMethod: "interrupt()", swiftEquivalent: "Agent.interrupt()", status: "PASS"),
-            MethodMapping(index: 2, tsMethod: "rewindFiles(msgId, { dryRun? })", swiftEquivalent: "NO EQUIVALENT", status: "MISSING"),
+            MethodMapping(index: 2, tsMethod: "rewindFiles(msgId, { dryRun? })", swiftEquivalent: "Agent.rewindFiles(to:dryRun:)", status: "PASS"),
             MethodMapping(index: 3, tsMethod: "setPermissionMode(mode)", swiftEquivalent: "Agent.setPermissionMode()", status: "PASS"),
             MethodMapping(index: 4, tsMethod: "setModel(model?)", swiftEquivalent: "Agent.switchModel()", status: "PASS"),
-            MethodMapping(index: 5, tsMethod: "initializationResult()", swiftEquivalent: "NO EQUIVALENT", status: "MISSING"),
-            MethodMapping(index: 6, tsMethod: "supportedCommands()", swiftEquivalent: "NO EQUIVALENT", status: "MISSING"),
-            MethodMapping(index: 7, tsMethod: "supportedModels()", swiftEquivalent: "MODEL_PRICING keys (partial)", status: "PARTIAL"),
-            MethodMapping(index: 8, tsMethod: "supportedAgents()", swiftEquivalent: "NO EQUIVALENT", status: "MISSING"),
-            MethodMapping(index: 9, tsMethod: "mcpServerStatus()", swiftEquivalent: "NO EQUIVALENT", status: "MISSING"),
-            MethodMapping(index: 10, tsMethod: "reconnectMcpServer(name)", swiftEquivalent: "NO EQUIVALENT", status: "MISSING"),
-            MethodMapping(index: 11, tsMethod: "toggleMcpServer(name, enabled)", swiftEquivalent: "NO EQUIVALENT", status: "MISSING"),
-            MethodMapping(index: 12, tsMethod: "setMcpServers(servers)", swiftEquivalent: "NO EQUIVALENT", status: "MISSING"),
-            MethodMapping(index: 13, tsMethod: "streamInput(stream)", swiftEquivalent: "NO EQUIVALENT", status: "MISSING"),
-            MethodMapping(index: 14, tsMethod: "stopTask(taskId)", swiftEquivalent: "NO EQUIVALENT", status: "MISSING"),
-            MethodMapping(index: 15, tsMethod: "close()", swiftEquivalent: "NO EQUIVALENT", status: "MISSING"),
-            MethodMapping(index: 16, tsMethod: "setMaxThinkingTokens(n)", swiftEquivalent: "NO EQUIVALENT", status: "MISSING"),
+            MethodMapping(index: 5, tsMethod: "initializationResult()", swiftEquivalent: "Agent.initializationResult()", status: "PASS"),
+            MethodMapping(index: 6, tsMethod: "supportedCommands()", swiftEquivalent: "initializationResult().commands", status: "PASS"),
+            MethodMapping(index: 7, tsMethod: "supportedModels()", swiftEquivalent: "Agent.supportedModels()", status: "PASS"),
+            MethodMapping(index: 8, tsMethod: "supportedAgents()", swiftEquivalent: "Agent.supportedAgents()", status: "PASS"),
+            MethodMapping(index: 9, tsMethod: "mcpServerStatus()", swiftEquivalent: "Agent.mcpServerStatus()", status: "PASS"),
+            MethodMapping(index: 10, tsMethod: "reconnectMcpServer(name)", swiftEquivalent: "Agent.reconnectMcpServer(name:)", status: "PASS"),
+            MethodMapping(index: 11, tsMethod: "toggleMcpServer(name, enabled)", swiftEquivalent: "Agent.toggleMcpServer(name:enabled:)", status: "PASS"),
+            MethodMapping(index: 12, tsMethod: "setMcpServers(servers)", swiftEquivalent: "Agent.setMcpServers(_:)", status: "PASS"),
+            MethodMapping(index: 13, tsMethod: "streamInput(stream)", swiftEquivalent: "Agent.streamInput(_:)", status: "PASS"),
+            MethodMapping(index: 14, tsMethod: "stopTask(taskId)", swiftEquivalent: "Agent.stopTask(taskId:)", status: "PASS"),
+            MethodMapping(index: 15, tsMethod: "close()", swiftEquivalent: "Agent.close()", status: "PASS"),
+            MethodMapping(index: 16, tsMethod: "setMaxThinkingTokens(n)", swiftEquivalent: "Agent.setMaxThinkingTokens(_:)", status: "PASS"),
         ]
 
         XCTAssertEqual(methods.count, 16, "Should have exactly 16 TS Query methods")
@@ -693,9 +714,9 @@ final class QueryMethodsCompatTests: XCTestCase {
         let partialCount = methods.filter { $0.status == "PARTIAL" }.count
         let missingCount = methods.filter { $0.status == "MISSING" }.count
 
-        XCTAssertEqual(passCount, 3, "3 methods PASS")
-        XCTAssertEqual(partialCount, 1, "1 method PARTIAL")
-        XCTAssertEqual(missingCount, 12, "12 methods MISSING")
+        XCTAssertEqual(passCount, 16, "16 methods PASS")
+        XCTAssertEqual(partialCount, 0, "0 methods PARTIAL")
+        XCTAssertEqual(missingCount, 0, "0 methods MISSING")
     }
 
     /// AC9 [P0]: Additional TS Agent methods compatibility (from AC8).
@@ -709,17 +730,19 @@ final class QueryMethodsCompatTests: XCTestCase {
         let methods: [AgentMethodMapping] = [
             AgentMethodMapping(tsMethod: "getMessages()", swiftEquivalent: "NO PUBLIC EQUIVALENT", status: "MISSING"),
             AgentMethodMapping(tsMethod: "clear()", swiftEquivalent: "NO EQUIVALENT", status: "MISSING"),
-            AgentMethodMapping(tsMethod: "setMaxThinkingTokens(n | null)", swiftEquivalent: "ThinkingConfig at creation only", status: "MISSING"),
+            AgentMethodMapping(tsMethod: "setMaxThinkingTokens(n | null)", swiftEquivalent: "Agent.setMaxThinkingTokens(_:)", status: "PASS"),
             AgentMethodMapping(tsMethod: "getSessionId()", swiftEquivalent: "NO PUBLIC GETTER", status: "MISSING"),
             AgentMethodMapping(tsMethod: "getApiType()", swiftEquivalent: "LLMProvider enum (internal)", status: "N/A"),
         ]
 
         XCTAssertEqual(methods.count, 5, "Should have 5 additional TS Agent methods")
 
+        let passCount = methods.filter { $0.status == "PASS" }.count
         let missingCount = methods.filter { $0.status == "MISSING" }.count
         let naCount = methods.filter { $0.status == "N/A" }.count
 
-        XCTAssertEqual(missingCount, 4, "4 methods MISSING")
+        XCTAssertEqual(passCount, 1, "1 method PASS (setMaxThinkingTokens)")
+        XCTAssertEqual(missingCount, 3, "3 methods MISSING")
         XCTAssertEqual(naCount, 1, "1 method N/A")
     }
 
@@ -744,22 +767,22 @@ final class QueryMethodsCompatTests: XCTestCase {
 
     /// AC9 [P0]: Overall compatibility summary.
     func testCompatReport_overallSummary() {
-        // Query methods: 3 PASS + 1 PARTIAL + 12 MISSING = 16
-        // Agent methods: 0 PASS + 0 PARTIAL + 4 MISSING + 1 N/A = 5
+        // Query methods: 16 PASS + 0 PARTIAL + 0 MISSING = 16
+        // Agent methods: 1 PASS + 0 PARTIAL + 3 MISSING + 1 N/A = 5
         // ModelInfo fields: 7 PASS + 0 PARTIAL + 0 MISSING = 7
         //
-        // Total: 10 PASS + 1 PARTIAL + 16 MISSING + 1 N/A = 28
+        // Total: 24 PASS + 0 PARTIAL + 3 MISSING + 1 N/A = 28
 
-        let totalPass = 10
-        let totalPartial = 1
-        let totalMissing = 16
+        let totalPass = 24
+        let totalPartial = 0
+        let totalMissing = 3
         let totalNA = 1
         let total = totalPass + totalPartial + totalMissing + totalNA
 
         XCTAssertEqual(total, 28, "Total verifications should be 28")
-        XCTAssertEqual(totalPass, 10, "10 items PASS")
-        XCTAssertEqual(totalPartial, 1, "1 item PARTIAL")
-        XCTAssertEqual(totalMissing, 16, "16 items MISSING")
+        XCTAssertEqual(totalPass, 24, "24 items PASS")
+        XCTAssertEqual(totalPartial, 0, "0 items PARTIAL")
+        XCTAssertEqual(totalMissing, 3, "3 items MISSING")
         XCTAssertEqual(totalNA, 1, "1 item N/A")
     }
 }

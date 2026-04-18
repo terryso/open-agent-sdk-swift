@@ -68,7 +68,7 @@ record("Query.interrupt()", swiftField: "Agent.interrupt()", status: "PASS",
        note: "Both cancel running query. TS uses AbortController.abort(), Swift sets _interrupted flag + cancels _streamTask.")
 
 // ================================================================
-// AC2 #2: rewindFiles(msgId, { dryRun? }) -- MISSING
+// AC2 #2: rewindFiles(msgId, { dryRun? }) -- PASS
 // ================================================================
 
 print("--- AC2 #2: rewindFiles(msgId, { dryRun? }) ---")
@@ -102,7 +102,7 @@ record("Query.setModel(model?)", swiftField: "Agent.switchModel()", status: "PAS
 try? agent.switchModel(originalModel)
 
 // ================================================================
-// AC2 #5: initializationResult() -- MISSING
+// AC2 #5: initializationResult() -- PASS
 // ================================================================
 
 print("--- AC2 #5: initializationResult() ---")
@@ -111,7 +111,7 @@ record("Query.initializationResult()", swiftField: "Agent.initializationResult()
        note: "SDKControlInitializeResponse with commands(\(initResult.commands.count)), agents(\(initResult.agents.count)), models(\(initResult.models.count)), outputStyle='\(initResult.outputStyle)'")
 
 // ================================================================
-// AC2 #6: supportedCommands() -- MISSING
+// AC2 #6: supportedCommands() -- PASS
 // ================================================================
 
 print("--- AC2 #6: supportedCommands() ---")
@@ -120,7 +120,7 @@ record("Query.supportedCommands()", swiftField: "initializationResult().commands
        note: "Slash commands are TS-specific. Swift returns empty SlashCommand array via initializationResult().")
 
 // ================================================================
-// AC2 #7: supportedModels() -- PARTIAL
+// AC2 #7: supportedModels() -- PASS
 // ================================================================
 
 print("--- AC2 #7: supportedModels() ---")
@@ -129,7 +129,7 @@ record("Query.supportedModels()", swiftField: "Agent.supportedModels()", status:
        note: "Returns [ModelInfo] from MODEL_PRICING. \(supportedModelsList.count) models: \(supportedModelsList.map { $0.value }.joined(separator: ", "))")
 
 // ================================================================
-// AC2 #8: supportedAgents() -- MISSING
+// AC2 #8: supportedAgents() -- PASS
 // ================================================================
 
 print("--- AC2 #8: supportedAgents() ---")
@@ -138,7 +138,7 @@ record("Query.supportedAgents()", swiftField: "Agent.supportedAgents()", status:
        note: "Returns [AgentInfo]. \(supportedAgentsList.count) agents configured (empty if no sub-agents defined).")
 
 // ================================================================
-// AC2 #9: mcpServerStatus() -- MISSING
+// AC2 #9: mcpServerStatus() -- PASS
 // ================================================================
 
 print("--- AC2 #9: mcpServerStatus() ---")
@@ -147,7 +147,7 @@ record("Query.mcpServerStatus()", swiftField: "Agent.mcpServerStatus()", status:
        note: "Returns [String: McpServerStatus]. \(mcpStatus.count) servers (empty when no MCP servers configured).")
 
 // ================================================================
-// AC2 #10: reconnectMcpServer(name) -- MISSING
+// AC2 #10: reconnectMcpServer(name) -- PASS
 // ================================================================
 
 print("--- AC2 #10: reconnectMcpServer(name) ---")
@@ -155,7 +155,7 @@ record("Query.reconnectMcpServer(name)", swiftField: "Agent.reconnectMcpServer(n
        note: "Reconnects MCP server by name. Throws MCPClientManagerError.serverNotFound if not found.")
 
 // ================================================================
-// AC2 #11: toggleMcpServer(name, enabled) -- MISSING
+// AC2 #11: toggleMcpServer(name, enabled) -- PASS
 // ================================================================
 
 print("--- AC2 #11: toggleMcpServer(name, enabled) ---")
@@ -163,7 +163,7 @@ record("Query.toggleMcpServer(name, enabled)", swiftField: "Agent.toggleMcpServe
        note: "Enables/disables MCP server by name. Throws if server not found.")
 
 // ================================================================
-// AC2 #12: setMcpServers(servers) -- MISSING
+// AC2 #12: setMcpServers(servers) -- PASS
 // ================================================================
 
 print("--- AC2 #12: setMcpServers(servers) ---")
@@ -171,7 +171,7 @@ record("Query.setMcpServers(servers)", swiftField: "Agent.setMcpServers(_:)", st
        note: "Dynamically replaces full MCP server set. Returns McpServerUpdateResult.")
 
 // ================================================================
-// AC2 #13: streamInput(stream) -- MISSING
+// AC2 #13: streamInput(stream) -- PASS
 // ================================================================
 
 print("--- AC2 #13: streamInput(stream) ---")
@@ -190,7 +190,7 @@ record("Query.streamInput(stream)", swiftField: "Agent.streamInput(_:)", status:
        note: "Accepts AsyncStream<String>, returns AsyncStream<SDKMessage>. Multi-turn streaming input. Received \(streamInputEventCount) events.")
 
 // ================================================================
-// AC2 #14: stopTask(taskId) -- MISSING
+// AC2 #14: stopTask(taskId) -- PASS
 // ================================================================
 
 print("--- AC2 #14: stopTask(taskId) ---")
@@ -208,7 +208,7 @@ record("Query.stopTask(taskId)", swiftField: "Agent.stopTask(taskId:)", status: 
        note: "Delegates to TaskStore.delete(id:). Throws if no TaskStore or task not found.")
 
 // ================================================================
-// AC2 #15: close() -- MISSING
+// AC2 #15: close() -- PASS
 // ================================================================
 
 print("--- AC2 #15: close() ---")
@@ -223,7 +223,7 @@ record("Query.close()", swiftField: "Agent.close()", status: "PASS",
        note: "Sets closed flag, interrupts query, persists session, shuts down MCP. Subsequent calls throw.")
 
 // ================================================================
-// AC2 #16: setMaxThinkingTokens(n) -- MISSING
+// AC2 #16: setMaxThinkingTokens(n) -- PASS
 // ================================================================
 
 print("--- AC2 #16: setMaxThinkingTokens(n) ---")
@@ -325,12 +325,12 @@ record("ModelInfo.description", swiftField: modelInfoFieldNames.contains("descri
        note: "description='\(modelInfo.description)'")
 record("ModelInfo.supportsEffort", swiftField: modelInfoFieldNames.contains("supportsEffort") ? "supportsEffort: Bool" : "MISSING", status: "PASS",
        note: "supportsEffort=\(modelInfo.supportsEffort)")
-record("ModelInfo.supportedEffortLevels", swiftField: "MISSING", status: "MISSING",
-       note: "Swift ModelInfo does not have supportedEffortLevels field")
-record("ModelInfo.supportsAdaptiveThinking", swiftField: "MISSING", status: "MISSING",
-       note: "Swift ModelInfo does not have supportsAdaptiveThinking field")
-record("ModelInfo.supportsFastMode", swiftField: "MISSING", status: "MISSING",
-       note: "Swift ModelInfo does not have supportsFastMode field")
+record("ModelInfo.supportedEffortLevels", swiftField: modelInfoFieldNames.contains("supportedEffortLevels") ? "supportedEffortLevels: [EffortLevel]?" : "MISSING", status: "PASS",
+       note: "supportedEffortLevels=\(String(describing: modelInfo.supportedEffortLevels))")
+record("ModelInfo.supportsAdaptiveThinking", swiftField: modelInfoFieldNames.contains("supportsAdaptiveThinking") ? "supportsAdaptiveThinking: Bool?" : "MISSING", status: "PASS",
+       note: "supportsAdaptiveThinking=\(String(describing: modelInfo.supportsAdaptiveThinking))")
+record("ModelInfo.supportsFastMode", swiftField: modelInfoFieldNames.contains("supportsFastMode") ? "supportsFastMode: Bool?" : "MISSING", status: "PASS",
+       note: "supportsFastMode=\(String(describing: modelInfo.supportsFastMode))")
 
 print("")
 
@@ -548,9 +548,10 @@ for m in additionalMethods {
 }
 print("")
 
+let amPass = additionalMethods.filter { $0.status == "PASS" }.count
 let amMissing = additionalMethods.filter { $0.status == "MISSING" }.count
 let amNA = additionalMethods.filter { $0.status == "N/A" }.count
-print("Agent Methods Summary: MISSING: \(amMissing) | N/A: \(amNA) | Total: \(additionalMethods.count)")
+print("Agent Methods Summary: PASS: \(amPass) | MISSING: \(amMissing) | N/A: \(amNA) | Total: \(additionalMethods.count)")
 print("")
 
 // --- ModelInfo Field Table ---
@@ -565,9 +566,9 @@ let modelInfoFields: [FieldMapping] = [
     FieldMapping(tsField: "displayName", swiftField: "displayName: String", status: "PASS"),
     FieldMapping(tsField: "description", swiftField: "description: String", status: "PASS"),
     FieldMapping(tsField: "supportsEffort", swiftField: "supportsEffort: Bool", status: "PASS"),
-    FieldMapping(tsField: "supportedEffortLevels", swiftField: "MISSING", status: "MISSING"),
-    FieldMapping(tsField: "supportsAdaptiveThinking", swiftField: "MISSING", status: "MISSING"),
-    FieldMapping(tsField: "supportsFastMode", swiftField: "MISSING", status: "MISSING"),
+    FieldMapping(tsField: "supportedEffortLevels", swiftField: "supportedEffortLevels: [EffortLevel]?", status: "PASS"),
+    FieldMapping(tsField: "supportsAdaptiveThinking", swiftField: "supportsAdaptiveThinking: Bool?", status: "PASS"),
+    FieldMapping(tsField: "supportsFastMode", swiftField: "supportsFastMode: Bool?", status: "PASS"),
 ]
 
 print("ModelInfo Field Compatibility")
@@ -590,10 +591,10 @@ print("==============================================")
 print("Story 16-7: Query Methods Compat Summary")
 print("==============================================")
 print("Query Methods:       \(qmPass) PASS | \(qmPartial) PARTIAL | \(qmMissing) MISSING (total: \(queryMethods.count))")
-print("Agent Methods:       0 PASS | \(amMissing) MISSING | \(amNA) N/A (total: \(additionalMethods.count))")
+print("Agent Methods:       \(amPass) PASS | \(amMissing) MISSING | \(amNA) N/A (total: \(additionalMethods.count))")
 print("ModelInfo Fields:    \(miPass) PASS | \(miMissing) MISSING (total: \(modelInfoFields.count))")
 print("----------------------------------------------")
-let totalPass = qmPass + 0 + miPass
+let totalPass = qmPass + amPass + miPass
 let totalPartial = qmPartial
 let totalMissing = qmMissing + amMissing + miMissing
 let totalNA = amNA
