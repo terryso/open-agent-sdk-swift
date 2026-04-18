@@ -1,5 +1,5 @@
 # generated: 2026-04-04
-# last_updated: 2026-04-18 (story 18-11 done)
+# last_updated: 2026-04-18 (story 18-12 done)
 # project: open-agent-sdk-swift
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-04-04
-last_updated: 2026-04-18 (story 18-11 done)
+last_updated: 2026-04-18 (story 18-12 done)
 project_key: NOKEY
 tracking_system: file-system
 story_location: _bmad-output/implementation-artifacts
@@ -214,7 +214,7 @@ development_status:
   epic-17-retrospective: optional
 
   # Epic 18: 示例与官方 SDK 完全对齐
-  epic-18: in-progress
+  epic-18: done
   18-1-update-compat-core-query: done
   18-2-update-compat-tool-system: done
   18-3-update-compat-message-types: done
@@ -226,5 +226,5 @@ development_status:
   18-9-update-compat-permissions: done
   18-10-update-compat-subagents: done
   18-11-update-compat-thinking-model: done
-  18-12-update-compat-sandbox: backlog
+  18-12-update-compat-sandbox: done
   epic-18-retrospective: optional
