@@ -501,42 +501,45 @@ final class AgentOptionsCompatTests: XCTestCase {
     // MARK: - AC5: Extended Configuration Field-Level Verification (11 fields)
 
     // ================================================================
-    // AC5 #1: settingSources -- MISSING
+    // AC5 #1: settingSources -- PASS
     // ================================================================
 
-    /// AC5 #1 [MISSING]: TS `settingSources: SettingSource[]` has no Swift equivalent.
-    func testSettingSources_missing() {
-        let options = AgentOptions(apiKey: "test-key", model: "test")
+    /// AC5 #1 [PASS]: TS `settingSources: SettingSource[]` maps to `AgentOptions.settingSources: [SettingSource]?`.
+    func testSettingSources_pass() {
+        let options = AgentOptions(apiKey: "test-key", model: "test", settingSources: [.project])
         let fields = fieldNames(of: options)
 
-        XCTAssertFalse(fields.contains("settingSources"),
-                       "GAP: AgentOptions has no 'settingSources' property. TS SDK has settingSources: SettingSource[] for file-based settings source configuration.")
+        XCTAssertTrue(fields.contains("settingSources"),
+                       "AgentOptions.settingSources: [SettingSource]?")
+        XCTAssertEqual(options.settingSources?.first, .project)
     }
 
     // ================================================================
-    // AC5 #2: plugins -- MISSING
+    // AC5 #2: plugins -- PASS
     // ================================================================
 
-    /// AC5 #2 [MISSING]: TS `plugins: SdkPluginConfig[]` has no Swift equivalent.
-    func testPlugins_missing() {
-        let options = AgentOptions(apiKey: "test-key", model: "test")
+    /// AC5 #2 [PASS]: TS `plugins: SdkPluginConfig[]` maps to `AgentOptions.plugins: [SdkPluginConfig]?`.
+    func testPlugins_pass() {
+        let options = AgentOptions(apiKey: "test-key", model: "test", plugins: [SdkPluginConfig(name: "my-plugin")])
         let fields = fieldNames(of: options)
 
-        XCTAssertFalse(fields.contains("plugins"),
-                       "GAP: AgentOptions has no 'plugins' property. TS SDK has plugins: SdkPluginConfig[] for plugin loading.")
+        XCTAssertTrue(fields.contains("plugins"),
+                       "AgentOptions.plugins: [SdkPluginConfig]?")
+        XCTAssertEqual(options.plugins?.first?.name, "my-plugin")
     }
 
     // ================================================================
-    // AC5 #3: betas -- MISSING
+    // AC5 #3: betas -- PASS
     // ================================================================
 
-    /// AC5 #3 [MISSING]: TS `betas: SdkBeta[]` has no Swift equivalent.
-    func testBetas_missing() {
-        let options = AgentOptions(apiKey: "test-key", model: "test")
+    /// AC5 #3 [PASS]: TS `betas: SdkBeta[]` maps to `AgentOptions.betas: [SdkBeta]?`.
+    func testBetas_pass() {
+        let options = AgentOptions(apiKey: "test-key", model: "test", betas: [.maxTurns])
         let fields = fieldNames(of: options)
 
-        XCTAssertFalse(fields.contains("betas"),
-                       "GAP: AgentOptions has no 'betas' property. TS SDK has betas: SdkBeta[] for beta feature flags.")
+        XCTAssertTrue(fields.contains("betas"),
+                       "AgentOptions.betas: [SdkBeta]?")
+        XCTAssertEqual(options.betas?.first?.rawValue, "max-turns")
     }
 
     // ================================================================
@@ -612,42 +615,45 @@ final class AgentOptionsCompatTests: XCTestCase {
     }
 
     // ================================================================
-    // AC5 #9: strictMcpConfig -- MISSING
+    // AC5 #9: strictMcpConfig -- PASS
     // ================================================================
 
-    /// AC5 #9 [MISSING]: TS `strictMcpConfig: boolean` has no Swift equivalent.
-    func testStrictMcpConfig_missing() {
-        let options = AgentOptions(apiKey: "test-key", model: "test")
+    /// AC5 #9 [PASS]: TS `strictMcpConfig: boolean` maps to `AgentOptions.strictMcpConfig: Bool`.
+    func testStrictMcpConfig_pass() {
+        let options = AgentOptions(apiKey: "test-key", model: "test", strictMcpConfig: true)
         let fields = fieldNames(of: options)
 
-        XCTAssertFalse(fields.contains("strictMcpConfig"),
-                       "GAP: AgentOptions has no 'strictMcpConfig' property. TS SDK has strictMcpConfig: boolean for strict MCP config validation.")
+        XCTAssertTrue(fields.contains("strictMcpConfig"),
+                       "AgentOptions.strictMcpConfig: Bool")
+        XCTAssertEqual(options.strictMcpConfig, true)
     }
 
     // ================================================================
-    // AC5 #10: extraArgs -- MISSING
+    // AC5 #10: extraArgs -- PASS
     // ================================================================
 
-    /// AC5 #10 [MISSING]: TS `extraArgs: Record<string, string | null>` has no Swift equivalent.
-    func testExtraArgs_missing() {
-        let options = AgentOptions(apiKey: "test-key", model: "test")
+    /// AC5 #10 [PASS]: TS `extraArgs: Record<string, string | null>` maps to `AgentOptions.extraArgs: [String: String?]?`.
+    func testExtraArgs_pass() {
+        let options = AgentOptions(apiKey: "test-key", model: "test", extraArgs: ["key": "value"])
         let fields = fieldNames(of: options)
 
-        XCTAssertFalse(fields.contains("extraArgs"),
-                       "GAP: AgentOptions has no 'extraArgs' property. TS SDK has extraArgs: Record<string, string | null> for extra argument passthrough.")
+        XCTAssertTrue(fields.contains("extraArgs"),
+                       "AgentOptions.extraArgs: [String: String?]?")
+        XCTAssertEqual(options.extraArgs?["key"] ?? nil, "value")
     }
 
     // ================================================================
-    // AC5 #11: enableFileCheckpointing -- MISSING
+    // AC5 #11: enableFileCheckpointing -- PASS
     // ================================================================
 
-    /// AC5 #11 [MISSING]: TS `enableFileCheckpointing: boolean` has no Swift equivalent.
-    func testEnableFileCheckpointing_missing() {
-        let options = AgentOptions(apiKey: "test-key", model: "test")
+    /// AC5 #11 [PASS]: TS `enableFileCheckpointing: boolean` maps to `AgentOptions.enableFileCheckpointing: Bool`.
+    func testEnableFileCheckpointing_pass() {
+        let options = AgentOptions(apiKey: "test-key", model: "test", enableFileCheckpointing: true)
         let fields = fieldNames(of: options)
 
-        XCTAssertFalse(fields.contains("enableFileCheckpointing"),
-                       "GAP: AgentOptions has no 'enableFileCheckpointing' property. TS SDK has enableFileCheckpointing: boolean for file checkpointing system.")
+        XCTAssertTrue(fields.contains("enableFileCheckpointing"),
+                       "AgentOptions.enableFileCheckpointing: Bool")
+        XCTAssertEqual(options.enableFileCheckpointing, true)
     }
 
     /// AC5 [P0]: Summary of all 11 extended configuration fields.
@@ -822,17 +828,17 @@ final class AgentOptionsCompatTests: XCTestCase {
             FieldMapping(tsField: "persistSession", swiftField: "AgentOptions.persistSession", status: "PASS", category: "session"),
 
             // Extended configuration (11 fields)
-            FieldMapping(tsField: "settingSources", swiftField: "NO EQUIVALENT", status: "MISSING", category: "extended"),
-            FieldMapping(tsField: "plugins", swiftField: "NO EQUIVALENT", status: "MISSING", category: "extended"),
-            FieldMapping(tsField: "betas", swiftField: "NO EQUIVALENT", status: "MISSING", category: "extended"),
+            FieldMapping(tsField: "settingSources", swiftField: "AgentOptions.settingSources: [SettingSource]?", status: "PASS", category: "extended"),
+            FieldMapping(tsField: "plugins", swiftField: "AgentOptions.plugins: [SdkPluginConfig]?", status: "PASS", category: "extended"),
+            FieldMapping(tsField: "betas", swiftField: "AgentOptions.betas: [SdkBeta]?", status: "PASS", category: "extended"),
             FieldMapping(tsField: "executable", swiftField: "N/A (Swift runtime)", status: "N/A", category: "extended"),
             FieldMapping(tsField: "spawnClaudeCodeProcess", swiftField: "N/A (Swift process)", status: "N/A", category: "extended"),
             FieldMapping(tsField: "additionalDirectories", swiftField: "skillDirectories (partial)", status: "PARTIAL", category: "extended"),
             FieldMapping(tsField: "debug / debugFile", swiftField: "logLevel + logOutput", status: "PARTIAL", category: "extended"),
             FieldMapping(tsField: "stderr", swiftField: "LogOutput.custom", status: "PARTIAL", category: "extended"),
-            FieldMapping(tsField: "strictMcpConfig", swiftField: "NO EQUIVALENT", status: "MISSING", category: "extended"),
-            FieldMapping(tsField: "extraArgs", swiftField: "NO EQUIVALENT", status: "MISSING", category: "extended"),
-            FieldMapping(tsField: "enableFileCheckpointing", swiftField: "NO EQUIVALENT", status: "MISSING", category: "extended"),
+            FieldMapping(tsField: "strictMcpConfig", swiftField: "AgentOptions.strictMcpConfig: Bool", status: "PASS", category: "extended"),
+            FieldMapping(tsField: "extraArgs", swiftField: "AgentOptions.extraArgs: [String: String?]?", status: "PASS", category: "extended"),
+            FieldMapping(tsField: "enableFileCheckpointing", swiftField: "AgentOptions.enableFileCheckpointing: Bool", status: "PASS", category: "extended"),
         ]
 
         XCTAssertEqual(allFields.count, 37, "Should have exactly 37 TS SDK Options fields")
@@ -842,9 +848,9 @@ final class AgentOptionsCompatTests: XCTestCase {
         let missingCount = allFields.filter { $0.status == "MISSING" }.count
         let naCount = allFields.filter { $0.status == "N/A" }.count
 
-        XCTAssertEqual(passCount, 23, "23 fields PASS")
+        XCTAssertEqual(passCount, 29, "29 fields PASS")
         XCTAssertEqual(partialCount, 6, "6 fields PARTIAL")
-        XCTAssertEqual(missingCount, 6, "6 fields MISSING")
+        XCTAssertEqual(missingCount, 0, "0 fields MISSING")
         XCTAssertEqual(naCount, 2, "2 fields N/A")
     }
 
@@ -853,8 +859,8 @@ final class AgentOptionsCompatTests: XCTestCase {
         // Core: 11 PASS + 1 PARTIAL + 0 MISSING = 12
         // Advanced: 7 PASS + 2 PARTIAL + 0 MISSING = 9
         // Session: 5 PASS + 0 PARTIAL + 0 MISSING = 5
-        // Extended: 0 PASS + 3 PARTIAL + 6 MISSING + 2 N/A = 11
-        // Total: 23 PASS + 6 PARTIAL + 6 MISSING + 2 N/A = 37
+        // Extended: 6 PASS + 3 PARTIAL + 0 MISSING + 2 N/A = 11
+        // Total: 29 PASS + 6 PARTIAL + 0 MISSING + 2 N/A = 37
 
         let coreTotal = 12
         let advancedTotal = 9
@@ -871,23 +877,23 @@ final class AgentOptionsCompatTests: XCTestCase {
 
     /// AC9 [P0]: Overall compatibility summary counts.
     func testCompatReport_overallSummary() {
-        // 23 PASS + 6 PARTIAL + 6 MISSING + 2 N/A = 37
-        let totalPass = 23
+        // 29 PASS + 6 PARTIAL + 0 MISSING + 2 N/A = 37
+        let totalPass = 29
         let totalPartial = 6
-        let totalMissing = 6
+        let totalMissing = 0
         let totalNA = 2
         let total = totalPass + totalPartial + totalMissing + totalNA
 
         XCTAssertEqual(total, 37, "Total verifications should be 37")
-        XCTAssertEqual(totalPass, 23, "23 items PASS")
+        XCTAssertEqual(totalPass, 29, "29 items PASS")
         XCTAssertEqual(totalPartial, 6, "6 items PARTIAL")
-        XCTAssertEqual(totalMissing, 6, "6 items MISSING")
+        XCTAssertEqual(totalMissing, 0, "0 items MISSING")
         XCTAssertEqual(totalNA, 2, "2 items N/A")
 
-        // Coverage rate: (PASS + PARTIAL) / (PASS + PARTIAL + MISSING) = 29/35 = 82%
+        // Coverage rate: (PASS + PARTIAL) / (PASS + PARTIAL + MISSING) = 35/35 = 100%
         let actionable = totalPass + totalPartial + totalMissing
         let compatRate = Double(totalPass + totalPartial) / Double(actionable) * 100
-        XCTAssertEqual(Int(compatRate), 82, "Pass+Partial rate should be ~82%")
+        XCTAssertEqual(Int(compatRate), 100, "Pass+Partial rate should be 100%")
     }
 
     // MARK: - AgentOptions Property Count Verification

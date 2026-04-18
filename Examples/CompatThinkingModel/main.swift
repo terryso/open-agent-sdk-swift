@@ -407,10 +407,10 @@ let tokenUsageMappings: [FieldMapping] = [
     FieldMapping(index: 2, tsField: "ModelUsage.outputTokens", swiftEquivalent: "TokenUsage.outputTokens: Int", status: "PASS", note: "Direct equivalent"),
     FieldMapping(index: 3, tsField: "ModelUsage.cacheReadInputTokens", swiftEquivalent: "TokenUsage.cacheReadInputTokens: Int?", status: "PASS", note: "Optional, matches TS"),
     FieldMapping(index: 4, tsField: "ModelUsage.cacheCreationInputTokens", swiftEquivalent: "TokenUsage.cacheCreationInputTokens: Int?", status: "PASS", note: "Optional, matches TS"),
-    FieldMapping(index: 5, tsField: "ModelUsage.webSearchRequests", swiftEquivalent: "NO EQUIVALENT", status: "MISSING", note: "No field in Swift"),
+    FieldMapping(index: 5, tsField: "ModelUsage.webSearchRequests", swiftEquivalent: "ModelUsageEntry.webSearchRequests: Int?", status: "PASS", note: "Optional Int field"),
     FieldMapping(index: 6, tsField: "ModelUsage.costUSD", swiftEquivalent: "QueryResult.totalCostUsd + CostBreakdownEntry.costUsd", status: "PARTIAL", note: "Different location"),
     FieldMapping(index: 7, tsField: "ModelUsage.contextWindow", swiftEquivalent: "getContextWindowSize(model:)", status: "PARTIAL", note: "Utility function, not field"),
-    FieldMapping(index: 8, tsField: "ModelUsage.maxOutputTokens", swiftEquivalent: "NO EQUIVALENT", status: "MISSING", note: "No field in Swift"),
+    FieldMapping(index: 8, tsField: "ModelUsage.maxOutputTokens", swiftEquivalent: "ModelUsageEntry.maxOutputTokens: Int?", status: "PASS", note: "Optional Int field"),
     FieldMapping(index: 9, tsField: "CostBreakdownEntry fields", swiftEquivalent: "CostBreakdownEntry(model, inputTokens, outputTokens, costUsd)", status: "PASS", note: "All fields present"),
     FieldMapping(index: 10, tsField: "QueryResult.costBreakdown", swiftEquivalent: "QueryResult.costBreakdown: [CostBreakdownEntry]", status: "PASS", note: "Per-model cost tracking"),
 ]

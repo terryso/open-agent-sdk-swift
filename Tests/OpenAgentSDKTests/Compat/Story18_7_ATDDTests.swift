@@ -450,10 +450,10 @@ final class Story18_7_CompatReportATDDTests: XCTestCase {
         }
 
         let methods: [AgentMethodMapping] = [
-            AgentMethodMapping(tsMethod: "getMessages()", swiftEquivalent: "NO PUBLIC EQUIVALENT", status: "MISSING"),
-            AgentMethodMapping(tsMethod: "clear()", swiftEquivalent: "NO EQUIVALENT", status: "MISSING"),
+            AgentMethodMapping(tsMethod: "getMessages()", swiftEquivalent: "Agent.getMessages() -> [SDKMessage]", status: "PASS"),
+            AgentMethodMapping(tsMethod: "clear()", swiftEquivalent: "Agent.clear()", status: "PASS"),
             AgentMethodMapping(tsMethod: "setMaxThinkingTokens(n | null)", swiftEquivalent: "Agent.setMaxThinkingTokens(_:)", status: "PASS"),
-            AgentMethodMapping(tsMethod: "getSessionId()", swiftEquivalent: "NO PUBLIC GETTER", status: "MISSING"),
+            AgentMethodMapping(tsMethod: "getSessionId()", swiftEquivalent: "Agent.getSessionId() -> String?", status: "PASS"),
             AgentMethodMapping(tsMethod: "getApiType()", swiftEquivalent: "LLMProvider enum (internal)", status: "N/A"),
         ]
 
@@ -463,36 +463,36 @@ final class Story18_7_CompatReportATDDTests: XCTestCase {
         let missingCount = methods.filter { $0.status == "MISSING" }.count
         let naCount = methods.filter { $0.status == "N/A" }.count
 
-        XCTAssertEqual(passCount, 1,
-            "1 method PASS (setMaxThinkingTokens now on Agent)")
-        XCTAssertEqual(missingCount, 3,
-            "3 methods MISSING (getMessages, clear, getSessionId)")
+        XCTAssertEqual(passCount, 4,
+            "4 methods PASS (setMaxThinkingTokens, getMessages, clear, getSessionId)")
+        XCTAssertEqual(missingCount, 0,
+            "0 methods MISSING")
         XCTAssertEqual(naCount, 1,
             "1 method N/A (getApiType)")
     }
 
-    /// AC12 report [P0] RED: Overall summary must be 24 PASS, 0 PARTIAL, 3 MISSING, 1 N/A.
+    /// AC12 report [P0] RED: Overall summary must be 27 PASS, 0 PARTIAL, 0 MISSING, 1 N/A.
     func testCompatReport_overallSummary() {
         // Query methods: 16 PASS + 0 PARTIAL + 0 MISSING = 16
-        // Agent methods: 1 PASS + 0 PARTIAL + 3 MISSING + 1 N/A = 5
+        // Agent methods: 4 PASS + 0 PARTIAL + 0 MISSING + 1 N/A = 5
         // ModelInfo fields: 7 PASS + 0 PARTIAL + 0 MISSING = 7
         //
-        // Total: 24 PASS + 0 PARTIAL + 3 MISSING + 1 N/A = 28
+        // Total: 27 PASS + 0 PARTIAL + 0 MISSING + 1 N/A = 28
 
-        let totalPass = 24
+        let totalPass = 27
         let totalPartial = 0
-        let totalMissing = 3
+        let totalMissing = 0
         let totalNA = 1
         let total = totalPass + totalPartial + totalMissing + totalNA
 
         XCTAssertEqual(total, 28, "Total verifications should be 28")
-        XCTAssertEqual(totalPass, 24,
-            "24 items PASS (16 query + 1 agent + 7 modelInfo). " +
-            "Was 10 PASS, +14 from Story 17-10/17-11 updates")
+        XCTAssertEqual(totalPass, 27,
+            "27 items PASS (16 query + 4 agent + 7 modelInfo). " +
+            "Was 24 PASS, +3 from adding getMessages/clear/getSessionId")
         XCTAssertEqual(totalPartial, 0,
             "0 items PARTIAL (supportedModels upgraded from PARTIAL to PASS)")
-        XCTAssertEqual(totalMissing, 3,
-            "3 items MISSING (getMessages, clear, getSessionId -- genuine gaps)")
+        XCTAssertEqual(totalMissing, 0,
+            "0 items MISSING (all gaps resolved)")
         XCTAssertEqual(totalNA, 1, "1 item N/A (getApiType)")
     }
 }

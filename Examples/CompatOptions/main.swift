@@ -258,17 +258,23 @@ print("")
 print("=== AC5: Extended Configuration Field-Level Verification (11 fields) ===")
 print("")
 
-// 1. settingSources: SettingSource[] -> NO EQUIVALENT
-record("settingSources: SettingSource[]", swiftField: "NO EQUIVALENT", status: "MISSING",
-       note: "No file-based settings source configuration.")
+// 1. settingSources: SettingSource[] -> AgentOptions.settingSources
+let sourcesOptions = AgentOptions(settingSources: [.project])
+let _ = sourcesOptions.settingSources
+record("settingSources: SettingSource[]", swiftField: "AgentOptions.settingSources: [SettingSource]?", status: "PASS",
+       note: "SettingSource enum with user/project/enterprise cases.")
 
-// 2. plugins: SdkPluginConfig[] -> NO EQUIVALENT
-record("plugins: SdkPluginConfig[]", swiftField: "NO EQUIVALENT", status: "MISSING",
-       note: "No plugin loading mechanism.")
+// 2. plugins: SdkPluginConfig[] -> AgentOptions.plugins
+let pluginsOptions = AgentOptions(plugins: [SdkPluginConfig(name: "my-plugin")])
+let _ = pluginsOptions.plugins
+record("plugins: SdkPluginConfig[]", swiftField: "AgentOptions.plugins: [SdkPluginConfig]?", status: "PASS",
+       note: "SdkPluginConfig with name/enabled fields.")
 
-// 3. betas: SdkBeta[] -> NO EQUIVALENT
-record("betas: SdkBeta[]", swiftField: "NO EQUIVALENT", status: "MISSING",
-       note: "No beta feature flags.")
+// 3. betas: SdkBeta[] -> AgentOptions.betas
+let betasOptions = AgentOptions(betas: [.maxTurns, .extendedThinking])
+let _ = betasOptions.betas
+record("betas: SdkBeta[]", swiftField: "AgentOptions.betas: [SdkBeta]?", status: "PASS",
+       note: "SdkBeta with rawValue and static presets.")
 
 // 4. executable: 'bun' | 'deno' | 'node' -> N/A
 record("executable: 'bun' | 'deno' | 'node'", swiftField: "N/A", status: "N/A",
@@ -300,17 +306,23 @@ let _ = stderrOptions.logOutput
 record("stderr: (data: string) => void", swiftField: "AgentOptions.logOutput: .custom(@Sendable (String) -> Void)", status: "PARTIAL",
        note: "LogOutput.custom closure provides stderr-like callback. Different scope (all logs vs stderr only).")
 
-// 9. strictMcpConfig: boolean -> NO EQUIVALENT
-record("strictMcpConfig: boolean", swiftField: "NO EQUIVALENT", status: "MISSING",
-       note: "No strict MCP config validation flag.")
+// 9. strictMcpConfig: boolean -> AgentOptions.strictMcpConfig
+let strictMcpOptions = AgentOptions(strictMcpConfig: true)
+let _ = strictMcpOptions.strictMcpConfig
+record("strictMcpConfig: boolean", swiftField: "AgentOptions.strictMcpConfig: Bool", status: "PASS",
+       note: "Strict MCP config validation flag.")
 
-// 10. extraArgs: Record<string, string | null> -> NO EQUIVALENT
-record("extraArgs: Record<string, string | null>", swiftField: "NO EQUIVALENT", status: "MISSING",
-       note: "No extra argument passthrough mechanism.")
+// 10. extraArgs: Record<string, string | null> -> AgentOptions.extraArgs
+let extraArgsOptions = AgentOptions(extraArgs: ["key": "value", "nil_val": nil])
+let _ = extraArgsOptions.extraArgs
+record("extraArgs: Record<string, string | null>", swiftField: "AgentOptions.extraArgs: [String: String?]?", status: "PASS",
+       note: "Extra argument passthrough dictionary.")
 
-// 11. enableFileCheckpointing: boolean -> NO EQUIVALENT
-record("enableFileCheckpointing: boolean", swiftField: "NO EQUIVALENT", status: "MISSING",
-       note: "No file checkpointing system.")
+// 11. enableFileCheckpointing: boolean -> AgentOptions.enableFileCheckpointing
+let checkpointOptions = AgentOptions(enableFileCheckpointing: true)
+let _ = checkpointOptions.enableFileCheckpointing
+record("enableFileCheckpointing: boolean", swiftField: "AgentOptions.enableFileCheckpointing: Bool", status: "PASS",
+       note: "File checkpointing flag.")
 
 print("")
 
@@ -491,17 +503,17 @@ print("")
 
 // --- Extended Configuration Table ---
 let extendedMappings: [FieldMapping] = [
-    FieldMapping(index: 1, tsField: "settingSources: SettingSource[]", swiftEquivalent: "NO EQUIVALENT", status: "MISSING", note: "No settings source config"),
-    FieldMapping(index: 2, tsField: "plugins: SdkPluginConfig[]", swiftEquivalent: "NO EQUIVALENT", status: "MISSING", note: "No plugin system"),
-    FieldMapping(index: 3, tsField: "betas: SdkBeta[]", swiftEquivalent: "NO EQUIVALENT", status: "MISSING", note: "No beta flags"),
+    FieldMapping(index: 1, tsField: "settingSources: SettingSource[]", swiftEquivalent: "AgentOptions.settingSources: [SettingSource]?", status: "PASS", note: "SettingSource enum"),
+    FieldMapping(index: 2, tsField: "plugins: SdkPluginConfig[]", swiftEquivalent: "AgentOptions.plugins: [SdkPluginConfig]?", status: "PASS", note: "SdkPluginConfig struct"),
+    FieldMapping(index: 3, tsField: "betas: SdkBeta[]", swiftEquivalent: "AgentOptions.betas: [SdkBeta]?", status: "PASS", note: "SdkBeta with rawValue"),
     FieldMapping(index: 4, tsField: "executable: 'bun'|'deno'|'node'", swiftEquivalent: "N/A", status: "N/A", note: "Swift runtime"),
     FieldMapping(index: 5, tsField: "spawnClaudeCodeProcess", swiftEquivalent: "N/A", status: "N/A", note: "Not applicable"),
     FieldMapping(index: 6, tsField: "additionalDirectories: string[]", swiftEquivalent: "skillDirectories: [String]?", status: "PARTIAL", note: "Skill dirs only"),
     FieldMapping(index: 7, tsField: "debug: boolean / debugFile: string", swiftEquivalent: "logLevel / logOutput", status: "PARTIAL", note: "Enum vs boolean/string"),
     FieldMapping(index: 8, tsField: "stderr: (data: string) => void", swiftEquivalent: "LogOutput.custom closure", status: "PARTIAL", note: "All logs, not just stderr"),
-    FieldMapping(index: 9, tsField: "strictMcpConfig: boolean", swiftEquivalent: "NO EQUIVALENT", status: "MISSING", note: "No strict MCP config flag"),
-    FieldMapping(index: 10, tsField: "extraArgs: Record<string, string | null>", swiftEquivalent: "NO EQUIVALENT", status: "MISSING", note: "No extra arg passthrough"),
-    FieldMapping(index: 11, tsField: "enableFileCheckpointing: boolean", swiftEquivalent: "NO EQUIVALENT", status: "MISSING", note: "No file checkpointing"),
+    FieldMapping(index: 9, tsField: "strictMcpConfig: boolean", swiftEquivalent: "AgentOptions.strictMcpConfig: Bool", status: "PASS", note: "Strict MCP config flag"),
+    FieldMapping(index: 10, tsField: "extraArgs: Record<string, string | null>", swiftEquivalent: "AgentOptions.extraArgs: [String: String?]?", status: "PASS", note: "Extra arg passthrough"),
+    FieldMapping(index: 11, tsField: "enableFileCheckpointing: boolean", swiftEquivalent: "AgentOptions.enableFileCheckpointing: Bool", status: "PASS", note: "File checkpointing flag"),
 ]
 
 print("Extended Configuration (11 fields)")

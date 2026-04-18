@@ -42,6 +42,9 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
     /// and read cooperatively by the running Task — no locking needed.
     nonisolated(unsafe) private var _interrupted: Bool = false
 
+    /// Messages from the most recently completed query, accessible via ``getMessages()``.
+    nonisolated(unsafe) private var _lastQueryMessages: [SDKMessage] = []
+
     /// Whether the agent has been permanently closed via ``close()``.
     /// Once closed, all subsequent prompt/stream/interrupt calls throw.
     /// Protected by ``_closedLock`` for thread-safe reads from concurrent contexts.
@@ -234,6 +237,32 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
         self.model = trimmed
         self.options.model = trimmed
         Logger.shared.info("Agent", "model_switch", data: ["from": oldModel, "to": trimmed])
+    }
+
+    // MARK: - Agent State Accessors
+
+    /// Returns the messages from the most recently completed query.
+    ///
+    /// Maps to the TypeScript SDK's `getMessages()` method. Returns an empty
+    /// array if no query has been executed yet.
+    public func getMessages() -> [SDKMessage] {
+        return _lastQueryMessages
+    }
+
+    /// Clears internal conversation state, resetting the agent for a fresh query.
+    ///
+    /// Maps to the TypeScript SDK's `clear()` method. After calling this method,
+    /// the agent will not carry over any context from previous queries.
+    public func clear() {
+        _lastQueryMessages = []
+    }
+
+    /// Returns the current session ID, if one is configured.
+    ///
+    /// Maps to the TypeScript SDK's `getSessionId()` method. Returns `nil`
+    /// when no session is configured via ``AgentOptions/sessionId``.
+    public func getSessionId() -> String? {
+        return options.sessionId
     }
 
     // MARK: - Query Cancellation
@@ -1257,7 +1286,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
         }
 
         let isCancelled = (status == .cancelled)
-        return QueryResult(
+        let result = QueryResult(
             text: lastAssistantText,
             usage: totalUsage,
             numTurns: turnCount,
@@ -1268,6 +1297,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
             costBreakdown: Array(costByModel.values),
             isCancelled: isCancelled
         )
+        _lastQueryMessages = result.messages
+        return result
     }
 
     // MARK: - Stream (AsyncStream Response)

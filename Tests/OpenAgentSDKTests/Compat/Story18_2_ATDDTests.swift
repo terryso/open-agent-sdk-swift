@@ -256,10 +256,10 @@ final class Story18_2_CompatReportATDDTests: XCTestCase {
         report.append(CompatEntry(tsField: "FileReadInput fields", swiftField: "file_path, offset, limit", status: "PASS", note: nil))
         report.append(CompatEntry(tsField: "FileEditInput fields", swiftField: "file_path, old_string, new_string, replace_all", status: "PASS", note: nil))
 
-        // Output structures (remain MISSING)
-        report.append(CompatEntry(tsField: "ReadOutput (typed)", swiftField: "String", status: "MISSING", note: "No type discrimination"))
-        report.append(CompatEntry(tsField: "EditOutput (structuredPatch)", swiftField: "String", status: "MISSING", note: "No structured output"))
-        report.append(CompatEntry(tsField: "BashOutput (stdout/stderr)", swiftField: "String (combined)", status: "MISSING", note: "No stdout/stderr separation"))
+        // Output structures
+        report.append(CompatEntry(tsField: "ReadOutput (typed)", swiftField: "ReadOutput (filePath, content)", status: "PASS", note: "Typed struct available"))
+        report.append(CompatEntry(tsField: "EditOutput (structuredPatch)", swiftField: "EditOutput (filePath, oldContent, newContent, replaceAll, message)", status: "PASS", note: "Structured output available"))
+        report.append(CompatEntry(tsField: "BashOutput (stdout/stderr)", swiftField: "BashOutput (stdout, stderr, exitCode, interrupted)", status: "PASS", note: "stdout/stderr separated"))
 
         // InProcessMCPServer
         report.append(CompatEntry(tsField: "createSdkMcpServer", swiftField: "InProcessMCPServer", status: "PASS", note: nil))
@@ -292,10 +292,10 @@ final class Story18_2_CompatReportATDDTests: XCTestCase {
         report.append(CompatEntry(tsField: "FileReadInput fields", swiftField: "file_path, offset, limit", status: "PASS", note: nil))
         report.append(CompatEntry(tsField: "FileEditInput fields", swiftField: "file_path, old_string, new_string, replace_all", status: "PASS", note: nil))
 
-        // Current state: Output structures (MISSING)
-        report.append(CompatEntry(tsField: "ReadOutput (typed)", swiftField: "String", status: "MISSING", note: "No type discrimination"))
-        report.append(CompatEntry(tsField: "EditOutput (structuredPatch)", swiftField: "String", status: "MISSING", note: "No structured output"))
-        report.append(CompatEntry(tsField: "BashOutput (stdout/stderr)", swiftField: "String (combined)", status: "MISSING", note: "No stdout/stderr separation"))
+        // Current state: Output structures (PASS)
+        report.append(CompatEntry(tsField: "ReadOutput (typed)", swiftField: "ReadOutput (filePath, content)", status: "PASS", note: "Typed struct available"))
+        report.append(CompatEntry(tsField: "EditOutput (structuredPatch)", swiftField: "EditOutput (filePath, oldContent, newContent, replaceAll, message)", status: "PASS", note: "Structured output available"))
+        report.append(CompatEntry(tsField: "BashOutput (stdout/stderr)", swiftField: "BashOutput (stdout, stderr, exitCode, interrupted)", status: "PASS", note: "stdout/stderr separated"))
 
         // InProcessMCPServer
         report.append(CompatEntry(tsField: "createSdkMcpServer", swiftField: "InProcessMCPServer", status: "PASS", note: nil))

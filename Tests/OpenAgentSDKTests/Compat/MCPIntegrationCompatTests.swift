@@ -756,8 +756,8 @@ final class MCPIntegrationCompatTests: XCTestCase {
             FieldMapping(tsField: "status", swiftField: "status: McpServerStatusEnum (5 values)", status: "PASS"),
             FieldMapping(tsField: "serverInfo", swiftField: "serverInfo: McpServerInfo?", status: "PASS"),
             FieldMapping(tsField: "error", swiftField: "error: String?", status: "PASS"),
-            FieldMapping(tsField: "config", swiftField: "MISSING", status: "MISSING"),
-            FieldMapping(tsField: "scope", swiftField: "MISSING", status: "MISSING"),
+            FieldMapping(tsField: "config", swiftField: "McpServerStatus.config: McpServerConfig?", status: "PASS"),
+            FieldMapping(tsField: "scope", swiftField: "McpServerStatus.scope: String?", status: "PASS"),
             FieldMapping(tsField: "tools", swiftField: "tools: [String]", status: "PASS"),
         ]
 
@@ -765,9 +765,9 @@ final class MCPIntegrationCompatTests: XCTestCase {
         let partialCount = mappings.filter { $0.status == "PARTIAL" }.count
         let missingCount = mappings.filter { $0.status == "MISSING" }.count
 
-        XCTAssertEqual(passCount, 5)
+        XCTAssertEqual(passCount, 7)
         XCTAssertEqual(partialCount, 0)
-        XCTAssertEqual(missingCount, 2)
+        XCTAssertEqual(missingCount, 0)
         XCTAssertEqual(mappings.count, 7, "All 7 TS fields checked")
     }
 

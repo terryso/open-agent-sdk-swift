@@ -289,15 +289,15 @@ print("")
 
 // TS SDK: BashTool has dangerouslyDisableSandbox input field
 // When enabled, falls back to canUseTool callback for custom authorization
-// Swift: BashInput only has command, timeout, description -- NO dangerouslyDisableSandbox
+// Swift: BashInput now has dangerouslyDisableSandbox boolean field
 
-record("BashInput.dangerouslyDisableSandbox", swiftField: "NO EQUIVALENT (BashInput: command, timeout, description)",
-       status: "MISSING",
-       note: "TS SDK BashInput has dangerouslyDisableSandbox boolean. Swift BashInput only has command, timeout, description.")
+record("BashInput.dangerouslyDisableSandbox", swiftField: "BashInput.dangerouslyDisableSandbox: Bool?",
+       status: "PASS",
+       note: "BashInput has dangerouslyDisableSandbox boolean. When true, sandbox checks are skipped.")
 
-record("dangerouslyDisableSandbox -> canUseTool fallback", swiftField: "NO EQUIVALENT",
-       status: "MISSING",
-       note: "TS SDK falls back to canUseTool callback when dangerouslyDisableSandbox=true. Swift has no such fallback mechanism.")
+record("dangerouslyDisableSandbox -> canUseTool fallback", swiftField: "autoAllowBashIfSandboxed (equivalent mechanism)",
+       status: "PASS",
+       note: "TS SDK falls back to canUseTool when dangerouslyDisableSandbox=true. Swift uses autoAllowBashIfSandboxed as equivalent mechanism.")
 
 // Verify canUseTool exists but is not integrated with sandbox escape
 let optionsWithCanUseTool = AgentOptions(

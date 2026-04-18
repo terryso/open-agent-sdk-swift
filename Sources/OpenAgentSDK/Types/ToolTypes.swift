@@ -59,6 +59,68 @@ public enum ToolContent: Sendable, Equatable {
     case resource(uri: String, name: String?)
 }
 
+// MARK: - Typed Tool Output Structures
+
+/// Typed output from a file read tool, providing structured access to file contents.
+///
+/// Maps to the TypeScript SDK's `ReadOutput` type.
+public struct ReadOutput: Sendable, Equatable {
+    /// The file path that was read.
+    public let filePath: String
+    /// The content of the file (cat -n formatted with line numbers).
+    public let content: String
+
+    public init(filePath: String, content: String) {
+        self.filePath = filePath
+        self.content = content
+    }
+}
+
+/// Typed output from a file edit tool, providing structured patch information.
+///
+/// Maps to the TypeScript SDK's `EditOutput` type.
+public struct EditOutput: Sendable, Equatable {
+    /// The file path that was edited.
+    public let filePath: String
+    /// The old string that was replaced.
+    public let oldContent: String
+    /// The new string that replaced it.
+    public let newContent: String
+    /// Whether the edit replaced all occurrences.
+    public let replaceAll: Bool
+    /// Human-readable result message.
+    public let message: String
+
+    public init(filePath: String, oldContent: String, newContent: String, replaceAll: Bool = false, message: String = "") {
+        self.filePath = filePath
+        self.oldContent = oldContent
+        self.newContent = newContent
+        self.replaceAll = replaceAll
+        self.message = message
+    }
+}
+
+/// Typed output from a bash command execution, with separated stdout and stderr.
+///
+/// Maps to the TypeScript SDK's `BashOutput` type.
+public struct BashOutput: Sendable, Equatable {
+    /// Standard output from the command.
+    public let stdout: String
+    /// Standard error from the command.
+    public let stderr: String
+    /// Exit code of the command. `nil` if the command was terminated by signal.
+    public let exitCode: Int32?
+    /// Whether the command was interrupted.
+    public let interrupted: Bool
+
+    public init(stdout: String, stderr: String, exitCode: Int32?, interrupted: Bool = false) {
+        self.stdout = stdout
+        self.stderr = stderr
+        self.exitCode = exitCode
+        self.interrupted = interrupted
+    }
+}
+
 // MARK: - ToolProtocol
 
 /// Protocol defining a tool that can be executed by the agent.

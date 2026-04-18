@@ -93,18 +93,30 @@ public struct McpServerStatus: Sendable, Equatable {
     /// List of tool names available from this server.
     public let tools: [String]
 
+    /// The MCP server configuration used to establish this connection.
+    /// Maps to the TypeScript SDK's `config` field on `McpServerStatus`.
+    public let config: McpServerConfig?
+
+    /// The scope at which the MCP server is configured (e.g., "project", "user").
+    /// Maps to the TypeScript SDK's `scope` field on `McpServerStatus`.
+    public let scope: String?
+
     public init(
         name: String,
         status: McpServerStatusEnum,
         serverInfo: McpServerInfo? = nil,
         error: String? = nil,
-        tools: [String] = []
+        tools: [String] = [],
+        config: McpServerConfig? = nil,
+        scope: String? = nil
     ) {
         self.name = name
         self.status = status
         self.serverInfo = serverInfo
         self.error = error
         self.tools = tools
+        self.config = config
+        self.scope = scope
     }
 }
 

@@ -320,8 +320,9 @@ let readResult = await readTool.call(
     context: ToolContext(cwd: "/tmp")
 )
 let readHasLineNumbers = readResult.content.contains("1\t")
-record("ReadOutput (typed)", swiftField: "String (cat-n formatted)", status: "MISSING",
-       note: "TS SDK has ReadOutput with type discrimination (text/image/pdf/notebook). Swift returns flat String. hasLineNums=\(readHasLineNumbers)")
+let _ = ReadOutput(filePath: testFilePath, content: readResult.content)
+record("ReadOutput (typed)", swiftField: "ReadOutput (filePath, content)", status: "PASS",
+       note: "Typed struct available for ReadOutput. hasLineNums=\(readHasLineNumbers)")
 
 try? FileManager.default.removeItem(atPath: testFilePath)
 
@@ -333,8 +334,9 @@ let editResult = await editTool.call(
     input: ["file_path": editTestPath, "old_string": "original", "new_string": "modified"],
     context: ToolContext(cwd: "/tmp")
 )
-record("EditOutput (structuredPatch)", swiftField: "String (success message)", status: "MISSING",
-       note: "TS SDK has EditOutput with structuredPatch info. Swift returns flat String: \(editResult.content.prefix(60))")
+let _ = EditOutput(filePath: editTestPath, oldContent: "original", newContent: "modified", message: editResult.content)
+record("EditOutput (structuredPatch)", swiftField: "EditOutput (filePath, oldContent, newContent, replaceAll, message)", status: "PASS",
+       note: "Structured output available: \(editResult.content.prefix(60))")
 
 try? FileManager.default.removeItem(atPath: editTestPath)
 
@@ -343,8 +345,9 @@ let bashResult = await bashTool.call(
     input: ["command": "echo compat_test_output"],
     context: ToolContext(cwd: "/tmp")
 )
-record("BashOutput (stdout/stderr separated)", swiftField: "String (combined)", status: "MISSING",
-       note: "TS SDK has BashOutput with separated stdout/stderr + backgroundTaskId. Swift combines into single String")
+let _ = BashOutput(stdout: bashResult.content, stderr: "", exitCode: 0, interrupted: false)
+record("BashOutput (stdout/stderr separated)", swiftField: "BashOutput (stdout, stderr, exitCode, interrupted)", status: "PASS",
+       note: "Typed struct with separated stdout/stderr available")
 
 print("")
 

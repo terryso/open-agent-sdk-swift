@@ -711,9 +711,9 @@ final class CompatToolSystemTests: XCTestCase {
         report.append(CompatEntry(tsField: "FileEditInput fields", swiftField: "file_path, old_string, new_string, replace_all", status: "PASS", note: nil))
 
         // AC6: Output structures
-        report.append(CompatEntry(tsField: "ReadOutput (typed)", swiftField: "String", status: "MISSING", note: "No type discrimination"))
-        report.append(CompatEntry(tsField: "EditOutput (structuredPatch)", swiftField: "String", status: "MISSING", note: "No structured output"))
-        report.append(CompatEntry(tsField: "BashOutput (stdout/stderr)", swiftField: "String (combined)", status: "MISSING", note: "No stdout/stderr separation"))
+        report.append(CompatEntry(tsField: "ReadOutput (typed)", swiftField: "ReadOutput (filePath, content)", status: "PASS", note: "Typed struct available"))
+        report.append(CompatEntry(tsField: "EditOutput (structuredPatch)", swiftField: "EditOutput (filePath, oldContent, newContent, replaceAll, message)", status: "PASS", note: "Structured output available"))
+        report.append(CompatEntry(tsField: "BashOutput (stdout/stderr)", swiftField: "BashOutput (stdout, stderr, exitCode, interrupted)", status: "PASS", note: "stdout/stderr separated"))
 
         // AC7: InProcessMCPServer
         report.append(CompatEntry(tsField: "createSdkMcpServer", swiftField: "InProcessMCPServer", status: "PASS", note: nil))
@@ -727,7 +727,7 @@ final class CompatToolSystemTests: XCTestCase {
         let missingCount = report.filter { $0.status == "MISSING" }.count
 
         XCTAssertTrue(passCount > 0, "Should have PASS entries")
-        XCTAssertTrue(missingCount > 0, "Should have MISSING entries (documented gaps)")
+        XCTAssertTrue(missingCount == 0, "Should have no MISSING entries (all gaps resolved)")
     }
 
     /// AC8 [P1]: Compatibility report status values are standardized.

@@ -728,10 +728,10 @@ final class QueryMethodsCompatTests: XCTestCase {
         }
 
         let methods: [AgentMethodMapping] = [
-            AgentMethodMapping(tsMethod: "getMessages()", swiftEquivalent: "NO PUBLIC EQUIVALENT", status: "MISSING"),
-            AgentMethodMapping(tsMethod: "clear()", swiftEquivalent: "NO EQUIVALENT", status: "MISSING"),
+            AgentMethodMapping(tsMethod: "getMessages()", swiftEquivalent: "Agent.getMessages() -> [SDKMessage]", status: "PASS"),
+            AgentMethodMapping(tsMethod: "clear()", swiftEquivalent: "Agent.clear()", status: "PASS"),
             AgentMethodMapping(tsMethod: "setMaxThinkingTokens(n | null)", swiftEquivalent: "Agent.setMaxThinkingTokens(_:)", status: "PASS"),
-            AgentMethodMapping(tsMethod: "getSessionId()", swiftEquivalent: "NO PUBLIC GETTER", status: "MISSING"),
+            AgentMethodMapping(tsMethod: "getSessionId()", swiftEquivalent: "Agent.getSessionId() -> String?", status: "PASS"),
             AgentMethodMapping(tsMethod: "getApiType()", swiftEquivalent: "LLMProvider enum (internal)", status: "N/A"),
         ]
 
@@ -741,8 +741,8 @@ final class QueryMethodsCompatTests: XCTestCase {
         let missingCount = methods.filter { $0.status == "MISSING" }.count
         let naCount = methods.filter { $0.status == "N/A" }.count
 
-        XCTAssertEqual(passCount, 1, "1 method PASS (setMaxThinkingTokens)")
-        XCTAssertEqual(missingCount, 3, "3 methods MISSING")
+        XCTAssertEqual(passCount, 4, "4 methods PASS")
+        XCTAssertEqual(missingCount, 0, "0 methods MISSING")
         XCTAssertEqual(naCount, 1, "1 method N/A")
     }
 
@@ -768,21 +768,21 @@ final class QueryMethodsCompatTests: XCTestCase {
     /// AC9 [P0]: Overall compatibility summary.
     func testCompatReport_overallSummary() {
         // Query methods: 16 PASS + 0 PARTIAL + 0 MISSING = 16
-        // Agent methods: 1 PASS + 0 PARTIAL + 3 MISSING + 1 N/A = 5
+        // Agent methods: 4 PASS + 0 PARTIAL + 0 MISSING + 1 N/A = 5
         // ModelInfo fields: 7 PASS + 0 PARTIAL + 0 MISSING = 7
         //
-        // Total: 24 PASS + 0 PARTIAL + 3 MISSING + 1 N/A = 28
+        // Total: 27 PASS + 0 PARTIAL + 0 MISSING + 1 N/A = 28
 
-        let totalPass = 24
+        let totalPass = 27
         let totalPartial = 0
-        let totalMissing = 3
+        let totalMissing = 0
         let totalNA = 1
         let total = totalPass + totalPartial + totalMissing + totalNA
 
         XCTAssertEqual(total, 28, "Total verifications should be 28")
-        XCTAssertEqual(totalPass, 24, "24 items PASS")
+        XCTAssertEqual(totalPass, 27, "27 items PASS")
         XCTAssertEqual(totalPartial, 0, "0 items PARTIAL")
-        XCTAssertEqual(totalMissing, 3, "3 items MISSING")
+        XCTAssertEqual(totalMissing, 0, "0 items MISSING")
         XCTAssertEqual(totalNA, 1, "1 item N/A")
     }
 }

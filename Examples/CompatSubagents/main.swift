@@ -233,15 +233,15 @@ record("HookInput.event", swiftField: "HookInput.event: HookEvent", status: "PAS
 record("HookInput.toolName", swiftField: "HookInput.toolName: String?", status: "PASS",
        note: "Generic field. value='\(hookInput.toolName ?? "nil")'")
 
-// Missing subagent-specific HookInput fields
+// Subagent-specific HookInput fields
 record("SubagentStartHookInput.agent_id", swiftField: "NO EQUIVALENT (generic HookInput)", status: "PARTIAL",
        note: "HookInput has no subagent-specific agent_id field. Only generic toolUseId.")
-record("SubagentStartHookInput.agent_type", swiftField: "NO EQUIVALENT", status: "MISSING",
-       note: "HookInput has no agent_type field.")
-record("SubagentStartHookInput.agent_transcript_path", swiftField: "NO EQUIVALENT", status: "MISSING",
-       note: "HookInput has no agent_transcript_path field.")
-record("SubagentStartHookInput.last_assistant_message", swiftField: "NO EQUIVALENT", status: "MISSING",
-       note: "HookInput has no last_assistant_message field.")
+record("SubagentStartHookInput.agent_type", swiftField: "HookInput.agentType: String?", status: "PASS",
+       note: "HookInput has agentType field for agent type identification.")
+record("SubagentStartHookInput.agent_transcript_path", swiftField: "HookInput.agentTranscriptPath: String?", status: "PASS",
+       note: "HookInput has agentTranscriptPath field for sub-agent transcript path.")
+record("SubagentStartHookInput.last_assistant_message", swiftField: "HookInput.lastAssistantMessage: String?", status: "PASS",
+       note: "HookInput has lastAssistantMessage field.")
 
 // Verify hook handler can be registered for subagent events
 let hookRegistry = HookRegistry()
@@ -518,9 +518,9 @@ let hookMappings: [FieldMapping] = [
     FieldMapping(index: 1, tsField: "SubagentStart event", swiftEquivalent: "HookEvent.subagentStart", status: "PASS", note: "Direct equivalent"),
     FieldMapping(index: 2, tsField: "SubagentStop event", swiftEquivalent: "HookEvent.subagentStop", status: "PASS", note: "Direct equivalent"),
     FieldMapping(index: 3, tsField: "HookInput.agent_id (subagent-specific)", swiftEquivalent: "HookInput.toolUseId (generic)", status: "PARTIAL", note: "Generic struct, no subagent-specific fields"),
-    FieldMapping(index: 4, tsField: "HookInput.agent_type", swiftEquivalent: "NO EQUIVALENT", status: "MISSING", note: "No agent_type"),
-    FieldMapping(index: 5, tsField: "HookInput.agent_transcript_path", swiftEquivalent: "NO EQUIVALENT", status: "MISSING", note: "No transcript path"),
-    FieldMapping(index: 6, tsField: "HookInput.last_assistant_message", swiftEquivalent: "NO EQUIVALENT", status: "MISSING", note: "No last message"),
+    FieldMapping(index: 4, tsField: "HookInput.agent_type", swiftEquivalent: "HookInput.agentType: String?", status: "PASS", note: "Agent type field"),
+    FieldMapping(index: 5, tsField: "HookInput.agent_transcript_path", swiftEquivalent: "HookInput.agentTranscriptPath: String?", status: "PASS", note: "Transcript path field"),
+    FieldMapping(index: 6, tsField: "HookInput.last_assistant_message", swiftEquivalent: "HookInput.lastAssistantMessage: String?", status: "PASS", note: "Last message field"),
 ]
 
 print("Subagent Hooks (6 items)")

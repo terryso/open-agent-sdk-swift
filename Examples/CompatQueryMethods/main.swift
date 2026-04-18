@@ -386,13 +386,13 @@ print("")
 print("=== AC8: Additional TS SDK Agent Methods from Source ===")
 print("")
 
-// getMessages() -- MISSING
-record("Agent.getMessages()", swiftField: "NO PUBLIC PROPERTY", status: "MISSING",
-       note: "Swift Agent has no public messages property. Messages are internal to the agent loop.")
+// getMessages() -- PASS
+record("Agent.getMessages()", swiftField: "Agent.getMessages() -> [SDKMessage]", status: "PASS",
+       note: "Returns messages from most recently completed query.")
 
-// clear() -- MISSING
-record("Agent.clear()", swiftField: "NO EQUIVALENT", status: "MISSING",
-       note: "Swift Agent has no clear() method to reset conversation history.")
+// clear() -- PASS
+record("Agent.clear()", swiftField: "Agent.clear()", status: "PASS",
+       note: "Clears internal conversation state for fresh query.")
 
 // setMaxThinkingTokens(n | null) -- PASS
 record("Agent.setMaxThinkingTokens(n | null)", swiftField: "Agent.setMaxThinkingTokens(_:)", status: "PASS",
@@ -421,9 +421,9 @@ thinkingOptions.thinking = .enabled(budgetTokens: 5000)
 record("AgentOptions.thinking configurable", swiftField: "AgentOptions.thinking = .enabled(budgetTokens:)", status: "PASS",
        note: "Can set thinking config at creation: \(String(describing: thinkingOptions.thinking))")
 
-// getSessionId() -- MISSING
-record("Agent.getSessionId()", swiftField: "NO PUBLIC GETTER", status: "MISSING",
-       note: "Swift Agent has no session ID getter. sessionId is in AgentOptions, not a property on Agent.")
+// getSessionId() -- PASS
+record("Agent.getSessionId()", swiftField: "Agent.getSessionId() -> String?", status: "PASS",
+       note: "Returns the session ID from AgentOptions.")
 
 // getApiType() -- N/A
 record("Agent.getApiType()", swiftField: "LLMProvider (internal)", status: "N/A",
@@ -522,17 +522,17 @@ print("")
 // --- Additional TS Agent Methods Table ---
 let additionalMethods: [MethodMapping] = [
     MethodMapping(index: 1, tsMethod: "getMessages()",
-        swiftEquivalent: "NO PUBLIC PROPERTY", status: "MISSING",
-        note: "Messages are internal to agent loop"),
+        swiftEquivalent: "Agent.getMessages() -> [SDKMessage]", status: "PASS",
+        note: "Returns messages from last completed query"),
     MethodMapping(index: 2, tsMethod: "clear()",
-        swiftEquivalent: "NO EQUIVALENT", status: "MISSING",
-        note: "No method to reset conversation history"),
+        swiftEquivalent: "Agent.clear()", status: "PASS",
+        note: "Clears internal conversation state"),
     MethodMapping(index: 3, tsMethod: "setMaxThinkingTokens(n | null)",
         swiftEquivalent: "Agent.setMaxThinkingTokens(_:)", status: "PASS",
         note: "Thread-safe runtime mutation of thinking config"),
     MethodMapping(index: 4, tsMethod: "getSessionId()",
-        swiftEquivalent: "NO PUBLIC GETTER", status: "MISSING",
-        note: "sessionId in AgentOptions, not Agent property"),
+        swiftEquivalent: "Agent.getSessionId() -> String?", status: "PASS",
+        note: "Returns session ID from AgentOptions"),
     MethodMapping(index: 5, tsMethod: "getApiType()",
         swiftEquivalent: "LLMProvider (internal)", status: "N/A",
         note: "Exists but no public getter. Low priority."),

@@ -8,12 +8,14 @@ private struct BashInput: Codable {
     let timeout: Int?
     let description: String?
     let runInBackground: Bool?
+    let dangerouslyDisableSandbox: Bool?
 
     enum CodingKeys: String, CodingKey {
         case command
         case timeout
         case description
         case runInBackground = "run_in_background"
+        case dangerouslyDisableSandbox = "dangerously_disable_sandbox"
     }
 }
 
@@ -139,9 +141,12 @@ public func createBashTool() -> ToolProtocol {
             BashConstants.maxTimeoutMs
         ))
 
-        // Sandbox: enforce command restrictions before process execution
-        if let sandbox = context.sandbox {
-            try SandboxChecker.checkCommand(input.command, settings: sandbox)
+        // Sandbox: enforce command restrictions before process execution.
+        // When dangerouslyDisableSandbox is true, skip sandbox checks (TS SDK compat).
+        if input.dangerouslyDisableSandbox != true {
+            if let sandbox = context.sandbox {
+                try SandboxChecker.checkCommand(input.command, settings: sandbox)
+            }
         }
 
         // Background execution path

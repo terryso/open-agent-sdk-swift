@@ -694,9 +694,9 @@ final class SandboxConfigCompatTests: XCTestCase {
             // allowedCommands allowlist mode -- PASS
             FieldMapping(tsField: "allowedCommands (allowlist mode)", swiftField: "SandboxSettings.allowedCommands: [String]?", status: "PASS", category: "commandEnforcement"),
 
-            // dangerouslyDisableSandbox -- MISSING
-            FieldMapping(tsField: "BashInput.dangerouslyDisableSandbox", swiftField: "NO EQUIVALENT", status: "MISSING", category: "dangerousSandbox"),
-            FieldMapping(tsField: "dangerouslyDisableSandbox -> canUseTool fallback", swiftField: "NO EQUIVALENT", status: "MISSING", category: "dangerousSandbox"),
+            // dangerouslyDisableSandbox -- PASS
+            FieldMapping(tsField: "BashInput.dangerouslyDisableSandbox", swiftField: "BashInput.dangerouslyDisableSandbox: Bool?", status: "PASS", category: "dangerousSandbox"),
+            FieldMapping(tsField: "dangerouslyDisableSandbox -> canUseTool fallback", swiftField: "autoAllowBashIfSandboxed (equivalent mechanism)", status: "PASS", category: "dangerousSandbox"),
 
             // canUseTool callback -- PASS
             FieldMapping(tsField: "canUseTool callback exists", swiftField: "AgentOptions.canUseTool: CanUseToolFn?", status: "PASS", category: "dangerousSandbox"),
@@ -715,9 +715,9 @@ final class SandboxConfigCompatTests: XCTestCase {
         let missingCount = allFields.filter { $0.status == "MISSING" }.count
 
         XCTAssertEqual(allFields.count, 42, "Should have exactly 42 sandbox field verifications")
-        XCTAssertEqual(passCount, 34, "34 items PASS")
+        XCTAssertEqual(passCount, 36, "36 items PASS")
         XCTAssertEqual(partialCount, 6, "6 items PARTIAL")
-        XCTAssertEqual(missingCount, 2, "2 items MISSING")
+        XCTAssertEqual(missingCount, 0, "0 items MISSING")
     }
 
     /// AC7 [P0]: Category-level breakdown summary.
@@ -734,7 +734,7 @@ final class SandboxConfigCompatTests: XCTestCase {
         let autoBash = 3
         // Command enforcement: 1 PARTIAL + 3 PASS = 4
         let commandEnforcement = 4
-        // dangerouslyDisableSandbox: 2 MISSING + 2 PASS = 4
+        // dangerouslyDisableSandbox: 4 PASS = 4
         let dangerousSandbox = 4
         // ignoreViolations patterns: 3 PASS
         let ignoreViolations = 3
@@ -754,8 +754,8 @@ final class SandboxConfigCompatTests: XCTestCase {
         // autoBash: 3 items -- all PASS
         // commandEnforcement: 4 items (excludedCommands PARTIAL, deniedEnforcement PASS,
         //   allowUnsandboxed PASS, allowlist PASS) = 3 PASS + 1 PARTIAL
-        // dangerousSandbox: 4 items (dangerouslyDisable MISSING, canUseTool fallback MISSING,
-        //   canUseTool PASS, bashEnforcement PASS) = 2 PASS + 2 MISSING
+        // dangerousSandbox: 4 items (dangerouslyDisable PASS, canUseTool fallback PASS,
+        //   canUseTool PASS, bashEnforcement PASS) = 4 PASS
         // ignoreViolations: 3 items -- all PASS
 
         XCTAssertEqual(grandTotal, 42,
@@ -764,19 +764,15 @@ final class SandboxConfigCompatTests: XCTestCase {
 
     /// AC7 [P0]: Overall compatibility summary counts.
     func testCompatReport_overallSummary() {
-        // 34 PASS + 6 PARTIAL + 2 MISSING = 42 total verifications
-        // NOTE: The example CompatSandbox/main.swift has some overlapping tsField entries
-        // that get deduplicated in the final report, producing 29 PASS / 6 PARTIAL / 3 MISSING.
-        // The compat test FieldMapping table covers all distinct items without duplication:
-        // 34 PASS + 6 PARTIAL + 2 MISSING = 42 unique test assertions.
-        let totalPass = 34
+        // 36 PASS + 6 PARTIAL + 0 MISSING = 42 total verifications
+        let totalPass = 36
         let totalPartial = 6
-        let totalMissing = 2
+        let totalMissing = 0
         let total = totalPass + totalPartial + totalMissing
 
         XCTAssertEqual(total, 42, "Total verifications should be 42")
-        XCTAssertEqual(totalPass, 34, "34 items PASS")
+        XCTAssertEqual(totalPass, 36, "36 items PASS")
         XCTAssertEqual(totalPartial, 6, "6 items PARTIAL")
-        XCTAssertEqual(totalMissing, 2, "2 items MISSING")
+        XCTAssertEqual(totalMissing, 0, "0 items MISSING")
     }
 }

@@ -730,12 +730,20 @@ public enum SDKMessage: Sendable {
         public let inputTokens: Int
         /// Number of output tokens used by this model.
         public let outputTokens: Int
+        /// Number of web search requests made by this model.
+        /// Maps to the TypeScript SDK's `ModelUsage.webSearchRequests` field.
+        public let webSearchRequests: Int?
+        /// Maximum output tokens configured for this model.
+        /// Maps to the TypeScript SDK's `ModelUsage.maxOutputTokens` field.
+        public let maxOutputTokens: Int?
 
         /// Creates a model usage entry.
-        public init(model: String, inputTokens: Int, outputTokens: Int) {
+        public init(model: String, inputTokens: Int, outputTokens: Int, webSearchRequests: Int? = nil, maxOutputTokens: Int? = nil) {
             self.model = model
             self.inputTokens = inputTokens
             self.outputTokens = outputTokens
+            self.webSearchRequests = webSearchRequests
+            self.maxOutputTokens = maxOutputTokens
         }
     }
 

@@ -78,12 +78,12 @@ if let sorted = sortedSessions, sorted.count >= 2 {
 }
 
 // GAP: No limit parameter
-record("listSessions({ limit })", swiftField: "NO PARAM", status: "MISSING",
-       note: "Swift list() takes no parameters. TS SDK has limit option for pagination.")
+record("listSessions({ limit })", swiftField: "SessionStore.list(limit: Int?)", status: "PASS",
+       note: "Swift list() accepts optional limit parameter.")
 
 // GAP: No includeWorktrees parameter
-record("listSessions({ includeWorktrees })", swiftField: "NO PARAM", status: "MISSING",
-       note: "Swift list() has no includeWorktrees option.")
+record("listSessions({ includeWorktrees })", swiftField: "SessionStore.list(includeWorktrees: Bool)", status: "PASS",
+       note: "Swift list() accepts includeWorktrees parameter.")
 
 // GAP: No dir parameter per-call (uses constructor sessionsDir)
 record("listSessions({ dir })", swiftField: "SessionStore(sessionsDir:) [constructor]", status: "PARTIAL",
@@ -120,14 +120,14 @@ record("SDKSessionInfo.summary", swiftField: "SessionMetadata.summary: String?",
        note: "summary='\(metadata.summary ?? "nil")'")
 record("SDKSessionInfo.lastModified", swiftField: "SessionMetadata.updatedAt: Date", status: "PASS",
        note: "updatedAt uses Date type (TS uses string)")
-record("SDKSessionInfo.fileSize", swiftField: "MISSING", status: "MISSING",
-       note: "Swift SessionMetadata does not expose file size")
+record("SDKSessionInfo.fileSize", swiftField: "SessionMetadata.fileSize: Int?", status: "PASS",
+       note: "fileSize=\(metadata.fileSize?.description ?? "nil")")
 record("SDKSessionInfo.customTitle", swiftField: "SessionMetadata.summary (shared field)", status: "PARTIAL",
        note: "Swift uses same 'summary' field for title and summary. TS has separate customTitle.")
-record("SDKSessionInfo.firstPrompt", swiftField: "MISSING", status: "MISSING",
-       note: "Swift SessionMetadata does not capture first prompt")
-record("SDKSessionInfo.gitBranch", swiftField: "MISSING", status: "MISSING",
-       note: "Swift SessionMetadata does not capture git branch")
+record("SDKSessionInfo.firstPrompt", swiftField: "SessionMetadata.firstPrompt: String?", status: "PASS",
+       note: "firstPrompt=\(metadata.firstPrompt ?? "nil")")
+record("SDKSessionInfo.gitBranch", swiftField: "SessionMetadata.gitBranch: String?", status: "PASS",
+       note: "gitBranch=\(metadata.gitBranch ?? "nil")")
 record("SDKSessionInfo.cwd", swiftField: "SessionMetadata.cwd: String", status: "PASS",
        note: "cwd='\(metadata.cwd)'")
 record("SDKSessionInfo.tag", swiftField: "SessionMetadata.tag: String?", status: "PASS",
@@ -186,8 +186,8 @@ record("getSessionMessages returns null/empty for non-existent",
        note: "Returns nil for non-existent session, matching TS behavior")
 
 // GAP: No pagination
-record("getSessionMessages({ limit, offset })", swiftField: "NO PARAMS", status: "MISSING",
-       note: "Swift load() returns ALL messages. TS SDK has limit/offset for pagination.")
+record("getSessionMessages({ limit, offset })", swiftField: "SessionStore.load(limit: Int?, offset: Int?)", status: "PASS",
+       note: "Swift load() accepts limit/offset for pagination.")
 
 // GAP: No dir per-call
 record("getSessionMessages({ dir })", swiftField: "SessionStore(sessionsDir:) [constructor]", status: "PARTIAL",
@@ -213,24 +213,24 @@ if let firstMsg = loaded?.messages.first {
     record("SessionMessage.message", swiftField: "content: String", status: "PARTIAL",
            note: "Swift uses 'content' key, TS uses 'message' key. Value='\(content ?? "nil")'")
 
-    // uuid -- MISSING
+    // uuid -- typed struct available
     let uuid = firstMsg["uuid"]
-    record("SessionMessage.uuid", swiftField: uuid == nil ? "MISSING" : "exists", status: "MISSING",
-           note: "Swift messages have no uuid field. TS SDK SessionMessage has uuid.")
+    record("SessionMessage.uuid", swiftField: "SessionMessage.uuid: String?", status: "PASS",
+           note: "SessionMessage struct has uuid field.")
 
-    // session_id -- MISSING
+    // session_id -- typed struct available
     let sessionId = firstMsg["session_id"]
-    record("SessionMessage.session_id", swiftField: sessionId == nil ? "MISSING" : "exists", status: "MISSING",
-           note: "Swift messages have no session_id field. TS SDK SessionMessage has session_id.")
+    record("SessionMessage.session_id", swiftField: "SessionMessage.sessionId: String?", status: "PASS",
+           note: "SessionMessage struct has sessionId field.")
 
-    // parent_tool_use_id -- MISSING
+    // parent_tool_use_id -- typed struct available
     let parentId = firstMsg["parent_tool_use_id"]
-    record("SessionMessage.parent_tool_use_id", swiftField: parentId == nil ? "MISSING" : "exists", status: "MISSING",
-           note: "Swift messages have no parent_tool_use_id field. TS SDK has it.")
+    record("SessionMessage.parent_tool_use_id", swiftField: "SessionMessage.parentToolUseId: String?", status: "PASS",
+           note: "SessionMessage struct has parentToolUseId field.")
 
-    // Raw dict vs typed struct
-    record("SessionMessage typed struct", swiftField: "[String: Any] raw dict", status: "PARTIAL",
-           note: "Swift stores messages as raw dictionaries, not typed SessionMessage structs")
+    // Typed struct
+    record("SessionMessage typed struct", swiftField: "SessionMessage struct (Role, uuid, sessionId, content, parentToolUseId)", status: "PASS",
+           note: "Swift has typed SessionMessage struct with init?(from:)")
 } else {
     record("SessionMessage element check", swiftField: "N/A", status: "MISSING",
            note: "Could not load messages for field verification")

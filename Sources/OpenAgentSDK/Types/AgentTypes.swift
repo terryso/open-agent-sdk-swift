@@ -110,6 +110,55 @@ public struct OutputFormat: Sendable, Equatable {
     }
 }
 
+// MARK: - SettingSource
+
+/// Represents a source for loading agent settings.
+///
+/// Maps to the TypeScript SDK's `SettingSource` type.
+public enum SettingSource: Sendable, Equatable {
+    /// User-level global settings.
+    case user
+    /// Project-level settings from `.claude/settings.json`.
+    case project
+    /// Enterprise-managed policy settings.
+    case enterprise
+}
+
+// MARK: - SdkPluginConfig
+
+/// Configuration for a single plugin in the SDK plugin system.
+///
+/// Maps to the TypeScript SDK's `SdkPluginConfig` type.
+public struct SdkPluginConfig: Sendable, Equatable {
+    /// Unique name of the plugin.
+    public let name: String
+    /// Whether the plugin is enabled. Defaults to `true`.
+    public let enabled: Bool
+
+    public init(name: String, enabled: Bool = true) {
+        self.name = name
+        self.enabled = enabled
+    }
+}
+
+// MARK: - SdkBeta
+
+/// Beta feature flag for enabling experimental SDK behavior.
+///
+/// Maps to the TypeScript SDK's `SdkBeta` type.
+public struct SdkBeta: Sendable, Equatable, RawRepresentable {
+    /// The raw beta flag string.
+    public let rawValue: String
+
+    public init(rawValue: String) {
+        self.rawValue = rawValue
+    }
+
+    public static let maxTurns = SdkBeta(rawValue: "max-turns")
+    public static let extendedThinking = SdkBeta(rawValue: "extended-thinking")
+    public static let tokenEfficientTools = SdkBeta(rawValue: "token-efficient-tools")
+}
+
 // MARK: - ToolConfig
 
 /// Configuration for tool execution behavior.
@@ -348,6 +397,32 @@ public struct AgentOptions: Sendable {
     /// When set, takes priority over the plain `systemPrompt` string.
     public var systemPromptConfig: SystemPromptConfig?
 
+    // MARK: - Extended Configuration (TS SDK compat)
+
+    /// Sources for loading settings (e.g., project `.claude/settings.json`).
+    /// Maps to the TypeScript SDK's `settingSources` field.
+    public var settingSources: [SettingSource]?
+
+    /// Plugin configurations for extending agent behavior.
+    /// Maps to the TypeScript SDK's `plugins` field.
+    public var plugins: [SdkPluginConfig]?
+
+    /// Beta feature flags to enable experimental behavior.
+    /// Maps to the TypeScript SDK's `betas` field.
+    public var betas: [SdkBeta]?
+
+    /// When `true`, strict MCP configuration validation is enforced.
+    /// Maps to the TypeScript SDK's `strictMcpConfig` field. Defaults to `false`.
+    public var strictMcpConfig: Bool
+
+    /// Extra arguments passed through to the underlying process.
+    /// Maps to the TypeScript SDK's `extraArgs` field.
+    public var extraArgs: [String: String?]?
+
+    /// When `true`, file checkpointing (undo) is enabled for write operations.
+    /// Maps to the TypeScript SDK's `enableFileCheckpointing` field. Defaults to `false`.
+    public var enableFileCheckpointing: Bool
+
     // MARK: - Memberwise Init
 
     public init(
@@ -402,7 +477,13 @@ public struct AgentOptions: Sendable {
         forkSession: Bool = false,
         resumeSessionAt: String? = nil,
         persistSession: Bool = true,
-        systemPromptConfig: SystemPromptConfig? = nil
+        systemPromptConfig: SystemPromptConfig? = nil,
+        settingSources: [SettingSource]? = nil,
+        plugins: [SdkPluginConfig]? = nil,
+        betas: [SdkBeta]? = nil,
+        strictMcpConfig: Bool = false,
+        extraArgs: [String: String?]? = nil,
+        enableFileCheckpointing: Bool = false
     ) {
         self.apiKey = apiKey
         self.model = model
@@ -456,6 +537,12 @@ public struct AgentOptions: Sendable {
         self.resumeSessionAt = resumeSessionAt
         self.persistSession = persistSession
         self.systemPromptConfig = systemPromptConfig
+        self.settingSources = settingSources
+        self.plugins = plugins
+        self.betas = betas
+        self.strictMcpConfig = strictMcpConfig
+        self.extraArgs = extraArgs
+        self.enableFileCheckpointing = enableFileCheckpointing
     }
 
     // MARK: - Auto-Discover Skills
@@ -557,6 +644,12 @@ public struct AgentOptions: Sendable {
         self.resumeSessionAt = nil
         self.persistSession = true
         self.systemPromptConfig = nil
+        self.settingSources = nil
+        self.plugins = nil
+        self.betas = nil
+        self.strictMcpConfig = false
+        self.extraArgs = nil
+        self.enableFileCheckpointing = false
     }
 
     // MARK: - Validation

@@ -238,11 +238,11 @@ record("McpServerStatus.error", swiftField: "McpServerStatus.error: String?", st
 record("McpServerStatus.tools", swiftField: "McpServerStatus.tools: [String]", status: "PASS",
        note: "tools=\(serverStatus.tools)")
 
-// config, scope still MISSING (deferred - not on McpServerStatus)
-record("McpServerStatus.config", swiftField: "NO EQUIVALENT", status: "MISSING",
-       note: "Not on McpServerStatus (deferred)")
-record("McpServerStatus.scope", swiftField: "NO EQUIVALENT", status: "MISSING",
-       note: "Not on McpServerStatus (deferred)")
+// config, scope on McpServerStatus
+record("McpServerStatus.config", swiftField: "McpServerStatus.config: McpServerConfig?", status: "PASS",
+       note: "config=\(serverStatus.config != nil ? "set" : "nil")")
+record("McpServerStatus.scope", swiftField: "McpServerStatus.scope: String?", status: "PASS",
+       note: "scope=\(serverStatus.scope ?? "nil")")
 print("")
 
 // MARK: - AC5: MCP Tool Namespace Verification
@@ -348,11 +348,12 @@ print("=== AC7: AgentMcpServerSpec Verification ===")
 print("")
 
 // Check AgentDefinition for MCP config field
-let agentDef = AgentDefinition(name: "sub-agent", description: "A sub-agent")
-record("AgentMcpServerSpec (string reference)", swiftField: "NO EQUIVALENT", status: "MISSING",
-       note: "TS SDK supports string reference to parent's MCP server. Swift AgentDefinition has no mcpServers field.")
-record("AgentMcpServerSpec (inline config)", swiftField: "NO EQUIVALENT", status: "MISSING",
-       note: "TS SDK supports inline MCP server config. Swift AgentDefinition has no mcpServers field.")
+let agentDef = AgentDefinition(name: "sub-agent", description: "A sub-agent", mcpServers: [.reference("github-mcp")])
+record("AgentMcpServerSpec (string reference)", swiftField: "AgentMcpServerSpec.reference(String)", status: "PASS",
+       note: "Swift supports string reference to parent's MCP server via .reference case.")
+let inlineDef = AgentDefinition(name: "inline-agent", mcpServers: [.inline(.stdio(McpStdioConfig(command: "npx", args: ["my-server"])))])
+record("AgentMcpServerSpec (inline config)", swiftField: "AgentMcpServerSpec.inline(McpServerConfig)", status: "PASS",
+       note: "Swift supports inline MCP server config via .inline case.")
 
 // Verify AgentDefinition fields (Mirror inspection)
 let agentDefMirror = Mirror(reflecting: agentDef)

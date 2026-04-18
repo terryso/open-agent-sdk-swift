@@ -372,8 +372,8 @@ final class Story18_5_CompatReportATDDTests: XCTestCase {
             FieldMapping(tsField: "serverInfo", swiftField: "McpServerStatus.serverInfo: McpServerInfo?", status: "PASS"),
             FieldMapping(tsField: "error", swiftField: "McpServerStatus.error: String?", status: "PASS"),
             FieldMapping(tsField: "tools", swiftField: "McpServerStatus.tools: [String]", status: "PASS"),
-            FieldMapping(tsField: "config", swiftField: "MISSING", status: "MISSING"),
-            FieldMapping(tsField: "scope", swiftField: "MISSING", status: "MISSING"),
+            FieldMapping(tsField: "config", swiftField: "McpServerStatus.config: McpServerConfig?", status: "PASS"),
+            FieldMapping(tsField: "scope", swiftField: "McpServerStatus.scope: String?", status: "PASS"),
         ]
 
         let passCount = expectedFields.filter { $0.status == "PASS" }.count
@@ -382,13 +382,11 @@ final class Story18_5_CompatReportATDDTests: XCTestCase {
 
         XCTAssertEqual(expectedFields.count, 7,
             "Must have exactly 7 TS SDK McpServerStatus fields")
-        XCTAssertEqual(passCount, 5,
-            "5 fields should be PASS via McpServerStatus (public type from Story 17-8). " +
-            "Update CompatMCP example: serverInfo from MISSING to PASS, error from MISSING to PASS, " +
-            "status from PARTIAL to PASS (5 values), tools from PARTIAL to PASS ([String]).")
+        XCTAssertEqual(passCount, 7,
+            "7 fields should be PASS via McpServerStatus (public type from Story 17-8 + config/scope).")
         XCTAssertEqual(partialCount, 0,
             "No fields should be PARTIAL after Story 17-8")
-        XCTAssertEqual(missingCount, 2,
-            "config and scope remain MISSING (genuinely not on McpServerStatus)")
+        XCTAssertEqual(missingCount, 0,
+            "All fields resolved (config and scope now on McpServerStatus)")
     }
 }

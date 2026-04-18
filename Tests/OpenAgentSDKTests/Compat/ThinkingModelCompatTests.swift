@@ -780,10 +780,10 @@ final class ThinkingModelCompatTests: XCTestCase {
             FieldMapping(tsField: "ModelUsage.outputTokens", swiftField: "TokenUsage.outputTokens: Int", status: "PASS", category: "tokenUsage"),
             FieldMapping(tsField: "ModelUsage.cacheReadInputTokens", swiftField: "TokenUsage.cacheReadInputTokens: Int?", status: "PASS", category: "tokenUsage"),
             FieldMapping(tsField: "ModelUsage.cacheCreationInputTokens", swiftField: "TokenUsage.cacheCreationInputTokens: Int?", status: "PASS", category: "tokenUsage"),
-            FieldMapping(tsField: "ModelUsage.webSearchRequests", swiftField: "NO EQUIVALENT", status: "MISSING", category: "tokenUsage"),
+            FieldMapping(tsField: "ModelUsage.webSearchRequests", swiftField: "ModelUsageEntry.webSearchRequests: Int?", status: "PASS", category: "tokenUsage"),
             FieldMapping(tsField: "ModelUsage.costUSD", swiftField: "QueryResult.totalCostUsd + CostBreakdownEntry.costUsd", status: "PARTIAL", category: "tokenUsage"),
             FieldMapping(tsField: "ModelUsage.contextWindow", swiftField: "getContextWindowSize(model:)", status: "PARTIAL", category: "tokenUsage"),
-            FieldMapping(tsField: "ModelUsage.maxOutputTokens", swiftField: "NO EQUIVALENT", status: "MISSING", category: "tokenUsage"),
+            FieldMapping(tsField: "ModelUsage.maxOutputTokens", swiftField: "ModelUsageEntry.maxOutputTokens: Int?", status: "PASS", category: "tokenUsage"),
 
             // CostBreakdownEntry (supplemental)
             FieldMapping(tsField: "CostBreakdownEntry fields", swiftField: "CostBreakdownEntry(model, inputTokens, outputTokens, costUsd)", status: "PASS", category: "tokenUsage"),
@@ -812,9 +812,9 @@ final class ThinkingModelCompatTests: XCTestCase {
         let missingCount = allFields.filter { $0.status == "MISSING" }.count
 
         XCTAssertEqual(allFields.count, 37, "Should have exactly 37 thinking/model field verifications")
-        XCTAssertEqual(passCount, 32, "32 items PASS")
+        XCTAssertEqual(passCount, 34, "34 items PASS")
         XCTAssertEqual(partialCount, 3, "3 items PARTIAL")
-        XCTAssertEqual(missingCount, 2, "2 items MISSING")
+        XCTAssertEqual(missingCount, 0, "0 items MISSING")
     }
 
     /// AC9 [P0]: Category-level breakdown summary.
@@ -822,7 +822,7 @@ final class ThinkingModelCompatTests: XCTestCase {
         // ThinkingConfig: 5 PASS + 1 PARTIAL = 6
         // Effort: 3 PASS = 3
         // ModelInfo: 7 PASS = 7
-        // TokenUsage/ModelUsage: 6 PASS + 2 PARTIAL + 2 MISSING = 10 (includes 2 supplemental CostBreakdownEntry)
+        // TokenUsage/ModelUsage: 8 PASS + 2 PARTIAL + 0 MISSING = 10 (includes 2 supplemental CostBreakdownEntry)
         // fallbackModel: 2 PASS = 2
         // switchModel: 5 PASS = 5
         // Cache tracking: 4 PASS = 4
@@ -835,15 +835,15 @@ final class ThinkingModelCompatTests: XCTestCase {
 
     /// AC9 [P0]: Overall compatibility summary counts.
     func testCompatReport_overallSummary() {
-        // 32 PASS + 3 PARTIAL + 2 MISSING = 37 total verifications
-        let totalPass = 32
+        // 34 PASS + 3 PARTIAL + 0 MISSING = 37 total verifications
+        let totalPass = 34
         let totalPartial = 3
-        let totalMissing = 2
+        let totalMissing = 0
         let total = totalPass + totalPartial + totalMissing
 
         XCTAssertEqual(total, 37, "Total verifications should be 37")
-        XCTAssertEqual(totalPass, 32, "32 items PASS")
+        XCTAssertEqual(totalPass, 34, "34 items PASS")
         XCTAssertEqual(totalPartial, 3, "3 items PARTIAL")
-        XCTAssertEqual(totalMissing, 2, "2 items MISSING")
+        XCTAssertEqual(totalMissing, 0, "0 items MISSING")
     }
 }
