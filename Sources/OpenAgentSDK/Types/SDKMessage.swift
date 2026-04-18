@@ -258,6 +258,10 @@ public enum SDKMessage: Sendable {
         public let permissionDenials: [SDKPermissionDenial]?
         /// Per-model token usage entries for this query (distinct from costBreakdown).
         public let modelUsage: [ModelUsageEntry]?
+        /// Error messages for error subtypes (TS SDK: `errors: string[]`).
+        public let errors: [String]?
+        /// Cumulative API call duration in milliseconds, excluding local tool execution (TS SDK: `duration_api_ms`).
+        public let durationApiMs: Int?
 
         /// Creates result data with the original fields.
         ///
@@ -272,7 +276,9 @@ public enum SDKMessage: Sendable {
         ///   - structuredOutput: Structured output (JSON-compatible). Defaults to `nil`.
         ///   - permissionDenials: Permission denials. Defaults to `nil`.
         ///   - modelUsage: Per-model usage entries. Defaults to `nil`.
-        public init(subtype: Subtype, text: String, usage: TokenUsage?, numTurns: Int, durationMs: Int, totalCostUsd: Double = 0.0, costBreakdown: [CostBreakdownEntry] = [], structuredOutput: SendableStructuredOutput? = nil, permissionDenials: [SDKPermissionDenial]? = nil, modelUsage: [ModelUsageEntry]? = nil) {
+        ///   - errors: Error messages for error subtypes. Defaults to `nil`.
+        ///   - durationApiMs: Cumulative API call duration. Defaults to `nil`.
+        public init(subtype: Subtype, text: String, usage: TokenUsage?, numTurns: Int, durationMs: Int, totalCostUsd: Double = 0.0, costBreakdown: [CostBreakdownEntry] = [], structuredOutput: SendableStructuredOutput? = nil, permissionDenials: [SDKPermissionDenial]? = nil, modelUsage: [ModelUsageEntry]? = nil, errors: [String]? = nil, durationApiMs: Int? = nil) {
             self.subtype = subtype
             self.text = text
             self.usage = usage
@@ -283,6 +289,8 @@ public enum SDKMessage: Sendable {
             self.structuredOutput = structuredOutput
             self.permissionDenials = permissionDenials
             self.modelUsage = modelUsage
+            self.errors = errors
+            self.durationApiMs = durationApiMs
         }
 
         public static func == (lhs: ResultData, rhs: ResultData) -> Bool {
@@ -296,6 +304,8 @@ public enum SDKMessage: Sendable {
                 && lhs.structuredOutput == rhs.structuredOutput
                 && lhs.permissionDenials == rhs.permissionDenials
                 && lhs.modelUsage == rhs.modelUsage
+                && lhs.errors == rhs.errors
+                && lhs.durationApiMs == rhs.durationApiMs
         }
     }
 
@@ -371,6 +381,18 @@ public enum SDKMessage: Sendable {
         public let mcpServers: [McpServerInfo]?
         /// Current working directory, available during init events.
         public let cwd: String?
+        /// Compact metadata, available during compactBoundary events.
+        public let compactMetadata: CompactMetadata?
+        /// Status string, available during status events (`"compacting"`, `"requesting"`, or `nil`).
+        public let statusValue: String?
+        /// Compact result, available during status events after compaction (`"success"` or `"failed"`).
+        public let compactResult: String?
+        /// Compact error message, available when compact result is `"failed"`.
+        public let compactError: String?
+        /// Task notification data, available during taskNotification events.
+        public let taskNotificationInfo: TaskNotificationInfo?
+        /// Rate limit information, available during rateLimit events.
+        public let rateLimitInfo: RateLimitInfo?
 
         /// Creates system data with optional init-specific fields.
         ///
@@ -383,7 +405,13 @@ public enum SDKMessage: Sendable {
         ///   - permissionMode: Permission mode. Defaults to `nil`.
         ///   - mcpServers: MCP servers. Defaults to `nil`.
         ///   - cwd: Working directory. Defaults to `nil`.
-        public init(subtype: Subtype, message: String, sessionId: String? = nil, tools: [ToolInfo]? = nil, model: String? = nil, permissionMode: String? = nil, mcpServers: [McpServerInfo]? = nil, cwd: String? = nil) {
+        ///   - compactMetadata: Compact metadata. Defaults to `nil`.
+        ///   - statusValue: Status string. Defaults to `nil`.
+        ///   - compactResult: Compact result. Defaults to `nil`.
+        ///   - compactError: Compact error. Defaults to `nil`.
+        ///   - taskNotificationInfo: Task notification data. Defaults to `nil`.
+        ///   - rateLimitInfo: Rate limit information. Defaults to `nil`.
+        public init(subtype: Subtype, message: String, sessionId: String? = nil, tools: [ToolInfo]? = nil, model: String? = nil, permissionMode: String? = nil, mcpServers: [McpServerInfo]? = nil, cwd: String? = nil, compactMetadata: CompactMetadata? = nil, statusValue: String? = nil, compactResult: String? = nil, compactError: String? = nil, taskNotificationInfo: TaskNotificationInfo? = nil, rateLimitInfo: RateLimitInfo? = nil) {
             self.subtype = subtype
             self.message = message
             self.sessionId = sessionId
@@ -392,6 +420,29 @@ public enum SDKMessage: Sendable {
             self.permissionMode = permissionMode
             self.mcpServers = mcpServers
             self.cwd = cwd
+            self.compactMetadata = compactMetadata
+            self.statusValue = statusValue
+            self.compactResult = compactResult
+            self.compactError = compactError
+            self.taskNotificationInfo = taskNotificationInfo
+            self.rateLimitInfo = rateLimitInfo
+        }
+
+        public static func == (lhs: SystemData, rhs: SystemData) -> Bool {
+            return lhs.subtype == rhs.subtype
+                && lhs.message == rhs.message
+                && lhs.sessionId == rhs.sessionId
+                && lhs.tools == rhs.tools
+                && lhs.model == rhs.model
+                && lhs.permissionMode == rhs.permissionMode
+                && lhs.mcpServers == rhs.mcpServers
+                && lhs.cwd == rhs.cwd
+                && lhs.compactMetadata == rhs.compactMetadata
+                && lhs.statusValue == rhs.statusValue
+                && lhs.compactResult == rhs.compactResult
+                && lhs.compactError == rhs.compactError
+                && lhs.taskNotificationInfo == rhs.taskNotificationInfo
+                && lhs.rateLimitInfo == rhs.rateLimitInfo
         }
     }
 
@@ -713,6 +764,139 @@ public enum SDKMessage: Sendable {
         public init(name: String, command: String) {
             self.name = name
             self.command = command
+        }
+    }
+
+    /// Metadata for a compact_boundary event (TS SDK: `compact_metadata`).
+    public struct CompactMetadata: Sendable, Equatable {
+        /// The compaction trigger type.
+        public enum Trigger: String, Sendable, Equatable {
+            case manual
+            case auto
+        }
+
+        /// A preserved segment within the compacted conversation.
+        public struct PreservedSegment: Sendable, Equatable {
+            /// UUID of the head message.
+            public let headUuid: String
+            /// UUID of the anchor message.
+            public let anchorUuid: String
+            /// UUID of the tail message.
+            public let tailUuid: String
+
+            public init(headUuid: String, anchorUuid: String, tailUuid: String) {
+                self.headUuid = headUuid
+                self.anchorUuid = anchorUuid
+                self.tailUuid = tailUuid
+            }
+        }
+
+        /// What triggered the compaction.
+        public let trigger: Trigger?
+        /// Token count before compaction.
+        public let preTokens: Int?
+        /// Token count after compaction.
+        public let postTokens: Int?
+        /// Duration of compaction in milliseconds.
+        public let durationMs: Int?
+        /// The segment of conversation preserved during compaction.
+        public let preservedSegment: PreservedSegment?
+
+        public init(trigger: Trigger? = nil, preTokens: Int? = nil, postTokens: Int? = nil, durationMs: Int? = nil, preservedSegment: PreservedSegment? = nil) {
+            self.trigger = trigger
+            self.preTokens = preTokens
+            self.postTokens = postTokens
+            self.durationMs = durationMs
+            self.preservedSegment = preservedSegment
+        }
+    }
+
+    /// Task notification data for system/task_notification events (TS SDK: `SDKTaskNotificationMessage`).
+    public struct TaskNotificationInfo: Sendable, Equatable {
+        /// Task notification status.
+        public enum TaskStatus: String, Sendable, Equatable {
+            case completed
+            case failed
+            case stopped
+        }
+
+        /// Usage info reported with the task notification.
+        public struct TaskUsage: Sendable, Equatable {
+            /// Total tokens used.
+            public let totalTokens: Int
+            /// Number of tool uses.
+            public let toolUses: Int
+            /// Duration in milliseconds.
+            public let durationMs: Int
+
+            public init(totalTokens: Int, toolUses: Int, durationMs: Int) {
+                self.totalTokens = totalTokens
+                self.toolUses = toolUses
+                self.durationMs = durationMs
+            }
+        }
+
+        /// The task identifier.
+        public let taskId: String
+        /// The tool use ID, if applicable.
+        public let toolUseId: String?
+        /// The task completion status.
+        public let status: TaskStatus?
+        /// Path to the task output file.
+        public let outputFile: String?
+        /// A human-readable summary of the task result.
+        public let summary: String?
+        /// Token usage for the task.
+        public let usage: TaskUsage?
+        /// Whether to skip transcript persistence.
+        public let skipTranscript: Bool?
+
+        public init(taskId: String, toolUseId: String? = nil, status: TaskStatus? = nil, outputFile: String? = nil, summary: String? = nil, usage: TaskUsage? = nil, skipTranscript: Bool? = nil) {
+            self.taskId = taskId
+            self.toolUseId = toolUseId
+            self.status = status
+            self.outputFile = outputFile
+            self.summary = summary
+            self.usage = usage
+            self.skipTranscript = skipTranscript
+        }
+    }
+
+    /// Rate limit information for rate_limit_event messages (TS SDK: `SDKRateLimitInfo`).
+    public struct RateLimitInfo: Sendable, Equatable {
+        /// Rate limit status.
+        public enum RateLimitStatus: String, Sendable, Equatable {
+            case allowed
+            case allowedWarning = "allowed_warning"
+            case rejected
+        }
+
+        /// Rate limit type.
+        public enum RateLimitType: String, Sendable, Equatable {
+            case fiveHour = "five_hour"
+            case sevenDay = "seven_day"
+            case sevenDayOpus = "seven_day_opus"
+            case sevenDaySonnet = "seven_day_sonnet"
+            case overage
+        }
+
+        /// Current rate limit status.
+        public let status: RateLimitStatus?
+        /// Timestamp when the rate limit resets.
+        public let resetsAt: Int?
+        /// The type of rate limit applied.
+        public let rateLimitType: RateLimitType?
+        /// Utilization percentage (0–1).
+        public let utilization: Double?
+        /// Whether the account is using overage capacity.
+        public let isUsingOverage: Bool?
+
+        public init(status: RateLimitStatus? = nil, resetsAt: Int? = nil, rateLimitType: RateLimitType? = nil, utilization: Double? = nil, isUsingOverage: Bool? = nil) {
+            self.status = status
+            self.resetsAt = resetsAt
+            self.rateLimitType = rateLimitType
+            self.utilization = utilization
+            self.isUsingOverage = isUsingOverage
         }
     }
 }

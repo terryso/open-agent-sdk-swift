@@ -21,6 +21,12 @@ public struct SessionMetadata: Sendable, Equatable {
     public let summary: String?
     /// An optional tag for categorizing the session.
     public let tag: String?
+    /// The JSONL file size in bytes (TS SDK: `fileSize?`).
+    public let fileSize: Int?
+    /// The first meaningful user prompt (TS SDK: `firstPrompt?`).
+    public let firstPrompt: String?
+    /// The git branch at the end of the session (TS SDK: `gitBranch?`).
+    public let gitBranch: String?
 
     public init(
         id: String,
@@ -30,7 +36,10 @@ public struct SessionMetadata: Sendable, Equatable {
         updatedAt: Date,
         messageCount: Int,
         summary: String? = nil,
-        tag: String? = nil
+        tag: String? = nil,
+        fileSize: Int? = nil,
+        firstPrompt: String? = nil,
+        gitBranch: String? = nil
     ) {
         self.id = id
         self.cwd = cwd
@@ -40,6 +49,9 @@ public struct SessionMetadata: Sendable, Equatable {
         self.messageCount = messageCount
         self.summary = summary
         self.tag = tag
+        self.fileSize = fileSize
+        self.firstPrompt = firstPrompt
+        self.gitBranch = gitBranch
     }
 }
 
@@ -62,6 +74,50 @@ public struct SessionData: @unchecked Sendable {
     }
 }
 
+/// A typed session message from historical session data (TS SDK: `SessionMessage`).
+public struct SessionMessage: Sendable, Equatable {
+    /// The role that produced this message.
+    public enum Role: String, Sendable, Equatable {
+        case user
+        case assistant
+        case system
+    }
+
+    /// The role (`user`, `assistant`, or `system`).
+    public let role: Role
+    /// Unique identifier for this message.
+    public let uuid: String?
+    /// Session identifier this message belongs to.
+    public let sessionId: String?
+    /// The message content (type depends on role).
+    public let content: String?
+    /// Parent tool use ID (always `nil` in historical messages per TS SDK).
+    public let parentToolUseId: String?
+
+    public init(role: Role, uuid: String? = nil, sessionId: String? = nil, content: String? = nil, parentToolUseId: String? = nil) {
+        self.role = role
+        self.uuid = uuid
+        self.sessionId = sessionId
+        self.content = content
+        self.parentToolUseId = parentToolUseId
+    }
+
+    /// Creates a typed SessionMessage from a raw dictionary.
+    public init?(from dict: [String: Any]) {
+        guard let roleStr = dict["type"] as? String ?? dict["role"] as? String,
+              let role = Role(rawValue: roleStr) else { return nil }
+        self.role = role
+        self.uuid = dict["uuid"] as? String
+        self.sessionId = dict["session_id"] as? String ?? dict["sessionId"] as? String
+        if let msg = dict["message"] {
+            self.content = msg as? String ?? String(describing: msg)
+        } else {
+            self.content = dict["content"] as? String
+        }
+        self.parentToolUseId = dict["parent_tool_use_id"] as? String ?? dict["parentToolUseId"] as? String
+    }
+}
+
 /// Input metadata for saving a session (subset of ``SessionMetadata`` fields).
 ///
 /// Used by ``SessionStore/save(sessionId:messages:metadata:)`` to capture session
@@ -76,11 +132,17 @@ public struct PartialSessionMetadata: Sendable {
     public let summary: String?
     /// An optional tag for categorizing the session.
     public let tag: String?
+    /// The first meaningful user prompt.
+    public let firstPrompt: String?
+    /// The git branch at the end of the session.
+    public let gitBranch: String?
 
-    public init(cwd: String, model: String, summary: String? = nil, tag: String? = nil) {
+    public init(cwd: String, model: String, summary: String? = nil, tag: String? = nil, firstPrompt: String? = nil, gitBranch: String? = nil) {
         self.cwd = cwd
         self.model = model
         self.summary = summary
         self.tag = tag
+        self.firstPrompt = firstPrompt
+        self.gitBranch = gitBranch
     }
 }

@@ -536,10 +536,10 @@ let metaFields: [FieldMapping] = [
     FieldMapping(tsField: "sessionId", swiftField: "id: String", status: "PASS"),
     FieldMapping(tsField: "summary", swiftField: "summary: String?", status: "PASS"),
     FieldMapping(tsField: "lastModified", swiftField: "updatedAt: Date", status: "PASS"),
-    FieldMapping(tsField: "fileSize", swiftField: "MISSING", status: "MISSING"),
+    FieldMapping(tsField: "fileSize", swiftField: "fileSize: Int?", status: "PASS"),
     FieldMapping(tsField: "customTitle", swiftField: "summary (shared)", status: "PARTIAL"),
-    FieldMapping(tsField: "firstPrompt", swiftField: "MISSING", status: "MISSING"),
-    FieldMapping(tsField: "gitBranch", swiftField: "MISSING", status: "MISSING"),
+    FieldMapping(tsField: "firstPrompt", swiftField: "firstPrompt: String?", status: "PASS"),
+    FieldMapping(tsField: "gitBranch", swiftField: "gitBranch: String?", status: "PASS"),
     FieldMapping(tsField: "cwd", swiftField: "cwd: String", status: "PASS"),
     FieldMapping(tsField: "tag", swiftField: "tag: String?", status: "PASS"),
     FieldMapping(tsField: "createdAt", swiftField: "createdAt: Date", status: "PASS"),
@@ -567,26 +567,27 @@ print("")
 
 // --- Message Element Fields ---
 let msgFields: [FieldMapping] = [
-    FieldMapping(tsField: "type (user/assistant)", swiftField: "role (user/assistant)", status: "PARTIAL"),
-    FieldMapping(tsField: "uuid", swiftField: "MISSING", status: "MISSING"),
-    FieldMapping(tsField: "session_id", swiftField: "MISSING", status: "MISSING"),
-    FieldMapping(tsField: "message", swiftField: "content", status: "PARTIAL"),
-    FieldMapping(tsField: "parent_tool_use_id", swiftField: "MISSING", status: "MISSING"),
+    FieldMapping(tsField: "type (user/assistant)", swiftField: "SessionMessage.role", status: "PASS"),
+    FieldMapping(tsField: "uuid", swiftField: "SessionMessage.uuid", status: "PASS"),
+    FieldMapping(tsField: "session_id", swiftField: "SessionMessage.sessionId", status: "PASS"),
+    FieldMapping(tsField: "message", swiftField: "SessionMessage.content", status: "PASS"),
+    FieldMapping(tsField: "parent_tool_use_id", swiftField: "SessionMessage.parentToolUseId", status: "PASS"),
 ]
 
 print("SessionMessage Element Field Compatibility")
 print("==========================================")
 print("")
-print(String(format: "%-35s %-45s %-8s", "TS SDK SessionMessage", "Swift Raw Dict", "Status"))
+print(String(format: "%-35s %-45s %-8s", "TS SDK SessionMessage", "Swift SessionMessage", "Status"))
 print(String(repeating: "-", count: 100))
 for f in msgFields {
     print(String(format: "%-35s %-45s [%-7s]", f.tsField, f.swiftField, f.status))
 }
 print("")
 
+let msgPass = msgFields.filter { $0.status == "PASS" }.count
 let msgPartial = msgFields.filter { $0.status == "PARTIAL" }.count
 let msgMissing = msgFields.filter { $0.status == "MISSING" }.count
-print("Message Summary: PARTIAL: \(msgPartial) | MISSING: \(msgMissing) | Total: \(msgFields.count)")
+print("Message Summary: PASS: \(msgPass) | PARTIAL: \(msgPartial) | MISSING: \(msgMissing) | Total: \(msgFields.count)")
 print("Note: Swift messages are raw [String: Any] dicts, not typed structs")
 print("")
 
@@ -641,10 +642,10 @@ print("Story 16-6: Session Management Compat Summary")
 print("==============================================")
 print("Session Functions:    \(fnPassCount) PASS | \(fnPartialCount) PARTIAL | 0 MISSING | \(fnExtraCount) EXTRA (Swift-only)")
 print("Metadata Fields:     \(metaPass) PASS | \(metaPartial) PARTIAL | \(metaMissing) MISSING | \(metaExtra) EXTRA (Swift-only)")
-print("Message Fields:      0 PASS | \(msgPartial) PARTIAL | \(msgMissing) MISSING")
+print("Message Fields:      \(msgPass) PASS | \(msgPartial) PARTIAL | \(msgMissing) MISSING")
 print("Restore Options:     \(optPass) PASS | \(optPartial) PARTIAL | \(optMissing) MISSING")
 print("----------------------------------------------")
-let totalPass = fnPassCount + metaPass + 0 + optPass
+let totalPass = fnPassCount + metaPass + msgPass + optPass
 let totalPartial = fnPartialCount + metaPartial + msgPartial + optPartial
 let totalMissing = 0 + metaMissing + msgMissing + optMissing
 let totalExtra = fnExtraCount + metaExtra + 0 + 0

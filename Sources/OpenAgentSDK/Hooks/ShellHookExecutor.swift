@@ -193,18 +193,29 @@ public enum ShellHookExecutor {
         let permissionDecisionStr = dict["permissionDecision"] as? String
         let permissionDecision = permissionDecisionStr.flatMap { PermissionDecision(rawValue: $0) }
         let updatedMCPToolOutput = dict["updatedMCPToolOutput"]
+        let decisionStr = dict["decision"] as? String
+        let decision = decisionStr.flatMap { HookDecision(rawValue: $0) }
+
+        // Derive block from decision when present, otherwise use explicit block field
+        let effectiveBlock: Bool
+        if let decision = decision {
+            effectiveBlock = decision == .block
+        } else {
+            effectiveBlock = block
+        }
 
         return HookOutput(
             message: message,
             permissionUpdate: permissionUpdate,
-            block: block,
+            block: effectiveBlock,
             notification: notification,
             systemMessage: systemMessage,
             reason: reason,
             updatedInput: updatedInput,
             additionalContext: additionalContext,
             permissionDecision: permissionDecision,
-            updatedMCPToolOutput: updatedMCPToolOutput
+            updatedMCPToolOutput: updatedMCPToolOutput,
+            decision: decision
         )
     }
 }

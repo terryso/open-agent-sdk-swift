@@ -119,15 +119,15 @@ final class Story18_3_ResultDataATDDTests: XCTestCase {
             "ResultData.Subtype.errorMaxStructuredOutputRetries must exist (maps to TS SDK error_max_structured_output_retries)")
     }
 
-    /// AC3 [P0]: ResultData.errors array remains genuinely MISSING (gap confirmed).
-    func testResultData_errors_stillMissing() {
+    /// AC3 [P0]: ResultData.errors array now exists (resolved).
+    func testResultData_errors_exists() {
         let data = SDKMessage.ResultData(
-            subtype: .errorDuringExecution, text: "", usage: nil, numTurns: 1, durationMs: 100
+            subtype: .errorDuringExecution, text: "", usage: nil, numTurns: 1, durationMs: 100, errors: ["err"]
         )
         let mirror = Mirror(reflecting: data)
         let fieldNames = Set(mirror.children.map { $0.label ?? "" })
-        XCTAssertFalse(fieldNames.contains("errors"),
-            "[GAP] ResultData should NOT have errors field yet. This remains genuinely MISSING.")
+        XCTAssertTrue(fieldNames.contains("errors"),
+            "ResultData now has errors field.")
     }
 }
 
@@ -575,42 +575,35 @@ final class Story18_3_CompatReportATDDTests: XCTestCase {
     ///
     /// This test verifies that compactBoundary, status, taskNotification, and rateLimit
     /// remain PARTIAL because they genuinely lack specific fields.
-    func testCompatReport_4RemainingPartial_AreDocumentedGaps() {
-        // The 4 PARTIAL entries with their genuine missing fields
-        let partialEntries: [(tsType: String, missingField: String)] = [
-            ("SDKCompactBoundaryMessage", "compact_metadata"),
-            ("SDKStatusMessage", "status-specific fields"),
-            ("SDKTaskNotificationMessage", "task_id, output_file, summary, usage"),
-            ("SDKRateLimitEvent", "rate limit-specific fields (limit, remaining, reset)"),
-        ]
+    func testCompatReport_PartialNowResolved() {
+        // The 4 previously PARTIAL entries are now RESOLVED
+        // Verify each field now exists in the SDK types
 
-        XCTAssertEqual(partialEntries.count, 4,
-            "Must have exactly 4 PARTIAL entries with documented gaps")
-
-        // Verify each gap is genuine by checking the SDK types don't have these fields
-        // compactBoundary: SystemData does not have compactMetadata
-        let compactData = SDKMessage.SystemData(subtype: .compactBoundary, message: "")
+        // compactBoundary: SystemData now has compactMetadata
+        let compactData = SDKMessage.SystemData(subtype: .compactBoundary, message: "", compactMetadata: SDKMessage.CompactMetadata(trigger: .auto, preTokens: 100))
         let compactMirror = Mirror(reflecting: compactData)
         let compactFields = Set(compactMirror.children.map { $0.label ?? "" })
-        XCTAssertFalse(compactFields.contains("compactMetadata"),
-            "SDKCompactBoundaryMessage remains PARTIAL: compact_metadata not implemented")
+        XCTAssertTrue(compactFields.contains("compactMetadata"),
+            "SDKCompactBoundaryMessage now PASS: compactMetadata implemented")
 
-        // taskNotification: SystemData does not have taskId, outputFile, summary, usage
-        let taskData = SDKMessage.SystemData(subtype: .taskNotification, message: "")
+        // taskNotification: SystemData now has taskNotificationInfo
+        let taskInfo = SDKMessage.TaskNotificationInfo(taskId: "t1", outputFile: "/tmp/out", summary: "done")
+        let taskData = SDKMessage.SystemData(subtype: .taskNotification, message: "", taskNotificationInfo: taskInfo)
         let taskMirror = Mirror(reflecting: taskData)
         let taskFields = Set(taskMirror.children.map { $0.label ?? "" })
-        XCTAssertFalse(taskFields.contains("taskId"),
-            "SDKTaskNotificationMessage remains PARTIAL: task_id not implemented")
-        XCTAssertFalse(taskFields.contains("outputFile"),
-            "SDKTaskNotificationMessage remains PARTIAL: output_file not implemented")
+        XCTAssertTrue(taskFields.contains("taskNotificationInfo"),
+            "SDKTaskNotificationMessage now PASS: taskNotificationInfo implemented")
 
-        // rateLimit: SystemData does not have rate limit fields
-        let rateData = SDKMessage.SystemData(subtype: .rateLimit, message: "")
+        // rateLimit: SystemData now has rateLimitInfo
+        let rateInfo = SDKMessage.RateLimitInfo(status: .allowed, resetsAt: 12345)
+        let rateData = SDKMessage.SystemData(subtype: .rateLimit, message: "", rateLimitInfo: rateInfo)
         let rateMirror = Mirror(reflecting: rateData)
         let rateFields = Set(rateMirror.children.map { $0.label ?? "" })
-        XCTAssertFalse(rateFields.contains("limit"),
-            "SDKRateLimitEvent remains PARTIAL: limit not implemented")
-        XCTAssertFalse(rateFields.contains("remaining"),
-            "SDKRateLimitEvent remains PARTIAL: remaining not implemented")
+        XCTAssertTrue(rateFields.contains("rateLimitInfo"),
+            "SDKRateLimitEvent now PASS: rateLimitInfo implemented")
+
+        // status: SystemData now has statusValue, compactResult, compactError
+        let statusData = SDKMessage.SystemData(subtype: .status, message: "", statusValue: "compacting", compactResult: "success")
+        XCTAssertTrue(statusData.statusValue == "compacting", "status fields exist")
     }
 }

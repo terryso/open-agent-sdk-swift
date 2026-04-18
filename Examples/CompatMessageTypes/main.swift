@@ -151,9 +151,9 @@ record("SDKResultMessage.permissionDenials", swiftField: "ResultData.permissionD
 record("SDKResultMessage.model_usage (distinct)", swiftField: "ResultData.modelUsage: [ModelUsageEntry]?", status: "PASS",
        note: "Added by Story 17-1. Per-model token usage entries. count=\(fullResult.modelUsage?.count ?? 0)")
 
-// Remaining genuine gap
-record("SDKResultMessage.errors", swiftField: "Not available", status: "MISSING",
-       note: "TS SDK: errors: string[] for error result details. Genuine gap -- not yet implemented.")
+// Resolved by Spec 19
+record("SDKResultMessage.errors", swiftField: "ResultData.errors ([String]?)", status: "PASS",
+       note: "TS SDK: errors: string[] for error result details. Now available.")
 
 print("")
 
@@ -185,14 +185,14 @@ record("SDKSystemMessage(init)", swiftField: ".system(SystemData) subtype=.init"
        note: "All init fields present: sessionId='\(fullSystem.sessionId ?? "nil")', tools=\(fullSystem.tools?.count ?? 0), model='\(fullSystem.model ?? "nil")', permissionMode='\(fullSystem.permissionMode ?? "nil")', mcpServers=\(fullSystem.mcpServers?.count ?? 0), cwd='\(fullSystem.cwd ?? "nil")'")
 
 // Remaining PARTIAL entries (genuine gaps)
-record("SDKSystemMessage(compact_boundary)", swiftField: ".system(SystemData) subtype=.compactBoundary", status: "PARTIAL",
-       note: "Has message. MISSING: compact_metadata")
-record("SDKSystemMessage(status)", swiftField: ".system(SystemData) subtype=.status", status: "PARTIAL",
-       note: "Has message + permissionMode field. Still missing status-specific fields.")
-record("SDKSystemMessage(task_notification)", swiftField: ".system(SystemData) subtype=.taskNotification", status: "PARTIAL",
-       note: "Has message. MISSING: task_id, output_file, summary, usage")
-record("SDKRateLimitEvent", swiftField: ".system(SystemData) subtype=.rateLimit", status: "PARTIAL",
-       note: "Has subtype + message. MISSING: rate limit-specific fields (limit, remaining, reset)")
+record("SDKSystemMessage(compact_boundary)", swiftField: ".system(SystemData) subtype=.compactBoundary", status: "PASS",
+       note: "Has message + compactMetadata (CompactMetadata with trigger, preTokens, postTokens, preservedSegment)")
+record("SDKSystemMessage(status)", swiftField: ".system(SystemData) subtype=.status", status: "PASS",
+       note: "Has message + statusValue, compactResult, compactError fields.")
+record("SDKSystemMessage(task_notification)", swiftField: ".system(SystemData) subtype=.taskNotification", status: "PASS",
+       note: "Has message + taskNotificationInfo (TaskNotificationInfo with taskId, outputFile, summary, usage)")
+record("SDKRateLimitEvent", swiftField: ".system(SystemData) subtype=.rateLimit", status: "PASS",
+       note: "Has subtype + message + rateLimitInfo (RateLimitInfo with status, resetsAt, rateLimitType, utilization)")
 
 // Story 17-1 resolved: 7 new system subtypes (previously MISSING, now PASS)
 record("SDKSystemMessage(task_started)", swiftField: "SystemData.Subtype.taskStarted + .taskStarted(TaskStartedData)", status: "PASS",
@@ -306,8 +306,8 @@ if case .taskProgress(let retrieved) = taskProgMsg {
            note: "Added by Story 17-1. taskId=\(retrieved.taskId)")
 }
 
-record("SDKTaskNotificationMessage", swiftField: ".system(SystemData) subtype=.taskNotification", status: "PARTIAL",
-       note: "Type exists but missing typed fields: task_id, output_file, summary, usage")
+record("SDKTaskNotificationMessage", swiftField: ".system(SystemData) subtype=.taskNotification", status: "PASS",
+       note: "Type exists with taskNotificationInfo: taskId, outputFile, summary, usage (resolved by Spec 19)")
 
 print("")
 
@@ -488,14 +488,14 @@ let mappings: [MessageTypeMapping] = [
         swiftEquivalent: ".partialMessage(PartialData)", status: "PASS",
         note: "All fields present: text, parentToolUseId, uuid, sessionId"),
     MessageTypeMapping(index: 6, tsType: "SDKCompactBoundaryMessage", tsTypeField: "system/compact_boundary",
-        swiftEquivalent: ".system(SystemData) subtype=.compactBoundary", status: "PARTIAL",
-        note: "Has message. MISSING: compact_metadata"),
+        swiftEquivalent: ".system(SystemData) subtype=.compactBoundary", status: "PASS",
+        note: "Has message + compactMetadata (CompactMetadata with trigger, preTokens, preservedSegment)"),
     MessageTypeMapping(index: 7, tsType: "SDKStatusMessage", tsTypeField: "system/status",
-        swiftEquivalent: ".system(SystemData) subtype=.status", status: "PARTIAL",
-        note: "Has message + permissionMode field. Still missing status-specific fields."),
+        swiftEquivalent: ".system(SystemData) subtype=.status", status: "PASS",
+        note: "Has message + statusValue, compactResult, compactError fields."),
     MessageTypeMapping(index: 8, tsType: "SDKTaskNotificationMessage", tsTypeField: "system/task_notification",
-        swiftEquivalent: ".system(SystemData) subtype=.taskNotification", status: "PARTIAL",
-        note: "Has message. MISSING: task_id, output_file, summary, usage"),
+        swiftEquivalent: ".system(SystemData) subtype=.taskNotification", status: "PASS",
+        note: "Has message + taskNotificationInfo (TaskNotificationInfo with taskId, outputFile, summary, usage)"),
     MessageTypeMapping(index: 9, tsType: "SDKTaskStartedMessage", tsTypeField: "system/task_started",
         swiftEquivalent: ".taskStarted(TaskStartedData) + SystemData.Subtype.taskStarted", status: "PASS",
         note: "Added by Story 17-1: taskId, taskType, description"),
@@ -521,8 +521,8 @@ let mappings: [MessageTypeMapping] = [
         swiftEquivalent: ".filesPersisted(FilesPersistedData) + SystemData.Subtype.filesPersisted", status: "PASS",
         note: "Added by Story 17-1: filePaths"),
     MessageTypeMapping(index: 17, tsType: "SDKRateLimitEvent", tsTypeField: "rate_limit_event",
-        swiftEquivalent: ".system(SystemData) subtype=.rateLimit", status: "PARTIAL",
-        note: "Has subtype + message. MISSING: rate limit-specific fields."),
+        swiftEquivalent: ".system(SystemData) subtype=.rateLimit", status: "PASS",
+        note: "Has subtype + message + rateLimitInfo (RateLimitInfo with status, resetsAt, rateLimitType, utilization)."),
     MessageTypeMapping(index: 18, tsType: "SDKLocalCommandOutputMessage", tsTypeField: "system/local_command_output",
         swiftEquivalent: ".localCommandOutput(LocalCommandOutputData) + SystemData.Subtype.localCommandOutput", status: "PASS",
         note: "Added by Story 17-1: output, command"),

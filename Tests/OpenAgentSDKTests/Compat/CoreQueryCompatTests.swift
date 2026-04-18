@@ -426,22 +426,21 @@ final class ErrorResultCompatTests: XCTestCase {
     // Swift SDK does not currently expose this on ResultData or QueryResult.
     // This is documented as [MISSING] in the compatibility report.
 
-    /// AC7 [GAP]: Error results do NOT expose error details (errors: [String]).
-    func testErrorResult_errorsField_gap() {
-        // TS SDK: error results include errors: string[]
-        // Swift SDK: ResultData does not have an errors field
+    /// AC7 [RESOLVED]: Error results now expose error details (errors: [String]?).
+    func testErrorResult_errorsField_exists() {
         let data = SDKMessage.ResultData(
             subtype: .errorDuringExecution,
             text: "",
             usage: nil,
             numTurns: 1,
-            durationMs: 100
+            durationMs: 100,
+            errors: ["API error", "timeout"]
         )
-        // Verify the gap exists using Mirror introspection
         let mirror = Mirror(reflecting: data)
         let fieldNames = Set(mirror.children.map { $0.label ?? "" })
-        XCTAssertFalse(fieldNames.contains("errors"),
-            "[GAP] ResultData should NOT have errors yet. If this fails, update the compat report.")
+        XCTAssertTrue(fieldNames.contains("errors"),
+            "ResultData now has errors field matching TS SDK.")
+        XCTAssertEqual(data.errors, ["API error", "timeout"])
     }
 }
 
@@ -533,9 +532,9 @@ final class CompatReportTests: XCTestCase {
         // Agent query methods (added by Story 17-10)
         report.append(("AsyncIterable input", "agent.streamInput(_ input: AsyncStream<String>)", "PASS"))
 
-        // Known gaps (genuinely not implemented)
-        report.append(("errors", "Not exposed on ResultData", "MISSING"))
-        report.append(("durationApiMs", "Not separate (merged into durationMs)", "MISSING"))
+        // Resolved by Spec 19
+        report.append(("errors", "ResultData.errors ([String]?)", "PASS"))
+        report.append(("durationApiMs", "ResultData.durationApiMs (Int?)", "PASS"))
 
         // Verify report has entries
         XCTAssertTrue(report.count > 0, "Compatibility report must have entries")

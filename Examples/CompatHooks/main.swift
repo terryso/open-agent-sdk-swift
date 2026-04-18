@@ -346,8 +346,8 @@ let hookOutput = HookOutput(
     notification: HookNotification(title: "Hook", body: "Executed", level: .info)
 )
 
-record("HookOutput.decision (approve/block)", swiftField: "HookOutput.block: Bool", status: "PARTIAL",
-       note: "Swift has block: Bool only. TS has decision: 'approve'|'block'. Missing 'approve' explicit value.")
+record("HookOutput.decision (approve/block)", swiftField: "HookOutput.decision: HookDecision?", status: "PASS",
+       note: "Swift now has HookDecision enum (.approve/.block) + decision field. block: Bool kept as convenience.")
 record("HookOutput.block default", swiftField: "HookOutput.block: Bool = false", status: "PASS",
        note: "block=\(hookOutput.block)")
 record("HookOutput.message", swiftField: "HookOutput.message: String?", status: "PASS",
@@ -583,7 +583,7 @@ struct OutputFieldMapping {
 }
 
 let outputFieldMappings: [OutputFieldMapping] = [
-    OutputFieldMapping(tsField: "decision (approve/block)", swiftField: "block: Bool", status: "PARTIAL", note: "block only, no approve"),
+    OutputFieldMapping(tsField: "decision (approve/block)", swiftField: "decision: HookDecision?", status: "PASS", note: "HookDecision enum + block: Bool convenience"),
     OutputFieldMapping(tsField: "systemMessage", swiftField: "systemMessage: String?", status: "PASS", note: "Resolved by Story 17-4"),
     OutputFieldMapping(tsField: "reason", swiftField: "reason: String?", status: "PASS", note: "Dedicated field (resolved by Story 17-4)"),
     OutputFieldMapping(tsField: "permissionDecision (allow/deny/ask)", swiftField: "permissionDecision: PermissionDecision?", status: "PASS", note: "allow/deny/ask (resolved by Stories 17-4 + 17-5)"),

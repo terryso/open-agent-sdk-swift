@@ -187,15 +187,18 @@ final class ListSessionsCompatTests: XCTestCase {
     }
 
     /// AC2 [GAP]: SessionMetadata has NO fileSize field (TS SDK has fileSize).
-    func testSessionMetadata_noFileSize_gap() {
+    /// AC2 [RESOLVED]: SessionMetadata now has fileSize field.
+    func testSessionMetadata_fileSize_exists() {
         let metadata = SessionMetadata(
             id: "sess-3", cwd: "/tmp", model: "m",
-            createdAt: Date(), updatedAt: Date(), messageCount: 0
+            createdAt: Date(), updatedAt: Date(), messageCount: 0,
+            fileSize: 4096
         )
         let mirror = Mirror(reflecting: metadata)
         let fieldNames = Set(mirror.children.compactMap { $0.label })
-        XCTAssertFalse(fieldNames.contains("fileSize"),
-            "[GAP] SessionMetadata should NOT have fileSize. TS SDK SDKSessionInfo has fileSize.")
+        XCTAssertTrue(fieldNames.contains("fileSize"),
+            "SessionMetadata now has fileSize matching TS SDK SDKSessionInfo.")
+        XCTAssertEqual(metadata.fileSize, 4096)
     }
 
     /// AC2 [PARTIAL]: SessionMetadata uses summary for customTitle (TS has separate customTitle).
@@ -211,28 +214,32 @@ final class ListSessionsCompatTests: XCTestCase {
             "PARTIAL: summary serves as both summary and customTitle (TS has separate fields)")
     }
 
-    /// AC2 [GAP]: SessionMetadata has NO firstPrompt field (TS SDK has firstPrompt).
-    func testSessionMetadata_noFirstPrompt_gap() {
+    /// AC2 [RESOLVED]: SessionMetadata now has firstPrompt field.
+    func testSessionMetadata_firstPrompt_exists() {
         let metadata = SessionMetadata(
             id: "sess-5", cwd: "/tmp", model: "m",
-            createdAt: Date(), updatedAt: Date(), messageCount: 0
+            createdAt: Date(), updatedAt: Date(), messageCount: 0,
+            firstPrompt: "Hello"
         )
         let mirror = Mirror(reflecting: metadata)
         let fieldNames = Set(mirror.children.compactMap { $0.label })
-        XCTAssertFalse(fieldNames.contains("firstPrompt"),
-            "[GAP] SessionMetadata should NOT have firstPrompt. TS SDK SDKSessionInfo has firstPrompt.")
+        XCTAssertTrue(fieldNames.contains("firstPrompt"),
+            "SessionMetadata now has firstPrompt matching TS SDK SDKSessionInfo.")
+        XCTAssertEqual(metadata.firstPrompt, "Hello")
     }
 
-    /// AC2 [GAP]: SessionMetadata has NO gitBranch field (TS SDK has gitBranch).
-    func testSessionMetadata_noGitBranch_gap() {
+    /// AC2 [RESOLVED]: SessionMetadata now has gitBranch field.
+    func testSessionMetadata_gitBranch_exists() {
         let metadata = SessionMetadata(
             id: "sess-6", cwd: "/tmp", model: "m",
-            createdAt: Date(), updatedAt: Date(), messageCount: 0
+            createdAt: Date(), updatedAt: Date(), messageCount: 0,
+            gitBranch: "feature/compat"
         )
         let mirror = Mirror(reflecting: metadata)
         let fieldNames = Set(mirror.children.compactMap { $0.label })
-        XCTAssertFalse(fieldNames.contains("gitBranch"),
-            "[GAP] SessionMetadata should NOT have gitBranch. TS SDK SDKSessionInfo has gitBranch.")
+        XCTAssertTrue(fieldNames.contains("gitBranch"),
+            "SessionMetadata now has gitBranch matching TS SDK SDKSessionInfo.")
+        XCTAssertEqual(metadata.gitBranch, "feature/compat")
     }
 
     /// AC2 [P0]: SessionMetadata has cwd field (maps to TS SDK cwd).
@@ -287,18 +294,16 @@ final class ListSessionsCompatTests: XCTestCase {
             "messageCount is a Swift-only field, not in TS SDK SDKSessionInfo")
     }
 
-    /// AC2 [P0]: SessionMetadata has exactly 8 fields.
+    /// AC2 [P0]: SessionMetadata has 11 fields (8 original + fileSize + firstPrompt + gitBranch).
     func testSessionMetadata_fieldCount() {
         let metadata = SessionMetadata(
             id: "x", cwd: "/tmp", model: "m",
             createdAt: Date(), updatedAt: Date(), messageCount: 0
         )
         let mirror = Mirror(reflecting: metadata)
-        // Swift has 8 fields: id, cwd, model, createdAt, updatedAt, messageCount, summary, tag
-        // TS SDK has 10 fields: sessionId, summary, lastModified, fileSize, customTitle,
-        //   firstPrompt, gitBranch, cwd, tag, createdAt
-        XCTAssertEqual(mirror.children.count, 8,
-            "Swift has 8 fields vs TS SDK's 10 fields (4 MISSING, 3 EXTRA)")
+        // Swift has 11 fields: id, cwd, model, createdAt, updatedAt, messageCount, summary, tag, fileSize, firstPrompt, gitBranch
+        XCTAssertEqual(mirror.children.count, 11,
+            "Swift has 11 fields matching TS SDK's 10 fields (+1 Swift-only messageCount)")
     }
 }
 
@@ -912,10 +917,10 @@ final class SessionManagementCompatReportTests: XCTestCase {
             FieldMapping(tsField: "sessionId", swiftField: "id: String", status: "PASS"),
             FieldMapping(tsField: "summary", swiftField: "summary: String?", status: "PASS"),
             FieldMapping(tsField: "lastModified", swiftField: "updatedAt: Date", status: "PASS"),
-            FieldMapping(tsField: "fileSize", swiftField: "MISSING", status: "MISSING"),
+            FieldMapping(tsField: "fileSize", swiftField: "fileSize: Int?", status: "PASS"),
             FieldMapping(tsField: "customTitle", swiftField: "summary (shared)", status: "PARTIAL"),
-            FieldMapping(tsField: "firstPrompt", swiftField: "MISSING", status: "MISSING"),
-            FieldMapping(tsField: "gitBranch", swiftField: "MISSING", status: "MISSING"),
+            FieldMapping(tsField: "firstPrompt", swiftField: "firstPrompt: String?", status: "PASS"),
+            FieldMapping(tsField: "gitBranch", swiftField: "gitBranch: String?", status: "PASS"),
             FieldMapping(tsField: "cwd", swiftField: "cwd: String", status: "PASS"),
             FieldMapping(tsField: "tag", swiftField: "tag: String?", status: "PASS"),
             FieldMapping(tsField: "createdAt", swiftField: "createdAt: Date", status: "PASS"),
@@ -939,9 +944,9 @@ final class SessionManagementCompatReportTests: XCTestCase {
         print("Summary: PASS: \(passCount) | PARTIAL: \(partialCount) | MISSING: \(missingCount) | EXTRA: \(extraCount)")
         print("")
 
-        XCTAssertEqual(passCount, 6, "6 fields fully pass")
+        XCTAssertEqual(passCount, 9, "9 fields fully pass (including fileSize, firstPrompt, gitBranch)")
         XCTAssertEqual(partialCount, 1, "1 field partial (customTitle)")
-        XCTAssertEqual(missingCount, 3, "3 fields missing (fileSize, firstPrompt, gitBranch)")
+        XCTAssertEqual(missingCount, 0, "0 fields missing (all TS fields now covered)")
         XCTAssertEqual(extraCount, 3, "3 Swift-only extra fields")
     }
 
@@ -954,15 +959,15 @@ final class SessionManagementCompatReportTests: XCTestCase {
         }
 
         let mappings: [FieldMapping] = [
-            // TS SDK SessionMessage fields vs Swift raw message dict keys
-            FieldMapping(tsField: "type (user/assistant)", swiftField: "role (user/assistant)", status: "PARTIAL"),
-            FieldMapping(tsField: "uuid", swiftField: "MISSING", status: "MISSING"),
-            FieldMapping(tsField: "session_id", swiftField: "MISSING", status: "MISSING"),
-            FieldMapping(tsField: "message", swiftField: "content", status: "PARTIAL"),
-            FieldMapping(tsField: "parent_tool_use_id", swiftField: "MISSING", status: "MISSING"),
+            // TS SDK SessionMessage fields vs Swift SessionMessage struct
+            FieldMapping(tsField: "type (user/assistant)", swiftField: "SessionMessage.role", status: "PASS"),
+            FieldMapping(tsField: "uuid", swiftField: "SessionMessage.uuid", status: "PASS"),
+            FieldMapping(tsField: "session_id", swiftField: "SessionMessage.sessionId", status: "PASS"),
+            FieldMapping(tsField: "message", swiftField: "SessionMessage.content", status: "PASS"),
+            FieldMapping(tsField: "parent_tool_use_id", swiftField: "SessionMessage.parentToolUseId", status: "PASS"),
         ]
 
-        let partialCount = mappings.filter { $0.status == "PARTIAL" }.count
+        let passCount = mappings.filter { $0.status == "PASS" }.count
         let missingCount = mappings.filter { $0.status == "MISSING" }.count
 
         print("")
@@ -970,12 +975,12 @@ final class SessionManagementCompatReportTests: XCTestCase {
         for m in mappings {
             print("  [\(m.status)] TS: \(m.tsField) -> Swift: \(m.swiftField)")
         }
-        print("Summary: PARTIAL: \(partialCount) | MISSING: \(missingCount) | Total: \(mappings.count)")
-        print("Note: Swift messages are raw [String: Any] dicts, not typed structs")
+        print("Summary: PASS: \(passCount) | MISSING: \(missingCount) | Total: \(mappings.count)")
+        print("Note: Swift now has typed SessionMessage struct (added by Spec 19)")
         print("")
 
-        XCTAssertEqual(partialCount, 2, "2 fields partial (type->role, message->content)")
-        XCTAssertEqual(missingCount, 3, "3 fields missing (uuid, session_id, parent_tool_use_id)")
+        XCTAssertEqual(passCount, 5, "5 fields pass (all SessionMessage fields now implemented)")
+        XCTAssertEqual(missingCount, 0, "0 fields missing (SessionMessage struct added by Spec 19)")
     }
 
     /// AC7 [P0]: Session restore options compatibility report.
@@ -1033,34 +1038,34 @@ final class SessionManagementCompatReportTests: XCTestCase {
     /// AC7 [P0]: Overall compatibility summary.
     func testCompatReport_overallSummary() {
         // Method-level: 2 PASS, 3 PARTIAL, 0 MISSING, 3 EXTRA
-        // Field-level (metadata): 6 PASS, 1 PARTIAL, 3 MISSING, 3 EXTRA
-        // Field-level (messages): 0 PASS, 2 PARTIAL, 3 MISSING
+        // Field-level (metadata): 9 PASS, 1 PARTIAL, 0 MISSING, 3 EXTRA (updated by Spec 19)
+        // Field-level (messages): 5 PASS, 0 PARTIAL, 0 MISSING (updated by Spec 19)
         // Options-level: 1 PASS, 1 PARTIAL, 4 RESOLVED (was 4 MISSING, resolved by Story 17-7)
 
         print("")
         print("==============================================")
         print("Story 16-6: Session Management Compat Summary")
-        print("(Updated by Story 17-7: 4 MISSING options resolved)")
+        print("(Updated by Spec 19: metadata+message fields resolved)")
         print("==============================================")
         print("Session Functions:    2 PASS | 3 PARTIAL | 0 MISSING | 3 EXTRA (Swift-only)")
-        print("Metadata Fields:     6 PASS | 1 PARTIAL | 3 MISSING | 3 EXTRA (Swift-only)")
-        print("Message Fields:      0 PASS | 2 PARTIAL | 3 MISSING")
+        print("Metadata Fields:     9 PASS | 1 PARTIAL | 0 MISSING | 3 EXTRA (Swift-only)")
+        print("Message Fields:      5 PASS | 0 PARTIAL | 0 MISSING")
         print("Restore Options:     1 PASS | 1 PARTIAL | 4 RESOLVED | 0 MISSING")
         print("----------------------------------------------")
-        print("Total:               9 PASS | 7 PARTIAL | 6 MISSING | 4 RESOLVED | 6 EXTRA")
+        print("Total:              17 PASS | 5 PARTIAL | 0 MISSING | 4 RESOLVED | 6 EXTRA")
         print("==============================================")
         print("")
 
         // Verify totals
-        let totalPass = 2 + 6 + 0 + 1
-        let totalPartial = 3 + 1 + 2 + 1
-        let totalMissing = 0 + 3 + 3 + 0  // Options-level now 0 MISSING
-        let totalResolved = 4  // 4 options resolved by Story 17-7
+        let totalPass = 2 + 9 + 5 + 1
+        let totalPartial = 3 + 1 + 0 + 1
+        let totalMissing = 0 + 0 + 0 + 0
+        let totalResolved = 4
         let totalExtra = 3 + 3 + 0 + 0
 
-        XCTAssertEqual(totalPass, 9)
-        XCTAssertEqual(totalPartial, 7)
-        XCTAssertEqual(totalMissing, 6)
+        XCTAssertEqual(totalPass, 17)
+        XCTAssertEqual(totalPartial, 5)
+        XCTAssertEqual(totalMissing, 0)
         XCTAssertEqual(totalResolved, 4)
         XCTAssertEqual(totalExtra, 6)
     }

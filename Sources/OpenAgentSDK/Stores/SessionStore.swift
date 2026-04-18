@@ -57,6 +57,12 @@ public actor SessionStore {
         if let tag = metadata.tag {
             metadataDict["tag"] = tag
         }
+        if let firstPrompt = metadata.firstPrompt {
+            metadataDict["firstPrompt"] = firstPrompt
+        }
+        if let gitBranch = metadata.gitBranch {
+            metadataDict["gitBranch"] = gitBranch
+        }
 
         let sessionDict: [String: Any] = [
             "metadata": metadataDict,
@@ -96,12 +102,24 @@ public actor SessionStore {
         if !success {
             throw SDKError.sessionError(message: "Failed to write transcript file at \(transcriptPath)")
         }
+
+        // Write fileSize back to metadata for future reads
+        if let fileData = FileManager.default.contents(atPath: transcriptPath) {
+            var updateDict = metadataDict
+            updateDict["fileSize"] = fileData.count
+            if let updateJSON = try? JSONSerialization.data(withJSONObject: ["metadata": updateDict, "messages": messages], options: [.prettyPrinted, .sortedKeys]) {
+                _ = FileManager.default.createFile(atPath: transcriptPath, contents: updateJSON, attributes: permissions)
+            }
+        }
     }
 
     /// Load a session transcript from disk.
-    /// - Parameter sessionId: The session identifier to load.
+    /// - Parameters:
+    ///   - sessionId: The session identifier to load.
+    ///   - limit: Maximum number of messages to return. Defaults to `nil` (all messages).
+    ///   - offset: Number of messages to skip from the beginning. Defaults to `nil` (start from 0).
     /// - Returns: `SessionData` if the session exists and can be deserialized, `nil` otherwise.
-    public func load(sessionId: String) throws -> SessionData? {
+    public func load(sessionId: String, limit: Int? = nil, offset: Int? = nil) throws -> SessionData? {
         try validateSessionId(sessionId)
         let sessionPath = getSessionPath(sessionId)
         let transcriptPath = (sessionPath as NSString).appendingPathComponent("transcript.json")
@@ -153,6 +171,9 @@ public actor SessionStore {
 
         let summary = metadataDict["summary"] as? String
         let tag = metadataDict["tag"] as? String
+        let fileSize = metadataDict["fileSize"] as? Int
+        let firstPrompt = metadataDict["firstPrompt"] as? String
+        let gitBranch = metadataDict["gitBranch"] as? String
 
         let metadata = SessionMetadata(
             id: id,
@@ -162,10 +183,22 @@ public actor SessionStore {
             updatedAt: updatedAt,
             messageCount: messageCount,
             summary: summary,
-            tag: tag
+            tag: tag,
+            fileSize: fileSize,
+            firstPrompt: firstPrompt,
+            gitBranch: gitBranch
         )
 
-        return SessionData(metadata: metadata, messages: messagesArray)
+        // Apply pagination
+        var paginatedMessages = messagesArray
+        if let off = offset, off > 0 {
+            paginatedMessages = Array(paginatedMessages.dropFirst(off))
+        }
+        if let lim = limit, lim > 0 {
+            paginatedMessages = Array(paginatedMessages.prefix(lim))
+        }
+
+        return SessionData(metadata: metadata, messages: paginatedMessages)
     }
 
     /// Delete a session directory and all its files.
@@ -238,8 +271,11 @@ public actor SessionStore {
 
     /// List all sessions, returning metadata sorted by `updatedAt` descending (most recent first).
     /// Invalid or corrupt sessions are silently skipped.
+    /// - Parameters:
+    ///   - limit: Maximum number of sessions to return. Defaults to `nil` (all sessions).
+    ///   - includeWorktrees: Whether to include worktree sessions. Defaults to `false`.
     /// - Returns: Array of `SessionMetadata` for all valid sessions.
-    public func list() throws -> [SessionMetadata] {
+    public func list(limit: Int? = nil, includeWorktrees: Bool = false) throws -> [SessionMetadata] {
         let sessionsDir = getSessionsDir()
 
         let entries: [String]
@@ -266,6 +302,19 @@ public actor SessionStore {
             if a.createdAt != b.createdAt { return a.createdAt > b.createdAt }
             return a.id > b.id
         }
+
+        if !includeWorktrees {
+            // Filter out worktree sessions by checking for the .claude/worktrees path convention
+            sessions = sessions.filter { session in
+                let id = session.id.lowercased()
+                return !id.contains("/.claude/worktrees/") && !id.hasPrefix("wt-")
+            }
+        }
+
+        if let lim = limit, lim > 0 {
+            sessions = Array(sessions.prefix(lim))
+        }
+
         return sessions
     }
 
@@ -282,7 +331,9 @@ public actor SessionStore {
             cwd: data.metadata.cwd,
             model: data.metadata.model,
             summary: newTitle,
-            tag: data.metadata.tag
+            tag: data.metadata.tag,
+            firstPrompt: data.metadata.firstPrompt,
+            gitBranch: data.metadata.gitBranch
         )
         try save(sessionId: sessionId, messages: data.messages, metadata: metadata)
     }
@@ -301,7 +352,9 @@ public actor SessionStore {
             cwd: data.metadata.cwd,
             model: data.metadata.model,
             summary: data.metadata.summary,
-            tag: tag
+            tag: tag,
+            firstPrompt: data.metadata.firstPrompt,
+            gitBranch: data.metadata.gitBranch
         )
         try save(sessionId: sessionId, messages: data.messages, metadata: metadata)
     }

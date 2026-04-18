@@ -627,13 +627,15 @@ final class HookOutputCompatTests: XCTestCase {
         XCTAssertEqual(output.notification?.title, "Alert")
     }
 
-    /// AC7 [GAP]: HookOutput does NOT have decision field (TS SDK has decision: approve/block).
-    func testHookOutput_decision_gap() {
-        let output = HookOutput(block: true)
+    /// AC7 [RESOLVED]: HookOutput now has decision field (TS SDK: approve/block).
+    func testHookOutput_decision_exists() {
+        let output = HookOutput(decision: .block)
         let mirror = Mirror(reflecting: output)
         let fieldNames = Set(mirror.children.map { $0.label ?? "" })
-        XCTAssertFalse(fieldNames.contains("decision"),
-            "[GAP] HookOutput uses block: Bool instead of decision: 'approve'|'block'. TS SDK has explicit decision field.")
+        XCTAssertTrue(fieldNames.contains("decision"),
+            "HookOutput now has decision field matching TS SDK.")
+        XCTAssertEqual(output.decision, .block)
+        XCTAssertTrue(output.block)
     }
 
     /// AC7 [RESOLVED by Story 17-4]: HookOutput now has systemMessage (TS SDK has systemMessage).
@@ -681,12 +683,12 @@ final class HookOutputCompatTests: XCTestCase {
             "HookOutput must have updatedMCPToolOutput. TS SDK PostToolUse hookSpecificOutput has this. Resolved by Story 17-4.")
     }
 
-    /// AC7 [P0]: HookOutput has 10 fields (4 original + 6 new from Story 17-4).
+    /// AC7 [P0]: HookOutput has 11 fields (4 original + 6 new from Story 17-4 + decision).
     func testHookOutput_fieldCount() {
         let output = HookOutput()
         let mirror = Mirror(reflecting: output)
-        XCTAssertEqual(mirror.children.count, 10,
-            "HookOutput should have 10 fields (message, permissionUpdate, block, notification, systemMessage, reason, updatedInput, additionalContext, permissionDecision, updatedMCPToolOutput).")
+        XCTAssertEqual(mirror.children.count, 11,
+            "HookOutput should have 11 fields (message, permissionUpdate, block, notification, systemMessage, reason, updatedInput, additionalContext, permissionDecision, updatedMCPToolOutput, decision).")
     }
 
     /// AC7 [P0]: PermissionBehavior has allow, deny, and ask cases.
@@ -953,7 +955,7 @@ final class HookSystemCompatReportTests: XCTestCase {
     /// AC9 [P0]: HookOutput field-level compatibility summary.
     func testCompatReport_hookOutputFieldSummary() {
         let fields: [(tsField: String, swiftField: String, status: String)] = [
-            ("decision (approve/block)", "block: Bool", "PARTIAL"),
+            ("decision (approve/block)", "decision: HookDecision?", "PASS"),
             ("systemMessage", "systemMessage", "PASS"),
             ("reason", "reason", "PASS"),
             ("permissionDecision (allow/deny/ask)", "permissionDecision", "PASS"),
@@ -974,8 +976,8 @@ final class HookSystemCompatReportTests: XCTestCase {
         print("Summary: PASS: \(passCount) | PARTIAL: \(partialCount) | MISSING: \(missingCount) | Total: \(fields.count)")
         print("")
 
-        XCTAssertEqual(passCount, 6, "6 fields should be PASS (resolved by Story 17-4)")
-        XCTAssertEqual(partialCount, 1, "1 field should be PARTIAL (decision -> block mapping)")
+        XCTAssertEqual(passCount, 7, "All 7 fields should be PASS (decision resolved by Spec 19)")
+        XCTAssertEqual(partialCount, 0, "No fields should be PARTIAL after Spec 19")
         XCTAssertEqual(missingCount, 0, "No fields should be MISSING after Story 17-4")
     }
 }

@@ -143,6 +143,14 @@ public struct HookInput: @unchecked Sendable {
     }
 }
 
+/// Hook decision types matching TS SDK's `decision: 'approve' | 'block'`.
+public enum HookDecision: String, Sendable, Equatable {
+    /// Approve the operation.
+    case approve
+    /// Block the operation.
+    case block
+}
+
 /// Output returned from hook handlers.
 ///
 /// Hooks can return a `HookOutput` to influence agent behavior by providing messages,
@@ -172,6 +180,8 @@ public struct HookOutput: @unchecked Sendable, Equatable {
     public let permissionDecision: PermissionDecision?
     /// An optional updated MCP tool output (PostToolUse hooks).
     public let updatedMCPToolOutput: Any?
+    /// Explicit hook decision matching TS SDK's `decision: 'approve' | 'block'`.
+    public let decision: HookDecision?
 
     public init(
         message: String? = nil,
@@ -183,7 +193,8 @@ public struct HookOutput: @unchecked Sendable, Equatable {
         updatedInput: [String: Any]? = nil,
         additionalContext: String? = nil,
         permissionDecision: PermissionDecision? = nil,
-        updatedMCPToolOutput: Any? = nil
+        updatedMCPToolOutput: Any? = nil,
+        decision: HookDecision? = nil
     ) {
         self.message = message
         self.permissionUpdate = permissionUpdate
@@ -195,6 +206,22 @@ public struct HookOutput: @unchecked Sendable, Equatable {
         self.additionalContext = additionalContext
         self.permissionDecision = permissionDecision
         self.updatedMCPToolOutput = updatedMCPToolOutput
+        self.decision = decision
+    }
+
+    /// Convenience initializer that sets both `block` and `decision` from a single decision value.
+    public init(decision: HookDecision, message: String? = nil, permissionUpdate: PermissionUpdate? = nil, notification: HookNotification? = nil, systemMessage: String? = nil, reason: String? = nil, updatedInput: [String: Any]? = nil, additionalContext: String? = nil, permissionDecision: PermissionDecision? = nil, updatedMCPToolOutput: Any? = nil) {
+        self.message = message
+        self.permissionUpdate = permissionUpdate
+        self.block = decision == .block
+        self.notification = notification
+        self.systemMessage = systemMessage
+        self.reason = reason
+        self.updatedInput = updatedInput
+        self.additionalContext = additionalContext
+        self.permissionDecision = permissionDecision
+        self.updatedMCPToolOutput = updatedMCPToolOutput
+        self.decision = decision
     }
 
     public static func == (lhs: HookOutput, rhs: HookOutput) -> Bool {
@@ -206,6 +233,7 @@ public struct HookOutput: @unchecked Sendable, Equatable {
             && lhs.reason == rhs.reason
             && lhs.additionalContext == rhs.additionalContext
             && lhs.permissionDecision == rhs.permissionDecision
+            && lhs.decision == rhs.decision
         // Note: updatedInput ([String: Any]?) and updatedMCPToolOutput (Any?)
         // are excluded from equality comparison because they contain non-Equatable types.
     }

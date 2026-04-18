@@ -236,13 +236,13 @@ final class ResultMessageCompatTests: XCTestCase {
         XCTAssertEqual(data.modelUsage?.count, 1)
     }
 
-    /// AC3 [GAP]: ResultData does NOT have errors array field (TS SDK error results have this).
-    func testResultData_errorsArray_gap() {
-        let data = SDKMessage.ResultData(subtype: .errorDuringExecution, text: "", usage: nil, numTurns: 1, durationMs: 100)
+    /// AC3 [RESOLVED]: ResultData now has errors array field.
+    func testResultData_errorsArray_exists() {
+        let data = SDKMessage.ResultData(subtype: .errorDuringExecution, text: "", usage: nil, numTurns: 1, durationMs: 100, errors: ["err"])
         let mirror = Mirror(reflecting: data)
         let fieldNames = Set(mirror.children.map { $0.label ?? "" })
-        XCTAssertFalse(fieldNames.contains("errors"),
-            "[GAP] ResultData does not have errors array yet. TS SDK error results include errors: string[].")
+        XCTAssertTrue(fieldNames.contains("errors"),
+            "ResultData now has errors field matching TS SDK.")
     }
 }
 
@@ -404,28 +404,25 @@ final class SystemMessageCompatTests: XCTestCase {
             "SystemData.cwd maps to TS SDK system/init cwd")
     }
 
-    /// AC4 [GAP]: SystemData compactBoundary does NOT expose compact_metadata (TS SDK has this).
-    func testSystemData_compactBoundary_metadata_gap() {
-        let data = SDKMessage.SystemData(subtype: .compactBoundary, message: "")
+    /// AC4 [RESOLVED]: SystemData compactBoundary now exposes compactMetadata.
+    func testSystemData_compactBoundary_metadata_exists() {
+        let data = SDKMessage.SystemData(subtype: .compactBoundary, message: "", compactMetadata: SDKMessage.CompactMetadata(trigger: .auto, preTokens: 1000, postTokens: 500))
         let mirror = Mirror(reflecting: data)
         let fieldNames = Set(mirror.children.map { $0.label ?? "" })
-        XCTAssertFalse(fieldNames.contains("compactMetadata"),
-            "[GAP] SystemData does not have compactMetadata yet. TS SDK compact_boundary includes compact_metadata.")
+        XCTAssertTrue(fieldNames.contains("compactMetadata"),
+            "SystemData now has compactMetadata matching TS SDK compact_boundary.")
+        XCTAssertEqual(data.compactMetadata?.trigger, .auto)
     }
 
-    /// AC4 [GAP]: SystemData taskNotification does NOT expose task_id, output_file, summary, usage.
-    func testSystemData_taskNotification_fields_gap() {
-        let data = SDKMessage.SystemData(subtype: .taskNotification, message: "")
+    /// AC4 [RESOLVED]: SystemData taskNotification now exposes taskNotificationInfo.
+    func testSystemData_taskNotification_fields_exist() {
+        let info = SDKMessage.TaskNotificationInfo(taskId: "task-1", status: .completed, outputFile: "/tmp/out", summary: "done")
+        let data = SDKMessage.SystemData(subtype: .taskNotification, message: "", taskNotificationInfo: info)
         let mirror = Mirror(reflecting: data)
         let fieldNames = Set(mirror.children.map { $0.label ?? "" })
-        XCTAssertFalse(fieldNames.contains("taskId"),
-            "[GAP] SystemData does not have taskId yet. TS SDK task_notification includes task_id.")
-        XCTAssertFalse(fieldNames.contains("outputFile"),
-            "[GAP] SystemData does not have outputFile yet. TS SDK task_notification includes output_file.")
-        XCTAssertFalse(fieldNames.contains("summary"),
-            "[GAP] SystemData does not have summary yet. TS SDK task_notification includes summary.")
-        XCTAssertFalse(fieldNames.contains("usage"),
-            "[GAP] SystemData does not have usage yet. TS SDK task_notification includes usage.")
+        XCTAssertTrue(fieldNames.contains("taskNotificationInfo"),
+            "SystemData now has taskNotificationInfo matching TS SDK task_notification.")
+        XCTAssertEqual(data.taskNotificationInfo?.taskId, "task-1")
     }
 }
 
@@ -755,14 +752,14 @@ final class MessageTypesCompatReportTests: XCTestCase {
                 swiftEquivalent: ".partialMessage(PartialData)", status: "PASS",
                 note: "All fields present: text, parentToolUseId, uuid, sessionId"),
             MessageTypeMapping(index: 6, tsType: "SDKCompactBoundaryMessage", tsTypeField: "system/compact_boundary",
-                swiftEquivalent: ".system(SystemData) subtype=.compactBoundary", status: "PARTIAL",
-                note: "Has message. MISSING: compact_metadata"),
+                swiftEquivalent: ".system(SystemData) subtype=.compactBoundary", status: "PASS",
+                note: "Has message + compactMetadata (CompactMetadata with trigger, preTokens, postTokens, preservedSegment)"),
             MessageTypeMapping(index: 7, tsType: "SDKStatusMessage", tsTypeField: "system/status",
-                swiftEquivalent: ".system(SystemData) subtype=.status", status: "PARTIAL",
-                note: "Has message + permissionMode field. Still missing status-specific fields."),
+                swiftEquivalent: ".system(SystemData) subtype=.status", status: "PASS",
+                note: "Has message + statusValue, compactResult, compactError fields."),
             MessageTypeMapping(index: 8, tsType: "SDKTaskNotificationMessage", tsTypeField: "system/task_notification",
-                swiftEquivalent: ".system(SystemData) subtype=.taskNotification", status: "PARTIAL",
-                note: "Has message. MISSING: task_id, output_file, summary, usage"),
+                swiftEquivalent: ".system(SystemData) subtype=.taskNotification", status: "PASS",
+                note: "Has message + taskNotificationInfo (TaskNotificationInfo with taskId, outputFile, summary, usage)"),
             MessageTypeMapping(index: 9, tsType: "SDKTaskStartedMessage", tsTypeField: "system/task_started",
                 swiftEquivalent: ".taskStarted(TaskStartedData) + SystemData.Subtype.taskStarted", status: "PASS",
                 note: "Added by Story 17.1: taskId, taskType, description"),
@@ -788,8 +785,8 @@ final class MessageTypesCompatReportTests: XCTestCase {
                 swiftEquivalent: ".filesPersisted(FilesPersistedData) + SystemData.Subtype.filesPersisted", status: "PASS",
                 note: "Added by Story 17.1: filePaths"),
             MessageTypeMapping(index: 17, tsType: "SDKRateLimitEvent", tsTypeField: "rate_limit_event",
-                swiftEquivalent: ".system(SystemData) subtype=.rateLimit", status: "PARTIAL",
-                note: "Has subtype + message. MISSING: rate limit-specific fields."),
+                swiftEquivalent: ".system(SystemData) subtype=.rateLimit", status: "PASS",
+                note: "Has subtype + message + rateLimitInfo (RateLimitInfo with status, resetsAt, rateLimitType, utilization)."),
             MessageTypeMapping(index: 18, tsType: "SDKLocalCommandOutputMessage", tsTypeField: "system/local_command_output",
                 swiftEquivalent: ".localCommandOutput(LocalCommandOutputData) + SystemData.Subtype.localCommandOutput", status: "PASS",
                 note: "Added by Story 17.1: output, command"),
@@ -828,10 +825,10 @@ final class MessageTypesCompatReportTests: XCTestCase {
             "Most TS SDK types should now be PASS after Story 17.1")
         XCTAssertEqual(missingCount, 0,
             "No TS SDK types should be MISSING after Story 17.1")
-        XCTAssertEqual(passCount, 16,
-            "Expected 16 PASS message types after Story 17.1")
-        XCTAssertEqual(partialCount, 4,
-            "Expected 4 PARTIAL message types (compact boundary, status, task notification, rate limit)")
+        XCTAssertEqual(passCount, 20,
+            "All 20 message types now PASS after Spec 19")
+        XCTAssertEqual(partialCount, 0,
+            "0 PARTIAL message types after Spec 19 (compact boundary, status, task notification, rate limit resolved)")
     }
 }
 

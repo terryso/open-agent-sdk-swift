@@ -368,9 +368,9 @@ if budgetHit {
            note: "Budget not exceeded with 0.0001 USD limit")
 }
 
-// Known gaps for error results
-record("errors: [String]", swiftField: "Not exposed on ResultData/QueryResult", status: "MISSING",
-       note: "TS SDK error results include errors: string[] for details")
+// Resolved by Spec 19
+record("errors: [String]", swiftField: "ResultData.errors ([String]?)", status: "PASS",
+       note: "TS SDK error results include errors: string[]. Now available on ResultData.")
 
 // MARK: - Known Gaps Documentation
 
@@ -385,9 +385,9 @@ record("permissionDenials", swiftField: "ResultData.permissionDenials ([SDKPermi
 record("modelUsage", swiftField: "ResultData.modelUsage ([ModelUsageEntry]?)", status: "PASS",
        note: "Field exists on ResultData (type-level PASS)")
 
-// Still genuinely missing
-record("durationApiMs", swiftField: "Not separate (merged into durationMs)", status: "MISSING",
-       note: "TS SDK has separate durationApiMs. Swift only has durationMs (total wall-clock)")
+// Resolved by Spec 19
+record("durationApiMs", swiftField: "ResultData.durationApiMs (Int?)", status: "PASS",
+       note: "TS SDK has separate durationApiMs. Swift now has durationApiMs (cumulative API time).")
 
 // streamInput added by Story 17-10
 record("AsyncIterable input", swiftField: "agent.streamInput(_ input: AsyncStream<String>)", status: "PASS",

@@ -211,13 +211,13 @@ final class Story18_4_HookOutputATDDTests: XCTestCase {
             "HookOutput.updatedMCPToolOutput maps to TS SDK PostToolUse hookSpecificOutput.updatedMCPToolOutput")
     }
 
-    /// AC4 [P0]: HookOutput has 10 fields total (4 original + 6 new from Story 17-4).
+    /// AC4 [P0]: HookOutput has 11 fields total (4 original + 6 new from Story 17-4 + decision).
     func testHookOutput_fieldCount() {
         let output = HookOutput()
         let mirror = Mirror(reflecting: output)
-        XCTAssertEqual(mirror.children.count, 10,
-            "HookOutput should have 10 fields: message, permissionUpdate, block, notification, " +
-            "systemMessage, reason, updatedInput, additionalContext, permissionDecision, updatedMCPToolOutput")
+        XCTAssertEqual(mirror.children.count, 11,
+            "HookOutput should have 11 fields: message, permissionUpdate, block, notification, " +
+            "systemMessage, reason, updatedInput, additionalContext, permissionDecision, updatedMCPToolOutput, decision")
     }
 }
 
@@ -402,13 +402,10 @@ final class Story18_4_CompatReportATDDTests: XCTestCase {
             "HookInput must have 19 fields (event + 18 mapped fields)")
     }
 
-    /// AC7 [P0] RED: OutputFieldMapping table must have 6 PASS, 1 PARTIAL, 0 MISSING.
+    /// AC7 [P0]: OutputFieldMapping table must have 7 PASS, 0 PARTIAL, 0 MISSING.
     ///
-    /// This test verifies the HookOutput field distribution:
-    /// - 6 PASS: systemMessage, reason, permissionDecision, updatedInput, additionalContext, updatedMCPToolOutput
-    /// - 1 PARTIAL: decision (block: Bool only, no explicit "approve")
-    /// - 0 MISSING
-    func testCompatReport_OutputFieldMapping_6PASS_1PARTIAL_0MISSING() {
+    /// All HookOutput fields now PASS including decision (HookDecision enum).
+    func testCompatReport_OutputFieldMapping_7PASS_0PARTIAL_0MISSING() {
         struct OutputFieldMapping {
             let tsField: String
             let swiftField: String
@@ -417,8 +414,8 @@ final class Story18_4_CompatReportATDDTests: XCTestCase {
         }
 
         let expectedFields: [OutputFieldMapping] = [
-            OutputFieldMapping(tsField: "decision (approve/block)", swiftField: "block: Bool", status: "PARTIAL",
-                               note: "block only, no explicit approve decision"),
+            OutputFieldMapping(tsField: "decision (approve/block)", swiftField: "decision: HookDecision?", status: "PASS",
+                               note: "HookDecision enum with .approve/.block + block: Bool convenience"),
             OutputFieldMapping(tsField: "systemMessage", swiftField: "systemMessage: String?", status: "PASS",
                                note: "Dedicated field. Added by Story 17-4."),
             OutputFieldMapping(tsField: "reason", swiftField: "reason: String?", status: "PASS",
@@ -439,24 +436,21 @@ final class Story18_4_CompatReportATDDTests: XCTestCase {
 
         XCTAssertEqual(expectedFields.count, 7,
             "Must have exactly 7 HookOutput field mappings")
-        XCTAssertEqual(passCount, 6,
-            "6 HookOutput fields should be PASS after Stories 17-4/17-5. " +
-            "Update CompatHooks example: systemMessage, updatedInput, additionalContext, updatedMCPToolOutput from MISSING to PASS; " +
-            "reason from PARTIAL to PASS; permissionDecision from PARTIAL to PASS.")
-        XCTAssertEqual(partialCount, 1,
-            "1 HookOutput field should be PARTIAL: decision (block: Bool only, no explicit approve). This is a genuine gap.")
+        XCTAssertEqual(passCount, 7,
+            "All 7 HookOutput fields should be PASS now that decision is resolved.")
+        XCTAssertEqual(partialCount, 0,
+            "No HookOutput fields should be PARTIAL after decision field added.")
         XCTAssertEqual(missingCount, 0,
             "No HookOutput fields should be MISSING after Stories 17-4/17-5.")
 
-        // Verify the remaining PARTIAL entry is genuine
-        // decision -> block: Bool mapping (no explicit "approve")
-        let output = HookOutput(block: false)
+        // Verify decision field exists
+        let output = HookOutput(decision: .approve)
         let mirror = Mirror(reflecting: output)
         let fieldNames = Set(mirror.children.map { $0.label ?? "" })
+        XCTAssertTrue(fieldNames.contains("decision"),
+            "decision field now exists as HookDecision enum")
         XCTAssertTrue(fieldNames.contains("block"),
-            "block: Bool exists as the PARTIAL mapping for TS SDK decision")
-        XCTAssertFalse(fieldNames.contains("decision"),
-            "decision field does NOT exist (genuine gap: block: Bool only)")
+            "block: Bool still exists as convenience property")
     }
 
     /// AC7 [P0]: Full HookInput construction with all 19 fields verifies compile-time completeness.

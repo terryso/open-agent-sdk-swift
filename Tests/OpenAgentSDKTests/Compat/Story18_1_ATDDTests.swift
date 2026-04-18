@@ -150,20 +150,21 @@ final class ResultDataFieldsATDDTests: XCTestCase {
         XCTAssertEqual(data.modelUsage?.count, 1)
     }
 
-    /// AC2 [P0]: ResultData does NOT have errors field (remains genuinely MISSING).
-    func testResultData_errors_stillMissing() {
+    /// AC2 [P0]: ResultData now has errors field (resolved).
+    func testResultData_errors_exists() {
         let data = SDKMessage.ResultData(
             subtype: .errorDuringExecution,
             text: "",
             usage: nil,
             numTurns: 1,
-            durationMs: 100
+            durationMs: 100,
+            errors: ["something went wrong"]
         )
-        // Verify the gap still exists -- errors: [String] is NOT on ResultData
         let mirror = Mirror(reflecting: data)
         let fieldNames = Set(mirror.children.map { $0.label ?? "" })
-        XCTAssertFalse(fieldNames.contains("errors"),
-            "[GAP] ResultData should NOT have errors field yet. This gap is documented as MISSING.")
+        XCTAssertTrue(fieldNames.contains("errors"),
+            "ResultData now has errors field.")
+        XCTAssertEqual(data.errors?.count, 1)
     }
 }
 
@@ -288,9 +289,9 @@ final class CompatReportUpdateATDDTests: XCTestCase {
         // Agent query methods -- NOW PASS (added by Story 17-10, updated by Story 18-1)
         report.append(("AsyncIterable input", "agent.streamInput(_ input: AsyncStream<String>)", "PASS"))
 
-        // Genuinely missing (remain MISSING)
-        report.append(("errors", "Not exposed on ResultData", "MISSING"))
-        report.append(("durationApiMs", "Not separate (merged into durationMs)", "MISSING"))
+        // Resolved by Spec 19
+        report.append(("errors", "ResultData.errors ([String]?)", "PASS"))
+        report.append(("durationApiMs", "ResultData.durationApiMs (Int?)", "PASS"))
 
         return report
     }
@@ -352,24 +353,24 @@ final class CompatReportUpdateATDDTests: XCTestCase {
             "Update CompatReportTests.testCompatReport_fieldMapping to mark permissionDenials as PASS.")
     }
 
-    /// AC4 [P0]: errors must remain MISSING (genuinely not implemented).
-    func testCompatReport_errors_remainsMISSING() {
+    /// AC4 [P0]: errors now PASS (resolved by Spec 19).
+    func testCompatReport_errors_isPASS() {
         let report = buildCurrentCompatReport()
         let entry = report.first { $0.tsField == "errors" }
 
         XCTAssertNotNil(entry, "Compat report must have an errors entry")
-        XCTAssertEqual(entry?.status, "MISSING",
-            "errors must remain MISSING -- ResultData.errors has not been implemented yet.")
+        XCTAssertEqual(entry?.status, "PASS",
+            "errors is now PASS -- ResultData.errors implemented by Spec 19.")
     }
 
-    /// AC4 [P0]: durationApiMs must remain MISSING (genuinely not implemented).
-    func testCompatReport_durationApiMs_remainsMISSING() {
+    /// AC4 [P0]: durationApiMs now PASS (resolved by Spec 19).
+    func testCompatReport_durationApiMs_isPASS() {
         let report = buildCurrentCompatReport()
         let entry = report.first { $0.tsField == "durationApiMs" }
 
         XCTAssertNotNil(entry, "Compat report must have a durationApiMs entry")
-        XCTAssertEqual(entry?.status, "MISSING",
-            "durationApiMs must remain MISSING -- merged into durationMs, not a separate field.")
+        XCTAssertEqual(entry?.status, "PASS",
+            "durationApiMs is now PASS -- ResultData.durationApiMs implemented by Spec 19.")
     }
 
     /// AC4 [P0]: Compat report must have at least 20 PASS entries after update.
@@ -419,9 +420,9 @@ final class CompatReportUpdateATDDTests: XCTestCase {
         // AC3: AgentOptions / streamInput -- MUST BE PASS (Story 17-10)
         report.append(("AsyncIterable input", "Agent.streamInput(_ input: AsyncStream<String>)", "PASS"))
 
-        // Genuinely missing (remain MISSING)
-        report.append(("errors", "Not exposed on ResultData", "MISSING"))
-        report.append(("durationApiMs", "Not separate (merged into durationMs)", "MISSING"))
+        // Resolved by Spec 19
+        report.append(("errors", "ResultData.errors ([String]?)", "PASS"))
+        report.append(("durationApiMs", "ResultData.durationApiMs (Int?)", "PASS"))
 
         let passCount = report.filter { $0.status == "PASS" }.count
 

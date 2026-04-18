@@ -593,12 +593,12 @@ final class HookTypesTests: XCTestCase {
         XCTAssertNotEqual(a, b, "Different permissionDecision should make outputs unequal")
     }
 
-    /// AC4 [P0]: HookOutput field count is 10 (4 original + 6 new).
+    /// AC4 [P0]: HookOutput field count is 11 (4 original + 6 new + decision).
     func testHookOutput_fieldCount() {
         let output = HookOutput()
         let mirror = Mirror(reflecting: output)
-        XCTAssertEqual(mirror.children.count, 10,
-            "HookOutput should have 10 fields (message, permissionUpdate, block, notification, systemMessage, reason, updatedInput, additionalContext, permissionDecision, updatedMCPToolOutput)")
+        XCTAssertEqual(mirror.children.count, 11,
+            "HookOutput should have 11 fields (message, permissionUpdate, block, notification, systemMessage, reason, updatedInput, additionalContext, permissionDecision, updatedMCPToolOutput, decision)")
     }
 
     /// AC4 [P0]: HookInput field count is 19 (8 original + 4 base + 7 per-event).
