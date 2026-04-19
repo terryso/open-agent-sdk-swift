@@ -38,6 +38,10 @@ func record(_ tsField: String, swiftField: String, status: String, note: String?
     print("  \(statusStr) TS: \(tsField) -> Swift: \(swiftField)\(note.map { " (\($0))" } ?? "")")
 }
 
+func pad(_ s: String, _ n: Int) -> String {
+    s.padding(toLength: n, withPad: " ", startingAt: 0)
+}
+
 // MARK: - AC1: Build Compilation Verification
 
 print("=== AC1: Build Compilation ===")
@@ -515,10 +519,10 @@ let eventMappings: [EventMapping] = [
 print("18 TS SDK HookEvents vs Swift SDK HookEvent")
 print("============================================")
 print("")
-print(String(format: "%-2s %-25s %-35s %-8s | Notes", "#", "TS SDK Event", "Swift Equivalent", "Status"))
+print("\("Status")) \("Swift Equivalent") \("TS SDK Event") \("#") | Notes")
 print(String(repeating: "-", count: 120))
 for m in eventMappings {
-    print(String(format: "%-2d %-25s %-35s [%-7s] | %@", m.index, m.tsEvent, m.swiftEquivalent, m.status, m.note))
+    print("\(m.index) \(m.note)) \(m.status) [\(m.swiftEquivalent)] | \(m.tsEvent)")
 }
 print("")
 
@@ -562,10 +566,10 @@ let inputFieldMappings: [InputFieldMapping] = [
 print("HookInput Field Compatibility")
 print("=============================")
 print("")
-print(String(format: "%-35s %-35s %-8s | Notes", "TS SDK Field", "Swift SDK Field"))
+print("%@ \("Swift SDK Field")) \("TS SDK Field") | Notes")
 print(String(repeating: "-", count: 110))
 for m in inputFieldMappings {
-    print(String(format: "%-35s %-35s [%-7s] | %@", m.tsField, m.swiftField, m.status, m.note))
+    print("\(m.note)) \(m.status) [\(m.swiftField)] | \(m.tsField)")
 }
 print("")
 
@@ -595,10 +599,10 @@ let outputFieldMappings: [OutputFieldMapping] = [
 print("HookOutput Field Compatibility")
 print("==============================")
 print("")
-print(String(format: "%-45s %-45s %-8s | Notes", "TS SDK Field", "Swift SDK Field"))
+print("%@ \("Swift SDK Field")) \("TS SDK Field") | Notes")
 print(String(repeating: "-", count: 120))
 for m in outputFieldMappings {
-    print(String(format: "%-45s %-45s [%-7s] | %@", m.tsField, m.swiftField, m.status, m.note))
+    print("\(m.note)) \(m.status) [\(m.swiftField)] | \(m.tsField)")
 }
 print("")
 
@@ -627,11 +631,11 @@ let fieldPartialCount = finalReport.filter { $0.status == "PARTIAL" }.count
 let fieldMissingCount = finalReport.filter { $0.status == "MISSING" }.count
 let fieldNACount = finalReport.filter { $0.status == "N/A" }.count
 
-print(String(format: "%-50s | %-55s | %-8s | Notes", "TS SDK Field", "Swift SDK Field"))
+print("%@ | \("Swift SDK Field")) | \("TS SDK Field") | Notes")
 print(String(repeating: "-", count: 150))
 for entry in finalReport {
     let noteStr = entry.note ?? ""
-    print(String(format: "%-50s | %-55s | [%-7s] | %@", entry.tsField, entry.swiftField, entry.status, noteStr))
+    print("\(noteStr)) | \(entry.status) | [\(entry.swiftField)] | \(entry.tsField)")
 }
 
 print("")

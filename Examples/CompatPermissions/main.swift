@@ -38,6 +38,10 @@ func record(_ tsField: String, swiftField: String, status: String, note: String?
     print("  \(statusStr) TS: \(tsField) -> Swift: \(swiftField)\(note.map { " (\($0))" } ?? "")")
 }
 
+func pad(_ s: String, _ n: Int) -> String {
+    s.padding(toLength: n, withPad: " ", startingAt: 0)
+}
+
 // MARK: - AC1: Build Compilation Verification
 
 print("=== AC1: Build Compilation ===")
@@ -421,10 +425,10 @@ let modeMappings: [FieldMapping] = [
 print("PermissionMode (6 cases)")
 print("========================")
 print("")
-print(String(format: "%-2s %-40s %-45s %-8s | Notes", "#", "TS SDK Mode", "Swift Equivalent", "Status"))
+print("\("Status")) \("Swift Equivalent") \("TS SDK Mode") \("#") | Notes")
 print(String(repeating: "-", count: 130))
 for m in modeMappings {
-    print(String(format: "%-2d %-40s %-45s [%-7s] | %@", m.index, m.tsField, m.swiftEquivalent, m.status, m.note))
+    print("\(m.index) \(m.note)) \(m.status) [\(m.swiftEquivalent)] | \(m.tsField)")
 }
 print("")
 
@@ -447,10 +451,10 @@ let canUseMappings: [FieldMapping] = [
 print("CanUseToolFn Params (8 fields)")
 print("==============================")
 print("")
-print(String(format: "%-2s %-40s %-45s %-8s | Notes", "#", "TS SDK Param", "Swift Equivalent", "Status"))
+print("\("Status")) \("Swift Equivalent") \("TS SDK Param") \("#") | Notes")
 print(String(repeating: "-", count: 130))
 for m in canUseMappings {
-    print(String(format: "%-2d %-40s %-45s [%-7s] | %@", m.index, m.tsField, m.swiftEquivalent, m.status, m.note))
+    print("\(m.index) \(m.note)) \(m.status) [\(m.swiftEquivalent)] | \(m.tsField)")
 }
 print("")
 
@@ -475,10 +479,10 @@ let resultMappings: [FieldMapping] = [
 print("CanUseToolResult Fields (8 items)")
 print("=================================")
 print("")
-print(String(format: "%-2s %-40s %-45s %-8s | Notes", "#", "TS SDK Field", "Swift Equivalent", "Status"))
+print("\("Status")) \("Swift Equivalent") \("TS SDK Field") \("#") | Notes")
 print(String(repeating: "-", count: 130))
 for m in resultMappings {
-    print(String(format: "%-2d %-40s %-45s [%-7s] | %@", m.index, m.tsField, m.swiftEquivalent, m.status, m.note))
+    print("\(m.index) \(m.note)) \(m.status) [\(m.swiftEquivalent)] | \(m.tsField)")
 }
 print("")
 
@@ -501,10 +505,10 @@ let updateMappings: [FieldMapping] = [
 print("PermissionUpdate Operations (6 types)")
 print("=====================================")
 print("")
-print(String(format: "%-2s %-40s %-45s %-8s | Notes", "#", "TS SDK Operation", "Swift Equivalent", "Status"))
+print("\("Status")) \("Swift Equivalent") \("TS SDK Operation") \("#") | Notes")
 print(String(repeating: "-", count: 130))
 for m in updateMappings {
-    print(String(format: "%-2d %-40s %-45s [%-7s] | %@", m.index, m.tsField, m.swiftEquivalent, m.status, m.note))
+    print("\(m.index) \(m.note)) \(m.status) [\(m.swiftEquivalent)] | \(m.tsField)")
 }
 print("")
 
@@ -527,10 +531,10 @@ let policyMappings: [FieldMapping] = [
 print("PermissionPolicy System (Swift-only additions)")
 print("==============================================")
 print("")
-print(String(format: "%-2s %-40s %-45s %-8s | Notes", "#", "TS SDK Equivalent", "Swift Type", "Status"))
+print("\("Status")) \("Swift Type") \("TS SDK Equivalent") \("#") | Notes")
 print(String(repeating: "-", count: 130))
 for m in policyMappings {
-    print(String(format: "%-2d %-40s %-45s [%-7s] | %@", m.index, m.tsField, m.swiftEquivalent, m.status, m.note))
+    print("\(m.index) \(m.note)) \(m.status) [\(m.swiftEquivalent)] | \(m.tsField)")
 }
 print("")
 
@@ -558,11 +562,11 @@ let fieldPartialCount = finalReport.filter { $0.status == "PARTIAL" }.count
 let fieldMissingCount = finalReport.filter { $0.status == "MISSING" }.count
 let fieldNACount = finalReport.filter { $0.status == "N/A" }.count
 
-print(String(format: "%-55s | %-55s | %-8s | Notes", "TS SDK Field", "Swift SDK Field"))
+print("%@ | \("Swift SDK Field")) | \("TS SDK Field") | Notes")
 print(String(repeating: "-", count: 160))
 for entry in finalReport {
     let noteStr = entry.note ?? ""
-    print(String(format: "%-55s | %-55s | [%-7s] | %@", entry.tsField, entry.swiftField, entry.status, noteStr))
+    print("\(noteStr)) | \(entry.status) | [\(entry.swiftField)] | \(entry.tsField)")
 }
 
 print("")

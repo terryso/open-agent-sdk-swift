@@ -38,6 +38,10 @@ func record(_ tsField: String, swiftField: String, status: String, note: String?
     print("  \(statusStr) TS: \(tsField) -> Swift: \(swiftField)\(note.map { " (\($0))" } ?? "")")
 }
 
+func pad(_ s: String, _ n: Int) -> String {
+    s.padding(toLength: n, withPad: " ", startingAt: 0)
+}
+
 // MARK: - AC1: Build Compilation Verification
 
 print("=== AC1: Build Compilation ===")
@@ -408,10 +412,10 @@ let defMappings: [FieldMapping] = [
 print("AgentDefinition Fields (10 items)")
 print("==================================")
 print("")
-print(String(format: "%-2s %-55s %-45s %-8s | Notes", "#", "TS SDK Field", "Swift Equivalent", "Status"))
+print("\("Status")) \("Swift Equivalent") \("TS SDK Field") \("#") | Notes")
 print(String(repeating: "-", count: 140))
 for m in defMappings {
-    print(String(format: "%-2d %-55s %-45s [%-7s] | %@", m.index, m.tsField, m.swiftEquivalent, m.status, m.note))
+    print("\(m.index) \(m.note)) \(m.status) [\(m.swiftEquivalent)] | \(m.tsField)")
 }
 print("")
 
@@ -440,10 +444,10 @@ let inputMappings: [FieldMapping] = [
 print("AgentToolInput Fields (11 items)")
 print("================================")
 print("")
-print(String(format: "%-2s %-55s %-45s %-8s | Notes", "#", "TS SDK Field", "Swift Equivalent", "Status"))
+print("\("Status")) \("Swift Equivalent") \("TS SDK Field") \("#") | Notes")
 print(String(repeating: "-", count: 140))
 for m in inputMappings {
-    print(String(format: "%-2d %-55s %-45s [%-7s] | %@", m.index, m.tsField, m.swiftEquivalent, m.status, m.note))
+    print("\(m.index) \(m.note)) \(m.status) [\(m.swiftEquivalent)] | \(m.tsField)")
 }
 print("")
 
@@ -473,10 +477,10 @@ let outputMappings: [FieldMapping] = [
 print("Agent Output (SubAgentResult) Fields (14 items)")
 print("================================================")
 print("")
-print(String(format: "%-2s %-55s %-45s %-8s | Notes", "#", "TS SDK Field", "Swift Equivalent", "Status"))
+print("\("Status")) \("Swift Equivalent") \("TS SDK Field") \("#") | Notes")
 print(String(repeating: "-", count: 140))
 for m in outputMappings {
-    print(String(format: "%-2d %-55s %-45s [%-7s] | %@", m.index, m.tsField, m.swiftEquivalent, m.status, m.note))
+    print("\(m.index) \(m.note)) \(m.status) [\(m.swiftEquivalent)] | \(m.tsField)")
 }
 print("")
 
@@ -501,10 +505,10 @@ let spawnerMappings: [FieldMapping] = [
 print("SubAgentSpawner Protocol Params (9 items)")
 print("==========================================")
 print("")
-print(String(format: "%-2s %-55s %-45s %-8s | Notes", "#", "TS SDK Param", "Swift Equivalent", "Status"))
+print("\("Status")) \("Swift Equivalent") \("TS SDK Param") \("#") | Notes")
 print(String(repeating: "-", count: 140))
 for m in spawnerMappings {
-    print(String(format: "%-2d %-55s %-45s [%-7s] | %@", m.index, m.tsField, m.swiftEquivalent, m.status, m.note))
+    print("\(m.index) \(m.note)) \(m.status) [\(m.swiftEquivalent)] | \(m.tsField)")
 }
 print("")
 
@@ -526,10 +530,10 @@ let hookMappings: [FieldMapping] = [
 print("Subagent Hooks (6 items)")
 print("========================")
 print("")
-print(String(format: "%-2s %-55s %-45s %-8s | Notes", "#", "TS SDK Field", "Swift Equivalent", "Status"))
+print("\("Status")) \("Swift Equivalent") \("TS SDK Field") \("#") | Notes")
 print(String(repeating: "-", count: 140))
 for m in hookMappings {
-    print(String(format: "%-2d %-55s %-45s [%-7s] | %@", m.index, m.tsField, m.swiftEquivalent, m.status, m.note))
+    print("\(m.index) \(m.note)) \(m.status) [\(m.swiftEquivalent)] | \(m.tsField)")
 }
 print("")
 
@@ -549,10 +553,10 @@ let builtinMappings: [FieldMapping] = [
 print("Builtin Agents (3 items)")
 print("========================")
 print("")
-print(String(format: "%-2s %-55s %-45s %-8s | Notes", "#", "TS SDK Item", "Swift Equivalent", "Status"))
+print("\("Status")) \("Swift Equivalent") \("TS SDK Item") \("#") | Notes")
 print(String(repeating: "-", count: 140))
 for m in builtinMappings {
-    print(String(format: "%-2d %-55s %-45s [%-7s] | %@", m.index, m.tsField, m.swiftEquivalent, m.status, m.note))
+    print("\(m.index) \(m.note)) \(m.status) [\(m.swiftEquivalent)] | \(m.tsField)")
 }
 print("")
 
@@ -581,11 +585,11 @@ let fieldPartialCount = finalReport.filter { $0.status == "PARTIAL" }.count
 let fieldMissingCount = finalReport.filter { $0.status == "MISSING" }.count
 let fieldNACount = finalReport.filter { $0.status == "N/A" }.count
 
-print(String(format: "%-55s | %-55s | %-8s | Notes", "TS SDK Field", "Swift SDK Field"))
+print("%@ | \("Swift SDK Field")) | \("TS SDK Field") | Notes")
 print(String(repeating: "-", count: 160))
 for entry in finalReport {
     let noteStr = entry.note ?? ""
-    print(String(format: "%-55s | %-55s | [%-7s] | %@", entry.tsField, entry.swiftField, entry.status, noteStr))
+    print("\(noteStr)) | \(entry.status) | [\(entry.swiftField)] | \(entry.tsField)")
 }
 
 print("")

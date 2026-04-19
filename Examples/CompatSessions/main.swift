@@ -41,6 +41,10 @@ func record(_ tsField: String, swiftField: String, status: String, note: String?
     print("  \(statusStr) TS: \(tsField) -> Swift: \(swiftField)\(note.map { " (\($0))" } ?? "")")
 }
 
+func pad(_ s: String, _ n: Int) -> String {
+    s.padding(toLength: n, withPad: " ", startingAt: 0)
+}
+
 // MARK: - AC1: Build Compilation Verification
 
 print("=== AC1: Build Compilation ===")
@@ -512,10 +516,10 @@ let fnMappings: [FnMapping] = [
 print("TS SDK Session Functions vs Swift SDK SessionStore")
 print("===================================================")
 print("")
-print(String(format: "%-2s %-55s %-50s %-8s | Notes", "#", "TS SDK Function", "Swift Equivalent", "Status"))
+print("\("Status")) \("Swift Equivalent") \("TS SDK Function") \("#") | Notes")
 print(String(repeating: "-", count: 150))
 for m in fnMappings {
-    print(String(format: "%-2d %-55s %-50s [%-7s] | %@", m.index, m.tsFunction, m.swiftEquivalent, m.status, m.note))
+    print("\(m.index) \(m.note)) \(m.status) [\(m.swiftEquivalent)] | \(m.tsFunction)")
 }
 print("")
 
@@ -551,10 +555,10 @@ let metaFields: [FieldMapping] = [
 print("SessionMetadata Field Compatibility")
 print("====================================")
 print("")
-print(String(format: "%-35s %-45s %-8s", "TS SDK SDKSessionInfo", "Swift SessionMetadata", "Status"))
+print("\("Status")) \("Swift SessionMetadata") \("TS SDK SDKSessionInfo")")
 print(String(repeating: "-", count: 100))
 for f in metaFields {
-    print(String(format: "%-35s %-45s [%-7s]", f.tsField, f.swiftField, f.status))
+    print("\(f.status)) \(f.swiftField) [\(f.tsField)]")
 }
 print("")
 
@@ -577,10 +581,10 @@ let msgFields: [FieldMapping] = [
 print("SessionMessage Element Field Compatibility")
 print("==========================================")
 print("")
-print(String(format: "%-35s %-45s %-8s", "TS SDK SessionMessage", "Swift SessionMessage", "Status"))
+print("\("Status")) \("Swift SessionMessage") \("TS SDK SessionMessage")")
 print(String(repeating: "-", count: 100))
 for f in msgFields {
-    print(String(format: "%-35s %-45s [%-7s]", f.tsField, f.swiftField, f.status))
+    print("\(f.status)) \(f.swiftField) [\(f.tsField)]")
 }
 print("")
 
@@ -623,10 +627,10 @@ let optMappings: [OptionMapping] = [
 print("Session Restore Options Compatibility")
 print("=====================================")
 print("")
-print(String(format: "%-35s %-45s %-8s | Notes", "TS SDK Option", "Swift Equivalent", "Status"))
+print("\("Status")) \("Swift Equivalent") \("TS SDK Option") | Notes")
 print(String(repeating: "-", count: 120))
 for o in optMappings {
-    print(String(format: "%-35s %-45s [%-7s] | %@", o.tsOption, o.swiftEquivalent, o.status, o.note))
+    print("\(o.note)) \(o.status) [\(o.swiftEquivalent)] | \(o.tsOption)")
 }
 print("")
 
@@ -672,11 +676,11 @@ let fieldPartialCount = finalReport.filter { $0.status == "PARTIAL" }.count
 let fieldMissingCount = finalReport.filter { $0.status == "MISSING" }.count
 let fieldExtraCount = finalReport.filter { $0.status == "EXTRA" }.count
 
-print(String(format: "%-55s | %-55s | %-8s | Notes", "TS SDK Field", "Swift SDK Field"))
+print("%@ | \("Swift SDK Field")) | \("TS SDK Field") | Notes")
 print(String(repeating: "-", count: 160))
 for entry in finalReport {
     let noteStr = entry.note ?? ""
-    print(String(format: "%-55s | %-55s | [%-7s] | %@", entry.tsField, entry.swiftField, entry.status, noteStr))
+    print("\(noteStr)) | \(entry.status) | [\(entry.swiftField)] | \(entry.tsField)")
 }
 
 print("")

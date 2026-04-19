@@ -38,6 +38,10 @@ func record(_ tsField: String, swiftField: String, status: String, note: String?
     print("  \(statusStr) TS: \(tsField) -> Swift: \(swiftField)\(note.map { " (\($0))" } ?? "")")
 }
 
+func pad(_ s: String, _ n: Int) -> String {
+    s.padding(toLength: n, withPad: " ", startingAt: 0)
+}
+
 // MARK: - AC1: Build Compilation Verification
 
 print("=== AC1: Build Compilation ===")
@@ -394,10 +398,10 @@ let configMappings: [ConfigMapping] = [
 print("5 TS SDK McpServerConfig Types vs Swift SDK")
 print("==============================================")
 print("")
-print(String(format: "%-2s %-35s %-50s %-8s | Notes", "#", "TS SDK Type", "Swift Equivalent", "Status"))
+print("\("Status")) \("Swift Equivalent") \("TS SDK Type") \("#") | Notes")
 print(String(repeating: "-", count: 130))
 for m in configMappings {
-    print(String(format: "%-2d %-35s %-50s [%-7s] | %@", m.index, m.tsType, m.swiftEquivalent, m.status, m.note))
+    print("\(m.index) \(m.note)) \(m.status) [\(m.swiftEquivalent)] | \(m.tsType)")
 }
 print("")
 
@@ -427,10 +431,10 @@ let statusMappings: [StatusMapping] = [
 print("McpServerStatusEnum Values vs TS McpServerStatus")
 print("=================================================")
 print("")
-print(String(format: "%-20s %-50s %-8s | Notes", "TS Status Value", "Swift Equivalent"))
+print("%@ \("Swift Equivalent")) \("TS Status Value") | Notes")
 print(String(repeating: "-", count: 110))
 for m in statusMappings {
-    print(String(format: "%-20s %-50s [%-7s] | %@", m.tsValue, m.swiftEquivalent, m.status, m.note))
+    print("\(m.note)) \(m.status) [\(m.swiftEquivalent)] | \(m.tsValue)")
 }
 print("")
 
@@ -458,10 +462,10 @@ let operationMappings: [OperationMapping] = [
 print("MCP Runtime Management Operations")
 print("==================================")
 print("")
-print(String(format: "%-35s %-50s %-8s | Notes", "TS SDK Operation", "Swift Equivalent"))
+print("%@ \("Swift Equivalent")) \("TS SDK Operation") | Notes")
 print(String(repeating: "-", count: 120))
 for m in operationMappings {
-    print(String(format: "%-35s %-50s [%-7s] | %@", m.tsOperation, m.swiftEquivalent, m.status, m.note))
+    print("\(m.note)) \(m.status) [\(m.swiftEquivalent)] | \(m.tsOperation)")
 }
 print("")
 
@@ -490,11 +494,11 @@ let fieldPartialCount = finalReport.filter { $0.status == "PARTIAL" }.count
 let fieldMissingCount = finalReport.filter { $0.status == "MISSING" }.count
 let fieldNACount = finalReport.filter { $0.status == "N/A" }.count
 
-print(String(format: "%-50s | %-55s | %-8s | Notes", "TS SDK Field", "Swift SDK Field"))
+print("%@ | \("Swift SDK Field")) | \("TS SDK Field") | Notes")
 print(String(repeating: "-", count: 150))
 for entry in finalReport {
     let noteStr = entry.note ?? ""
-    print(String(format: "%-50s | %-55s | [%-7s] | %@", entry.tsField, entry.swiftField, entry.status, noteStr))
+    print("\(noteStr)) | \(entry.status) | [\(entry.swiftField)] | \(entry.tsField)")
 }
 
 print("")

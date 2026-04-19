@@ -38,6 +38,10 @@ func record(_ tsField: String, swiftField: String, status: String, note: String?
     print("  \(statusStr) TS: \(tsField) -> Swift: \(swiftField)\(note.map { " (\($0))" } ?? "")")
 }
 
+func pad(_ s: String, _ n: Int) -> String {
+    s.padding(toLength: n, withPad: " ", startingAt: 0)
+}
+
 // MARK: - AC1: Build Compilation Verification
 
 print("=== AC1: Build Compilation ===")
@@ -434,10 +438,10 @@ let coreMappings: [FieldMapping] = [
 print("Core Configuration (12 fields)")
 print("==============================")
 print("")
-print(String(format: "%-2s %-45s %-50s %-8s | Notes", "#", "TS SDK Field", "Swift Equivalent", "Status"))
+print("\("Status")) \("Swift Equivalent") \("TS SDK Field") \("#") | Notes")
 print(String(repeating: "-", count: 140))
 for m in coreMappings {
-    print(String(format: "%-2d %-45s %-50s [%-7s] | %@", m.index, m.tsField, m.swiftEquivalent, m.status, m.note))
+    print("\(m.index) \(m.note)) \(m.status) [\(m.swiftEquivalent)] | \(m.tsField)")
 }
 print("")
 
@@ -463,10 +467,10 @@ let advancedMappings: [FieldMapping] = [
 print("Advanced Configuration (9 fields)")
 print("=================================")
 print("")
-print(String(format: "%-2s %-45s %-50s %-8s | Notes", "#", "TS SDK Field", "Swift Equivalent", "Status"))
+print("\("Status")) \("Swift Equivalent") \("TS SDK Field") \("#") | Notes")
 print(String(repeating: "-", count: 140))
 for m in advancedMappings {
-    print(String(format: "%-2d %-45s %-50s [%-7s] | %@", m.index, m.tsField, m.swiftEquivalent, m.status, m.note))
+    print("\(m.index) \(m.note)) \(m.status) [\(m.swiftEquivalent)] | \(m.tsField)")
 }
 print("")
 
@@ -488,10 +492,10 @@ let sessionMappings: [FieldMapping] = [
 print("Session Configuration (5 fields)")
 print("=================================")
 print("")
-print(String(format: "%-2s %-45s %-50s %-8s | Notes", "#", "TS SDK Field", "Swift Equivalent", "Status"))
+print("\("Status")) \("Swift Equivalent") \("TS SDK Field") \("#") | Notes")
 print(String(repeating: "-", count: 140))
 for m in sessionMappings {
-    print(String(format: "%-2d %-45s %-50s [%-7s] | %@", m.index, m.tsField, m.swiftEquivalent, m.status, m.note))
+    print("\(m.index) \(m.note)) \(m.status) [\(m.swiftEquivalent)] | \(m.tsField)")
 }
 print("")
 
@@ -519,10 +523,10 @@ let extendedMappings: [FieldMapping] = [
 print("Extended Configuration (11 fields)")
 print("==================================")
 print("")
-print(String(format: "%-2s %-45s %-50s %-8s | Notes", "#", "TS SDK Field", "Swift Equivalent", "Status"))
+print("\("Status")) \("Swift Equivalent") \("TS SDK Field") \("#") | Notes")
 print(String(repeating: "-", count: 140))
 for m in extendedMappings {
-    print(String(format: "%-2d %-45s %-50s [%-7s] | %@", m.index, m.tsField, m.swiftEquivalent, m.status, m.note))
+    print("\(m.index) \(m.note)) \(m.status) [\(m.swiftEquivalent)] | \(m.tsField)")
 }
 print("")
 
@@ -544,10 +548,10 @@ let thinkingMappings: [FieldMapping] = [
 print("ThinkingConfig Detail (4 items)")
 print("===============================")
 print("")
-print(String(format: "%-2s %-45s %-50s %-8s | Notes", "#", "TS SDK Type", "Swift Equivalent", "Status"))
+print("\("Status")) \("Swift Equivalent") \("TS SDK Type") \("#") | Notes")
 print(String(repeating: "-", count: 140))
 for m in thinkingMappings {
-    print(String(format: "%-2d %-45s %-50s [%-7s] | %@", m.index, m.tsField, m.swiftEquivalent, m.status, m.note))
+    print("\(m.index) \(m.note)) \(m.status) [\(m.swiftEquivalent)] | \(m.tsField)")
 }
 print("")
 
@@ -575,11 +579,11 @@ let fieldPartialCount = finalReport.filter { $0.status == "PARTIAL" }.count
 let fieldMissingCount = finalReport.filter { $0.status == "MISSING" }.count
 let fieldNACount = finalReport.filter { $0.status == "N/A" }.count
 
-print(String(format: "%-50s | %-55s | %-8s | Notes", "TS SDK Field", "Swift SDK Field"))
+print("%@ | \("Swift SDK Field")) | \("TS SDK Field") | Notes")
 print(String(repeating: "-", count: 150))
 for entry in finalReport {
     let noteStr = entry.note ?? ""
-    print(String(format: "%-50s | %-55s | [%-7s] | %@", entry.tsField, entry.swiftField, entry.status, noteStr))
+    print("\(noteStr)) | \(entry.status) | [\(entry.swiftField)] | \(entry.tsField)")
 }
 
 print("")

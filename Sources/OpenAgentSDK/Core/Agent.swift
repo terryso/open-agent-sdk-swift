@@ -2106,10 +2106,12 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                     let endInput = HookInput(event: .sessionEnd, cwd: capturedCwd)
                     await hookRegistry.execute(.sessionEnd, input: endInput)
                 }
+                _streamTask = nil
                 continuation.finish()
             }
-            continuation.onTermination = { @Sendable _ in
+            continuation.onTermination = { @Sendable [weak self] _ in
                 task.cancel()
+                self?._streamTask = nil
             }
             // Store Task reference for interrupt() support
             _streamTask = task

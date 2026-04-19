@@ -45,6 +45,10 @@ func record(_ tsField: String, swiftField: String, status: String, note: String?
     print("  \(statusStr) TS: \(tsField) -> Swift: \(swiftField)\(note.map { " (\($0))" } ?? "")")
 }
 
+func pad(_ s: String, _ n: Int) -> String {
+    s.padding(toLength: n, withPad: " ", startingAt: 0)
+}
+
 // MARK: - AC1: Build Compilation Verification
 
 print("=== AC1: Build Compilation ===")
@@ -537,10 +541,10 @@ let mappings: [MessageTypeMapping] = [
 print("TS SDK 20 Message Types vs Swift SDK")
 print("=====================================")
 print("")
-print(String(format: "%-2s %-35s %-25s %-45s %-8s", "#", "TS SDK Type", "TS type field", "Swift Equivalent", "Status"))
+print("\("Status")) \("Swift Equivalent") \("TS type field") \("TS SDK Type") \("#")")
 print(String(repeating: "-", count: 140))
 for m in mappings {
-    print(String(format: "%-2d %-35s %-25s %-45s [%-7s]", m.index, m.tsType, m.tsTypeField, m.swiftEquivalent, m.status))
+    print("\(m.index) \(m.status)) \(m.swiftEquivalent) \(m.tsTypeField) [\(m.tsType)]")
     print("     Note: \(m.note)")
 }
 print("")
@@ -571,11 +575,11 @@ let fieldPartialCount = finalReport.filter { $0.status == "PARTIAL" }.count
 let fieldMissingCount = finalReport.filter { $0.status == "MISSING" }.count
 let fieldNACount = finalReport.filter { $0.status == "N/A" }.count
 
-print(String(format: "%-50s | %-55s | %-8s | Notes", "TS SDK Field", "Swift SDK Field"))
+print("%@ | \("Swift SDK Field")) | \("TS SDK Field") | Notes")
 print(String(repeating: "-", count: 150))
 for entry in finalReport {
     let noteStr = entry.note ?? ""
-    print(String(format: "%-50s | %-55s | %-8s | %@", entry.tsField, entry.swiftField, "[\(entry.status)]", noteStr))
+    print("\(noteStr)) | \("[\(entry.status)]") | \(entry.swiftField) | \(entry.tsField)")
 }
 
 print("")

@@ -45,6 +45,10 @@ func record(_ tsField: String, swiftField: String, status: String, note: String?
     print("  \(statusStr) TS: \(tsField) -> Swift: \(swiftField)\(note.map { " (\($0))" } ?? "")")
 }
 
+func pad(_ s: String, _ n: Int) -> String {
+    s.padding(toLength: n, withPad: " ", startingAt: 0)
+}
+
 // MARK: - AC1: Build Compilation Verification
 
 print("=== AC1: Build Compilation ===")
@@ -417,11 +421,16 @@ print("Core Query API Compatibility Report")
 print("====================================")
 print("")
 
-print(String(format: "%-35s | %-50s | %-8s | Notes", "TS SDK Field", "Swift SDK Field"))
+let headerTs = "TS SDK Field".padding(toLength: 35, withPad: " ", startingAt: 0)
+let headerSwift = "Swift SDK Field".padding(toLength: 50, withPad: " ", startingAt: 0)
+print("\(headerTs) | \(headerSwift) | Status   | Notes")
 print(String(repeating: "-", count: 130))
 for entry in finalReport {
     let noteStr = entry.note ?? ""
-    print(String(format: "%-35s | %-50s | %-8s | %@", entry.tsField, entry.swiftField, "[\(entry.status)]", noteStr))
+    let ts = entry.tsField.padding(toLength: 35, withPad: " ", startingAt: 0)
+    let sw = entry.swiftField.padding(toLength: 50, withPad: " ", startingAt: 0)
+    let st = "[\(entry.status)]".padding(toLength: 8, withPad: " ", startingAt: 0)
+    print("\(ts) | \(sw) | \(st) | \(noteStr)")
 }
 
 print("")

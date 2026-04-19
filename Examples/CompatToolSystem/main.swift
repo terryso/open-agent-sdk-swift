@@ -27,6 +27,10 @@ func record(_ tsField: String, swiftField: String, status: String, note: String?
     print("  \(statusStr) TS: \(tsField) -> Swift: \(swiftField)\(note.map { " (\($0))" } ?? "")")
 }
 
+func pad(_ s: String, _ n: Int) -> String {
+    s.padding(toLength: n, withPad: " ", startingAt: 0)
+}
+
 // MARK: - AC1: Build Compilation Verification
 
 print("=== AC1: Build Compilation ===")
@@ -435,11 +439,11 @@ print("Tool System Compatibility Report")
 print("=================================")
 print("")
 
-print(String(format: "%-45s | %-55s | %-8s | Notes", "TS SDK Field", "Swift SDK Field"))
+print("%@ | \("Swift SDK Field")) | \("TS SDK Field") | Notes")
 print(String(repeating: "-", count: 145))
 for entry in finalReport {
     let noteStr = entry.note ?? ""
-    print(String(format: "%-45s | %-55s | %-8s | %@", entry.tsField, entry.swiftField, "[\(entry.status)]", noteStr))
+    print("\(noteStr)) | \("[\(entry.status)]") | \(entry.swiftField) | \(entry.tsField)")
 }
 
 print("")
