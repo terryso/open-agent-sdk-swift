@@ -816,7 +816,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
             return QueryResult(
                 text: "", usage: TokenUsage(inputTokens: 0, outputTokens: 0),
                 numTurns: 0, durationMs: 0, messages: [],
-                status: .errorDuringExecution
+                status: .errorDuringExecution,
+                errors: ["Agent is already closed"]
             )
         }
         _interrupted = false
@@ -1078,7 +1079,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                     status: resultStatus,
                     totalCostUsd: totalCostUsd,
                     costBreakdown: Array(costByModel.values),
-                    isCancelled: isCancelled
+                    isCancelled: isCancelled,
+                    errors: ["[\(statusCode)] \(errorMessage)"]
                 )
             }
 

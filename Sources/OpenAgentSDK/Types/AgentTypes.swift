@@ -745,8 +745,10 @@ public struct QueryResult: Sendable {
     public let costBreakdown: [CostBreakdownEntry]
     /// Whether the query was cancelled by the user.
     public let isCancelled: Bool
+    /// Error messages collected during execution (non-nil on error statuses).
+    public let errors: [String]?
 
-    public init(text: String, usage: TokenUsage, numTurns: Int, durationMs: Int, messages: [SDKMessage], status: QueryStatus = .success, totalCostUsd: Double = 0.0, costBreakdown: [CostBreakdownEntry] = [], isCancelled: Bool = false) {
+    public init(text: String, usage: TokenUsage, numTurns: Int, durationMs: Int, messages: [SDKMessage], status: QueryStatus = .success, totalCostUsd: Double = 0.0, costBreakdown: [CostBreakdownEntry] = [], isCancelled: Bool = false, errors: [String]? = nil) {
         self.text = text
         self.usage = usage
         self.numTurns = numTurns
@@ -756,6 +758,7 @@ public struct QueryResult: Sendable {
         self.totalCostUsd = totalCostUsd
         self.costBreakdown = costBreakdown
         self.isCancelled = isCancelled
+        self.errors = errors
     }
 }
 
