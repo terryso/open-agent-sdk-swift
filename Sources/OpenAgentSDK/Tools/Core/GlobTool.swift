@@ -83,28 +83,25 @@ public func createGlobTool() -> ToolProtocol {
         }
 
         while let relativePath = enumerator.nextObject() as? String {
-            // Skip hidden directories and common large directories
-            let components = relativePath.components(separatedBy: "/")
-            let shouldSkip = components.contains { component in
-                component.hasPrefix(".") || component == "node_modules"
-            }
-            if shouldSkip {
-                // Skip descending into this directory entirely
-                let fullPath = (searchDir as NSString).appendingPathComponent(relativePath)
-                var itemIsDir: ObjCBool = false
-                fileManager.fileExists(atPath: fullPath, isDirectory: &itemIsDir)
-                if itemIsDir.boolValue {
+            let fullPath = (searchDir as NSString).appendingPathComponent(relativePath)
+
+            // Skip directories that are hidden or common large directories
+            var itemIsDir: ObjCBool = false
+            fileManager.fileExists(atPath: fullPath, isDirectory: &itemIsDir)
+            if itemIsDir.boolValue {
+                let lastComponent = (relativePath as NSString).lastPathComponent
+                if lastComponent.hasPrefix(".") || lastComponent == "node_modules" {
                     enumerator.skipDescendants()
                 }
                 continue
             }
 
-            let fullPath = (searchDir as NSString).appendingPathComponent(relativePath)
-
-            // Skip directories (only match files)
-            var itemIsDir: ObjCBool = false
-            fileManager.fileExists(atPath: fullPath, isDirectory: &itemIsDir)
-            if itemIsDir.boolValue {
+            // Skip files inside hidden or excluded directories
+            let components = relativePath.components(separatedBy: "/")
+            let insideSkippedDir = components.dropLast().contains { component in
+                component.hasPrefix(".") || component == "node_modules"
+            }
+            if insideSkippedDir {
                 continue
             }
 
