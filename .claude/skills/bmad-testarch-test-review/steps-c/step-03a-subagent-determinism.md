@@ -46,6 +46,12 @@ This is an **isolated subagent** running in parallel with other quality dimensio
 - External API calls without mocking
 - File system operations on random paths
 - Database queries with non-deterministic ordering
+- **PactV4 consumer tests: multiple `pact.addInteraction()` in a single `it()` block** — the Rust FFI non-deterministically drops interactions (see `pactjs-utils-consumer-helpers.md` Example 6). Flag any `.pacttest.ts` file where a single `it()`/`test()` contains more than one `addInteraction()` chain.
+- **PactV4 consumer Vitest config missing `fileParallelism: false`** in `vitest.config.pact.ts` — parallel workers race on the shared pact JSON file (see `pact-consumer-framework-setup.md` Example 2). HIGH regardless of file count.
+- **PactV4 consumer Vitest config missing `pool: 'forks'` + `poolOptions.forks.singleFork: true`** in `vitest.config.pact.ts` — best current understanding is that the `@pact-foundation/pact` napi-rs binding is not robust across Vitest worker threads sharing a process; once a consumer+provider pair has ≥2 `.pacttest.ts` files, default threads pool produces reproducible "request was expected but not received" flakes on Linux CI. **Severity: HIGH if the repo has ≥2 `.pacttest.ts` files for the same consumer+provider pair; LOW (future-proof advisory) for single-file suites.** See `pact-consumer-framework-setup.md` Example 2.
+- **Pact provider Vitest config missing `pool: 'forks'` + `poolOptions.forks.singleFork: true`** in `vitest.config.contract.ts` for multi-file provider suites (especially message providers) — same pool rule as the consumer side (see `pactjs-utils-provider-verifier.md` Example 7).
+- **Consumer or provider Vitest config sets any of: `sequence.concurrent: true`, `maxConcurrency > 1`, `maxWorkers > 1`, `isolate: false`** in `vitest.config.pact.ts` / `vitest.config.contract.ts` — each defeats the serialization the forks-singleFork rule relies on. HIGH.
+- **Consumer repo lacks a determinism gate** — if `tea_use_pactjs_utils` is enabled, flag any `package.json` whose `test:pact:consumer` script does not run `scripts/check-pact-determinism.sh` (see `pact-consumer-framework-setup.md` Example 10).
 
 **MEDIUM SEVERITY Violations**:
 
@@ -104,6 +110,43 @@ if (testFileContent.includes('waitForTimeout')) {
 
 // ... check other patterns
 ```
+
+**Detecting Pact Vitest config violations (`vitest.config.pact.ts` / `vitest.config.contract.ts`)**
+
+Vitest configs vary widely — `defineConfig({ test: { ... } })`, `mergeConfig(base, overrides)`, `satisfies UserConfig`, imported constants, TS spreads. A full AST parse is out of scope; use this fallback heuristic and accept false-negatives only for the `mergeConfig` case, which the subagent must flag separately:
+
+```javascript
+// Resolve the config file(s). For consumer: scripts.test:pact:consumer:run in package.json
+// usually points at `vitest run --config <path>`. For provider: `vitest run --config <path>`.
+// If neither script exists but `.pacttest.ts` files exist, default to 'vitest.config.pact.ts'.
+const configPath = resolveVitestConfigPath({ scriptName: 'test:pact:consumer:run', fallback: 'vitest.config.pact.ts' });
+const src = fs.readFileSync(configPath, 'utf8');
+
+// 1. Literal-match the two mandatory lines. Tolerate single or double quotes and whitespace.
+const hasFileParallelismFalse = /\bfileParallelism\s*:\s*false\b/.test(src);
+const hasPoolForks = /\bpool\s*:\s*['"]forks['"]/.test(src);
+const hasSingleForkTrue = /\bsingleFork\s*:\s*true\b/.test(src);
+
+// 2. Flag settings that would defeat the rule if a human added them.
+const hasSequenceConcurrent = /\bsequence\s*:\s*\{[^}]*\bconcurrent\s*:\s*true/.test(src);
+const hasHighMaxConcurrency = /\bmaxConcurrency\s*:\s*([2-9]|\d{2,})/.test(src);
+const hasHighMaxWorkers = /\bmaxWorkers\s*:\s*([2-9]|\d{2,})/.test(src);
+const hasIsolateFalse = /\bisolate\s*:\s*false\b/.test(src);
+
+// 3. mergeConfig / extends fallback — we cannot reliably follow imports. Emit LOW advisory.
+const usesMergeConfig = /\bmergeConfig\s*\(/.test(src) || /\bextends\s*:/.test(src);
+
+// 4. File-count gating for the pool-forks rule.
+const pactTestCount = glob.sync('tests/contract/**/*.pacttest.ts').length;
+```
+
+**Violation emission rules** (apply in order; exit on first match per check):
+
+- Missing `fileParallelism: false` → HIGH (always)
+- Missing `pool: 'forks'` OR missing `singleFork: true`, AND `pactTestCount >= 2` → HIGH
+- Missing `pool: 'forks'` OR missing `singleFork: true`, AND `pactTestCount < 2` → LOW (future-proof advisory)
+- Any of `sequence.concurrent: true`, `maxConcurrency > 1`, `maxWorkers > 1`, `isolate: false` present → HIGH
+- `usesMergeConfig` AND any of the three mandatory matches missing → LOW + `category: "pact-config-unverifiable"` with a suggestion to inline the pool settings at the leaf config or provide a `// tea:pact-ffi-safe` marker comment the subagent can trust
 
 ### 3. Calculate Determinism Score
 

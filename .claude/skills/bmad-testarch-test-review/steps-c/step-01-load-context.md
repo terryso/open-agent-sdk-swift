@@ -1,7 +1,7 @@
 ---
 name: 'step-01-load-context'
 description: 'Load knowledge base, determine scope, and gather context'
-nextStepFile: './step-02-discover-tests.md'
+nextStepFile: '{skill-root}/steps-c/step-02-discover-tests.md'
 knowledgeIndex: './resources/tea-index.csv'
 outputFile: '{test_artifacts}/test-review.md'
 ---
@@ -83,7 +83,7 @@ Load fragments based on their `tier` classification in `tea-index.csv`:
 
 **If `tea_use_pactjs_utils` is enabled** (and contract tests detected in review scope):
 
-Load: `pactjs-utils-overview.md`, `pactjs-utils-provider-verifier.md`, `pactjs-utils-request-filter.md` (the 3 most relevant for reviewing provider verification tests)
+Load: `pactjs-utils-overview.md`, `pactjs-utils-consumer-helpers.md` (one-interaction-per-`it()` determinism rule), `pactjs-utils-provider-verifier.md` (vitest `pool: 'forks'` + `singleFork` — applies to BOTH consumer and provider), `pactjs-utils-request-filter.md`, `pact-consumer-framework-setup.md` (consumer Vitest `fileParallelism: false` + `pool: 'forks'` + `singleFork: true`, determinism gate, `jq` publish normalization), `pact-broker-webhooks.md` (webhook auth, PAT rotation, staleness monitoring — relevant if CI failure patterns include `can-i-deploy` timeouts with no verification).
 
 **If `tea_use_pactjs_utils` is disabled** but contract tests are in review scope:
 
@@ -133,7 +133,7 @@ Read `{config_source}` and check `tea_use_playwright_utils`, `tea_use_pactjs_uti
 
 **Pact.js Utils (if enabled and contract tests in review scope):**
 
-- `pactjs-utils-overview.md`, `pactjs-utils-provider-verifier.md`, `pactjs-utils-request-filter.md`
+- `pactjs-utils-overview.md`, `pactjs-utils-consumer-helpers.md`, `pactjs-utils-provider-verifier.md`, `pactjs-utils-request-filter.md`, `pact-consumer-di.md`, `pact-consumer-framework-setup.md`, `pact-broker-webhooks.md`
 
 **Contract Testing (if pactjs-utils disabled but contract tests in review scope):**
 

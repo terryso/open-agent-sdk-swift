@@ -20,7 +20,15 @@ This is an **isolated subagent** running in parallel with E2E test generation.
 
 **Your task:** Generate API tests ONLY (not E2E, not fixtures, not other test types).
 
-**If `use_pactjs_utils` is enabled:** Also generate consumer contract tests and provider verification tests alongside API tests. Use the loaded pactjs-utils fragments (`pactjs-utils-overview`, `pactjs-utils-consumer-helpers`, `pactjs-utils-provider-verifier`, `pactjs-utils-request-filter`) for patterns. If `pact_mcp` is `"mcp"`, use SmartBear MCP tools (Fetch Provider States, Generate Pact Tests) to inform test generation.
+**If `use_pactjs_utils` is enabled AND contract artifacts are explicitly in scope for this subagent:** Apply pactjs-utils conventions from the loaded fragments (`pactjs-utils-overview`, `pactjs-utils-consumer-helpers`, `pactjs-utils-provider-verifier`, `pactjs-utils-request-filter`, `pact-consumer-framework-setup`) when generating contract-level API test scaffolding. Full consumer/provider suite generation — including edits to `vitest.config.pact.ts`, `vitest.config.contract.ts`, `package.json` scripts (`test:pact:consumer`, `test:pact:consumer:run`), and `scripts/publish-pact.sh` — must be triggered explicitly by the parent workflow flag `tea_use_pactjs_utils: true`; do not generate those artifacts implicitly. When in scope, enforce these determinism/FFI-safety rules:
+
+- **Consumer tests**: exactly one `pact.addInteraction()` per `it()` block (use `it.each` for parameterized cases) — PactV4's Rust FFI drops interactions otherwise.
+- **Consumer Vitest config**: `vitest.config.pact.ts` must include BOTH `fileParallelism: false` AND `pool: 'forks'` + `poolOptions.forks.singleFork: true`. `fileParallelism: false` prevents workers racing on the shared pact JSON; forks + singleFork prevents the `@pact-foundation/pact` Rust FFI from leaking state across files on Linux CI.
+- **Provider Vitest config**: `vitest.config.contract.ts` must include `pool: 'forks'` + `poolOptions.forks.singleFork: true` (same rule as consumer) for multi-file and message-provider suites.
+- **Consumer `package.json`**: generate both `test:pact:consumer` (determinism gate calling `scripts/check-pact-determinism.sh`) and `test:pact:consumer:run` (inner vitest invocation).
+- **Publish script**: `scripts/publish-pact.sh` normalizes interactions with `jq -S '.interactions |= sort_by(...)'` before `pact-broker publish`.
+
+If `pact_mcp` is `"mcp"`, use SmartBear MCP tools (Fetch Provider States, Generate Pact Tests) to inform test generation.
 
 ---
 

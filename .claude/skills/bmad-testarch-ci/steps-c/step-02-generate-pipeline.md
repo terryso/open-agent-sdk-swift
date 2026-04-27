@@ -1,7 +1,7 @@
 ---
 name: 'step-02-generate-pipeline'
 description: 'Generate CI pipeline configuration with adaptive orchestration (agent-team, subagent, or sequential)'
-nextStepFile: './step-03-configure-quality-gates.md'
+nextStepFile: '{skill-root}/steps-c/step-03-configure-quality-gates.md'
 knowledgeIndex: './resources/tea-index.csv'
 outputFile: '{test_artifacts}/ci-pipeline-progress.md'
 ---
@@ -191,8 +191,11 @@ Write the selected pipeline configuration to the resolved output path from step 
 
 **If `tea_use_pactjs_utils` is enabled**, use `{knowledgeIndex}` to load:
 
-- `pactjs-utils-provider-verifier.md` — `buildVerifierOptions`, broker config, and breaking change patterns for CI provider verification
+- `pact-consumer-framework-setup.md` — determinism gate, `jq -S` publish normalization, 1:1 local/CI parity, full consumer CI workflow template
+- `pactjs-utils-consumer-helpers.md` — one-interaction-per-`it()` determinism rule
+- `pactjs-utils-provider-verifier.md` — `buildVerifierOptions`, broker config, breaking change patterns, **vitest `pool: 'forks'` + `singleFork: true`** (same rule applies to consumer AND provider configs)
 - `pactjs-utils-request-filter.md` — `createRequestFilter` auth injection patterns for CI pipeline auth setup
+- `pact-broker-webhooks.md` — PactFlow → GitHub webhook auth (dedicated machine user, classic PAT with `repo` scope, PactFlow-stored secret), rotation runbook, and staleness monitoring options (the webhook is what makes `can-i-deploy` succeed end-to-end)
 
 When `tea_use_pactjs_utils` is enabled, add a `contract-test` stage after `test`:
 
@@ -208,23 +211,26 @@ env:
 
 > **Note:** `GITHUB_SHA` is auto-set by GitHub Actions, but `GITHUB_BRANCH` is **not** — it must be derived from `github.head_ref` (for PRs) or `github.ref_name` (for pushes). The pactjs-utils library reads both from `process.env`.
 
-1. **Consumer test + publish**: Run consumer contract tests, then publish pacts to broker
-   - `npm run test:pact:consumer`
-   - `npm run publish:pact`
-   - Only publish on PR and main branch pushes
+1. **Consumer test (determinism gate) + publish**: Run consumer contract tests as a determinism gate, then publish pacts to broker — each step calls the same `npm run` script a developer runs locally (1:1 parity)
+   - `npm run test:pact:consumer` — **this is the determinism gate**: runs `scripts/check-pact-determinism.sh` which invokes the inner `test:pact:consumer:run` N times (default 3) and fails if generated pact JSON is not byte-stable across runs. Never fold this into the publish step — keep it as its own visible CI step so failures are attributable to generation vs publish.
+   - `npm run publish:pact` — publishes to the broker; internally normalizes interactions via `jq -S '.interactions |= sort_by(...)'` as defense-in-depth against any ordering drift that slips past the gate.
+   - Ensure `jq` is available on the runner. It is preinstalled on GitHub `ubuntu-latest`; for other runner images or self-hosted runners, add an explicit install step (e.g., `apt-get install -y jq` or `brew install jq`) before any contract-test or publish command.
+   - Only publish on PR and main branch pushes.
 
 2. **Provider verification**: Run provider verification against published pacts
    - `npm run test:pact:provider:remote:contract`
    - `buildVerifierOptions` auto-reads `PACT_BROKER_BASE_URL`, `PACT_BROKER_TOKEN`, `GITHUB_SHA`, `GITHUB_BRANCH`
+   - Provider Vitest config (`vitest.config.contract.ts`) **must** use `pool: 'forks'` + `poolOptions.forks.singleFork: true` (see `pactjs-utils-provider-verifier.md` Example 7) — required for message providers and any multi-file provider contract suite to keep Pact Rust FFI state coherent. The SAME config is required on the consumer side (`vitest.config.pact.ts`) alongside `fileParallelism: false` — see `pact-consumer-framework-setup.md` Example 2.
    - Verification results published to broker when `CI=true`
 
 3. **Can-I-Deploy gate**: Block deployment if contracts are incompatible
    - `npm run can:i:deploy:provider`
    - Ensure the script adds `--retry-while-unknown 6 --retry-interval 10` for async verification
 
-4. **Webhook job**: Add `repository_dispatch` trigger for `pact_changed` event
+4. **Webhook job**: Add `repository_dispatch` trigger for `contract_requiring_verification_published` event
    - Provider verification runs when consumers publish new pacts
    - Ensures compatibility is checked on both consumer and provider changes
+   - Webhook authentication uses a dedicated GitHub machine user + classic PAT (`repo` scope, no expiration) stored as a PactFlow secret. See `pact-broker-webhooks.md` for the full pattern, rotation runbook, and staleness monitoring. A silently-expired PAT is the most common non-code cause of `can-i-deploy` timeouts with `There is no verified pact between ...`.
 
 5. **Breaking change handling**: When `PACT_BREAKING_CHANGE=true` env var is set:
    - Provider test passes `includeMainAndDeployed: false` to `buildVerifierOptions` — verifies only matching branch
@@ -232,6 +238,8 @@ env:
 
 6. **Record deployment**: After successful deployment, record version in broker
    - `npm run record:provider:deployment --env=production`
+
+7. **Staleness monitoring (recommended)**: Scheduled CI job (e.g., daily) that asserts recent verification results exist for each critical consumer/provider pair — surfaces silent webhook failures before they block a release. See `pact-broker-webhooks.md` Example 4.
 
 Required CI secrets: `PACT_BROKER_BASE_URL`, `PACT_BROKER_TOKEN`
 

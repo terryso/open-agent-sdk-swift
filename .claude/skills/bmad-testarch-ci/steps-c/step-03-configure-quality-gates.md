@@ -1,7 +1,7 @@
 ---
 name: 'step-03-configure-quality-gates'
 description: 'Configure burn-in, quality gates, and notifications'
-nextStepFile: './step-04-validate-and-summary.md'
+nextStepFile: '{skill-root}/steps-c/step-04-validate-and-summary.md'
 knowledgeIndex: './resources/tea-index.csv'
 outputFile: '{test_artifacts}/ci-pipeline-progress.md'
 ---
@@ -85,13 +85,18 @@ Define:
 
 Use `{knowledgeIndex}` to load:
 
-- `pactjs-utils-provider-verifier.md` — `buildVerifierOptions`, broker config, and breaking change patterns for provider verification gates
+- `pact-consumer-framework-setup.md` — determinism gate (`check-pact-determinism.sh`), `jq -S` publish normalization, 1:1 local/CI parity
+- `pactjs-utils-consumer-helpers.md` — one-interaction-per-`it()` determinism rule
+- `pactjs-utils-provider-verifier.md` — `buildVerifierOptions`, broker config, breaking change patterns, vitest `pool: 'forks'` + `singleFork` (same rule applies to consumer AND provider)
 - `pactjs-utils-request-filter.md` — `createRequestFilter` auth injection patterns for CI pipeline auth setup
+- `pact-broker-webhooks.md` — webhook auth pattern, PAT rotation runbook, staleness monitoring (webhook failures silently break `can-i-deploy`)
 
+- **Determinism gate must pass** (consumer side): `npm run test:pact:consumer` runs the suite N times and fails on byte-different pact JSON before any publish is attempted. This is a non-negotiable pre-publish gate.
 - **can-i-deploy must pass** before any deployment to staging or production
 - Block the deployment pipeline if contract verification fails
 - Treat consumer pact publishing failures as CI failures (contracts must stay up-to-date)
 - Provider verification must pass for all consumer pacts before merge
+- **Staleness alert**: scheduled job asserts recent verifications exist — a missing signal indicates a silently-broken webhook (usually an expired GitHub PAT on the PactFlow secret; see `pact-broker-webhooks.md` rotation runbook).
 
 ---
 

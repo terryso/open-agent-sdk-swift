@@ -1,8 +1,8 @@
 ---
 name: 'step-04-analyze-gaps'
 description: 'Complete Phase 1 with adaptive orchestration (agent-team, subagent, or sequential)'
-nextStepFile: './step-05-gate-decision.md'
-outputFile: '{test_artifacts}/traceability-report.md'
+nextStepFile: '{skill-root}/steps-c/step-05-gate-decision.md'
+outputFile: '{test_artifacts}/traceability-matrix.md'
 tempOutputFile: '/tmp/tea-trace-coverage-matrix-{{timestamp}}.json'
 ---
 
@@ -33,7 +33,7 @@ tempOutputFile: '/tmp/tea-trace-coverage-matrix-{{timestamp}}.json'
 
 ## CONTEXT BOUNDARIES:
 
-- Available context: requirements from Step 1, tests from Step 2, traceability matrix from Step 3
+- Available context: resolved oracle items from Step 1, tests from Step 2, traceability matrix from Step 3
 - Focus: gap analysis and matrix completion
 - Limits: do not make gate decision (Phase 2 responsibility)
 
@@ -145,11 +145,15 @@ Use the heuristics inventory from Step 2 and mapped criteria from Step 3 to flag
 const endpointCoverageGaps = coverageHeuristics?.endpoints_without_tests || [];
 const authCoverageGaps = coverageHeuristics?.auth_missing_negative_paths || [];
 const errorPathGaps = coverageHeuristics?.criteria_happy_path_only || [];
+const uiJourneyGaps = coverageHeuristics?.ui_journeys_without_e2e || [];
+const uiStateGaps = coverageHeuristics?.ui_states_missing_coverage || [];
 
 const heuristicGapCounts = {
   endpoints_without_tests: endpointCoverageGaps.length,
   auth_missing_negative_paths: authCoverageGaps.length,
   happy_path_only_criteria: errorPathGaps.length,
+  ui_journeys_without_e2e: uiJourneyGaps.length,
+  ui_states_missing_coverage: uiStateGaps.length,
 };
 ```
 
@@ -162,6 +166,48 @@ Heuristics are advisory but must influence gap severity and recommendations, esp
 **Based on gap analysis:**
 
 ```javascript
+const progressDoc = fs.existsSync('{outputFile}') ? fs.readFileSync('{outputFile}', 'utf8') : '';
+const progressFrontmatterMatch = progressDoc.match(/^---\n([\s\S]*?)\n---/);
+const progressFrontmatter = progressFrontmatterMatch ? yaml.parse(progressFrontmatterMatch[1]) : {};
+
+const isUnresolved = (value) => typeof value === 'string' && value.startsWith('{') && value.endsWith('}');
+const normalizeResolvedToken = (value) => {
+  if (value === undefined || value === null) return null;
+  const normalized = String(value).trim().toLowerCase();
+  if (!normalized || normalized === 'auto' || isUnresolved(normalized)) return null;
+  return normalized;
+};
+const firstResolvedToken = (...values) => {
+  for (const value of values) {
+    const normalized = normalizeResolvedToken(value);
+    if (normalized) return normalized;
+  }
+  return null;
+};
+
+const oracleResolutionMode =
+  firstResolvedToken(runtime.getOracleResolutionMode?.(), progressFrontmatter.oracleResolutionMode) || 'formal_requirements';
+const resolvedCoverageBasis =
+  firstResolvedToken(runtime.getResolvedCoverageBasis?.(), progressFrontmatter.coverageBasis) ||
+  {
+    formal_requirements: 'acceptance_criteria',
+    spec_artifact: 'openapi_endpoints',
+    external_pointer: 'acceptance_criteria',
+    synthetic_source: 'user_journeys',
+  }[oracleResolutionMode] ||
+  'acceptance_criteria';
+const resolvedOracleConfidence =
+  firstResolvedToken(runtime.getResolvedOracleConfidence?.(), progressFrontmatter.oracleConfidence) ||
+  {
+    formal_requirements: 'high',
+    spec_artifact: 'high',
+    external_pointer: 'medium',
+    synthetic_source: 'medium',
+  }[oracleResolutionMode] ||
+  'medium';
+const oracleSources = runtime.getOracleSources?.() || progressFrontmatter.oracleSources || [];
+const externalPointerStatus =
+  firstResolvedToken(runtime.getExternalPointerStatus?.(), progressFrontmatter.externalPointerStatus) || 'not_used';
 const recommendations = [];
 
 // Critical gaps (P0)
@@ -215,12 +261,36 @@ if (errorPathGaps.length > 0) {
   });
 }
 
+if (uiJourneyGaps.length > 0) {
+  recommendations.push({
+    priority: 'HIGH',
+    action: `Add E2E or component coverage for ${uiJourneyGaps.length} inferred UI journey(s)`,
+    requirements: uiJourneyGaps.map((r) => r.id || r.route || r.journey || 'unknown'),
+  });
+}
+
+if (uiStateGaps.length > 0) {
+  recommendations.push({
+    priority: 'MEDIUM',
+    action: `Add loading/empty/error/permission state coverage for ${uiStateGaps.length} UI journey(s)`,
+    requirements: uiStateGaps.map((r) => r.id || r.route || r.journey || 'unknown'),
+  });
+}
+
 // Quality issues
 recommendations.push({
   priority: 'LOW',
   action: 'Run /bmad:tea:test-review to assess test quality',
   requirements: [],
 });
+
+if (oracleResolutionMode === 'synthetic_source') {
+  recommendations.push({
+    priority: 'MEDIUM',
+    action: 'Promote inferred journeys into formal acceptance criteria when the team confirms they reflect intended behavior',
+    requirements: traceabilityMatrix.map((r) => r.id),
+  });
+}
 ```
 
 ---
@@ -253,6 +323,117 @@ const p3CoveragePercentage = safePct(p3Covered, p3Total);
 
 ---
 
+### 4b. Build Deduplicated Test Inventory and Trace Metadata
+
+Persist the unique discovered tests in Phase 1 so Step 5 does not need to reconstruct counts from per-requirement mappings.
+
+```javascript
+const coverageEligibleStatuses = new Set(['FULL', 'PARTIAL', 'UNIT-ONLY', 'INTEGRATION-ONLY']);
+const byLevel = {
+  e2e: { tests: 0, criteria_covered: 0 },
+  api: { tests: 0, criteria_covered: 0 },
+  component: { tests: 0, criteria_covered: 0 },
+  unit: { tests: 0, criteria_covered: 0 },
+  other: { tests: 0, criteria_covered: 0 }, // captures tests with unrecognized or empty level
+};
+
+const normalizeTestStatus = (test) => {
+  const explicitStatus = String(test.status || '')
+    .trim()
+    .toLowerCase();
+  if (['skipped', 'pending', 'fixme'].includes(explicitStatus)) return explicitStatus;
+  if (test.fixme === true) return 'fixme';
+  if (test.pending === true) return 'pending';
+  if (test.skipped === true) return 'skipped';
+  return 'active';
+};
+
+const uniqueTests = new Map();
+(traceabilityMatrix || []).forEach((req) => {
+  (req.tests || []).forEach((test, index) => {
+    // Do NOT use the per-requirement `index` as a fallback — the same test can appear
+    // at different indices across requirements, producing spurious duplicate entries.
+    // Use only stable, test-intrinsic fields; omit line when unavailable.
+    const stableId =
+      test.id ||
+      [test.file, test.title || test.name, test.line].filter((value) => value !== undefined && value !== null && value !== '').join(':') ||
+      null; // unresolvable — skip rather than manufacture a key
+
+    if (stableId === null || uniqueTests.has(stableId)) return;
+    const status = normalizeTestStatus(test);
+    uniqueTests.set(stableId, {
+      id: stableId,
+      file: test.file || '',
+      line: test.line ?? null,
+      title: test.title || test.name || stableId,
+      level: String(test.level || '')
+        .trim()
+        .toLowerCase(),
+      status: status,
+      skipped: status === 'skipped',
+      fixme: status === 'fixme',
+      pending: status === 'pending',
+      blocker_reason: test.skip_reason || test.blocker_reason || test.fixme_reason || test.pending_reason || '',
+    });
+  });
+});
+
+[...uniqueTests.values()].forEach((test) => {
+  const bucket = byLevel[test.level] ? test.level : 'other';
+  if (bucket === 'other' && test.level) {
+    console.warn(`[trace] unknown test level "${test.level}" for test "${test.id}" — counted in "other"`);
+  }
+  byLevel[bucket].tests += 1;
+});
+
+(traceabilityMatrix || []).forEach((req) => {
+  if (!coverageEligibleStatuses.has(req.coverage)) return;
+  const requirementLevels = new Set(
+    (req.tests || []).map((test) => {
+      const level = String(test.level || '')
+        .trim()
+        .toLowerCase();
+      return byLevel[level] ? level : 'other';
+    }),
+  );
+  requirementLevels.forEach((level) => {
+    byLevel[level].criteria_covered += 1;
+  });
+});
+
+const deduplicatedTests = [...uniqueTests.values()];
+const deduplicatedTestInventory = {
+  summary: {
+    files: [...new Set(deduplicatedTests.map((test) => test.file).filter(Boolean))].length,
+    cases: deduplicatedTests.length,
+    skipped_cases: deduplicatedTests.filter((test) => test.skipped).length,
+    fixme_cases: deduplicatedTests.filter((test) => test.fixme).length,
+    pending_cases: deduplicatedTests.filter((test) => test.pending).length,
+    by_level: byLevel,
+  },
+  tests: deduplicatedTests,
+  blockers: deduplicatedTests
+    .filter((test) => ['skipped', 'pending', 'fixme'].includes(test.status))
+    .map((test) => ({
+      id: test.id,
+      severity: test.status === 'skipped' ? 'high' : 'medium',
+      reason: test.blocker_reason || `Test marked ${test.status} during trace collection`,
+      test_file: test.file,
+      test_title: test.title,
+    })),
+};
+
+const extractedTargetId = runtime.getTraceTargetId?.() || null;
+const extractedTargetLabel = runtime.getTraceTargetLabel?.() || null;
+const traceTarget = {
+  type: '{gate_type}',
+  id: extractedTargetId, // story_id / epic_num / release_version / hotfix identifier from Step 1
+  label: extractedTargetLabel || null,
+};
+```
+
+---
+
 ### 5. Generate Complete Coverage Matrix
 
 **Compile all Phase 1 outputs:**
@@ -261,6 +442,18 @@ const p3CoveragePercentage = safePct(p3Covered, p3Total);
 const coverageMatrix = {
   phase: 'PHASE_1_COMPLETE',
   generated_at: new Date().toISOString(),
+  trace_target: traceTarget,
+  collection_mode: '{collection_mode}',
+  allow_gate: '{allow_gate}',
+  coverage_basis: resolvedCoverageBasis,
+  summary_confidence: resolvedOracleConfidence,
+  oracle: {
+    resolution_mode: oracleResolutionMode,
+    confidence: resolvedOracleConfidence,
+    sources: oracleSources,
+    external_pointer_status: externalPointerStatus,
+    synthetic: oracleResolutionMode === 'synthetic_source',
+  },
 
   requirements: traceabilityMatrix, // Full matrix from Step 3
 
@@ -292,9 +485,13 @@ const coverageMatrix = {
     endpoint_gaps: endpointCoverageGaps,
     auth_negative_path_gaps: authCoverageGaps,
     happy_path_only_gaps: errorPathGaps,
+    ui_journey_gaps: uiJourneyGaps,
+    ui_state_gaps: uiStateGaps,
     counts: heuristicGapCounts,
   },
 
+  test_inventory: deduplicatedTestInventory,
+  blockers: deduplicatedTestInventory.blockers,
   recommendations: recommendations,
 };
 ```
@@ -311,6 +508,16 @@ fs.writeFileSync(outputPath, JSON.stringify(coverageMatrix, null, 2), 'utf8');
 
 console.log(`✅ Phase 1 Complete: Coverage matrix saved to ${outputPath}`);
 ```
+
+**Record the resolved path in the progress document** so Step 5 can read the exact same file rather than re-evaluating the timestamp expression:
+
+After writing the temp file, update the YAML frontmatter in `{outputFile}` to include:
+
+```yaml
+tempCoverageMatrixPath: '<resolved outputPath>'
+```
+
+Step 5 reads `tempCoverageMatrixPath` from the frontmatter first; falls back to reconstructing `{tempOutputFile}` only when the key is absent.
 
 ---
 

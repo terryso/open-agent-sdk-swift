@@ -58,6 +58,8 @@ scripts/
 
 ```typescript
 // vitest.config.pact.ts
+// See pact-consumer-framework-setup.md Example 2 "Key Points" for rationale on
+// fileParallelism + pool:forks + singleFork. Do not remove those three settings.
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
@@ -65,13 +67,20 @@ export default defineConfig({
     environment: 'node',
     include: ['tests/contract/**/*.pacttest.ts'],
     testTimeout: 30000,
+    fileParallelism: false,
+    pool: 'forks',
+    poolOptions: { forks: { singleFork: true } },
   },
 });
 ```
 
 **Key Points**:
 
-- Do NOT add `pool`, `poolOptions`, `setupFiles`, `coverage`, or other settings from the unit test config
+- **`fileParallelism: false` is required** — primary defense against non-deterministic pact generation. Without it, parallel workers race on the shared pact JSON file and corrupt interactions. Symptom: local runs pass, CI randomly fails with `Cannot change pact content for already published pact`. The `publish-pact.sh` `jq` sort (Example 4) provides byte-stability at publish time.
+- **`pool: 'forks'` + `singleFork: true` is required for multi-file consumer suites** — same config the provider side uses (`pactjs-utils-provider-verifier.md` Example 7). Best current understanding: the `@pact-foundation/pact` napi-rs binding is not robust across Vitest worker threads sharing a process; with the default threads pool (Vitest v1) and multiple `.pacttest.ts` files on the same consumer+provider pair, we observed reproducible "request was expected but not received" flakes on Linux CI only. `singleFork: true` serializes every pact file into one forked subprocess and eliminated the flake on two repos (`pactjs-utils`, `seon-mcp-server`). Vitest v2+ defaults to `forks`, but set the pool explicitly so the contract does not drift with Vitest version bumps.
+- **One `.pacttest.ts` per consumer+provider pair is the canonical pattern** — not just an observation. Two files for the same pair in one process (which `singleFork: true` guarantees) cause an FFI handle collision: the second file's `new PactV4(...)` call re-enters the FFI handle still holding stale state from the first file → "request was expected but not received" sporadically on Linux CI. The fix is structural — merge the files, not the config. `pool: 'forks'` is still required for pact JSON write safety but does NOT prevent same-pair file splits from colliding. Multiple files for **different** pairs (different consumer or provider name) are correct and safe. See Example 10 for the ✅/❌ pattern.
+- **Interacting settings**: leave `isolate` at its default (`true`). Do NOT set `sequence.concurrent: true`, `maxConcurrency > 1`, or `maxWorkers > 1` in this config — they defeat the serialization this rule relies on. `hookTimeout` may be raised if mock-server startup is slow, but keep `testTimeout` ≥ `hookTimeout`.
+- Do NOT add `setupFiles`, `coverage`, or other settings from the unit test config
 - Keep it minimal — Pact tests run in Node environment with extended timeout
 - 30 second timeout accommodates Pact mock server startup and interaction verification
 - Use a dedicated config file (`vitest.config.pact.ts`), not the main vitest config
@@ -131,15 +140,28 @@ export GITHUB_BRANCH="${GITHUB_BRANCH:-$(git rev-parse --abbrev-ref HEAD)}"
 
 ```bash
 #!/bin/bash
-# Publish generated pact files to PactFlow/Pact Broker
+# Publish generated pact files to PactFlow/Pact Broker.
 #
-# Requires: PACT_BROKER_BASE_URL, PACT_BROKER_TOKEN, GITHUB_SHA, GITHUB_BRANCH
+# Before publish, normalize each pact JSON: sort interactions by (description, provider state name,
+# method, path) and sort object keys via `jq -S`. This gives byte-stable output to the broker even
+# if the PactV4 generator produces ordering drift between runs. Ensures "Cannot change pact content"
+# from PactFlow never fires on ordering-only changes.
+#
+# Requires: PACT_BROKER_BASE_URL, PACT_BROKER_TOKEN, GITHUB_SHA, GITHUB_BRANCH, jq
 # -e: exit on error  -u: error on undefined vars  -o pipefail: fail if any pipe segment fails
 set -euo pipefail
 
 . ./scripts/env-setup.sh
 
 PACT_DIR="./pacts"
+
+# Defense-in-depth: normalize interaction order for byte-stable publishes.
+for f in "$PACT_DIR"/*.json; do
+  tmp="$(mktemp)"
+  jq -S '.interactions |= sort_by(.description, (.providerStates[0].name // ""), .request.method, .request.path)' \
+     "$f" > "$tmp"
+  mv "$tmp" "$f"
+done
 
 pact-broker publish "$PACT_DIR" \
     --consumer-app-version="$GITHUB_SHA" \
@@ -203,6 +225,7 @@ fi
 - Use `PACTICIPANT` env var (required via `${PACTICIPANT:?...}`), not hardcoded service names
 - `can-i-deploy` includes `--retry-while-unknown=10 --retry-interval=30` (waits for provider verification)
 - `record-deployment` has branch guard (only records on main/master)
+- **`publish-pact.sh` normalizes interactions with `jq -S` + `sort_by(...)` before publishing** — ensures byte-stable payload to the broker regardless of generator ordering quirks.
 - Do NOT invent custom env vars like `PACT_CONSUMER_VERSION` or `PACT_BREAKING_CHANGE` in scripts — those are handled by `env-setup.sh` and the CI detect-breaking-change action respectively
 
 ---
@@ -253,7 +276,7 @@ jobs:
       - name: Run consumer contract tests
         run: npm run test:pact:consumer
 
-      # (2) Publish pacts to broker
+      # (2) Publish pacts to broker (publish-pact.sh also normalizes interaction order as defense-in-depth)
       - name: Publish pacts to PactFlow
         run: npm run publish:pact
 
@@ -274,6 +297,7 @@ jobs:
 
 **Key Points**:
 
+- **1:1 local/CI parity is a hard rule**: every CI step is `npm run <same-name-a-dev-uses>`. Never let CI invoke `vitest` or `pact-broker` directly — that divergence is how "works on my machine" slips in. Consumer tests, publish, can-i-deploy, and record-deployment are all the same commands a developer runs locally.
 - **Workflow-level `env` block** for broker secrets and git vars — not per-step
 - **`detect-breaking-change` step** runs before install to set `PACT_BREAKING_CHANGE` env var
 - **Step numbering skips (3)** — step 3 is the webhook-triggered provider verification (happens externally)
@@ -596,11 +620,53 @@ pact-logs/
 
 ---
 
+### Example 10: Test File Organization — One File Per Consumer+Provider Pair
+
+**Context**: Avoiding Pact Rust FFI handle collisions when structuring consumer test files.
+
+**Rule**: Every consumer+provider pair maps to exactly one `.pacttest.ts` file. Never split interactions for the same pair across multiple files.
+
+**Root cause**: The Pact Rust FFI maintains one handle per consumer+provider pair per process. With `singleFork: true` (all files run sequentially in one forked process), two files for the same pair access the same FFI handle back-to-back. The second file's `new PactV4({ consumer, provider })` call re-enters the handle still holding stale interaction state from the first file. The first test in the second file starts the mock server in this corrupted state — "request was expected but not received" results, sporadic and Linux-CI-only (execution order differs between environments).
+
+**Evidence**: In `pactjs-utils`, `movies-read.pacttest.ts` and `movies-write.pacttest.ts` both used `consumer: 'SampleAppConsumer', provider: 'SampleMoviesAPI'`. The vitest config and CI workflow were correct throughout. The fix was merging the two files into `movies.pacttest.ts`. The config was not changed.
+
+```typescript
+// ❌ WRONG — same consumer+provider pair split across two files
+// movies-read.pacttest.ts
+const pact = new PactV4({ consumer: 'SampleAppConsumer', provider: 'SampleMoviesAPI', ... })
+describe('Read Operations', () => { /* 4 tests: GET /movies, GET /movies/:id */ })
+
+// movies-write.pacttest.ts  ← second PactV4 for the SAME pair = FFI handle collision
+const pact = new PactV4({ consumer: 'SampleAppConsumer', provider: 'SampleMoviesAPI', ... })
+describe('Write Operations', () => { /* 5 tests: POST, PUT, DELETE */ })
+
+// ✅ RIGHT — one file per consumer+provider pair, describe blocks for organization
+// movies.pacttest.ts
+const pact = new PactV4({ consumer: 'SampleAppConsumer', provider: 'SampleMoviesAPI', ... })
+describe('Movies API', () => {
+  describe('Read Operations', () => { /* 4 tests */ })
+  describe('Write Operations', () => { /* 5 tests */ })
+})
+```
+
+**Key Points**:
+
+- **File = contract**: A `.pacttest.ts` file represents one consumer+provider contract. One contract = one file.
+- **Describe blocks, not files**: Organize by operation type (`Read Operations`, `Write Operations`), resource, or feature — always within one file per pair.
+- **Different pairs = different files**: `ServiceA / BackendAPI` and `ServiceA / AuthAPI` are two contracts and correctly use two separate files. This rule only forbids splitting ONE pair.
+- **`singleFork: true` is not a fix for this**: It ensures correct pact JSON write semantics across files, but when two files share a pair it actually guarantees the FFI collision (both land in the same process). Without it you'd get file-write races instead. Neither is safe. The fix is one file per pair.
+- **Naming convention**: `{domain}.pacttest.ts` when one domain maps to one pair. `{consumer-kebab}-{provider-kebab}.pacttest.ts` when the filename must be self-describing about which pair it covers.
+
+---
+
 ## Validation Checklist
 
 Before presenting the consumer CDC framework to the user, verify:
 
-- [ ] `vitest.config.pact.ts` is minimal (no pool/coverage/setup copied from unit config)
+- [ ] `vitest.config.pact.ts` is minimal **and sets `fileParallelism: false` AND `pool: 'forks'` with `poolOptions.forks.singleFork: true`** (`fileParallelism: false` prevents shared pact JSON corruption from parallel workers; forks + `singleFork: true` is required for pact JSON write safety across files — see Example 2 Key Points for mechanism and evidence)
+- [ ] Each consumer+provider pair is covered by exactly ONE `.pacttest.ts` file — never split interactions for the same pair across multiple files (two `PactV4` instances for the same pair in one process cause FFI handle collision → "request was expected but not received" on Linux CI; `singleFork: true` does NOT prevent this — it ensures both files share one process, which guarantees the collision; see Example 10)
+- [ ] `vitest.config.pact.ts` does NOT set `sequence.concurrent: true`, `maxConcurrency > 1`, `maxWorkers > 1`, or `isolate: false` — all four defeat the serialization the rule relies on
+- [ ] `scripts/publish-pact.sh` normalizes interactions with `jq -S '.interactions |= sort_by(.description, (.providerStates[0].name // ""), .request.method, .request.path)'` before the `pact-broker publish` call (ensures byte-stable payload to PactFlow regardless of generator ordering)
 - [ ] Script names match pactjs-utils (`test:pact:consumer`, `publish:pact`, `can:i:deploy:consumer`, `record:consumer:deployment`)
 - [ ] Scripts source `env-setup.sh` inline in package.json
 - [ ] Shell scripts use `pact-broker` not `npx pact-broker`
@@ -611,6 +677,8 @@ Before presenting the consumer CDC framework to the user, verify:
 - [ ] CI workflow named `contract-test-consumer.yml`
 - [ ] CI has workflow-level env block (not per-step)
 - [ ] CI has `detect-breaking-change` step before install
+- [ ] CI step (1) generates pact files (calls `npm run test:pact:consumer`) — its own visible step, not folded into publish
+- [ ] CI steps are 1:1 with developer commands — every CI step calls `npm run <same-name>` a dev would run locally (no direct `vitest` or `pact-broker` invocation)
 - [ ] CI step numbering skips (3) — webhook-triggered provider verification
 - [ ] CI can-i-deploy has `PACT_BREAKING_CHANGE != 'true'` condition
 - [ ] CI has NO upload-artifact step
@@ -629,7 +697,8 @@ Before presenting the consumer CDC framework to the user, verify:
 ## Related Fragments
 
 - `pactjs-utils-overview.md` — Library decision tree and installation
-- `pactjs-utils-consumer-helpers.md` — `createProviderState`, `toJsonMap`, `setJsonContent`, and `setJsonBody` API details
-- `pactjs-utils-provider-verifier.md` — Provider-side verification patterns
+- `pactjs-utils-consumer-helpers.md` — `createProviderState`, `toJsonMap`, `setJsonContent`, `setJsonBody`, **one-interaction-per-`it()` rule**
+- `pactjs-utils-provider-verifier.md` — Provider-side verification patterns; consumer and provider BOTH require `pool: 'forks'` + `singleFork: true` — same FFI-safety rule applies on both sides
 - `pactjs-utils-request-filter.md` — Auth injection for provider verification
+- `pact-broker-webhooks.md` — PactFlow → GitHub webhook auth pattern (dedicated user, classic PAT, PactFlow secret) and staleness monitoring
 - `contract-testing.md` — Foundational CDC patterns and resilience coverage

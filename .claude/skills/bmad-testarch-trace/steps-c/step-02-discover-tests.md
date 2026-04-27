@@ -1,15 +1,15 @@
 ---
 name: 'step-02-discover-tests'
 description: 'Discover and catalog tests by level'
-nextStepFile: './step-03-map-criteria.md'
-outputFile: '{test_artifacts}/traceability-report.md'
+nextStepFile: '{skill-root}/steps-c/step-03-map-criteria.md'
+outputFile: '{test_artifacts}/traceability-matrix.md'
 ---
 
 # Step 2: Discover & Catalog Tests
 
 ## STEP GOAL
 
-Identify tests relevant to the requirements and classify by test level.
+Identify tests relevant to the resolved coverage oracle and classify by test level.
 
 ## MANDATORY EXECUTION RULES
 
@@ -41,7 +41,16 @@ Search `{test_dir}` for:
 
 - Test IDs (e.g., `1.3-E2E-001`)
 - Feature name matches
+- Resolved oracle item IDs/titles
 - Spec patterns (`*.spec.*`, `*.test.*`)
+
+When the oracle is synthetic (`synthetic_requirements` or `user_journeys`), also search for:
+
+- route/path matches
+- page/screen/component names
+- visible UI labels and CTA names
+- form action verbs (create, edit, save, delete, submit, search, checkout, etc.)
+- auth/session/logout flows
 
 ---
 
@@ -54,7 +63,11 @@ Classify as:
 - Component
 - Unit
 
-Record test IDs, describe blocks, and priority markers if present.
+Record test IDs, describe blocks, priority markers, and the per-test identity fields needed for machine-readable output:
+
+- Stable identity fields: `id`, `title`, `file`, `line`, `level`
+- Execution state flags: `skipped`, `pending`, `fixme`
+- Skip or blocker reason when it can be discovered from the test source or runtime metadata
 
 ---
 
@@ -71,6 +84,13 @@ Capture explicit coverage signals so Phase 1 can detect common blind spots:
 - Error-path coverage
   - Detect validation, timeout, network-failure, and server-error scenarios
   - Mark criteria with happy-path-only tests
+
+- UI journey coverage (when tracing UI/source-derived oracle items)
+  - Inventory routes/screens/journeys referenced by the oracle and journeys exercised by E2E/component tests
+  - Mark journeys with no end-to-end coverage
+- UI state coverage
+  - Detect loading, empty, validation, error, and permission-denied state assertions
+  - Mark journeys that only verify happy-path rendering
 
 Record these findings in step output as `coverage_heuristics` for Step 3/4.
 

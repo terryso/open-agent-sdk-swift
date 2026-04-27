@@ -1,7 +1,7 @@
 ---
 name: 'step-04-coverage-plan'
 description: 'Design test coverage, priorities, execution strategy, and estimates'
-nextStepFile: './step-05-generate-output.md'
+nextStepFile: '{skill-root}/steps-c/step-05-generate-output.md'
 outputFile: '{test_artifacts}/test-design-progress.md'
 ---
 
@@ -95,8 +95,11 @@ Define thresholds:
 
   ```yaml
   ---
+  workflowStatus: 'in-progress'
+  totalSteps: 5
   stepsCompleted: ['step-04-coverage-plan']
   lastStep: 'step-04-coverage-plan'
+  nextStep: '{nextStepFile}'
   lastSaved: '{date}'
   ---
   ```
@@ -104,8 +107,11 @@ Define thresholds:
   Then write this step's output below the frontmatter.
 
 - **If `{outputFile}` already exists**, update:
+  - Set `workflowStatus: 'in-progress'`
+  - Set `totalSteps: 5`
   - Add `'step-04-coverage-plan'` to `stepsCompleted` array (only if not already present)
   - Set `lastStep: 'step-04-coverage-plan'`
+  - Set `nextStep: '{nextStepFile}'`
   - Set `lastSaved: '{date}'`
   - Append this step's output to the appropriate section of the document.
 
