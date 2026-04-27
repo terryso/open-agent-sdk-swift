@@ -44,3 +44,20 @@ jobs:
           valColorRange: ${{ env.COVERAGE }}
           maxColorRange: 100
           minColorRange: 0
+
+  test-linux:
+    name: Test (Linux)
+    runs-on: ubuntu-latest
+    container: swift:6.1-jammy
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cache Swift build
+        uses: actions/cache@v4
+        with:
+          path: .build
+          key: swift-${{ runner.os }}-${{ hashFiles('Package.resolved') }}
+          restore-keys: swift-${{ runner.os }}-
+      - name: Build
+        run: swift build
+      - name: Run tests
+        run: swift test
