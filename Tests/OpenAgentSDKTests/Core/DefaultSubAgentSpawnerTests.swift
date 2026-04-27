@@ -2,6 +2,9 @@ import XCTest
 @testable import OpenAgentSDK
 
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 // MARK: - Mock URL Protocol for SubAgentSpawner Tests
 

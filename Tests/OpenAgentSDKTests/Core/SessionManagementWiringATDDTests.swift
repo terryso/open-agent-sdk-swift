@@ -10,6 +10,9 @@
 import XCTest
 @testable import OpenAgentSDK
 
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 // MARK: - Mock URL Protocol for Session Wiring Tests
 
 /// Custom URLProtocol subclass that intercepts network requests for session wiring testing.

@@ -1,6 +1,9 @@
 import XCTest
 @testable import OpenAgentSDK
 
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 // MARK: - Mock URL Protocol for Stream Tests
 
 /// Custom URLProtocol subclass that intercepts network requests for stream testing.

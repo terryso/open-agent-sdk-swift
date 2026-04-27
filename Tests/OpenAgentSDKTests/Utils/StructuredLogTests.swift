@@ -1,6 +1,9 @@
 import XCTest
 @testable import OpenAgentSDK
 
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 // MARK: - ATDD RED PHASE: Story 14.2 -- Structured Log Output
 //
 // All tests assert EXPECTED behavior. They will FAIL until:

@@ -1,6 +1,9 @@
 import XCTest
 @testable import OpenAgentSDK
 
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 // MARK: - Mock URL Protocol for Micro-Compact Integration Tests
 
 /// Custom URLProtocol that supports sequential responses for integration testing

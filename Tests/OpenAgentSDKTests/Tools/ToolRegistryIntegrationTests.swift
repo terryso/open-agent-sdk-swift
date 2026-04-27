@@ -1,6 +1,9 @@
 import XCTest
 @testable import OpenAgentSDK
 
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 // MARK: - Tool Registry Integration Tests
 
 /// ATDD RED PHASE: Integration tests for Story 3.1 -- Tool Protocol & Registry.

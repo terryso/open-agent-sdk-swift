@@ -1,5 +1,8 @@
 import XCTest
 @preconcurrency import OpenAgentSDK
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 // MARK: - Mock URL Protocol for Abort Tests
 
@@ -46,7 +49,7 @@ final class AbortMockURLProtocol: URLProtocol {
         // Apply delay if configured (to allow cancellation during request)
         if Self.responseDelayMs > 0 {
             let delayMs = Self.responseDelayMs
-            let capturedSelf = self
+            nonisolated(unsafe) let capturedSelf = self
             Thread {
                 Thread.sleep(forTimeInterval: Double(delayMs) / 1000.0)
                 capturedSelf.deliverResponse()

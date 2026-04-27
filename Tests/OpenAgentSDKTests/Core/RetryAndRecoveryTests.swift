@@ -1,6 +1,9 @@
 import XCTest
 @testable import OpenAgentSDK
 
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 // MARK: - Mock URL Protocol for Retry Tests (Blocking Path)
 
 /// Custom URLProtocol that supports returning different status codes on sequential requests

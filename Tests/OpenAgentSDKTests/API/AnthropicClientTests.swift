@@ -1,5 +1,8 @@
 import XCTest
 @testable import OpenAgentSDK
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 // MARK: - Mock URL Protocol for Network Interception
 

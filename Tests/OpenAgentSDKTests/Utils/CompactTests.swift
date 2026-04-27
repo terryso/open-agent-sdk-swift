@@ -1,6 +1,9 @@
 import XCTest
 @testable import OpenAgentSDK
 
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 // MARK: - AutoCompactState Tests
 
 /// ATDD RED PHASE: Tests for Story 2.5 -- Auto Conversation Compaction.

@@ -1,4 +1,7 @@
 import XCTest
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 @testable import OpenAgentSDK
 
 // MARK: - AC2: QueryResult Contains Cost Information

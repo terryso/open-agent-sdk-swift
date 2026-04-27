@@ -1,6 +1,9 @@
 import XCTest
 @testable import OpenAgentSDK
 
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 // MARK: - Integration Tests: Agent + ToolExecutor
 
 /// ATDD RED PHASE: Integration tests for Story 3.3 -- Agent integration with ToolExecutor.
