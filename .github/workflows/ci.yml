@@ -49,7 +49,6 @@ jobs:
     name: Test (Linux)
     runs-on: ubuntu-latest
     container: swift:6.1-jammy
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - name: Cache Swift build
