@@ -26,7 +26,7 @@ public struct ProcessGitCommandRunner: GitCommandRunning, Sendable {
 
     public func runGitCommand(_ command: String, cwd: String) -> String? {
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/bin/bash")
+        process.executableURL = URL(fileURLWithPath: PlatformUtils.shellPath())
         process.arguments = ["-c", command]
         process.currentDirectoryURL = URL(fileURLWithPath: cwd)
 

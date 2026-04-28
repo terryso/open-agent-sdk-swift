@@ -1,6 +1,9 @@
 import XCTest
 @testable import OpenAgentSDK
 
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 // MARK: - AC1 & AC4: Budget Enforcement in Blocking Path (prompt())
 
 /// ATDD RED PHASE: Tests for Story 2.3 — Budget Enforcement in prompt() (blocking path).

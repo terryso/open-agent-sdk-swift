@@ -133,7 +133,12 @@ struct SessionStoreE2ETests {
 
         // Ensure the session directory does NOT exist before save
         #if os(Linux)
-        let home = String(cString: getenv("HOME") ?? "/tmp")
+        let home: String
+        if let homeEnv = getenv("HOME") {
+            home = String(cString: homeEnv)
+        } else {
+            home = "/tmp"
+        }
         #else
         let home = NSHomeDirectory()
         #endif

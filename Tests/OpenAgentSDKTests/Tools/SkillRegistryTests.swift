@@ -1,6 +1,9 @@
 import XCTest
 @testable import OpenAgentSDK
 
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 // MARK: - SkillRegistry Tests (Story 11.1)
 
 /// Tests for Story 11.1 -- SkillRegistry.
@@ -485,10 +488,19 @@ final class SkillRegistryTests: XCTestCase {
     func testConcurrentRegistration_DoesNotCrash() {
         // Given: a registry
         let registry = SkillRegistry()
+        nonisolated(unsafe) let registryRef = registry
 
         // When: registering skills concurrently
         DispatchQueue.concurrentPerform(iterations: 100) { i in
-            registry.register(makeSkill(name: "skill_\(i)"))
+            registryRef.register(Skill(
+                name: "skill_\(i)",
+                description: "test",
+                aliases: [],
+                userInvocable: true,
+                toolRestrictions: nil,
+                isAvailable: { true },
+                promptTemplate: "test"
+            ))
         }
 
         // Then: all skills are registered without crash

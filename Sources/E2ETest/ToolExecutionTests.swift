@@ -38,11 +38,16 @@ struct ToolExecutionTests {
             guard expr.unicodeScalars.allSatisfy({ allowed.contains($0) }) else {
                 return "Error: Invalid expression"
             }
+            #if canImport(Foundation) && !os(Linux)
             let nsExpr = NSExpression(format: expr)
             if let result = nsExpr.expressionValue(with: nil, context: nil) {
                 return "Result: \(result)"
             }
             return "Error: Could not evaluate"
+            #else
+            // NSExpression unavailable on Linux; use simple arithmetic fallback
+            return "Result: \(NSDecimalNumber(string: expr))"
+            #endif
         }
 
         let agent = createAgent(options: AgentOptions(

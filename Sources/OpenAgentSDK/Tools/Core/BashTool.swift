@@ -181,7 +181,7 @@ private func launchBackgroundProcess(
     cwd: String
 ) -> ToolExecuteResult {
     let process = Process()
-    process.executableURL = URL(fileURLWithPath: "/bin/bash")
+    process.executableURL = URL(fileURLWithPath: PlatformUtils.shellPath())
     process.arguments = ["-c", command]
     process.currentDirectoryURL = URL(fileURLWithPath: cwd)
 
@@ -235,7 +235,7 @@ private func executeBashProcess(
         let stdoutPipe = Pipe()
         let stderrPipe = Pipe()
 
-        process.executableURL = URL(fileURLWithPath: "/bin/bash")
+        process.executableURL = URL(fileURLWithPath: PlatformUtils.shellPath())
         process.arguments = ["-c", command]
         process.currentDirectoryURL = URL(fileURLWithPath: cwd)
         process.standardOutput = stdoutPipe

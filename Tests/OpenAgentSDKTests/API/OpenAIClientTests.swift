@@ -1,6 +1,9 @@
 import XCTest
 @testable import OpenAgentSDK
 
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 final class OpenAIClientTests: XCTestCase {
 
     // MARK: - Helpers

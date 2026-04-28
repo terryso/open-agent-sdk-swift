@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 /// OpenAI-compatible API client that translates between Anthropic-format interface
 /// and OpenAI chat completion API format.

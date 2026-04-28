@@ -54,7 +54,7 @@ public enum ShellHookExecutor {
             let stdinPipe = Pipe()
             let stdoutPipe = Pipe()
 
-            process.executableURL = URL(fileURLWithPath: "/bin/bash")
+            process.executableURL = URL(fileURLWithPath: PlatformUtils.shellPath())
             process.arguments = ["-c", command]
             process.standardInput = stdinPipe
             process.standardOutput = stdoutPipe

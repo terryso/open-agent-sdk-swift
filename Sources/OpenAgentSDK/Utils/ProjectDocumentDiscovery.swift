@@ -81,7 +81,7 @@ public final class ProjectDocumentDiscovery: @unchecked Sendable {
     ///     discovery traversal is skipped and this path is used directly.
     ///   - homeDirectory: Override for the user's home directory. Used in tests
     ///     to avoid reading the real `~/.claude/CLAUDE.md`. Defaults to `nil`
-    ///     (uses `NSHomeDirectory()`).
+    ///     (uses `PlatformUtils.homeDirectory()`).
     /// - Returns: A `ProjectContextResult` with global and project instructions.
     public func collectProjectContext(
         cwd: String,
@@ -109,7 +109,7 @@ public final class ProjectDocumentDiscovery: @unchecked Sendable {
         }
 
         // Read global instructions: ~/.claude/CLAUDE.md
-        let home = homeDirectory ?? NSHomeDirectory()
+        let home = homeDirectory ?? PlatformUtils.homeDirectory()
         let globalClaudeDir = (home as NSString).appendingPathComponent(".claude")
         let globalClaudeMdPath = (globalClaudeDir as NSString).appendingPathComponent("CLAUDE.md")
         let globalInstructions = readFileContent(at: globalClaudeMdPath)

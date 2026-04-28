@@ -1,4 +1,7 @@
 import XCTest
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 @testable import OpenAgentSDK
 
 // MARK: - Compact + FileCache Integration ATDD Tests (Story 12.2)
