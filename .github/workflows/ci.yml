@@ -48,9 +48,12 @@ jobs:
   test-linux:
     name: Test (Linux)
     runs-on: ubuntu-latest
-    container: swift:6.1-jammy
     steps:
       - uses: actions/checkout@v4
+      - name: Setup Swift
+        uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: "6.1"
       - name: Cache Swift build
         uses: actions/cache@v4
         with:
