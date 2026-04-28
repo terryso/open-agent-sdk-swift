@@ -33,6 +33,16 @@ final class AgentLoopMockURLProtocol: URLProtocol {
         return request
     }
 
+    /// Whether stopLoading() has been called (task cancelled/finished).
+    /// On Linux (FoundationNetworking), the task is removed from the internal TaskRegistry
+    /// before stopLoading() is called, so any client call after this will crash.
+    private let stopLock = NSLock()
+    private var _stopped = false
+    private var stopped: Bool {
+        get { stopLock.withLock { _stopped } }
+        set { stopLock.withLock { _stopped = newValue } }
+    }
+
     override func startLoading() {
         // Capture request with body
         var capturedRequest = request
@@ -43,6 +53,8 @@ final class AgentLoopMockURLProtocol: URLProtocol {
         AgentLoopMockURLProtocol.lastRequest = capturedRequest
         AgentLoopMockURLProtocol.allRequests.append(capturedRequest)
 
+        guard !stopped, let activeClient = client else { return }
+
         // If sequential responses are configured, use them in order
         if !AgentLoopMockURLProtocol.sequentialResponses.isEmpty {
             let index = AgentLoopMockURLProtocol.responseIndex
@@ -50,7 +62,10 @@ final class AgentLoopMockURLProtocol: URLProtocol {
                 let responseData = AgentLoopMockURLProtocol.sequentialResponses[index]
                 AgentLoopMockURLProtocol.responseIndex += 1
 
-                let body = try! JSONSerialization.data(withJSONObject: responseData, options: [])
+                guard let body = try? JSONSerialization.data(withJSONObject: responseData, options: []) else {
+                    if !stopped { activeClient.urlProtocol(self, didFailWithError: NSError(domain: "AgentLoopMockURLProtocol", code: -2, userInfo: [:])) }
+                    return
+                }
                 let httpResponse = HTTPURLResponse(
                     url: request.url!,
                     statusCode: 200,
@@ -58,9 +73,7 @@ final class AgentLoopMockURLProtocol: URLProtocol {
                     headerFields: ["content-type": "application/json"]
                 )!
 
-                client?.urlProtocol(self, didReceive: httpResponse, cacheStoragePolicy: .notAllowed)
-                client?.urlProtocol(self, didLoad: body)
-                client?.urlProtocolDidFinishLoading(self)
+                deliverToClient(activeClient, httpResponse: httpResponse, body: body)
                 return
             }
         }
@@ -70,7 +83,7 @@ final class AgentLoopMockURLProtocol: URLProtocol {
             let error = NSError(domain: "AgentLoopMockURLProtocol", code: -1, userInfo: [
                 NSLocalizedDescriptionKey: "No mock response registered for URL: \(request.url?.absoluteString ?? "nil")"
             ])
-            client?.urlProtocol(self, didFailWithError: error)
+            if !stopped { activeClient.urlProtocol(self, didFailWithError: error) }
             return
         }
 
@@ -81,9 +94,23 @@ final class AgentLoopMockURLProtocol: URLProtocol {
             headerFields: mock.headers
         )!
 
-        client?.urlProtocol(self, didReceive: httpResponse, cacheStoragePolicy: .notAllowed)
-        client?.urlProtocol(self, didLoad: mock.body)
-        client?.urlProtocolDidFinishLoading(self)
+        deliverToClient(activeClient, httpResponse: httpResponse, body: mock.body)
+    }
+
+    /// Safely delivers response data to the URLProtocol client.
+    /// On Linux (FoundationNetworking), the task registry entry may be removed
+    /// before client calls complete. Re-check `stopped` between each client call.
+    private func deliverToClient(
+        _ activeClient: URLProtocolClient,
+        httpResponse: HTTPURLResponse,
+        body: Data
+    ) {
+        guard !stopped else { return }
+        activeClient.urlProtocol(self, didReceive: httpResponse, cacheStoragePolicy: .notAllowed)
+        guard !stopped else { return }
+        activeClient.urlProtocol(self, didLoad: body)
+        guard !stopped else { return }
+        activeClient.urlProtocolDidFinishLoading(self)
     }
 
     private static func readBodyFromStream(_ stream: InputStream) -> Data? {
@@ -104,7 +131,6 @@ final class AgentLoopMockURLProtocol: URLProtocol {
         return data
     }
 
-    private var stopped = false
     override func stopLoading() { stopped = true }
 
     static func reset() {

@@ -252,6 +252,16 @@ final class CompactMockURLProtocol: URLProtocol {
         return request
     }
 
+    /// Whether stopLoading() has been called (task cancelled/finished).
+    /// On Linux (FoundationNetworking), the task is removed from the internal TaskRegistry
+    /// before stopLoading() is called, so any client call after this will crash.
+    private let stopLock = NSLock()
+    private var _stopped = false
+    private var stopped: Bool {
+        get { stopLock.withLock { _stopped } }
+        set { stopLock.withLock { _stopped = newValue } }
+    }
+
     override func startLoading() {
         var capturedRequest = request
         if capturedRequest.httpBody == nil, let stream = capturedRequest.httpBodyStream {
@@ -259,6 +269,8 @@ final class CompactMockURLProtocol: URLProtocol {
         }
 
         CompactMockURLProtocol.allRequests.append(capturedRequest)
+
+        guard !stopped, let activeClient = client else { return }
 
         let index = CompactMockURLProtocol.responseIndex
         if index < CompactMockURLProtocol.sequentialResponses.count {
@@ -272,16 +284,19 @@ final class CompactMockURLProtocol: URLProtocol {
                 headerFields: response.headers
             )!
 
-            client?.urlProtocol(self, didReceive: httpResponse, cacheStoragePolicy: .notAllowed)
-            client?.urlProtocol(self, didLoad: response.body)
-            client?.urlProtocolDidFinishLoading(self)
+            guard !stopped else { return }
+            activeClient.urlProtocol(self, didReceive: httpResponse, cacheStoragePolicy: .notAllowed)
+            guard !stopped else { return }
+            activeClient.urlProtocol(self, didLoad: response.body)
+            guard !stopped else { return }
+            activeClient.urlProtocolDidFinishLoading(self)
         } else {
             let error = NSError(
                 domain: "CompactMockURLProtocol",
                 code: -1,
                 userInfo: [NSLocalizedDescriptionKey: "No more mock responses (index: \(index))"]
             )
-            client?.urlProtocol(self, didFailWithError: error)
+            if !stopped { activeClient.urlProtocol(self, didFailWithError: error) }
         }
     }
 
@@ -300,7 +315,6 @@ final class CompactMockURLProtocol: URLProtocol {
         return data
     }
 
-    private var stopped = false
     override func stopLoading() { stopped = true }
 
     static func reset() {

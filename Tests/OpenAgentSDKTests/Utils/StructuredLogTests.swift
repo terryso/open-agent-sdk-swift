@@ -83,7 +83,19 @@ private final class StructuredLogMockURLProtocol: URLProtocol {
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
 
+    /// Whether stopLoading() has been called (task cancelled/finished).
+    /// On Linux (FoundationNetworking), the task is removed from the internal TaskRegistry
+    /// before stopLoading() is called, so any client call after this will crash.
+    private let stopLock = NSLock()
+    private var _stopped = false
+    private var stopped: Bool {
+        get { stopLock.withLock { _stopped } }
+        set { stopLock.withLock { _stopped = newValue } }
+    }
+
     override func startLoading() {
+        guard !stopped, let activeClient = client else { return }
+
         if !Self.sequentialResponses.isEmpty {
             let index = Self.responseIndex
             if index < Self.sequentialResponses.count {
@@ -96,9 +108,12 @@ private final class StructuredLogMockURLProtocol: URLProtocol {
                     httpVersion: "HTTP/1.1",
                     headerFields: ["content-type": "application/json"]
                 )!
-                client?.urlProtocol(self, didReceive: httpResponse, cacheStoragePolicy: .notAllowed)
-                client?.urlProtocol(self, didLoad: body)
-                client?.urlProtocolDidFinishLoading(self)
+                guard !stopped else { return }
+                activeClient.urlProtocol(self, didReceive: httpResponse, cacheStoragePolicy: .notAllowed)
+                guard !stopped else { return }
+                activeClient.urlProtocol(self, didLoad: body)
+                guard !stopped else { return }
+                activeClient.urlProtocolDidFinishLoading(self)
                 return
             }
         }
@@ -108,7 +123,7 @@ private final class StructuredLogMockURLProtocol: URLProtocol {
             let error = NSError(domain: "StructuredLogMockURLProtocol", code: -1, userInfo: [
                 NSLocalizedDescriptionKey: "No mock response for \(request.url?.absoluteString ?? "nil")"
             ])
-            client?.urlProtocol(self, didFailWithError: error)
+            if !stopped { activeClient.urlProtocol(self, didFailWithError: error) }
             return
         }
 
@@ -118,12 +133,14 @@ private final class StructuredLogMockURLProtocol: URLProtocol {
             httpVersion: "HTTP/1.1",
             headerFields: mock.headers
         )!
-        client?.urlProtocol(self, didReceive: httpResponse, cacheStoragePolicy: .notAllowed)
-        client?.urlProtocol(self, didLoad: mock.body)
-        client?.urlProtocolDidFinishLoading(self)
+        guard !stopped else { return }
+        activeClient.urlProtocol(self, didReceive: httpResponse, cacheStoragePolicy: .notAllowed)
+        guard !stopped else { return }
+        activeClient.urlProtocol(self, didLoad: mock.body)
+        guard !stopped else { return }
+        activeClient.urlProtocolDidFinishLoading(self)
     }
 
-    private var stopped = false
     override func stopLoading() { stopped = true }
 
     static func reset() {

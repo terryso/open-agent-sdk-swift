@@ -28,6 +28,16 @@ final class CompactIntegrationMockURLProtocol: URLProtocol {
         return request
     }
 
+    /// Whether stopLoading() has been called (task cancelled/finished).
+    /// On Linux (FoundationNetworking), the task is removed from the internal TaskRegistry
+    /// before stopLoading() is called, so any client call after this will crash.
+    private let stopLock = NSLock()
+    private var _stopped = false
+    private var stopped: Bool {
+        get { stopLock.withLock { _stopped } }
+        set { stopLock.withLock { _stopped = newValue } }
+    }
+
     override func startLoading() {
         var capturedRequest = request
         if capturedRequest.httpBody == nil, let stream = capturedRequest.httpBodyStream {
@@ -35,6 +45,8 @@ final class CompactIntegrationMockURLProtocol: URLProtocol {
         }
 
         CompactIntegrationMockURLProtocol.allRequests.append(capturedRequest)
+
+        guard !stopped, let activeClient = client else { return }
 
         let index = CompactIntegrationMockURLProtocol.responseIndex
         if index < CompactIntegrationMockURLProtocol.sequentialResponses.count {
@@ -48,17 +60,31 @@ final class CompactIntegrationMockURLProtocol: URLProtocol {
                 headerFields: response.headers
             )!
 
-            client?.urlProtocol(self, didReceive: httpResponse, cacheStoragePolicy: .notAllowed)
-            client?.urlProtocol(self, didLoad: response.body)
-            client?.urlProtocolDidFinishLoading(self)
+            deliverToClient(activeClient, httpResponse: httpResponse, body: response.body)
         } else {
             let error = NSError(
                 domain: "CompactIntegrationMockURLProtocol",
                 code: -1,
                 userInfo: [NSLocalizedDescriptionKey: "No more mock responses (index: \(index))"]
             )
-            client?.urlProtocol(self, didFailWithError: error)
+            if !stopped { activeClient.urlProtocol(self, didFailWithError: error) }
         }
+    }
+
+    /// Safely delivers response data to the URLProtocol client.
+    /// On Linux (FoundationNetworking), the task registry entry may be removed
+    /// before client calls complete. Re-check `stopped` between each client call.
+    private func deliverToClient(
+        _ activeClient: URLProtocolClient,
+        httpResponse: HTTPURLResponse,
+        body: Data
+    ) {
+        guard !stopped else { return }
+        activeClient.urlProtocol(self, didReceive: httpResponse, cacheStoragePolicy: .notAllowed)
+        guard !stopped else { return }
+        activeClient.urlProtocol(self, didLoad: body)
+        guard !stopped else { return }
+        activeClient.urlProtocolDidFinishLoading(self)
     }
 
     private static func readBodyFromStream(_ stream: InputStream) -> Data? {
@@ -76,7 +102,6 @@ final class CompactIntegrationMockURLProtocol: URLProtocol {
         return data
     }
 
-    private var stopped = false
     override func stopLoading() { stopped = true }
 
     static func reset() {

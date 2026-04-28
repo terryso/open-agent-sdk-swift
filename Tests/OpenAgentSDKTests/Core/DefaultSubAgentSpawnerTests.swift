@@ -14,7 +14,19 @@ private final class SpawnerMockURLProtocol: URLProtocol {
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
 
+    /// Whether stopLoading() has been called (task cancelled/finished).
+    /// On Linux (FoundationNetworking), the task is removed from the internal TaskRegistry
+    /// before stopLoading() is called, so any client call after this will crash.
+    private let stopLock = NSLock()
+    private var _stopped = false
+    private var stopped: Bool {
+        get { stopLock.withLock { _stopped } }
+        set { stopLock.withLock { _stopped = newValue } }
+    }
+
     override func startLoading() {
+        guard !stopped, let activeClient = client else { return }
+
         let errorBody: [String: Any] = [
             "error": ["type": "authentication_error", "message": "invalid api key"]
         ]
@@ -25,12 +37,15 @@ private final class SpawnerMockURLProtocol: URLProtocol {
             httpVersion: "HTTP/1.1",
             headerFields: ["content-type": "application/json"]
         )!
-        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-        client?.urlProtocol(self, didLoad: body)
-        client?.urlProtocolDidFinishLoading(self)
+
+        guard !stopped else { return }
+        activeClient.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        guard !stopped else { return }
+        activeClient.urlProtocol(self, didLoad: body)
+        guard !stopped else { return }
+        activeClient.urlProtocolDidFinishLoading(self)
     }
 
-    private var stopped = false
     override func stopLoading() { stopped = true }
 }
 
