@@ -90,7 +90,8 @@ final class SessionWiringMockURLProtocol: URLProtocol {
         return data
     }
 
-    override func stopLoading() {}
+    private var stopped = false
+    override func stopLoading() { stopped = true }
 
     static func reset() {
         mockResponses = [:]

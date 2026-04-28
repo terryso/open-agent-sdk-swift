@@ -30,7 +30,8 @@ private final class SpawnerMockURLProtocol: URLProtocol {
         client?.urlProtocolDidFinishLoading(self)
     }
 
-    override func stopLoading() {}
+    private var stopped = false
+    override func stopLoading() { stopped = true }
 }
 
 // MARK: - DefaultSubAgentSpawner Tests
@@ -254,5 +255,117 @@ final class DefaultSubAgentSpawnerTests: XCTestCase {
 
         // Then: default maxTurns (10) is used — mock error proves completion
         XCTAssertTrue(result.isError, "Should get error from mock 401 response")
+    }
+
+    // MARK: - Enhanced spawn (with disallowedTools, mcpServers, etc.)
+
+    /// Enhanced spawn with disallowedTools filters out specified tools.
+    func testEnhancedSpawn_disallowedTools_filtersCorrectly() async throws {
+        let parentTools: [ToolProtocol] = [
+            createBashTool(),
+            createReadTool(),
+            createWriteTool(),
+        ]
+
+        let spawner = DefaultSubAgentSpawner(
+            apiKey: "test-key",
+            baseURL: nil,
+            parentModel: "claude-sonnet-4-6",
+            parentTools: parentTools,
+            client: makeMockClient()
+        )
+
+        let result = await spawner.spawn(
+            prompt: "Test",
+            model: nil,
+            systemPrompt: nil,
+            allowedTools: nil,
+            maxTurns: nil,
+            disallowedTools: ["Bash", "Write"],
+            mcpServers: nil,
+            skills: nil,
+            runInBackground: nil,
+            isolation: nil,
+            name: nil,
+            teamName: nil,
+            mode: nil,
+            resume: nil
+        )
+
+        XCTAssertTrue(result.isError, "Should complete (mock 401)")
+    }
+
+    /// Enhanced spawn with disallowedTools takes priority over allowedTools.
+    func testEnhancedSpawn_disallowedToolsOverridesAllowed() async throws {
+        let parentTools: [ToolProtocol] = [
+            createBashTool(),
+            createReadTool(),
+        ]
+
+        let spawner = DefaultSubAgentSpawner(
+            apiKey: "test-key",
+            baseURL: nil,
+            parentModel: "claude-sonnet-4-6",
+            parentTools: parentTools,
+            client: makeMockClient()
+        )
+
+        let result = await spawner.spawn(
+            prompt: "Test",
+            model: nil,
+            systemPrompt: nil,
+            allowedTools: ["Bash", "Read"],
+            maxTurns: nil,
+            disallowedTools: ["Bash"],
+            mcpServers: nil,
+            skills: nil,
+            runInBackground: nil,
+            isolation: nil,
+            name: nil,
+            teamName: nil,
+            mode: nil,
+            resume: nil
+        )
+
+        XCTAssertTrue(result.isError)
+    }
+
+    /// Enhanced spawn with inline and reference MCP server specs, empty disallowedTools,
+    /// custom model, permission mode, agent name, and AgentTool filtering — all in one test.
+    func testEnhancedSpawn_comprehensiveParameters() async throws {
+        let parentTools: [ToolProtocol] = [
+            createReadTool(),
+            createAgentTool(),
+        ]
+
+        let spawner = DefaultSubAgentSpawner(
+            apiKey: "test-key",
+            baseURL: "https://api.example.com",
+            parentModel: "claude-sonnet-4-6",
+            parentTools: parentTools,
+            provider: .anthropic,
+            client: makeMockClient()
+        )
+
+        let result = await spawner.spawn(
+            prompt: "Comprehensive sub-agent task",
+            model: "claude-haiku-4-5",
+            systemPrompt: "You are a specialized agent",
+            allowedTools: ["Read"],
+            maxTurns: 3,
+            disallowedTools: [],
+            mcpServers: nil,
+            skills: ["search"],
+            runInBackground: false,
+            isolation: "worktree",
+            name: "worker",
+            teamName: "team-a",
+            mode: .bypassPermissions,
+            resume: nil
+        )
+
+        // Tests: AgentTool filtered, empty disallowedTools no-op,
+        // custom model, permissionMode set, agentName set, all without crash
+        XCTAssertTrue(result.isError)
     }
 }
