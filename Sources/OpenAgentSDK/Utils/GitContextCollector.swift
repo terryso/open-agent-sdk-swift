@@ -37,23 +37,36 @@ public struct ProcessGitCommandRunner: GitCommandRunning, Sendable {
         do {
             try process.run()
 
-            // Apply timeout
-            if #available(macOS 13.0, *) {
-                let deadline = Date().addingTimeInterval(Double(timeoutMs) / 1000.0)
-                while process.isRunning && Date() < deadline {
-                    RunLoop.current.run(until: Date().addingTimeInterval(0.01))
-                }
-                if process.isRunning {
-                    process.terminate()
-                    return nil
-                }
-            } else {
-                // Fallback for older macOS: just wait
-                process.waitUntilExit()
+            // Read stdout before waiting to avoid pipe-buffer deadlock on Linux.
+            // On Linux, if the child fills the pipe buffer before the parent reads,
+            // the child blocks and waitUntilExit() deadlocks.
+            let outData: Data
+            #if canImport(Darwin)
+            // macOS: poll with timeout using RunLoop
+            let deadline = Date().addingTimeInterval(Double(timeoutMs) / 1000.0)
+            while process.isRunning && Date() < deadline {
+                RunLoop.current.run(until: Date().addingTimeInterval(0.01))
             }
+            if process.isRunning {
+                process.terminate()
+                return nil
+            }
+            outData = pipe.fileHandleForReading.readDataToEndOfFile()
+            #else
+            // Linux: read pipe first, then wait for exit with timeout
+            outData = pipe.fileHandleForReading.readDataToEndOfFile()
+            let deadline = Date().addingTimeInterval(Double(timeoutMs) / 1000.0)
+            while process.isRunning && Date() < deadline {
+                Thread.sleep(forTimeInterval: 0.01)
+            }
+            if process.isRunning {
+                process.terminate()
+                return nil
+            }
+            #endif
 
             guard process.terminationStatus == 0 else { return nil }
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            let data = outData
             let output = String(data: data, encoding: .utf8)?
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             return (output?.isEmpty ?? true) ? nil : output
