@@ -183,10 +183,13 @@ private func parseDuckDuckGoResults(_ html: String) -> [SearchResult] {
               let titleRange = Range(match.range(at: 2), in: html) else {
             continue
         }
-        let url = String(html[urlRange])
+        let rawUrl = String(html[urlRange])
         let title = stripHtmlTags(String(html[titleRange]))
 
-        // Filter out DuckDuckGo internal links
+        // Extract real URL from DDG redirect (uddg parameter)
+        let url = extractRealUrl(from: rawUrl)
+
+        // Filter out DuckDuckGo internal links (nav, settings, etc.)
         if !url.contains("duckduckgo.com") {
             links.append(LocatedLink(
                 url: url,
@@ -234,6 +237,20 @@ private func parseDuckDuckGoResults(_ html: String) -> [SearchResult] {
     }
 
     return results
+}
+
+/// Extracts the real URL from a DuckDuckGo redirect link.
+///
+/// DDG wraps result URLs in `//duckduckgo.com/l/?uddg={encodedUrl}&rut=...`.
+/// This extracts the `uddg` parameter. If the URL is not a redirect,
+/// it is returned as-is.
+private func extractRealUrl(from rawUrl: String) -> String {
+    guard let comps = URLComponents(string: rawUrl.hasPrefix("//") ? "https:\(rawUrl)" : rawUrl),
+          let uddg = comps.queryItems?.first(where: { $0.name == "uddg" })?.value,
+          !uddg.isEmpty else {
+        return rawUrl
+    }
+    return uddg
 }
 
 /// Removes all HTML tags from a string.

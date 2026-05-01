@@ -257,6 +257,60 @@ final class WebSearchToolTests: XCTestCase {
                       "Should include external results, got: \(result.content)")
     }
 
+    /// [P0]: WebSearch extracts real URLs from DDG redirect links.
+    func testWebSearch_extractsRealUrlFromRedirect() async {
+        let html = """
+        <html><body>
+        <div class="result">
+            <a rel="nofollow" class="result__a" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.sohu.com%2Fa%2F123&amp;rut=abc123">搜狐文章</a>
+            <a class="result__snippet" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.sohu.com%2Fa%2F123&amp;rut=abc123">搜狐文章摘要</a>
+        </div>
+        <div class="result">
+            <a rel="nofollow" class="result__a" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fzh.wikipedia.org%2Fwiki%2FTest&amp;rut=def456">维基百科</a>
+            <a class="result__snippet" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fzh.wikipedia.org%2Fwiki%2FTest&amp;rut=def456">维基百科摘要</a>
+        </div>
+        </body></html>
+        """
+        mockDDGResponse(query: "中文搜索", html: html)
+        let tool = makeWebSearchTool()
+
+        let result = await callTool(tool, input: ["query": "中文搜索"])
+
+        XCTAssertFalse(result.isError, "Should not error, got: \(result.content)")
+        XCTAssertTrue(result.content.contains("sohu.com"),
+                      "Should contain extracted sohu.com URL, got: \(result.content)")
+        XCTAssertTrue(result.content.contains("zh.wikipedia.org"),
+                      "Should contain extracted wikipedia URL, got: \(result.content)")
+        XCTAssertFalse(result.content.contains("duckduckgo.com/l/"),
+                       "Should NOT contain raw DDG redirect URL, got: \(result.content)")
+    }
+
+    /// [P1]: WebSearch filters DDG redirect URLs that point to DDG itself.
+    func testWebSearch_filtersRedirectToDDG() async {
+        let html = """
+        <html><body>
+        <div class="result">
+            <a rel="nofollow" class="result__a" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fduckduckgo.com%2Fabout&amp;rut=xyz">DDG About</a>
+            <a class="result__snippet" href="#">About snippet</a>
+        </div>
+        <div class="result">
+            <a rel="nofollow" class="result__a" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fexample.com&amp;rut=abc">External</a>
+            <a class="result__snippet" href="#">External snippet</a>
+        </div>
+        </body></html>
+        """
+        mockDDGResponse(query: "redirect filter test", html: html)
+        let tool = makeWebSearchTool()
+
+        let result = await callTool(tool, input: ["query": "redirect filter test"])
+
+        XCTAssertFalse(result.isError, "Should not error, got: \(result.content)")
+        XCTAssertFalse(result.content.contains("duckduckgo.com/about"),
+                       "Should filter out redirect pointing to DDG itself, got: \(result.content)")
+        XCTAssertTrue(result.content.contains("example.com"),
+                      "Should include external redirect results, got: \(result.content)")
+    }
+
     // MARK: - Tool metadata
 
     /// [P0]: WebSearch tool should be named "WebSearch".
