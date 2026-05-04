@@ -368,16 +368,7 @@ public actor SessionStore {
             return custom
         }
 
-        let home: String
-        #if os(Linux)
-        if let homeEnv = getenv("HOME") {
-            home = String(cString: homeEnv)
-        } else {
-            home = "/tmp"
-        }
-        #else
-        home = NSHomeDirectory()
-        #endif
+        let home = PlatformUtils.homeDirectory()
 
         return (home as NSString).appendingPathComponent(".open-agent-sdk/sessions")
     }

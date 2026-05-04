@@ -270,7 +270,7 @@ public enum SkillLoader {
     /// Expands `~` to the user's home directory.
     static func expandTilde(_ path: String) -> String {
         guard path.hasPrefix("~") else { return path }
-        let home = getEnv("HOME") ?? NSHomeDirectory()
+        let home = getEnv("HOME") ?? PlatformUtils.homeDirectory()
         return home + String(path.dropFirst())
     }
 

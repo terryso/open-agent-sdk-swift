@@ -10,9 +10,14 @@
 import XCTest
 @testable import OpenAgentSDK
 
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 // MARK: - Mock URL Protocol for Session Wiring Tests
 
 /// Custom URLProtocol subclass that intercepts network requests for session wiring testing.
+/// Uses the same Linux-safe pattern as AbortMockURLProtocol: NSLock-protected `stopped` flag
+/// and split `deliverToClient` to guard against FoundationNetworking TaskRegistry crashes.
 final class SessionWiringMockURLProtocol: URLProtocol {
 
     nonisolated(unsafe) static var mockResponses: [String: (statusCode: Int, headers: [String: String], body: Data)] = [:]
@@ -24,6 +29,16 @@ final class SessionWiringMockURLProtocol: URLProtocol {
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
 
+    /// Whether stopLoading() has been called (task cancelled/finished).
+    /// On Linux (FoundationNetworking), the task is removed from the internal TaskRegistry
+    /// before stopLoading() is called, so any client call after this will crash.
+    private let stopLock = NSLock()
+    private var _stopped = false
+    private var stopped: Bool {
+        get { stopLock.withLock { _stopped } }
+        set { stopLock.withLock { _stopped = newValue } }
+    }
+
     override func startLoading() {
         var capturedRequest = request
         if capturedRequest.httpBody == nil, let stream = capturedRequest.httpBodyStream {
@@ -33,6 +48,8 @@ final class SessionWiringMockURLProtocol: URLProtocol {
         SessionWiringMockURLProtocol.lastRequest = capturedRequest
         SessionWiringMockURLProtocol.allRequests.append(capturedRequest)
 
+        guard !stopped, let activeClient = client else { return }
+
         if !SessionWiringMockURLProtocol.sequentialResponses.isEmpty {
             let index = SessionWiringMockURLProtocol.responseIndex
             if index < SessionWiringMockURLProtocol.sequentialResponses.count {
@@ -40,26 +57,25 @@ final class SessionWiringMockURLProtocol: URLProtocol {
                 SessionWiringMockURLProtocol.responseIndex += 1
 
                 guard let body = try? JSONSerialization.data(withJSONObject: responseData, options: []) else {
-                    client?.urlProtocol(self, didFailWithError: NSError(domain: "SessionWiringMock", code: -2, userInfo: [:]))
+                    if !stopped { activeClient.urlProtocol(self, didFailWithError: NSError(domain: "SessionWiringMock", code: -2, userInfo: [:])) }
                     return
                 }
                 let httpResponse = HTTPURLResponse(
                     url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1",
                     headerFields: ["content-type": "application/json"]
                 )!
-                client?.urlProtocol(self, didReceive: httpResponse, cacheStoragePolicy: .notAllowed)
-                client?.urlProtocol(self, didLoad: body)
-                client?.urlProtocolDidFinishLoading(self)
+                deliverToClient(activeClient, httpResponse: httpResponse, body: body)
                 return
             }
         }
 
         guard let url = request.url?.absoluteString,
               let mock = SessionWiringMockURLProtocol.mockResponses[url] else {
-            client?.urlProtocol(self, didFailWithError: NSError(
+            let error = NSError(
                 domain: "SessionWiringMock", code: -1,
                 userInfo: [NSLocalizedDescriptionKey: "No mock for \(request.url?.absoluteString ?? "nil")"]
-            ))
+            )
+            if !stopped { activeClient.urlProtocol(self, didFailWithError: error) }
             return
         }
 
@@ -67,9 +83,23 @@ final class SessionWiringMockURLProtocol: URLProtocol {
             url: request.url!, statusCode: mock.statusCode, httpVersion: "HTTP/1.1",
             headerFields: mock.headers
         )!
-        client?.urlProtocol(self, didReceive: httpResponse, cacheStoragePolicy: .notAllowed)
-        client?.urlProtocol(self, didLoad: mock.body)
-        client?.urlProtocolDidFinishLoading(self)
+        deliverToClient(activeClient, httpResponse: httpResponse, body: mock.body)
+    }
+
+    /// Safely delivers response data to the URLProtocol client.
+    /// On Linux (FoundationNetworking), the task registry entry may be removed
+    /// before client calls complete. Re-check `stopped` between each client call.
+    private func deliverToClient(
+        _ activeClient: URLProtocolClient,
+        httpResponse: HTTPURLResponse,
+        body: Data
+    ) {
+        guard !stopped else { return }
+        activeClient.urlProtocol(self, didReceive: httpResponse, cacheStoragePolicy: .notAllowed)
+        guard !stopped else { return }
+        activeClient.urlProtocol(self, didLoad: body)
+        guard !stopped else { return }
+        activeClient.urlProtocolDidFinishLoading(self)
     }
 
     private static func readBodyFromStream(_ stream: InputStream) -> Data? {
@@ -87,7 +117,7 @@ final class SessionWiringMockURLProtocol: URLProtocol {
         return data
     }
 
-    override func stopLoading() {}
+    override func stopLoading() { stopped = true }
 
     static func reset() {
         mockResponses = [:]

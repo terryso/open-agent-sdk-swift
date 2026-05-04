@@ -124,3 +124,9 @@
 
 - **ATDD tautological assertions** -- `Story18_11_ATDDTests.swift` `testAC4_compatReport_completeFieldLevelCoverage()` compares local variables to their own literals (e.g., `let expectedPass = 32; XCTAssertEqual(expectedPass, 32)`). Pre-existing ATDD design pattern used consistently across all Stories 18-1 through 18-10. [Tests/OpenAgentSDKTests/Compat/Story18_11_ATDDTests.swift]
 - **testEffortThinkingInteraction_pass does not verify computeThinkingConfig() priority chain** -- Test only verifies field coexistence on AgentOptions, not the runtime priority chain `thinking > effort > nil` via `computeThinkingConfig()`. Out of scope for compat verification story; runtime behavior requires E2E tests. [Tests/OpenAgentSDKTests/Compat/ThinkingModelCompatTests.swift:195]
+
+## Deferred from: code review of linux-platform-support (2026-04-27)
+
+- **`/tmp` fallback 安全隐患** — `PlatformUtils.homeDirectory()` 在 Linux 上当 `$HOME` 未设置时回退到 `/tmp`，这是共享可写目录，session 数据可能被其他用户读取。预存在问题，非本变更引入。建议后续用 `getpwuid(getuid())` 获取真实 home 目录。 [PlatformUtils.swift:39]
+- **E2E 测试仍用旧的 `#if os(Linux)` / `NSHomeDirectory()` 模式** — `Sources/E2ETest/SessionStoreE2ETests.swift` 中的 home 目录获取逻辑未统一使用 `PlatformUtils.homeDirectory()`。有意排除在本次 scope 外，保持一致性可后续处理。 [SessionStoreE2ETests.swift:95-104, 135-139]
+- **Linux CI 未收集覆盖率** — Linux job 仅运行 `swift test`，未加 `--enable-code-coverage`。预存在差距，非本变更引入。 [ci.yml]

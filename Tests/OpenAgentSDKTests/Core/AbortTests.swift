@@ -1,5 +1,8 @@
 import XCTest
 @preconcurrency import OpenAgentSDK
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 // MARK: - Mock URL Protocol for Abort Tests
 
@@ -43,20 +46,55 @@ final class AbortMockURLProtocol: URLProtocol {
         AbortMockURLProtocol.lastRequest = capturedRequest
         AbortMockURLProtocol.allRequests.append(capturedRequest)
 
-        // Apply delay if configured (to allow cancellation during request)
+        // Apply delay if configured (to allow cancellation during request).
+        // Use DispatchWorkItem instead of Thread so we can cancel the delayed
+        // delivery in stopLoading(). On Linux, FoundationNetworking removes the task
+        // from its internal registry on cancellation, and any background Thread that
+        // outlives the task will crash with "Trying to access a behaviour for a task
+        // that is not in the registry."
         if Self.responseDelayMs > 0 {
             let delayMs = Self.responseDelayMs
-            let capturedSelf = self
-            Thread {
-                Thread.sleep(forTimeInterval: Double(delayMs) / 1000.0)
+            nonisolated(unsafe) let capturedSelf = self
+            let workItem = DispatchWorkItem {
                 capturedSelf.deliverResponse()
-            }.start()
+            }
+            delayedWorkItem = workItem
+            DispatchQueue.global().asyncAfter(
+                deadline: .now() + .milliseconds(delayMs),
+                execute: workItem
+            )
         } else {
             deliverResponse()
         }
     }
 
+    /// Whether stopLoading() has been called (task cancelled/finished).
+    /// Uses a lock to ensure visibility across threads — the URLSession callback thread
+    /// sets this flag, while the background delay thread reads it before calling client methods.
+    /// On Linux (FoundationNetworking), the task is removed from the internal TaskRegistry
+    /// before stopLoading() is called, so any client call after this flag is set will crash.
+    private let stopLock = NSLock()
+    private var _stopped = false
+    private var stopped: Bool {
+        get { stopLock.withLock { _stopped } }
+        set { stopLock.withLock { _stopped = newValue } }
+    }
+
+    /// DispatchWorkItem for the delayed response, so it can be cancelled in stopLoading()
+    /// to prevent background threads from outliving the URLSession task on Linux.
+    private var delayedWorkItem: DispatchWorkItem?
+
+    override func stopLoading() {
+        stopped = true
+        delayedWorkItem?.cancel()
+        delayedWorkItem = nil
+    }
+
     private func deliverResponse() {
+        // On Linux, URLSession tasks removed from the registry after cancellation
+        // will crash if we try to deliver responses via client. Guard against this.
+        guard !stopped, let activeClient = client else { return }
+
         // If sequential responses are configured, use them in order
         if !AbortMockURLProtocol.sequentialResponses.isEmpty {
             let index = AbortMockURLProtocol.responseIndex
@@ -72,9 +110,7 @@ final class AbortMockURLProtocol: URLProtocol {
                     headerFields: ["content-type": "application/json"]
                 )!
 
-                client?.urlProtocol(self, didReceive: httpResponse, cacheStoragePolicy: .notAllowed)
-                client?.urlProtocol(self, didLoad: body)
-                client?.urlProtocolDidFinishLoading(self)
+                deliverToClient(activeClient, httpResponse: httpResponse, body: body)
                 return
             }
         }
@@ -84,7 +120,7 @@ final class AbortMockURLProtocol: URLProtocol {
             let error = NSError(domain: "AbortMockURLProtocol", code: -1, userInfo: [
                 NSLocalizedDescriptionKey: "No mock response registered for URL: \(request.url?.absoluteString ?? "nil")"
             ])
-            client?.urlProtocol(self, didFailWithError: error)
+            if !stopped { activeClient.urlProtocol(self, didFailWithError: error) }
             return
         }
 
@@ -95,9 +131,25 @@ final class AbortMockURLProtocol: URLProtocol {
             headerFields: mock.headers
         )!
 
-        client?.urlProtocol(self, didReceive: httpResponse, cacheStoragePolicy: .notAllowed)
-        client?.urlProtocol(self, didLoad: mock.body)
-        client?.urlProtocolDidFinishLoading(self)
+        deliverToClient(activeClient, httpResponse: httpResponse, body: mock.body)
+    }
+
+    /// Safely delivers response data to the URLProtocol client.
+    /// On Linux (FoundationNetworking), the task registry entry may be removed
+    /// before client calls complete, causing a fatal error. We re-check `stopped`
+    /// before each client call to minimize the window where a concurrent cancellation
+    /// could cause a crash.
+    private func deliverToClient(
+        _ activeClient: URLProtocolClient,
+        httpResponse: HTTPURLResponse,
+        body: Data
+    ) {
+        guard !stopped else { return }
+        activeClient.urlProtocol(self, didReceive: httpResponse, cacheStoragePolicy: .notAllowed)
+        guard !stopped else { return }
+        activeClient.urlProtocol(self, didLoad: body)
+        guard !stopped else { return }
+        activeClient.urlProtocolDidFinishLoading(self)
     }
 
     private static func readBodyFromStream(_ stream: InputStream) -> Data? {
@@ -117,8 +169,6 @@ final class AbortMockURLProtocol: URLProtocol {
 
         return data
     }
-
-    override func stopLoading() {}
 
     static func reset() {
         mockResponses = [:]

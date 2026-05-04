@@ -146,8 +146,8 @@ final class FileWriteToolTests: XCTestCase {
 
     /// AC4 [P1]: Writing to an invalid/unwritable path returns an error.
     func testWriteFile_invalidPath_returnsError() async {
-        // Given: an unwritable path (root-level directory as file)
-        let invalidPath = "/cannot_write_here_\(UUID().uuidString).txt"
+        // Given: a path inside /proc which cannot be written to even as root
+        let invalidPath = "/proc/\(UUID().uuidString)/file.txt"
         let tool = makeWriteTool()
 
         // When: writing to the invalid path

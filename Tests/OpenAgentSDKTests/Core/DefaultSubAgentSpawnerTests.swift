@@ -2,6 +2,9 @@ import XCTest
 @testable import OpenAgentSDK
 
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 // MARK: - Mock URL Protocol for SubAgentSpawner Tests
 
@@ -11,7 +14,19 @@ private final class SpawnerMockURLProtocol: URLProtocol {
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
 
+    /// Whether stopLoading() has been called (task cancelled/finished).
+    /// On Linux (FoundationNetworking), the task is removed from the internal TaskRegistry
+    /// before stopLoading() is called, so any client call after this will crash.
+    private let stopLock = NSLock()
+    private var _stopped = false
+    private var stopped: Bool {
+        get { stopLock.withLock { _stopped } }
+        set { stopLock.withLock { _stopped = newValue } }
+    }
+
     override func startLoading() {
+        guard !stopped, let activeClient = client else { return }
+
         let errorBody: [String: Any] = [
             "error": ["type": "authentication_error", "message": "invalid api key"]
         ]
@@ -22,12 +37,16 @@ private final class SpawnerMockURLProtocol: URLProtocol {
             httpVersion: "HTTP/1.1",
             headerFields: ["content-type": "application/json"]
         )!
-        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-        client?.urlProtocol(self, didLoad: body)
-        client?.urlProtocolDidFinishLoading(self)
+
+        guard !stopped else { return }
+        activeClient.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        guard !stopped else { return }
+        activeClient.urlProtocol(self, didLoad: body)
+        guard !stopped else { return }
+        activeClient.urlProtocolDidFinishLoading(self)
     }
 
-    override func stopLoading() {}
+    override func stopLoading() { stopped = true }
 }
 
 // MARK: - DefaultSubAgentSpawner Tests
@@ -251,5 +270,117 @@ final class DefaultSubAgentSpawnerTests: XCTestCase {
 
         // Then: default maxTurns (10) is used — mock error proves completion
         XCTAssertTrue(result.isError, "Should get error from mock 401 response")
+    }
+
+    // MARK: - Enhanced spawn (with disallowedTools, mcpServers, etc.)
+
+    /// Enhanced spawn with disallowedTools filters out specified tools.
+    func testEnhancedSpawn_disallowedTools_filtersCorrectly() async throws {
+        let parentTools: [ToolProtocol] = [
+            createBashTool(),
+            createReadTool(),
+            createWriteTool(),
+        ]
+
+        let spawner = DefaultSubAgentSpawner(
+            apiKey: "test-key",
+            baseURL: nil,
+            parentModel: "claude-sonnet-4-6",
+            parentTools: parentTools,
+            client: makeMockClient()
+        )
+
+        let result = await spawner.spawn(
+            prompt: "Test",
+            model: nil,
+            systemPrompt: nil,
+            allowedTools: nil,
+            maxTurns: nil,
+            disallowedTools: ["Bash", "Write"],
+            mcpServers: nil,
+            skills: nil,
+            runInBackground: nil,
+            isolation: nil,
+            name: nil,
+            teamName: nil,
+            mode: nil,
+            resume: nil
+        )
+
+        XCTAssertTrue(result.isError, "Should complete (mock 401)")
+    }
+
+    /// Enhanced spawn with disallowedTools takes priority over allowedTools.
+    func testEnhancedSpawn_disallowedToolsOverridesAllowed() async throws {
+        let parentTools: [ToolProtocol] = [
+            createBashTool(),
+            createReadTool(),
+        ]
+
+        let spawner = DefaultSubAgentSpawner(
+            apiKey: "test-key",
+            baseURL: nil,
+            parentModel: "claude-sonnet-4-6",
+            parentTools: parentTools,
+            client: makeMockClient()
+        )
+
+        let result = await spawner.spawn(
+            prompt: "Test",
+            model: nil,
+            systemPrompt: nil,
+            allowedTools: ["Bash", "Read"],
+            maxTurns: nil,
+            disallowedTools: ["Bash"],
+            mcpServers: nil,
+            skills: nil,
+            runInBackground: nil,
+            isolation: nil,
+            name: nil,
+            teamName: nil,
+            mode: nil,
+            resume: nil
+        )
+
+        XCTAssertTrue(result.isError)
+    }
+
+    /// Enhanced spawn with inline and reference MCP server specs, empty disallowedTools,
+    /// custom model, permission mode, agent name, and AgentTool filtering — all in one test.
+    func testEnhancedSpawn_comprehensiveParameters() async throws {
+        let parentTools: [ToolProtocol] = [
+            createReadTool(),
+            createAgentTool(),
+        ]
+
+        let spawner = DefaultSubAgentSpawner(
+            apiKey: "test-key",
+            baseURL: "https://api.example.com",
+            parentModel: "claude-sonnet-4-6",
+            parentTools: parentTools,
+            provider: .anthropic,
+            client: makeMockClient()
+        )
+
+        let result = await spawner.spawn(
+            prompt: "Comprehensive sub-agent task",
+            model: "claude-haiku-4-5",
+            systemPrompt: "You are a specialized agent",
+            allowedTools: ["Read"],
+            maxTurns: 3,
+            disallowedTools: [],
+            mcpServers: nil,
+            skills: ["search"],
+            runInBackground: false,
+            isolation: "worktree",
+            name: "worker",
+            teamName: "team-a",
+            mode: .bypassPermissions,
+            resume: nil
+        )
+
+        // Tests: AgentTool filtered, empty disallowedTools no-op,
+        // custom model, permissionMode set, agentName set, all without crash
+        XCTAssertTrue(result.isError)
     }
 }

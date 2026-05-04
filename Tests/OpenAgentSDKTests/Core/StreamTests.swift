@@ -1,6 +1,9 @@
 import XCTest
 @testable import OpenAgentSDK
 
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 // MARK: - Mock URL Protocol for Stream Tests
 
 /// Custom URLProtocol subclass that intercepts network requests for stream testing.
@@ -30,6 +33,16 @@ final class StreamMockURLProtocol: URLProtocol {
         return request
     }
 
+    /// Whether stopLoading() has been called (task cancelled/finished).
+    /// On Linux (FoundationNetworking), the task is removed from the internal TaskRegistry
+    /// before stopLoading() is called, so any client call after this will crash.
+    private let stopLock = NSLock()
+    private var _stopped = false
+    private var stopped: Bool {
+        get { stopLock.withLock { _stopped } }
+        set { stopLock.withLock { _stopped = newValue } }
+    }
+
     override func startLoading() {
         // Capture request with body
         var capturedRequest = request
@@ -39,6 +52,8 @@ final class StreamMockURLProtocol: URLProtocol {
 
         StreamMockURLProtocol.lastRequest = capturedRequest
         StreamMockURLProtocol.allRequests.append(capturedRequest)
+
+        guard !stopped, let activeClient = client else { return }
 
         // If sequential responses are configured, use them in order
         if !StreamMockURLProtocol.sequentialSSEResponses.isEmpty {
@@ -54,9 +69,7 @@ final class StreamMockURLProtocol: URLProtocol {
                     headerFields: ["content-type": "text/event-stream"]
                 )!
 
-                client?.urlProtocol(self, didReceive: httpResponse, cacheStoragePolicy: .notAllowed)
-                client?.urlProtocol(self, didLoad: body)
-                client?.urlProtocolDidFinishLoading(self)
+                deliverToClient(activeClient, httpResponse: httpResponse, body: body)
                 return
             }
         }
@@ -66,7 +79,7 @@ final class StreamMockURLProtocol: URLProtocol {
             let error = NSError(domain: "StreamMockURLProtocol", code: -1, userInfo: [
                 NSLocalizedDescriptionKey: "No mock response registered for URL: \(request.url?.absoluteString ?? "nil")"
             ])
-            client?.urlProtocol(self, didFailWithError: error)
+            if !stopped { activeClient.urlProtocol(self, didFailWithError: error) }
             return
         }
 
@@ -77,9 +90,23 @@ final class StreamMockURLProtocol: URLProtocol {
             headerFields: mock.headers
         )!
 
-        client?.urlProtocol(self, didReceive: httpResponse, cacheStoragePolicy: .notAllowed)
-        client?.urlProtocol(self, didLoad: mock.body)
-        client?.urlProtocolDidFinishLoading(self)
+        deliverToClient(activeClient, httpResponse: httpResponse, body: mock.body)
+    }
+
+    /// Safely delivers response data to the URLProtocol client.
+    /// On Linux (FoundationNetworking), the task registry entry may be removed
+    /// before client calls complete. Re-check `stopped` between each client call.
+    private func deliverToClient(
+        _ activeClient: URLProtocolClient,
+        httpResponse: HTTPURLResponse,
+        body: Data
+    ) {
+        guard !stopped else { return }
+        activeClient.urlProtocol(self, didReceive: httpResponse, cacheStoragePolicy: .notAllowed)
+        guard !stopped else { return }
+        activeClient.urlProtocol(self, didLoad: body)
+        guard !stopped else { return }
+        activeClient.urlProtocolDidFinishLoading(self)
     }
 
     private static func readBodyFromStream(_ stream: InputStream) -> Data? {
@@ -100,7 +127,7 @@ final class StreamMockURLProtocol: URLProtocol {
         return data
     }
 
-    override func stopLoading() {}
+    override func stopLoading() { stopped = true }
 
     static func reset() {
         mockResponses = [:]

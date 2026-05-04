@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 /// Custom Anthropic API client implemented as an actor for safe concurrency.
 /// Communicates directly with the Anthropic Messages API using URLSession.

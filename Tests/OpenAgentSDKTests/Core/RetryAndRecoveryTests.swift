@@ -1,6 +1,9 @@
 import XCTest
 @testable import OpenAgentSDK
 
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 // MARK: - Mock URL Protocol for Retry Tests (Blocking Path)
 
 /// Custom URLProtocol that supports returning different status codes on sequential requests
@@ -25,6 +28,16 @@ final class RetryMockURLProtocol: URLProtocol {
         return request
     }
 
+    /// Whether stopLoading() has been called (task cancelled/finished).
+    /// On Linux (FoundationNetworking), the task is removed from the internal TaskRegistry
+    /// before stopLoading() is called, so any client call after this will crash.
+    private let stopLock = NSLock()
+    private var _stopped = false
+    private var stopped: Bool {
+        get { stopLock.withLock { _stopped } }
+        set { stopLock.withLock { _stopped = newValue } }
+    }
+
     override func startLoading() {
         // Capture request with body
         var capturedRequest = request
@@ -33,6 +46,8 @@ final class RetryMockURLProtocol: URLProtocol {
         }
 
         RetryMockURLProtocol.allRequests.append(capturedRequest)
+
+        guard !stopped, let activeClient = client else { return }
 
         let index = RetryMockURLProtocol.responseIndex
         if index < RetryMockURLProtocol.sequentialResponses.count {
@@ -46,17 +61,31 @@ final class RetryMockURLProtocol: URLProtocol {
                 headerFields: response.headers
             )!
 
-            client?.urlProtocol(self, didReceive: httpResponse, cacheStoragePolicy: .notAllowed)
-            client?.urlProtocol(self, didLoad: response.body)
-            client?.urlProtocolDidFinishLoading(self)
+            deliverToClient(activeClient, httpResponse: httpResponse, body: response.body)
         } else {
             let error = NSError(
                 domain: "RetryMockURLProtocol",
                 code: -1,
                 userInfo: [NSLocalizedDescriptionKey: "No more mock responses (index: \(index))"]
             )
-            client?.urlProtocol(self, didFailWithError: error)
+            if !stopped { activeClient.urlProtocol(self, didFailWithError: error) }
         }
+    }
+
+    /// Safely delivers response data to the URLProtocol client.
+    /// On Linux (FoundationNetworking), the task registry entry may be removed
+    /// before client calls complete. Re-check `stopped` between each client call.
+    private func deliverToClient(
+        _ activeClient: URLProtocolClient,
+        httpResponse: HTTPURLResponse,
+        body: Data
+    ) {
+        guard !stopped else { return }
+        activeClient.urlProtocol(self, didReceive: httpResponse, cacheStoragePolicy: .notAllowed)
+        guard !stopped else { return }
+        activeClient.urlProtocol(self, didLoad: body)
+        guard !stopped else { return }
+        activeClient.urlProtocolDidFinishLoading(self)
     }
 
     private static func readBodyFromStream(_ stream: InputStream) -> Data? {
@@ -74,7 +103,7 @@ final class RetryMockURLProtocol: URLProtocol {
         return data
     }
 
-    override func stopLoading() {}
+    override func stopLoading() { stopped = true }
 
     static func reset() {
         sequentialResponses = []
@@ -106,6 +135,16 @@ final class RetryStreamMockURLProtocol: URLProtocol {
         return request
     }
 
+    /// Whether stopLoading() has been called (task cancelled/finished).
+    /// On Linux (FoundationNetworking), the task is removed from the internal TaskRegistry
+    /// before stopLoading() is called, so any client call after this will crash.
+    private let stopLock = NSLock()
+    private var _stopped = false
+    private var stopped: Bool {
+        get { stopLock.withLock { _stopped } }
+        set { stopLock.withLock { _stopped = newValue } }
+    }
+
     override func startLoading() {
         var capturedRequest = request
         if capturedRequest.httpBody == nil, let stream = capturedRequest.httpBodyStream {
@@ -113,6 +152,8 @@ final class RetryStreamMockURLProtocol: URLProtocol {
         }
 
         RetryStreamMockURLProtocol.allRequests.append(capturedRequest)
+
+        guard !stopped, let activeClient = client else { return }
 
         let index = RetryStreamMockURLProtocol.responseIndex
         if index < RetryStreamMockURLProtocol.sequentialResponses.count {
@@ -126,17 +167,31 @@ final class RetryStreamMockURLProtocol: URLProtocol {
                 headerFields: response.headers
             )!
 
-            client?.urlProtocol(self, didReceive: httpResponse, cacheStoragePolicy: .notAllowed)
-            client?.urlProtocol(self, didLoad: response.body)
-            client?.urlProtocolDidFinishLoading(self)
+            deliverToClient(activeClient, httpResponse: httpResponse, body: response.body)
         } else {
             let error = NSError(
                 domain: "RetryStreamMockURLProtocol",
                 code: -1,
                 userInfo: [NSLocalizedDescriptionKey: "No more mock responses (index: \(index))"]
             )
-            client?.urlProtocol(self, didFailWithError: error)
+            if !stopped { activeClient.urlProtocol(self, didFailWithError: error) }
         }
+    }
+
+    /// Safely delivers response data to the URLProtocol client.
+    /// On Linux (FoundationNetworking), the task registry entry may be removed
+    /// before client calls complete. Re-check `stopped` between each client call.
+    private func deliverToClient(
+        _ activeClient: URLProtocolClient,
+        httpResponse: HTTPURLResponse,
+        body: Data
+    ) {
+        guard !stopped else { return }
+        activeClient.urlProtocol(self, didReceive: httpResponse, cacheStoragePolicy: .notAllowed)
+        guard !stopped else { return }
+        activeClient.urlProtocol(self, didLoad: body)
+        guard !stopped else { return }
+        activeClient.urlProtocolDidFinishLoading(self)
     }
 
     private static func readBodyFromStream(_ stream: InputStream) -> Data? {
@@ -154,7 +209,7 @@ final class RetryStreamMockURLProtocol: URLProtocol {
         return data
     }
 
-    override func stopLoading() {}
+    override func stopLoading() { stopped = true }
 
     static func reset() {
         sequentialResponses = []
