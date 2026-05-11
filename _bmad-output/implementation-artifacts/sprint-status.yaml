@@ -1,5 +1,5 @@
 # generated: 2026-05-12
-# last_updated: 2026-05-12T21:00
+# last_updated: 2026-05-12
 # project: open-agent-sdk-swift
 # project_key: NOKEY
 # tracking_system: file-system
@@ -234,6 +234,6 @@ development_status:
   # Epic 19: Axion Phase 2 驱动的 SDK 新能力
   epic-19: in-progress
   19-1-cross-run-memory-store: done
-  19-2-agent-as-mcp-server: backlog
+  19-2-agent-as-mcp-server: done
   19-3-human-in-the-loop-pause-protocol: backlog
   epic-19-retrospective: optional

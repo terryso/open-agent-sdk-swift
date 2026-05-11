@@ -1,0 +1,103 @@
+{
+  "schema_version": "0.1.0",
+  "snapshot_at": "2026-05-12T02:38:24Z",
+  "repo": "open-agent-sdk-swift",
+  "collection_mode": "contract_static",
+  "collection_status": "COLLECTED",
+  "inventory_basis": "acceptance_criteria",
+  "gate_basis": "priority_thresholds",
+  "source_sha": "",
+  "target": {
+    "type": "story",
+    "id": "19-2",
+    "label": "Agent-as-MCP-Server"
+  },
+  "decision_mode": "autonomous",
+  "evaluator": "Nick",
+  "confidence": "high",
+  "oracle": {
+    "resolution_mode": "formal_requirements",
+    "confidence": "high",
+    "sources": [
+      "_bmad-output/implementation-artifacts/19-2-agent-as-mcp-server.md",
+      "_bmad-output/test-artifacts/atdd-checklist-19-2-agent-as-mcp-server.md",
+      "Sources/OpenAgentSDK/MCP/AgentMCPServer.swift",
+      "Tests/OpenAgentSDKTests/MCP/AgentMCPServerTests.swift"
+    ],
+    "external_pointer_status": "not_used",
+    "synthetic": false
+  },
+  "gate_status": "PASS",
+  "gate_criteria": {
+    "p0_coverage_required": "100%",
+    "p0_coverage_actual": "100%",
+    "p0_status": "MET",
+    "p1_coverage_target": "90%",
+    "p1_coverage_minimum": "80%",
+    "p1_coverage_actual": "100%",
+    "p1_status": "MET",
+    "overall_coverage_minimum": "80%",
+    "overall_coverage_actual": "100%",
+    "overall_status": "MET"
+  },
+  "coverage": {
+    "inventory": {
+      "covered": 9,
+      "total": 9,
+      "pct": 100
+    },
+    "priority_breakdown": {
+      "P0": {"total": 7, "covered": 7, "pct": 100},
+      "P1": {"total": 2, "covered": 2, "pct": 100},
+      "P2": {"total": 0, "covered": 0, "pct": 100},
+      "P3": {"total": 0, "covered": 0, "pct": 100}
+    },
+    "by_level": {
+      "unit": {"tests": 29, "criteria_covered": 9}
+    }
+  },
+  "tests": {
+    "files": 1,
+    "cases": 29,
+    "skipped_cases": 0,
+    "fixme_cases": 0,
+    "pending_cases": 0
+  },
+  "risk_summary": {
+    "critical_open": 0,
+    "high_open": 0,
+    "medium_open": 0,
+    "low_open": 0
+  },
+  "heuristics": {
+    "endpoint_gaps": 0,
+    "auth_negative_path_status": "not_applicable",
+    "error_path_status": "present",
+    "ui_journey_status": "not_applicable",
+    "ui_state_status": "not_applicable"
+  },
+  "blockers": [],
+  "recommendations": [
+    {
+      "priority": "LOW",
+      "action": "Consider adding E2E test for stdio transport path",
+      "requirements": []
+    },
+    {
+      "priority": "LOW",
+      "action": "Run /bmad:tea:test-review to assess test quality",
+      "requirements": []
+    },
+    {
+      "priority": "LOW",
+      "action": "Document agent_prompt agent-loop integration pattern for SDK consumers",
+      "requirements": []
+    }
+  ],
+  "links": {
+    "trace_report_path": "_bmad-output/test-artifacts/traceability/19-2-traceability.md",
+    "trace_report_url": "",
+    "artifact_url": "",
+    "journey_evidence_url": ""
+  }
+}

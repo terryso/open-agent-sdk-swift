@@ -115,6 +115,7 @@
 /// - ``MCPStdioTransport`` — Stdio transport for MCP client connections
 /// - ``McpServerConfig`` — MCP server configuration (stdio/sse/http)
 /// - ``McpStdioConfig`` — MCP stdio transport configuration
+/// - ``AgentMCPServer`` — Actor that exposes an Agent's tools as an MCP stdio server
 ///
 /// ## Skill System
 /// - ``Skill`` — Reusable prompt template with optional tool restrictions and model overrides

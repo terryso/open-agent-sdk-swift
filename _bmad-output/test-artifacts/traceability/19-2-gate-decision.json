@@ -1,0 +1,24 @@
+{
+  "schema_version": "0.1.0",
+  "evaluated_at": "2026-05-12T02:38:24Z",
+  "repo": "open-agent-sdk-swift",
+  "target": {
+    "type": "story",
+    "id": "19-2",
+    "label": "Agent-as-MCP-Server"
+  },
+  "collection_status": "COLLECTED",
+  "gate_basis": "priority_thresholds",
+  "gate_status": "PASS",
+  "rationale": "P0 coverage is 100%, P1 coverage is 100% (target: 90%), and overall coverage is 100% (minimum: 80%). All 9 acceptance criteria are fully covered by 29 passing unit tests. No critical or high gaps identified.",
+  "p0_status": "MET",
+  "p1_status": "MET",
+  "overall_status": "MET",
+  "critical_open": 0,
+  "links": {
+    "trace_report_path": "_bmad-output/test-artifacts/traceability/19-2-traceability.md",
+    "trace_report_url": "",
+    "artifact_url": "",
+    "journey_evidence_url": ""
+  }
+}
