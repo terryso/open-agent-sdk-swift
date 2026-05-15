@@ -47,7 +47,7 @@ struct TemplateGenerator {
             dependencies: [
                 .package(
                     url: "https://github.com/terryso/open-agent-sdk-swift",
-                    from: "0.2.0"
+                    from: "0.2.1"
                 )
             ],
             targets: [
