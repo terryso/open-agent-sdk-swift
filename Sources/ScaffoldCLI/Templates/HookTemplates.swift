@@ -26,8 +26,7 @@ extension TemplateGenerator {
         func registerSafetyHooks(_ registry: HookRegistry) async {
             // Pre-tool hook — runs before each tool execution
             await registry.register(.preToolUse, definition: HookDefinition(
-                // matcher is a regex applied to toolName; nil matches all tools
-                matcher: "click|type_text|delete_file",
+                // handler is called when matcher matches the tool name
                 handler: { input in
                     // Inspect the tool being called
                     guard let toolName = input.toolName else { return nil }
@@ -44,7 +43,9 @@ extension TemplateGenerator {
 
                     // To allow with logging:
                     return nil
-                }
+                },
+                // matcher is a regex applied to toolName; nil matches all tools
+                matcher: "click|type_text|delete_file"
             ))
 
             // Post-tool hook — runs after each tool completes successfully

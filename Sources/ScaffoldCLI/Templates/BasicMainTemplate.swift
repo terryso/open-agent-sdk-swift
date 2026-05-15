@@ -37,10 +37,10 @@ extension TemplateGenerator {
         //
         // let registry = HookRegistry()
         // await registry.register(.preToolUse, definition: HookDefinition(
-        //     matcher: "click|type_text",
         //     handler: { input in
         //         return HookOutput(decision: .approve)
-        //     }
+        //     },
+        //     matcher: "click|type_text"
         // ))
 
         // MARK: - Create Agent
@@ -128,11 +128,11 @@ extension TemplateGenerator {
 
         // let registry = HookRegistry()
         // await registry.register(.preToolUse, definition: HookDefinition(
-        //     matcher: "mcp__axion-helper__click|mcp__axion-helper__type_text",
         //     handler: { input in
         //         print("Axion tool call: \\(input.toolName ?? "unknown")")
         //         return nil  // nil = allow
-        //     }
+        //     },
+        //     matcher: "mcp__axion-helper__click|mcp__axion-helper__type_text"
         // ))
 
         // MARK: - Create Agent
