@@ -117,16 +117,16 @@ public func filterTools(
 ) -> [ToolProtocol] {
     var filtered = tools
 
-    // Apply allowed list filter (non-nil, non-empty)
+    // Apply allowed list filter (non-nil, non-empty, case-insensitive)
     if let allowed, !allowed.isEmpty {
-        let allowedSet = Set(allowed)
-        filtered = filtered.filter { allowedSet.contains($0.name) }
+        let allowedSet = Set(allowed.map { $0.lowercased() })
+        filtered = filtered.filter { allowedSet.contains($0.name.lowercased()) }
     }
 
-    // Apply disallowed list filter (non-nil, non-empty)
+    // Apply disallowed list filter (non-nil, non-empty, case-insensitive)
     if let disallowed, !disallowed.isEmpty {
-        let disallowedSet = Set(disallowed)
-        filtered = filtered.filter { !disallowedSet.contains($0.name) }
+        let disallowedSet = Set(disallowed.map { $0.lowercased() })
+        filtered = filtered.filter { !disallowedSet.contains($0.name.lowercased()) }
     }
 
     return filtered
