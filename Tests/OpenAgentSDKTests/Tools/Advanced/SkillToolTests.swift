@@ -336,7 +336,7 @@ final class SkillToolTests: XCTestCase {
 
     // MARK: - AC2: Tool Restriction Stack (via SkillTool)
 
-    /// AC2 [P0]: SkillTool does NOT expose allowedTools in result (restrictions are enforced internally).
+    /// AC2 [P0]: SkillTool returns allowedTools field when skill has toolRestrictions.
     func testSkillTool_toolRestrictions_includedInJSON() async throws {
         // Given: a registry with a skill with tool restrictions
         let registry = SkillRegistry()
@@ -352,12 +352,14 @@ final class SkillToolTests: XCTestCase {
         let input: [String: Any] = ["skill": "restricted-skill"]
         let result = await tool.call(input: input, context: context)
 
-        // Then: JSON does NOT contain allowedTools (enforced internally, not exposed)
+        // Then: JSON contains allowedTools
         XCTAssertFalse(result.isError, "Expected success, got: \(result.content)")
 
         let jsonData = result.content.data(using: .utf8)!
         let json = try JSONSerialization.jsonObject(with: jsonData) as! [String: Any]
-        XCTAssertNil(json["allowedTools"], "allowedTools should NOT be present in result")
+        let allowedTools = json["allowedTools"] as? [String]
+        XCTAssertNotNil(allowedTools, "allowedTools should be present")
+        XCTAssertEqual(Set(allowedTools!), Set(["bash", "read"]))
     }
 
     /// AC2 [P1]: Skill without toolRestrictions omits allowedTools or returns null.
@@ -458,7 +460,10 @@ final class SkillToolTests: XCTestCase {
         XCTAssertTrue((json["prompt"] as? String)?.contains("git commit") ?? false,
                         "Prompt should contain 'git commit'")
 
-        // Commit skill has toolRestrictions but they are NOT exposed in result
-        XCTAssertNil(json["allowedTools"], "allowedTools should NOT be present in result")
+        // Commit skill has toolRestrictions
+        let allowedTools = json["allowedTools"] as? [String]
+        XCTAssertNotNil(allowedTools)
+        XCTAssertTrue(allowedTools!.contains("bash"))
+        XCTAssertTrue(allowedTools!.contains("read"))
     }
 }

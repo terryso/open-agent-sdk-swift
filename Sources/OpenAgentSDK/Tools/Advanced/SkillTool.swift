@@ -101,11 +101,10 @@ public func createSkillTool(registry: SkillRegistry) -> ToolProtocol {
             "prompt": skill.promptTemplate
         ]
 
-        // NOTE: Do NOT include allowedTools/toolRestrictions in the result.
-        // The restriction stack is pushed above (step 5) and enforced internally.
-        // Exposing tool names like "bash" in the result JSON causes the LLM to
-        // misinterpret them as skill names and call Skill("bash") instead of
-        // using the Bash tool directly.
+        // Include allowedTools if skill has tool restrictions
+        if let restrictions = skill.toolRestrictions {
+            result["allowedTools"] = restrictions.map(\.rawValue)
+        }
 
         // Include model if skill has a model override
         if let modelOverride = skill.modelOverride {
