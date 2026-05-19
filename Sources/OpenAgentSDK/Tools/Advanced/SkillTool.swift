@@ -32,9 +32,31 @@ private struct SkillToolInput: Codable {
 /// let skillTool = createSkillTool(registry: registry)
 /// ```
 public func createSkillTool(registry: SkillRegistry) -> ToolProtocol {
+    // Build dynamic description listing all registered skills so the LLM knows what's available
+    let skills = registry.allSkills
+    let desc: String
+    if skills.isEmpty {
+        desc = "Execute a registered skill by name. No skills are currently registered."
+    } else {
+        let skillList = skills.map { skill in
+            if skill.aliases.isEmpty {
+                return "- \(skill.name): \(skill.description)"
+            } else {
+                return "- \(skill.name) (aliases: \(skill.aliases.joined(separator: ", "))): \(skill.description)"
+            }
+        }.joined(separator: "\n")
+        desc = """
+Execute a registered skill by name. Available skills:
+\(skillList)
+
+Skills provide specialized capabilities through prompt templates with optional tool restrictions and model overrides. \
+Use this tool when the user's request matches one of the available skills.
+"""
+    }
+
     return defineTool(
         name: "Skill",
-        description: "Execute a registered skill by name. Skills provide specialized capabilities through prompt templates with optional tool restrictions and model overrides.",
+        description: desc,
         inputSchema: [
             "type": "object",
             "properties": [
