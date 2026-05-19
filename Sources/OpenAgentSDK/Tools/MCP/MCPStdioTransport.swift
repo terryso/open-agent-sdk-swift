@@ -54,6 +54,12 @@ public actor MCPStdioTransport: Transport {
     /// File descriptor for writing to child's stdin.
     private var outputFd: FileDescriptor?
 
+    /// Retain Pipe objects to prevent premature deallocation.
+    /// Without these, Foundation's Pipe dealloc closes guarded file descriptors,
+    /// triggering EXC_GUARD → SIGKILL when the child process exits.
+    private var stdinPipe: Pipe?
+    private var stdoutPipe: Pipe?
+
     /// Whether the transport is currently connected.
     private var isConnected = false
 
@@ -104,14 +110,37 @@ public actor MCPStdioTransport: Transport {
         process.standardError = FileHandle.nullDevice
         process.environment = getChildEnvironment()
 
+        // Retain pipes to prevent premature deallocation
+        self.stdinPipe = stdinPipe
+        self.stdoutPipe = stdoutPipe
+
         self.process = process
 
         // Launch the process
         try process.run()
 
-        // Extract raw file descriptors from Pipe's FileHandle
-        self.inputFd = FileDescriptor(rawValue: stdoutPipe.fileHandleForReading.fileDescriptor)
-        self.outputFd = FileDescriptor(rawValue: stdinPipe.fileHandleForWriting.fileDescriptor)
+        // Duplicate the file descriptors so we own them independently of Pipe's FileHandle.
+        // This prevents EXC_GUARD when Pipe is deallocated in autorelease pools on background threads.
+        let rawInputFd = stdoutPipe.fileHandleForReading.fileDescriptor
+        let rawOutputFd = stdinPipe.fileHandleForWriting.fileDescriptor
+        let dupedInput = dup(rawInputFd)
+        let dupedOutput = dup(rawOutputFd)
+
+        guard dupedInput >= 0, dupedOutput >= 0 else {
+            throw MCPError.transportError(
+                NSError(domain: "MCPStdioTransport", code: 3, userInfo: [
+                    NSLocalizedDescriptionKey: "Failed to duplicate file descriptors"
+                ])
+            )
+        }
+
+        self.inputFd = FileDescriptor(rawValue: dupedInput)
+        self.outputFd = FileDescriptor(rawValue: dupedOutput)
+
+        // Close Pipe's FileHandles so they no longer reference the guarded fds.
+        // Pipe dealloc will be a no-op for fd closing since we already closed them.
+        stdinPipe.fileHandleForWriting.closeFile()
+        stdoutPipe.fileHandleForReading.closeFile()
 
         isConnected = true
         logger.debug("MCP stdio transport connected")
@@ -127,17 +156,21 @@ public actor MCPStdioTransport: Transport {
         isConnected = false
         messageContinuation.finish()
 
+        // Close file descriptors via our FileDescriptor wrapper
+        try? inputFd?.close()
+        try? outputFd?.close()
+        inputFd = nil
+        outputFd = nil
+
+        // Release pipe references
+        stdinPipe = nil
+        stdoutPipe = nil
+
         // Terminate child process
         if let process, process.isRunning {
             process.terminate()
         }
         self.process = nil
-
-        // Close file descriptors
-        try? inputFd?.close()
-        try? outputFd?.close()
-        inputFd = nil
-        outputFd = nil
 
         logger.debug("MCP stdio transport disconnected")
     }
