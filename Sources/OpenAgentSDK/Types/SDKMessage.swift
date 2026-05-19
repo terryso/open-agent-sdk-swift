@@ -220,6 +220,22 @@ public enum SDKMessage: Sendable {
         }
     }
 
+    /// A paired tool invocation and its result, collected during the agent loop.
+    ///
+    /// Each pair represents one complete tool call cycle: the LLM's request and the tool's response.
+    /// Pairs are matched by `toolUseId` and collected automatically by the SDK.
+    public struct ToolExecutionPair: Sendable, Equatable {
+        /// The tool invocation requested by the LLM.
+        public let toolUse: ToolUseData
+        /// The result returned by the tool execution.
+        public let toolResult: ToolResultData
+
+        public init(toolUse: ToolUseData, toolResult: ToolResultData) {
+            self.toolUse = toolUse
+            self.toolResult = toolResult
+        }
+    }
+
     /// Final result data from an agent query.
     public struct ResultData: Sendable, Equatable {
         /// The result subtype indicating how the query terminated.
@@ -236,6 +252,8 @@ public enum SDKMessage: Sendable {
             case cancelled
             /// Structured output generation exceeded the maximum retry limit.
             case errorMaxStructuredOutputRetries
+            /// The number of LLM API calls exceeded the configured maxModelCalls limit.
+            case errorMaxModelCalls
         }
 
         /// How the query terminated.
@@ -262,6 +280,9 @@ public enum SDKMessage: Sendable {
         public let errors: [String]?
         /// Cumulative API call duration in milliseconds, excluding local tool execution (TS SDK: `duration_api_ms`).
         public let durationApiMs: Int?
+        /// All tool invocation/result pairs collected during the agent loop, matched by toolUseId.
+        /// Empty when no tools were called.
+        public let toolPairs: [ToolExecutionPair]
 
         /// Creates result data with the original fields.
         ///
@@ -278,7 +299,8 @@ public enum SDKMessage: Sendable {
         ///   - modelUsage: Per-model usage entries. Defaults to `nil`.
         ///   - errors: Error messages for error subtypes. Defaults to `nil`.
         ///   - durationApiMs: Cumulative API call duration. Defaults to `nil`.
-        public init(subtype: Subtype, text: String, usage: TokenUsage?, numTurns: Int, durationMs: Int, totalCostUsd: Double = 0.0, costBreakdown: [CostBreakdownEntry] = [], structuredOutput: SendableStructuredOutput? = nil, permissionDenials: [SDKPermissionDenial]? = nil, modelUsage: [ModelUsageEntry]? = nil, errors: [String]? = nil, durationApiMs: Int? = nil) {
+        ///   - toolPairs: Tool invocation/result pairs. Defaults to `[]`.
+        public init(subtype: Subtype, text: String, usage: TokenUsage?, numTurns: Int, durationMs: Int, totalCostUsd: Double = 0.0, costBreakdown: [CostBreakdownEntry] = [], structuredOutput: SendableStructuredOutput? = nil, permissionDenials: [SDKPermissionDenial]? = nil, modelUsage: [ModelUsageEntry]? = nil, errors: [String]? = nil, durationApiMs: Int? = nil, toolPairs: [ToolExecutionPair] = []) {
             self.subtype = subtype
             self.text = text
             self.usage = usage
@@ -291,6 +313,7 @@ public enum SDKMessage: Sendable {
             self.modelUsage = modelUsage
             self.errors = errors
             self.durationApiMs = durationApiMs
+            self.toolPairs = toolPairs
         }
 
         public static func == (lhs: ResultData, rhs: ResultData) -> Bool {
@@ -306,6 +329,7 @@ public enum SDKMessage: Sendable {
                 && lhs.modelUsage == rhs.modelUsage
                 && lhs.errors == rhs.errors
                 && lhs.durationApiMs == rhs.durationApiMs
+                && lhs.toolPairs == rhs.toolPairs
         }
     }
 

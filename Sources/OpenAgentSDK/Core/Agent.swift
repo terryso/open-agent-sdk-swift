@@ -588,6 +588,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                         subtype = .cancelled
                     case .errorDuringExecution:
                         subtype = .errorDuringExecution
+                    case .errorMaxModelCalls:
+                        subtype = .errorMaxModelCalls
                     }
 
                     continuation.yield(.result(SDKMessage.ResultData(
@@ -1272,6 +1274,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
         let MAX_TOKENS_RECOVERY = 3
         var compactState = createAutoCompactState()
         var costByModel: [String: CostBreakdownEntry] = [:]
+        var collectedToolPairs: [SDKMessage.ToolExecutionPair] = []
+        var modelCallCount = 0
         // Skill system: create restriction stack once before the loop so it persists across turns
         let restrictionStack = options.skillRegistry != nil ? ToolRestrictionStack() : nil
         // File cache: shared across all tool executions in this agent session
@@ -1462,6 +1466,20 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
             }
 
             turnCount += 1
+            modelCallCount += 1
+
+            // Check maxModelCalls limit
+            if let maxCalls = options.maxModelCalls, modelCallCount > maxCalls {
+                status = .errorMaxModelCalls
+                Logger.shared.warn("QueryEngine", "max_model_calls_exceeded", data: [
+                    "modelCalls": String(modelCallCount),
+                    "limit": String(maxCalls)
+                ])
+                if let content = response["content"] {
+                    lastAssistantText = extractText(from: content)
+                }
+                break
+            }
 
             // Parse usage from response
             if let usage = response["usage"] as? [String: Any] {
@@ -1601,6 +1619,32 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                     // Append tool_result user message
                     messages.append(ToolExecutor.buildToolResultMessage(from: processedResults))
 
+                    // Collect tool pairs for memory extraction
+                    for block in toolUseBlocks {
+                        if let matchingResult = processedResults.first(where: { $0.toolUseId == block.id }) {
+                            let inputJson: String
+                            if let dict = block.input as? [String: Any],
+                               let data = try? JSONSerialization.data(withJSONObject: dict, options: []),
+                               let str = String(data: data, encoding: .utf8) {
+                                inputJson = str
+                            } else {
+                                inputJson = "\(block.input)"
+                            }
+                            collectedToolPairs.append(SDKMessage.ToolExecutionPair(
+                                toolUse: SDKMessage.ToolUseData(
+                                    toolName: block.name,
+                                    toolUseId: block.id,
+                                    input: inputJson
+                                ),
+                                toolResult: SDKMessage.ToolResultData(
+                                    toolUseId: matchingResult.toolUseId,
+                                    content: matchingResult.content,
+                                    isError: matchingResult.isError
+                                )
+                            ))
+                        }
+                    }
+
                     // Reset maxTokensRecoveryAttempts (consistent with TS SDK)
                     maxTokensRecoveryAttempts = 0
 
@@ -1675,7 +1719,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
             status: status,
             totalCostUsd: totalCostUsd,
             costBreakdown: Array(costByModel.values),
-            isCancelled: isCancelled
+            isCancelled: isCancelled,
+            toolPairs: collectedToolPairs
         )
         _lastQueryMessages = result.messages
         return result
@@ -1752,6 +1797,9 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
         let capturedEnv = options.env
         let capturedIncludePartialMessages = options.includePartialMessages
         let capturedPauseTimeoutMs = options.pauseTimeoutMs
+        let capturedMaxModelCalls = options.maxModelCalls
+        let capturedOnRunComplete = options.onRunComplete
+        let capturedRunId = options.runId
 
         // Build tool definitions for API call
         let capturedApiTools: [[String: Any]]? = {
@@ -1924,6 +1972,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                 let MAX_TOKENS_RECOVERY = 3
                 var compactState = createAutoCompactState()
                 var costByModel: [String: CostBreakdownEntry] = [:]
+                var collectedToolPairs: [SDKMessage.ToolExecutionPair] = []
+                var modelCallCount = 0
 
                 while turnCount < capturedMaxTurns {
                     // Cancellation check (FR60): cooperative cancellation via Task.isCancelled
@@ -2217,6 +2267,47 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
 
                             case .messageStop:
                                 turnCount += 1
+                                modelCallCount += 1
+
+                                // Check maxModelCalls limit
+                                if let maxCalls = capturedMaxModelCalls, modelCallCount > maxCalls {
+                                    let elapsed = ContinuousClock.now - startTime
+                                    let durationMs = Self.computeDurationMs(elapsed)
+
+                                    Logger.shared.warn("QueryEngine", "max_model_calls_exceeded", data: [
+                                        "modelCalls": String(modelCallCount),
+                                        "limit": String(maxCalls)
+                                    ])
+
+                                    if let hookRegistry = capturedHookRegistry {
+                                        let stopInput = HookInput(event: .stop, cwd: capturedCwd)
+                                        await hookRegistry.execute(.stop, input: stopInput)
+                                    }
+
+                                    let previousText = Self.extractCollectedText(messages: messages)
+                                    let finalText = previousText.isEmpty ? accumulatedText : "\(previousText) \(accumulatedText)"
+
+                                    continuation.yield(.result(SDKMessage.ResultData(
+                                        subtype: .errorMaxModelCalls,
+                                        text: finalText,
+                                        usage: totalUsage,
+                                        numTurns: turnCount,
+                                        durationMs: durationMs,
+                                        totalCostUsd: totalCostUsd,
+                                        costBreakdown: Array(costByModel.values),
+                                        toolPairs: collectedToolPairs
+                                    )))
+
+                                    if let mcpManagerForCleanup {
+                                        await mcpManagerForCleanup.shutdown()
+                                    }
+                                    if let hookRegistry = capturedHookRegistry {
+                                        let endInput = HookInput(event: .sessionEnd, cwd: capturedCwd)
+                                        await hookRegistry.execute(.sessionEnd, input: endInput)
+                                    }
+                                    continuation.finish()
+                                    return
+                                }
 
                                 // Structured log for LLM response (stream)
                                 let streamDurationMs = Self.computeDurationMs(ContinuousClock.now - startTime)
@@ -2404,6 +2495,29 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                                     isError: result.isError
                                 ))
 
+                                // Collect tool pair
+                                if let matchingBlock = toolUseBlocks.first(where: { $0.id == result.toolUseId }) {
+                                    // Find the original accumulator item to get the raw input JSON string
+                                    let rawInputJson: String
+                                    if let accItem = toolUseAccumulator.values.first(where: { $0.id == matchingBlock.id }) {
+                                        rawInputJson = accItem.inputJson
+                                    } else {
+                                        rawInputJson = "\(matchingBlock.input)"
+                                    }
+                                    collectedToolPairs.append(SDKMessage.ToolExecutionPair(
+                                        toolUse: SDKMessage.ToolUseData(
+                                            toolName: matchingBlock.name,
+                                            toolUseId: matchingBlock.id,
+                                            input: rawInputJson
+                                        ),
+                                        toolResult: SDKMessage.ToolResultData(
+                                            toolUseId: result.toolUseId,
+                                            content: processedContent,
+                                            isError: result.isError
+                                        )
+                                    ))
+                                }
+
                                 // Emit toolResult event to stream
                                 continuation.yield(.toolResult(SDKMessage.ToolResultData(
                                     toolUseId: result.toolUseId,
@@ -2465,15 +2579,46 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                         .joined()
                 }.joined()
 
+                let resultSubtype: SDKMessage.ResultData.Subtype =
+                    (!loopExitedCleanly && turnCount >= capturedMaxTurns) ? .errorMaxTurns : .success
+
                 continuation.yield(.result(SDKMessage.ResultData(
-                    subtype: subtype,
+                    subtype: resultSubtype,
                     text: finalText,
                     usage: totalUsage,
                     numTurns: turnCount,
                     durationMs: durationMs,
                     totalCostUsd: totalCostUsd,
-                    costBreakdown: Array(costByModel.values)
+                    costBreakdown: Array(costByModel.values),
+                    toolPairs: collectedToolPairs
                 )))
+
+                // Fire onRunComplete callback before session save
+                if let onRunComplete = capturedOnRunComplete {
+                    let queryStatus: QueryStatus = {
+                        switch resultSubtype {
+                        case .success: return .success
+                        case .errorMaxTurns: return .errorMaxTurns
+                        case .errorMaxBudgetUsd: return .errorMaxBudgetUsd
+                        case .errorMaxModelCalls: return .errorMaxModelCalls
+                        case .errorDuringExecution: return .errorDuringExecution
+                        case .cancelled: return .cancelled
+                        case .errorMaxStructuredOutputRetries: return .errorDuringExecution
+                        }
+                    }()
+                    let context = RunCompleteContext(
+                        toolPairs: collectedToolPairs,
+                        task: text,
+                        runId: capturedRunId,
+                        status: queryStatus,
+                        usage: totalUsage,
+                        totalCostUsd: totalCostUsd,
+                        durationMs: durationMs,
+                        numTurns: turnCount,
+                        costBreakdown: Array(costByModel.values)
+                    )
+                    onRunComplete(context)
+                }
                 // MCP cleanup handled by defer block above
                 // Primary MCP cleanup — synchronous await on the main exit path.
                 // The defer above acts as a safety net for early returns only.

@@ -243,6 +243,10 @@ public struct AgentOptions: Sendable {
     public var maxTokens: Int
     /// Optional budget limit in USD. When exceeded, the agent loop terminates.
     public var maxBudgetUsd: Double?
+    /// Optional maximum number of LLM API calls. When exceeded, the agent loop terminates.
+    /// Counts each API response (including retries and fallback attempts).
+    /// `nil` means no limit.
+    public var maxModelCalls: Int?
     /// Optional thinking/reasoning configuration for the model.
     public var thinking: ThinkingConfig?
     /// Permission mode controlling tool execution behavior. Defaults to ``PermissionMode/default``.
@@ -431,6 +435,17 @@ public struct AgentOptions: Sendable {
     /// Set to `0` to disable timeout (agent waits indefinitely).
     public var pauseTimeoutMs: Int
 
+    /// Optional callback invoked after the agent run completes, before session save.
+    ///
+    /// Receives a ``RunCompleteContext`` with aggregated data including all tool pairs,
+    /// cost metrics, and run status. Use this for post-run processing such as memory
+    /// extraction or analytics. The callback runs synchronously; avoid long-blocking work.
+    public var onRunComplete: (@Sendable (RunCompleteContext) -> Void)?
+
+    /// Optional caller-provided run identifier, forwarded to ``RunCompleteContext/runId``.
+    /// Useful for correlating post-run callbacks with external tracking systems.
+    public var runId: String?
+
     // MARK: - Memberwise Init
 
     public init(
@@ -442,6 +457,7 @@ public struct AgentOptions: Sendable {
         maxTurns: Int = 10,
         maxTokens: Int = 16384,
         maxBudgetUsd: Double? = nil,
+        maxModelCalls: Int? = nil,
         thinking: ThinkingConfig? = nil,
         permissionMode: PermissionMode = .default,
         canUseTool: CanUseToolFn? = nil,
@@ -493,7 +509,9 @@ public struct AgentOptions: Sendable {
         strictMcpConfig: Bool = false,
         extraArgs: [String: String?]? = nil,
         enableFileCheckpointing: Bool = false,
-        pauseTimeoutMs: Int = 300_000
+        pauseTimeoutMs: Int = 300_000,
+        onRunComplete: (@Sendable (RunCompleteContext) -> Void)? = nil,
+        runId: String? = nil
     ) {
         self.apiKey = apiKey
         self.model = model
@@ -503,6 +521,7 @@ public struct AgentOptions: Sendable {
         self.maxTurns = maxTurns
         self.maxTokens = maxTokens
         self.maxBudgetUsd = maxBudgetUsd
+        self.maxModelCalls = maxModelCalls
         self.thinking = thinking
         self.permissionMode = permissionMode
         self.canUseTool = canUseTool
@@ -555,6 +574,8 @@ public struct AgentOptions: Sendable {
         self.extraArgs = extraArgs
         self.enableFileCheckpointing = enableFileCheckpointing
         self.pauseTimeoutMs = pauseTimeoutMs
+        self.onRunComplete = onRunComplete
+        self.runId = runId
     }
 
     // MARK: - Auto-Discover Skills
@@ -613,6 +634,7 @@ public struct AgentOptions: Sendable {
         self.maxTokens = config.maxTokens
         self.systemPrompt = nil
         self.maxBudgetUsd = nil
+        self.maxModelCalls = nil
         self.thinking = nil
         self.permissionMode = .default
         self.canUseTool = nil
@@ -664,6 +686,8 @@ public struct AgentOptions: Sendable {
         self.extraArgs = nil
         self.enableFileCheckpointing = false
         self.pauseTimeoutMs = 300_000
+        self.onRunComplete = nil
+        self.runId = nil
     }
 
     // MARK: - Validation
@@ -711,6 +735,56 @@ public enum QueryStatus: String, Sendable, Equatable {
     case errorMaxBudgetUsd
     /// The query was cancelled by the user (via Task.cancel() or Agent.interrupt()).
     case cancelled
+    /// The number of LLM API calls exceeded the configured maxModelCalls limit.
+    case errorMaxModelCalls
+}
+
+/// Context provided to `onRunComplete` callback after an agent run finishes.
+///
+/// Contains aggregated data from the completed run, including all tool invocation/result
+/// pairs, cost metrics, and timing information. Use this for post-run processing such as
+/// memory extraction, experience learning, or analytics.
+public struct RunCompleteContext: Sendable {
+    /// All tool invocation/result pairs collected during the run, matched by toolUseId.
+    public let toolPairs: [SDKMessage.ToolExecutionPair]
+    /// The original task prompt that initiated this run.
+    public let task: String
+    /// A caller-provided run identifier, or `nil`.
+    public let runId: String?
+    /// How the query terminated.
+    public let status: QueryStatus
+    /// Token usage statistics.
+    public let usage: TokenUsage
+    /// Total estimated cost in USD.
+    public let totalCostUsd: Double
+    /// Run duration in milliseconds.
+    public let durationMs: Int
+    /// Number of agent loop turns completed.
+    public let numTurns: Int
+    /// Per-model cost breakdown.
+    public let costBreakdown: [CostBreakdownEntry]
+
+    public init(
+        toolPairs: [SDKMessage.ToolExecutionPair],
+        task: String,
+        runId: String? = nil,
+        status: QueryStatus,
+        usage: TokenUsage,
+        totalCostUsd: Double,
+        durationMs: Int,
+        numTurns: Int,
+        costBreakdown: [CostBreakdownEntry] = []
+    ) {
+        self.toolPairs = toolPairs
+        self.task = task
+        self.runId = runId
+        self.status = status
+        self.usage = usage
+        self.totalCostUsd = totalCostUsd
+        self.durationMs = durationMs
+        self.numTurns = numTurns
+        self.costBreakdown = costBreakdown
+    }
 }
 
 /// Per-model cost entry for cost breakdown tracking.
@@ -761,8 +835,10 @@ public struct QueryResult: Sendable {
     public let isCancelled: Bool
     /// Error messages collected during execution (non-nil on error statuses).
     public let errors: [String]?
+    /// All tool invocation/result pairs collected during the run.
+    public let toolPairs: [SDKMessage.ToolExecutionPair]
 
-    public init(text: String, usage: TokenUsage, numTurns: Int, durationMs: Int, messages: [SDKMessage], status: QueryStatus = .success, totalCostUsd: Double = 0.0, costBreakdown: [CostBreakdownEntry] = [], isCancelled: Bool = false, errors: [String]? = nil) {
+    public init(text: String, usage: TokenUsage, numTurns: Int, durationMs: Int, messages: [SDKMessage], status: QueryStatus = .success, totalCostUsd: Double = 0.0, costBreakdown: [CostBreakdownEntry] = [], isCancelled: Bool = false, errors: [String]? = nil, toolPairs: [SDKMessage.ToolExecutionPair] = []) {
         self.text = text
         self.usage = usage
         self.numTurns = numTurns
@@ -773,6 +849,7 @@ public struct QueryResult: Sendable {
         self.costBreakdown = costBreakdown
         self.isCancelled = isCancelled
         self.errors = errors
+        self.toolPairs = toolPairs
     }
 }
 
