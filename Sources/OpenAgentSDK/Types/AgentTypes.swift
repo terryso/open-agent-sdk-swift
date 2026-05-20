@@ -446,6 +446,15 @@ public struct AgentOptions: Sendable {
     /// Useful for correlating post-run callbacks with external tracking systems.
     public var runId: String?
 
+    /// Whether to enable trace recording for debugging and observability.
+    /// When `true`, each SDKMessage is mapped to a trace event and written to a JSONL file.
+    /// Defaults to `false` (no tracing, zero overhead).
+    public var traceEnabled: Bool
+
+    /// Base directory for trace files. When set, trace files are written to
+    /// `{traceBaseURL}/{runId}/trace.jsonl`. When `nil`, defaults to `~/.open-agent-sdk/traces/`.
+    public var traceBaseURL: String?
+
     // MARK: - Memberwise Init
 
     public init(
@@ -511,7 +520,9 @@ public struct AgentOptions: Sendable {
         enableFileCheckpointing: Bool = false,
         pauseTimeoutMs: Int = 300_000,
         onRunComplete: (@Sendable (RunCompleteContext) -> Void)? = nil,
-        runId: String? = nil
+        runId: String? = nil,
+        traceEnabled: Bool = false,
+        traceBaseURL: String? = nil
     ) {
         self.apiKey = apiKey
         self.model = model
@@ -576,6 +587,8 @@ public struct AgentOptions: Sendable {
         self.pauseTimeoutMs = pauseTimeoutMs
         self.onRunComplete = onRunComplete
         self.runId = runId
+        self.traceEnabled = traceEnabled
+        self.traceBaseURL = traceBaseURL
     }
 
     // MARK: - Auto-Discover Skills
@@ -688,6 +701,8 @@ public struct AgentOptions: Sendable {
         self.pauseTimeoutMs = 300_000
         self.onRunComplete = nil
         self.runId = nil
+        self.traceEnabled = false
+        self.traceBaseURL = nil
     }
 
     // MARK: - Validation

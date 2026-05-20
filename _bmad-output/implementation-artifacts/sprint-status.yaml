@@ -241,7 +241,7 @@ development_status:
   # Epic 20: Agent HTTP API Server、Cost/Trace 服务与增强 Memory
   epic-20: in-progress
   20-1-agent-http-server: done
-  20-2-cost-tracker-trace-recorder: backlog
+  20-2-cost-tracker-trace-recorder: done
   20-3-enhanced-memory-fact-lifecycle: backlog
   20-4-sdkmessage-output-formatting: backlog
   epic-20-retrospective: optional

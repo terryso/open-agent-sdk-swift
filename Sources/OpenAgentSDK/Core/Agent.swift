@@ -1285,6 +1285,18 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
             maxEntrySizeBytes: options.fileCacheMaxEntrySizeBytes
         )
 
+        // CostTracker: structured cost accumulation (additive layer alongside existing inline tracking)
+        var costTracker = CostTracker(model: model, maxBudgetUsd: options.maxBudgetUsd)
+
+        // TraceRecorder: opt-in execution trace (JSONL)
+        var traceRecorder: TraceRecorder? = nil
+        if options.traceEnabled {
+            let traceBaseURL: URL? = options.traceBaseURL.map { URL(fileURLWithPath: $0) }
+            let runIdForTrace = options.runId ?? UUID().uuidString
+            traceRecorder = try? TraceRecorder(runId: runIdForTrace, baseURL: traceBaseURL)
+        }
+        var traceStepIndex = 0
+
         while turnCount < maxTurns {
             // Cancellation check (FR60): cooperative cancellation via Task.isCancelled or interrupt()
             if _Concurrency.Task.isCancelled || _interrupted {
@@ -1372,6 +1384,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                             totalUsage = totalUsage + turnUsage
                             let turnCost = estimateCost(model: fallbackModel, usage: turnUsage)
                             totalCostUsd += turnCost
+                            costTracker.recordUsage(model: fallbackModel, usage: turnUsage)
                             costByModel[fallbackModel] = CostBreakdownEntry(
                                 model: fallbackModel,
                                 inputTokens: turnUsage.inputTokens,
@@ -1490,6 +1503,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                 totalUsage = totalUsage + turnUsage
                 let turnCost = estimateCost(model: model, usage: turnUsage)
                 totalCostUsd += turnCost
+                costTracker.recordUsage(model: model, usage: turnUsage)
                 // Track per-model cost breakdown
                 let currentModel = model
                 if var existing = costByModel[currentModel] {
@@ -1525,13 +1539,22 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                 ])
             }
 
-            // Check budget limit after cost accumulation
-            if let budget = options.maxBudgetUsd, totalCostUsd > budget {
+            // Check budget via CostTracker (structured check) with inline fallback for backward compat
+            let budgetResult = costTracker.checkBudget()
+            let budgetExceeded: Bool
+            if case .budgetExceeded = budgetResult {
+                budgetExceeded = true
+            } else if let budget = options.maxBudgetUsd, totalCostUsd > budget {
+                budgetExceeded = true
+            } else {
+                budgetExceeded = false
+            }
+            if budgetExceeded {
                 status = .errorMaxBudgetUsd
                 // Structured log for budget exceeded
                 Logger.shared.warn("QueryEngine", "budget_exceeded", data: [
                     "costUsd": String(format: "%.4f", totalCostUsd),
-                    "budgetUsd": String(format: "%.4f", budget),
+                    "budgetUsd": String(format: "%.4f", options.maxBudgetUsd ?? 0),
                     "turnsUsed": String(turnCount)
                 ])
                 // Extract content before breaking so partial text is preserved
@@ -1710,6 +1733,9 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
         }
 
         let isCancelled = (status == .cancelled)
+        // Close trace recorder if active (promptImpl path doesn't yield SDKMessages,
+        // but trace file should still be cleaned up)
+        await traceRecorder?.close()
         let result = QueryResult(
             text: lastAssistantText,
             usage: totalUsage,
@@ -1800,6 +1826,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
         let capturedMaxModelCalls = options.maxModelCalls
         let capturedOnRunComplete = options.onRunComplete
         let capturedRunId = options.runId
+        let capturedTraceEnabled = options.traceEnabled
+        let capturedTraceBaseURL = options.traceBaseURL
 
         // Build tool definitions for API call
         let capturedApiTools: [[String: Any]]? = {
@@ -1975,6 +2003,18 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                 var collectedToolPairs: [SDKMessage.ToolExecutionPair] = []
                 var modelCallCount = 0
 
+                // CostTracker: structured cost accumulation (additive layer alongside existing inline tracking)
+                var streamCostTracker = CostTracker(model: capturedModel, maxBudgetUsd: capturedMaxBudgetUsd)
+
+                // TraceRecorder: opt-in execution trace (JSONL)
+                var streamTraceRecorder: TraceRecorder? = nil
+                if capturedTraceEnabled {
+                    let traceBaseURL: URL? = capturedTraceBaseURL.map { URL(fileURLWithPath: $0) }
+                    let runIdForTrace = capturedRunId ?? UUID().uuidString
+                    streamTraceRecorder = try? TraceRecorder(runId: runIdForTrace, baseURL: traceBaseURL)
+                }
+                var traceStepIndex = 0
+
                 while turnCount < capturedMaxTurns {
                     // Cancellation check (FR60): cooperative cancellation via Task.isCancelled
                     if _Concurrency.Task.isCancelled {
@@ -2095,6 +2135,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                                     // Calculate cost for input tokens at message start
                                     let turnCost = estimateCost(model: currentModel, usage: TokenUsage(inputTokens: inputTokens, outputTokens: 0))
                                     totalCostUsd += turnCost
+                                    streamCostTracker.recordUsage(model: currentModel, usage: TokenUsage(inputTokens: inputTokens, outputTokens: 0))
                                     // Track per-model cost breakdown
                                     let modelKey = currentModel
                                     if var existing = costByModel[modelKey] {
@@ -2115,7 +2156,16 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                                 }
 
                                 // Check budget after input token cost accumulation
-                                if let budget = capturedMaxBudgetUsd, totalCostUsd > budget {
+                                let streamBudgetResult = streamCostTracker.checkBudget()
+                                let streamBudgetExceeded: Bool
+                                if case .budgetExceeded = streamBudgetResult {
+                                    streamBudgetExceeded = true
+                                } else if let budget = capturedMaxBudgetUsd, totalCostUsd > budget {
+                                    streamBudgetExceeded = true
+                                } else {
+                                    streamBudgetExceeded = false
+                                }
+                                if streamBudgetExceeded {
                                     let elapsed = ContinuousClock.now - startTime
                                     let durationMs = Self.computeDurationMs(elapsed)
                                     let previousText = messages.compactMap { msg -> String? in
@@ -2129,7 +2179,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                                     // Structured log for budget exceeded
                                     Logger.shared.warn("QueryEngine", "budget_exceeded", data: [
                                         "costUsd": String(format: "%.4f", totalCostUsd),
-                                        "budgetUsd": String(format: "%.4f", budget),
+                                        "budgetUsd": String(format: "%.4f", capturedMaxBudgetUsd ?? 0),
                                         "turnsUsed": String(turnCount)
                                     ])
 
@@ -2141,7 +2191,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                                         await hookRegistry.execute(.sessionEnd, input: endInput)
                                     }
 
-                                    continuation.yield(.result(SDKMessage.ResultData(
+                                    let budgetStartResultMsg = SDKMessage.result(SDKMessage.ResultData(
                                         subtype: .errorMaxBudgetUsd,
                                         text: previousText,
                                         usage: totalUsage,
@@ -2149,7 +2199,12 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                                         durationMs: durationMs,
                                         totalCostUsd: totalCostUsd,
                                         costBreakdown: Array(costByModel.values)
-                                    )))
+                                    ))
+                                    continuation.yield(budgetStartResultMsg)
+                                    if let trace = streamTraceRecorder, let mapped = TraceEventMapping.traceEvent(from: budgetStartResultMsg) {
+                                        await trace.record(event: mapped.event, payload: mapped.payload)
+                                    }
+                                    await streamTraceRecorder?.close()
                                     continuation.finish()
                                     return
                                 }
@@ -2190,11 +2245,16 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                                     contentBlocks.append(block)
 
                                     // Emit toolUse event to stream
-                                    continuation.yield(.toolUse(SDKMessage.ToolUseData(
+                                    let toolUseMsg = SDKMessage.toolUse(SDKMessage.ToolUseData(
                                         toolName: accumulated.name,
                                         toolUseId: accumulated.id,
                                         input: accumulated.inputJson
-                                    )))
+                                    ))
+                                    continuation.yield(toolUseMsg)
+                                    if let trace = streamTraceRecorder, let mapped = TraceEventMapping.traceEvent(from: toolUseMsg, stepIndex: traceStepIndex) {
+                                        await trace.record(event: mapped.event, payload: mapped.payload)
+                                    }
+                                    traceStepIndex += 1
                                 }
 
                             case .messageDelta(let delta, let usage):
@@ -2206,6 +2266,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                                 totalUsage = totalUsage + turnUsage
                                 let turnCost = estimateCost(model: currentModel, usage: turnUsage)
                                 totalCostUsd += turnCost
+                                streamCostTracker.recordUsage(model: currentModel, usage: turnUsage)
                                 // Track per-model cost breakdown
                                 let modelKey = currentModel
                                 if var existing = costByModel[modelKey] {
@@ -2224,8 +2285,17 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                                     )
                                 }
 
-                                // Check budget after cost accumulation
-                                if let budget = capturedMaxBudgetUsd, totalCostUsd > budget {
+                                // Check budget after cost accumulation via CostTracker + inline fallback
+                                let deltaBudgetResult = streamCostTracker.checkBudget()
+                                let deltaBudgetExceeded: Bool
+                                if case .budgetExceeded = deltaBudgetResult {
+                                    deltaBudgetExceeded = true
+                                } else if let budget = capturedMaxBudgetUsd, totalCostUsd > budget {
+                                    deltaBudgetExceeded = true
+                                } else {
+                                    deltaBudgetExceeded = false
+                                }
+                                if deltaBudgetExceeded {
                                     let elapsed = ContinuousClock.now - startTime
                                     let durationMs = Self.computeDurationMs(elapsed)
                                     let previousText = messages.compactMap { msg -> String? in
@@ -2240,7 +2310,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                                     // Structured log for budget exceeded
                                     Logger.shared.warn("QueryEngine", "budget_exceeded", data: [
                                         "costUsd": String(format: "%.4f", totalCostUsd),
-                                        "budgetUsd": String(format: "%.4f", budget),
+                                        "budgetUsd": String(format: "%.4f", capturedMaxBudgetUsd ?? 0),
                                         "turnsUsed": String(turnCount + 1)
                                     ])
 
@@ -2252,7 +2322,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                                         await hookRegistry.execute(.sessionEnd, input: endInput)
                                     }
 
-                                    continuation.yield(.result(SDKMessage.ResultData(
+                                    let budgetResultMsg = SDKMessage.result(SDKMessage.ResultData(
                                         subtype: .errorMaxBudgetUsd,
                                         text: finalText,
                                         usage: totalUsage,
@@ -2260,7 +2330,12 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                                         durationMs: durationMs,
                                         totalCostUsd: totalCostUsd,
                                         costBreakdown: Array(costByModel.values)
-                                    )))
+                                    ))
+                                    continuation.yield(budgetResultMsg)
+                                    if let trace = streamTraceRecorder, let mapped = TraceEventMapping.traceEvent(from: budgetResultMsg) {
+                                        await trace.record(event: mapped.event, payload: mapped.payload)
+                                    }
+                                    await streamTraceRecorder?.close()
                                     continuation.finish()
                                     return
                                 }
@@ -2287,7 +2362,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                                     let previousText = Self.extractCollectedText(messages: messages)
                                     let finalText = previousText.isEmpty ? accumulatedText : "\(previousText) \(accumulatedText)"
 
-                                    continuation.yield(.result(SDKMessage.ResultData(
+                                    let maxCallsResultMsg = SDKMessage.result(SDKMessage.ResultData(
                                         subtype: .errorMaxModelCalls,
                                         text: finalText,
                                         usage: totalUsage,
@@ -2296,7 +2371,11 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                                         totalCostUsd: totalCostUsd,
                                         costBreakdown: Array(costByModel.values),
                                         toolPairs: collectedToolPairs
-                                    )))
+                                    ))
+                                    continuation.yield(maxCallsResultMsg)
+                                    if let trace = streamTraceRecorder, let mapped = TraceEventMapping.traceEvent(from: maxCallsResultMsg) {
+                                        await trace.record(event: mapped.event, payload: mapped.payload)
+                                    }
 
                                     if let mcpManagerForCleanup {
                                         await mcpManagerForCleanup.shutdown()
@@ -2305,6 +2384,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                                         let endInput = HookInput(event: .sessionEnd, cwd: capturedCwd)
                                         await hookRegistry.execute(.sessionEnd, input: endInput)
                                     }
+                                    await streamTraceRecorder?.close()
                                     continuation.finish()
                                     return
                                 }
@@ -2519,11 +2599,16 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                                 }
 
                                 // Emit toolResult event to stream
-                                continuation.yield(.toolResult(SDKMessage.ToolResultData(
+                                let toolResultMsg = SDKMessage.toolResult(SDKMessage.ToolResultData(
                                     toolUseId: result.toolUseId,
                                     content: processedContent,
                                     isError: result.isError
-                                )))
+                                ))
+                                continuation.yield(toolResultMsg)
+                                if let trace = streamTraceRecorder, let mapped = TraceEventMapping.traceEvent(from: toolResultMsg, stepIndex: traceStepIndex) {
+                                    await trace.record(event: mapped.event, payload: mapped.payload)
+                                }
+                                traceStepIndex += 1
                             }
 
                             // Append tool_result user message
@@ -2582,7 +2667,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                 let resultSubtype: SDKMessage.ResultData.Subtype =
                     (!loopExitedCleanly && turnCount >= capturedMaxTurns) ? .errorMaxTurns : .success
 
-                continuation.yield(.result(SDKMessage.ResultData(
+                let resultMsg = SDKMessage.result(SDKMessage.ResultData(
                     subtype: resultSubtype,
                     text: finalText,
                     usage: totalUsage,
@@ -2591,7 +2676,12 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                     totalCostUsd: totalCostUsd,
                     costBreakdown: Array(costByModel.values),
                     toolPairs: collectedToolPairs
-                )))
+                ))
+                continuation.yield(resultMsg)
+                if let trace = streamTraceRecorder, let mapped = TraceEventMapping.traceEvent(from: resultMsg) {
+                    await trace.record(event: mapped.event, payload: mapped.payload)
+                }
+                await streamTraceRecorder?.close()
 
                 // Fire onRunComplete callback before session save
                 if let onRunComplete = capturedOnRunComplete {
