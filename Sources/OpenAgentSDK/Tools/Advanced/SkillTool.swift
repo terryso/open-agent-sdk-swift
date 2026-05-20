@@ -107,13 +107,10 @@ Use this tool when the user's request matches one of the available skills.
         }
 
         // 5. Push tool restrictions if present (AC2/AC3/AC6)
+        // Restrictions persist for the rest of the stream — ToolExecutor checks
+        // the stack on every tool call. The stack is discarded when the stream ends.
         if let restrictions = skill.toolRestrictions {
             context.restrictionStack?.push(restrictions)
-        }
-        defer {
-            if skill.toolRestrictions != nil {
-                context.restrictionStack?.pop()
-            }
         }
 
         // 6. Build JSON result
