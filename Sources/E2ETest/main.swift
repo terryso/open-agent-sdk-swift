@@ -159,6 +159,11 @@ await MCPAgentE2ETests.run(apiKey: apiKey, model: model, baseURL: baseURL)
 await ThinkingConfigE2ETests.run(apiKey: apiKey, model: model, baseURL: baseURL)
 
 // ================================================================
+// SECTION 62-66: Skill Evolution E2E Tests (Story 22.2: LLMSkillEvolver)
+// ================================================================
+await SkillEvolutionE2ETests.run(apiKey: apiKey, model: model, baseURL: baseURL)
+
+// ================================================================
 // Results Summary
 // ================================================================
 print("\n=== E2E Test Results ===")

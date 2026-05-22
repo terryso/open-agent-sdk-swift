@@ -257,7 +257,7 @@ development_status:
   # Epic 22: 技能进化 — SkillEvolver 与生命周期管理
   epic-22: in-progress
   22-1-skill-signal-model-skill-evolver-protocol: done
-  22-2-llm-skill-evolver: backlog
+  22-2-llm-skill-evolver: done
   22-3-skill-usage-tracker-lifecycle: backlog
   22-4-skill-curator: backlog
   epic-22-retrospective: optional
