@@ -261,10 +261,12 @@ final class HookEventCoverageCompatTests: XCTestCase {
             }
         }
 
-        print("")
-        print("=== HookEvent Coverage Summary ===")
-        print("PASS: \(passCount) | MISSING: \(missingCount) | Total TS events: \(tsEvents.count)")
-        print("")
+        if missingCount > 0 {
+            for (tsName, rawValue) in tsEvents where HookEvent(rawValue: rawValue) == nil {
+                print("  [MISSING] \(tsName) -> \(rawValue)")
+            }
+        }
+        print("HookEvent Coverage: PASS: \(passCount) | MISSING: \(missingCount) | Total: \(tsEvents.count)")
 
         XCTAssertEqual(passCount, 18, "All 18 TS events should have Swift equivalents (resolved by Story 17-4)")
         XCTAssertEqual(missingCount, 0, "No TS events should be missing after Story 17-4")
@@ -896,18 +898,12 @@ final class HookSystemCompatReportTests: XCTestCase {
         let passCount = tsEvents.filter { $0.status == "PASS" }.count
         let missingCount = tsEvents.filter { $0.status == "MISSING" }.count
 
-        print("")
-        print("=== Hook System Compatibility Report (AC9) ===")
-        print("TS SDK 18 HookEvents vs Swift SDK HookEvent")
-        for m in tsEvents {
-            if m.status != "PASS" {
+        if missingCount > 0 {
+            for m in tsEvents where m.status != "PASS" {
                 print("  \(m.index)\t\(m.tsEvent)\t\(m.rawValue)\t[\(m.status)]\t\(m.note)")
             }
         }
-        print("")
-        print("Summary: PASS: \(passCount) | MISSING: \(missingCount) | Total: \(tsEvents.count)")
-        print("Swift extras: permissionDenied, taskCreated, cwdChanged, fileChanged, postCompact")
-        print("")
+        print("Hook System (AC9): PASS: \(passCount) | MISSING: \(missingCount) | Total: \(tsEvents.count)")
 
         XCTAssertEqual(passCount, 18, "All 18 TS events should have Swift equivalents (resolved by Story 17-4)")
         XCTAssertEqual(missingCount, 0, "No TS events should be MISSING after Story 17-4")
@@ -942,15 +938,12 @@ final class HookSystemCompatReportTests: XCTestCase {
         let passCount = fields.filter { $0.status == "PASS" }.count
         let missingCount = fields.filter { $0.status == "MISSING" }.count
 
-        print("")
-        print("=== HookInput Field Compatibility ===")
-        for f in fields {
-            if f.status != "PASS" {
+        if missingCount > 0 {
+            for f in fields where f.status != "PASS" {
                 print("  [\(f.status)] TS: \(f.tsField) -> Swift: \(f.swiftField)")
             }
         }
-        print("Summary: PASS: \(passCount) | MISSING: \(missingCount) | Total: \(fields.count)")
-        print("")
+        print("HookInput Fields: PASS: \(passCount) | MISSING: \(missingCount) | Total: \(fields.count)")
 
         XCTAssertEqual(passCount, 18, "All 18 fields should have Swift equivalents (resolved by Story 17-4)")
         XCTAssertEqual(missingCount, 0, "No fields should be MISSING after Story 17-4")
@@ -972,15 +965,12 @@ final class HookSystemCompatReportTests: XCTestCase {
         let partialCount = fields.filter { $0.status == "PARTIAL" }.count
         let missingCount = fields.filter { $0.status == "MISSING" }.count
 
-        print("")
-        print("=== HookOutput Field Compatibility ===")
-        for f in fields {
-            if f.status != "PASS" {
+        if partialCount > 0 || missingCount > 0 {
+            for f in fields where f.status != "PASS" {
                 print("  [\(f.status)] TS: \(f.tsField) -> Swift: \(f.swiftField)")
             }
         }
-        print("Summary: PASS: \(passCount) | PARTIAL: \(partialCount) | MISSING: \(missingCount) | Total: \(fields.count)")
-        print("")
+        print("HookOutput Fields: PASS: \(passCount) | PARTIAL: \(partialCount) | MISSING: \(missingCount) | Total: \(fields.count)")
 
         XCTAssertEqual(passCount, 7, "All 7 fields should be PASS (decision resolved by Spec 19)")
         XCTAssertEqual(partialCount, 0, "No fields should be PARTIAL after Spec 19")

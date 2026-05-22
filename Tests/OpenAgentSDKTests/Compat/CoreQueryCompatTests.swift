@@ -544,18 +544,13 @@ final class CompatReportTests: XCTestCase {
         let missingCount = report.filter { $0.status == "MISSING" }.count
         let naCount = report.filter { $0.status == "N/A" }.count
 
-        // Print report for visibility (using simple print, no String(format:))
-        print("")
-        print("=== Core Query API Compatibility Report ===")
-        print("TS SDK Field                  | Swift SDK Field                                | Status")
-        for entry in report {
-            if entry.status != "PASS" {
+        // Report summary
+        if missingCount > 0 || naCount > 0 {
+            for entry in report where entry.status != "PASS" {
                 print("  \(entry.tsField)  ->  \(entry.swiftField)  [\(entry.status)]")
             }
         }
-        print("PASS: \(passCount) | MISSING: \(missingCount) | N/A: \(naCount) | Total: \(report.count)")
-        print("============================================")
-        print("")
+        print("Core Query API: PASS: \(passCount) | MISSING: \(missingCount) | N/A: \(naCount) | Total: \(report.count)")
 
         // Verify majority of core fields pass (now 22 PASS entries)
         XCTAssertTrue(passCount >= 20,

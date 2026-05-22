@@ -97,6 +97,39 @@ public actor RunTracker {
         runs[runId] = run
     }
 
+    /// Flexible update for run fields, used by runHandler callbacks.
+    /// Only updates fields that are non-nil. Does not validate state transitions.
+    public func updateRun(
+        runId: String,
+        status: APIRunStatus? = nil,
+        totalSteps: Int? = nil,
+        durationMs: Int? = nil,
+        resultText: String? = nil,
+        error: String? = nil,
+        steps: [StepSummary]? = nil,
+        startedAt: String? = nil,
+        endedAt: String? = nil,
+        exitCode: Int? = nil,
+        result: RunResult? = nil,
+        intervention: InterventionData? = nil,
+        costTelemetry: TokenUsage? = nil
+    ) {
+        guard runs[runId] != nil else { return }
+        if let status { runs[runId]?.status = status }
+        if let totalSteps { runs[runId]?.totalSteps = totalSteps }
+        if let durationMs { runs[runId]?.durationMs = durationMs }
+        if let resultText { runs[runId]?.resultText = resultText }
+        if let error { runs[runId]?.error = error }
+        if let steps { runs[runId]?.steps = steps }
+        if let startedAt { runs[runId]?.startedAt = startedAt }
+        if let endedAt { runs[runId]?.endedAt = endedAt }
+        if let exitCode { runs[runId]?.exitCode = exitCode }
+        if let result { runs[runId]?.result = result }
+        if let intervention { runs[runId]?.intervention = intervention }
+        if let costTelemetry { runs[runId]?.costTelemetry = costTelemetry }
+        runs[runId]?.updatedAt = currentTimestamp()
+    }
+
     // MARK: - Query
 
     /// Retrieve a run by its ID.

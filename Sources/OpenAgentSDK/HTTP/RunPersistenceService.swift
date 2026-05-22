@@ -21,7 +21,7 @@ public struct RunPersistenceService: Sendable {
     // MARK: - Path Helpers
 
     /// Returns base directory for persisted runs.
-    func runsDirectory() -> String {
+    public func runsDirectory() -> String {
         if let custom = customBaseDirectory {
             return custom
         }
@@ -30,7 +30,7 @@ public struct RunPersistenceService: Sendable {
     }
 
     /// Returns the run directory, creating it if needed.
-    func runDirectory(runId: String) -> String {
+    public func runDirectory(runId: String) -> String {
         let dir = (runsDirectory() as NSString).appendingPathComponent(runId)
         try? FileManager.default.createDirectory(
             atPath: dir, withIntermediateDirectories: true
@@ -82,7 +82,7 @@ public struct RunPersistenceService: Sendable {
     }
 
     /// Load all AgentSSEEvents from api-events.jsonl.
-    func loadEvents(runId: String) -> [AgentSSEEvent] {
+    public func loadEvents(runId: String) -> [AgentSSEEvent] {
         let dir = (runsDirectory() as NSString).appendingPathComponent(runId)
         let path = (dir as NSString).appendingPathComponent("api-events.jsonl")
         guard FileManager.default.fileExists(atPath: path),

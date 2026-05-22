@@ -58,7 +58,7 @@ public actor MCPClientManager {
     ///   - name: The server name for identification and tool namespacing.
     ///   - config: The stdio configuration for the server.
     public func connect(name: String, config: McpStdioConfig) async {
-        print("[MCPClientManager] Connecting to '\(name)' via stdio: \(config.command) \(config.args)")
+        fputs("[MCPClientManager] Connecting to '\(name)' via stdio: \(config.command) \(config.args)\n", stderr)
         // Validate command
         guard !config.command.isEmpty else {
             connections[name] = MCPManagedConnection(

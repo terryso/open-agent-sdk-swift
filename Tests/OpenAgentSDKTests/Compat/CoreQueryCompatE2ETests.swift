@@ -424,17 +424,14 @@ final class CoreQueryCompatE2ETests: XCTestCase {
         // AC3: Cost breakdown
         report.append(("cost_breakdown", "AC3", blockResult.costBreakdown.isEmpty ? "MISSING" : "PASS"))
 
-        // Print report
-        print("\n=== E2E Compatibility Report ===")
-        for entry in report {
-            if entry.status != "PASS" {
-                print("[\(entry.status)] \(entry.ac): \(entry.test)")
-            }
+        // Report non-PASS items only
+        for entry in report where entry.status != "PASS" {
+            print("[\(entry.status)] \(entry.ac): \(entry.test)")
         }
-        print("================================\n")
+        let passCount = report.filter { $0.status == "PASS" }.count
+        print("E2E Compat: PASS: \(passCount) | Total: \(report.count)")
 
         // Verify at least streaming and blocking pass
-        let passCount = report.filter { $0.status == "PASS" }.count
         XCTAssertGreaterThanOrEqual(passCount, 2,
             "At least streaming and blocking queries should pass")
     }

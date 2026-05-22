@@ -807,20 +807,13 @@ final class MessageTypesCompatReportTests: XCTestCase {
         let partialCount = mappings.filter { $0.status == "PARTIAL" }.count
         let missingCount = mappings.filter { $0.status == "MISSING" }.count
 
-        // Print the report for visibility
-        print("")
-        print("=== Message Types Compatibility Report (AC10, updated after Story 17.1) ===")
-        print("#\tTS SDK Type\t\t\t\tTS type field\t\tSwift Equivalent\t\t\t\tStatus")
-        print(String(repeating: "-", count: 130))
-        for m in mappings {
-            if m.status != "PASS" {
-                print("\(m.index)\t\(m.tsType)\t\(m.tsTypeField)\t\(m.swiftEquivalent)\t[\(m.status)]")
-                print("\tNote: \(m.note)")
+        // Report non-PASS items only
+        if partialCount > 0 || missingCount > 0 {
+            for m in mappings where m.status != "PASS" {
+                print("[\(m.status)] \(m.index)\t\(m.tsType)\t\(m.swiftEquivalent)")
             }
         }
-        print("")
-        print("Summary: PASS: \(passCount) | PARTIAL: \(partialCount) | MISSING: \(missingCount) | Total: \(mappings.count)")
-        print("")
+        print("Message Types (AC10): PASS: \(passCount) | PARTIAL: \(partialCount) | MISSING: \(missingCount) | Total: \(mappings.count)")
 
         // Verify the expected distribution after Story 17.1
         XCTAssertTrue(passCount > 0,

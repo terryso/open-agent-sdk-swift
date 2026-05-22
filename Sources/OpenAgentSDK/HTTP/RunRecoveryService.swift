@@ -1,10 +1,13 @@
 import Foundation
+import os
 
 // MARK: - RunRecoveryService
 
 /// Recovers persisted run state on server restart.
 /// Marks interrupted runs as failed and preserves intervention_needed runs.
 public enum RunRecoveryService {
+
+    private static let logger = os.Logger(subsystem: "com.open-agent-sdk", category: "Recovery")
 
     /// Recover all persisted runs from disk into the tracker.
     public static func recover(
@@ -15,7 +18,7 @@ public enum RunRecoveryService {
         let persistedRuns = persistenceService.loadAllPersistedRuns()
         guard !persistedRuns.isEmpty else { return }
 
-        print("[Recovery] Found \(persistedRuns.count) persisted run(s), recovering...")
+        logger.info("Found \(persistedRuns.count) persisted run(s), recovering...")
 
         for var run in persistedRuns {
             switch run.status {
@@ -30,15 +33,19 @@ public enum RunRecoveryService {
                     return formatter.string(from: Date())
                 }()
                 persistenceService.persistRecordSafely(run)
-                print("[Recovery] Run \(run.runId): \(originalStatus) → failed")
+                logger.info("Run \(run.runId): \(originalStatus) → failed")
 
             // Terminal states → preserve
             case .completed, .failed, .cancelled:
-                print("[Recovery] Run \(run.runId): \(run.status.rawValue) — preserved")
+                logger.debug("Run \(run.runId): \(run.status.rawValue) — preserved")
 
             // intervention_needed → preserve
             case .interventionNeeded:
-                print("[Recovery] Run \(run.runId): intervention_needed — preserved")
+                logger.debug("Run \(run.runId): intervention_needed — preserved")
+
+            // user_takeover / resuming → preserve
+            case .userTakeover, .resuming:
+                logger.debug("Run \(run.runId): \(run.status.rawValue) — preserved")
             }
 
             await tracker.restoreRun(run)
@@ -50,6 +57,6 @@ public enum RunRecoveryService {
             }
         }
 
-        print("[Recovery] Recovery complete.")
+        logger.info("Recovery complete.")
     }
 }

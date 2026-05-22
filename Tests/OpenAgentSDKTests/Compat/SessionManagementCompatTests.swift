@@ -882,23 +882,16 @@ final class SessionManagementCompatReportTests: XCTestCase {
                 note: "Swift-only standalone fork. TS uses forkSession: true AgentOption."),
         ]
 
-        print("")
-        print("=== Session Management Compatibility Report (AC7) ===")
-        print("TS SDK Session Functions vs Swift SDK SessionStore")
-        for m in mappings {
-            if m.status != "PASS" {
-                print("  \(m.index)\t\(m.tsFunction)")
-                print("  \t-> \(m.swiftEquivalent) [\(m.status)] \(m.note)")
-            }
-        }
-
         let passCount = mappings.filter { $0.status == "PASS" }.count
         let partialCount = mappings.filter { $0.status == "PARTIAL" }.count
         let extraCount = mappings.filter { $0.status == "EXTRA" }.count
 
-        print("")
-        print("Summary: PASS: \(passCount) | PARTIAL: \(partialCount) | EXTRA: \(extraCount) | Total: \(mappings.count)")
-        print("")
+        if partialCount > 0 {
+            for m in mappings where m.status == "PARTIAL" {
+                print("  [PARTIAL] \(m.index)\t\(m.tsFunction) -> \(m.swiftEquivalent)")
+            }
+        }
+        print("Session Functions (AC7): PASS: \(passCount) | PARTIAL: \(partialCount) | EXTRA: \(extraCount) | Total: \(mappings.count)")
 
         XCTAssertEqual(passCount, 2, "2 functions fully pass (rename, tag)")
         XCTAssertEqual(partialCount, 3, "3 functions partial (list, getMessages, getInfo)")
@@ -932,21 +925,17 @@ final class SessionManagementCompatReportTests: XCTestCase {
             FieldMapping(tsField: "N/A", swiftField: "updatedAt: Date (separate)", status: "EXTRA"),
         ]
 
-        print("")
-        print("=== SessionMetadata Field Compatibility ===")
-        for m in mappings {
-            if m.status != "PASS" {
-                print("  [\(m.status)] TS: \(m.tsField) -> Swift: \(m.swiftField)")
-            }
-        }
-
         let passCount = mappings.filter { $0.status == "PASS" }.count
         let partialCount = mappings.filter { $0.status == "PARTIAL" }.count
         let missingCount = mappings.filter { $0.status == "MISSING" }.count
         let extraCount = mappings.filter { $0.status == "EXTRA" }.count
 
-        print("Summary: PASS: \(passCount) | PARTIAL: \(partialCount) | MISSING: \(missingCount) | EXTRA: \(extraCount)")
-        print("")
+        if missingCount > 0 || partialCount > 0 {
+            for m in mappings where m.status != "PASS" && m.status != "EXTRA" {
+                print("  [\(m.status)] TS: \(m.tsField) -> Swift: \(m.swiftField)")
+            }
+        }
+        print("SessionMetadata Fields: PASS: \(passCount) | PARTIAL: \(partialCount) | MISSING: \(missingCount) | EXTRA: \(extraCount)")
 
         XCTAssertEqual(passCount, 9, "9 fields fully pass (including fileSize, firstPrompt, gitBranch)")
         XCTAssertEqual(partialCount, 1, "1 field partial (customTitle)")
@@ -974,16 +963,12 @@ final class SessionManagementCompatReportTests: XCTestCase {
         let passCount = mappings.filter { $0.status == "PASS" }.count
         let missingCount = mappings.filter { $0.status == "MISSING" }.count
 
-        print("")
-        print("=== SessionMessage Element Field Compatibility ===")
-        for m in mappings {
-            if m.status != "PASS" {
+        if missingCount > 0 {
+            for m in mappings where m.status != "PASS" {
                 print("  [\(m.status)] TS: \(m.tsField) -> Swift: \(m.swiftField)")
             }
         }
-        print("Summary: PASS: \(passCount) | MISSING: \(missingCount) | Total: \(mappings.count)")
-        print("Note: Swift now has typed SessionMessage struct (added by Spec 19)")
-        print("")
+        print("SessionMessage Fields: PASS: \(passCount) | MISSING: \(missingCount) | Total: \(mappings.count)")
 
         XCTAssertEqual(passCount, 5, "5 fields pass (all SessionMessage fields now implemented)")
         XCTAssertEqual(missingCount, 0, "0 fields missing (SessionMessage struct added by Spec 19)")
@@ -1019,22 +1004,17 @@ final class SessionManagementCompatReportTests: XCTestCase {
                 note: "AgentOptions.persistSession gates session save (Story 17-2, wired 17-7)"),
         ]
 
-        print("")
-        print("=== Session Restore Options Compatibility ===")
-        for m in mappings {
-            if m.status != "PASS" {
-                print("  [\(m.status)] TS: \(m.tsOption) -> Swift: \(m.swiftEquivalent)")
-                print("       \(m.note)")
-            }
-        }
-
         let passCount = mappings.filter { $0.status == "PASS" }.count
         let partialCount = mappings.filter { $0.status == "PARTIAL" }.count
         let resolvedCount = mappings.filter { $0.status == "RESOLVED" }.count
         let missingCount = mappings.filter { $0.status == "MISSING" }.count
 
-        print("Summary: PASS: \(passCount) | PARTIAL: \(partialCount) | RESOLVED: \(resolvedCount) | MISSING: \(missingCount) | Total: \(mappings.count)")
-        print("")
+        if missingCount > 0 {
+            for m in mappings where m.status == "MISSING" {
+                print("  [MISSING] TS: \(m.tsOption) -> Swift: \(m.swiftEquivalent)")
+            }
+        }
+        print("Session Restore Options: PASS: \(passCount) | PARTIAL: \(partialCount) | RESOLVED: \(resolvedCount) | MISSING: \(missingCount) | Total: \(mappings.count)")
 
         XCTAssertEqual(passCount, 1, "1 option fully passes (sessionId)")
         XCTAssertEqual(partialCount, 1, "1 option partial (resume via sessionStore+sessionId)")
@@ -1050,19 +1030,7 @@ final class SessionManagementCompatReportTests: XCTestCase {
         // Field-level (messages): 5 PASS, 0 PARTIAL, 0 MISSING (updated by Spec 19)
         // Options-level: 1 PASS, 1 PARTIAL, 4 RESOLVED (was 4 MISSING, resolved by Story 17-7)
 
-        print("")
-        print("==============================================")
-        print("Story 16-6: Session Management Compat Summary")
-        print("(Updated by Spec 19: metadata+message fields resolved)")
-        print("==============================================")
-        print("Session Functions:    2 PASS | 3 PARTIAL | 0 MISSING | 3 EXTRA (Swift-only)")
-        print("Metadata Fields:     9 PASS | 1 PARTIAL | 0 MISSING | 3 EXTRA (Swift-only)")
-        print("Message Fields:      5 PASS | 0 PARTIAL | 0 MISSING")
-        print("Restore Options:     1 PASS | 1 PARTIAL | 4 RESOLVED | 0 MISSING")
-        print("----------------------------------------------")
-        print("Total:              17 PASS | 5 PARTIAL | 0 MISSING | 4 RESOLVED | 6 EXTRA")
-        print("==============================================")
-        print("")
+        print("Session Management: 17 PASS | 5 PARTIAL | 0 MISSING | 4 RESOLVED | 6 EXTRA")
 
         // Verify totals
         let totalPass = 2 + 9 + 5 + 1

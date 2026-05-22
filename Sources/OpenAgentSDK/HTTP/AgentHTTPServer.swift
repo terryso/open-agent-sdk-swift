@@ -1,5 +1,6 @@
 import Foundation
 import Hummingbird
+import os
 
 // MARK: - AgentHTTPServer
 
@@ -21,6 +22,29 @@ public class AgentHTTPServer: @unchecked Sendable {
     private let authKey: String?
     private let maxConcurrentRuns: Int
 
+    /// Hook for custom route registration. Called after SDK registers its standard routes.
+    /// Receives the v1 router group, tracker, broadcaster, persistence service, and limiter.
+    public var customRouteBuilder: (
+        (_ router: RouterGroup<BasicRequestContext>,
+         _ tracker: RunTracker,
+         _ broadcaster: EventBroadcaster,
+         _ persistenceService: RunPersistenceService,
+         _ limiter: ConcurrencyLimiter) -> Void
+    )?
+
+    /// Hook for custom run execution. When set, POST /v1/runs calls this instead of built-in executeRun.
+    public var runHandler: RunHandlerClosure?
+
+    /// Typealias for the run handler closure.
+    public typealias RunHandlerClosure = @Sendable (
+        _ task: String,
+        _ request: CreateRunRequest,
+        _ tracker: RunTracker,
+        _ broadcaster: EventBroadcaster,
+        _ persistenceService: RunPersistenceService,
+        _ limiter: ConcurrencyLimiter
+    ) async -> Void
+
     private let tracker: RunTracker
     private let broadcaster: EventBroadcaster
     private let persistenceService: RunPersistenceService
@@ -28,6 +52,14 @@ public class AgentHTTPServer: @unchecked Sendable {
 
     private var app: Application<RouterResponder<BasicRequestContext>>?
     private var serverTask: _Concurrency.Task<Void, Never>?
+
+    private static let logger = os.Logger(subsystem: "com.open-agent-sdk", category: "AgentHTTPServer")
+
+    /// Public accessor for the run tracker.
+    public var runTracker: RunTracker { tracker }
+
+    /// Public accessor for the event broadcaster.
+    public var eventBroadcaster: EventBroadcaster { broadcaster }
 
     // MARK: - Initialization
 
@@ -75,15 +107,29 @@ public class AgentHTTPServer: @unchecked Sendable {
         )
         self.app = app
 
-        print("[AgentHTTPServer] Starting on \(host):\(port)")
+        Self.logger.info("Starting on \(self.host):\(self.port)")
         try await app.runService()
     }
 
     /// Gracefully stop the server.
     public func stop() async {
-        print("[AgentHTTPServer] Stopping")
+        Self.logger.info("Stopping")
         serverTask?.cancel()
         serverTask = nil
+    }
+
+    /// Build an Application with all routes registered, without starting the server.
+    /// Useful for integration testing with HummingbirdTesting.
+    public func buildTestApplication() -> Application<RouterResponder<BasicRequestContext>> {
+        let router = Router()
+        if authKey != nil {
+            router.add(middleware: AuthMiddleware<BasicRequestContext>(authKey: authKey))
+        }
+        registerRoutes(on: router)
+        return Application(
+            router: router,
+            configuration: .init(address: .hostname(host, port: port))
+        )
     }
 
     // MARK: - Route Registration
@@ -97,7 +143,7 @@ public class AgentHTTPServer: @unchecked Sendable {
         }
 
         // POST /v1/runs — start a new run
-        v1.post("runs") { [tracker, broadcaster, persistenceService, limiter, agent] request, context -> Response in
+        v1.post("runs") { [tracker, broadcaster, persistenceService, limiter, agent, runHandler = self.runHandler] request, context -> Response in
             let createRequest: CreateRunRequest
             do {
                 createRequest = try await request.decode(as: CreateRunRequest.self, context: context)
@@ -111,16 +157,22 @@ public class AgentHTTPServer: @unchecked Sendable {
 
             let run = await tracker.submitRun(task: createRequest.task)
 
-            _Concurrency.Task {
-                await Self.executeRun(
-                    runId: run.runId,
-                    task: createRequest.task,
-                    tracker: tracker,
-                    broadcaster: broadcaster,
-                    persistenceService: persistenceService,
-                    limiter: limiter,
-                    agent: agent
-                )
+            if let runHandler = runHandler {
+                _Concurrency.Task {
+                    await runHandler(createRequest.task, createRequest, tracker, broadcaster, persistenceService, limiter)
+                }
+            } else {
+                _Concurrency.Task {
+                    await Self.executeRun(
+                        runId: run.runId,
+                        task: createRequest.task,
+                        tracker: tracker,
+                        broadcaster: broadcaster,
+                        persistenceService: persistenceService,
+                        limiter: limiter,
+                        agent: agent
+                    )
+                }
             }
 
             let response = run.toResponse()
@@ -184,6 +236,9 @@ public class AgentHTTPServer: @unchecked Sendable {
                 body: .init(asyncSequence: mapped)
             )
         }
+
+        // Call custom route builder if set
+        customRouteBuilder?(v1, tracker, broadcaster, persistenceService, limiter)
     }
 
     // MARK: - Agent Execution

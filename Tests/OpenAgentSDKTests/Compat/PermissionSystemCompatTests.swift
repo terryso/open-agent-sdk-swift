@@ -69,10 +69,12 @@ final class PermissionUpdateDestinationCompatTests: XCTestCase {
             }
         }
 
-        print("")
-        print("=== PermissionUpdateDestination Coverage Summary ===")
-        print("PASS: \(passCount) | MISSING: \(missingCount) | Total: \(destinations.count)")
-        print("")
+        if missingCount > 0 {
+            for (tsName, rawValue) in destinations where PermissionUpdateDestination(rawValue: rawValue) == nil {
+                print("  [MISSING] \(tsName) -> \(rawValue)")
+            }
+        }
+        print("PermissionUpdateDestination: PASS: \(passCount) | MISSING: \(missingCount) | Total: \(destinations.count)")
 
         XCTAssertEqual(passCount, 5, "All 5 TS SDK destinations should have Swift equivalents")
         XCTAssertEqual(missingCount, 0, "No TS SDK destinations should be missing")
@@ -157,10 +159,7 @@ final class PermissionUpdateOperationCompatTests: XCTestCase {
             ("removeDirectories", .removeDirectories(directories: [])),
         ]
 
-        print("")
-        print("=== PermissionUpdateOperation Coverage Summary ===")
-        print("Summary: \(ops.count) operations")
-        print("")
+        print("PermissionUpdateOperation: \(ops.count) operations")
 
         XCTAssertEqual(ops.count, 6, "All 6 TS SDK PermissionUpdate operations must exist")
     }
@@ -339,17 +338,12 @@ final class PermissionSystemCompatReportTests: XCTestCase {
         let resolvedCount = gaps.filter { $0.status == "RESOLVED" }.count
         let missingCount = gaps.filter { $0.status == "MISSING" }.count
 
-        print("")
-        print("=== Permission System Compatibility Report (Story 17-5) ===")
-        print("TS SDK Permission Features vs Swift SDK")
-        for g in gaps {
-            if g.status != "PASS" {
-                print("  \(g.index)\t\(g.tsFeature)\t[\(g.status)]\t\(g.note)")
+        if missingCount > 0 {
+            for g in gaps where g.status == "MISSING" {
+                print("  [MISSING] \(g.index)\t\(g.tsFeature)\t\(g.note)")
             }
         }
-        print("")
-        print("Summary: RESOLVED: \(resolvedCount) | MISSING: \(missingCount) | Total: \(gaps.count)")
-        print("")
+        print("Permission System (17-5): RESOLVED: \(resolvedCount) | MISSING: \(missingCount) | Total: \(gaps.count)")
 
         XCTAssertEqual(resolvedCount, 21, "All 21 permission system gaps should be resolved by Story 17-5")
         XCTAssertEqual(missingCount, 0, "No gaps should remain MISSING after Story 17-5")

@@ -11,6 +11,8 @@ public enum APIRunStatus: String, Codable, Equatable, Sendable, CaseIterable {
     case failed
     case cancelled
     case interventionNeeded = "intervention_needed"
+    case userTakeover = "user_takeover"
+    case resuming
 }
 
 // MARK: - CreateRunRequest
@@ -20,17 +22,20 @@ public struct CreateRunRequest: Codable, Equatable, Sendable {
     public let task: String
     public let maxSteps: Int?
     public let maxBatches: Int?
+    public let allowForeground: Bool?
 
     enum CodingKeys: String, CodingKey {
         case task
         case maxSteps = "max_steps"
         case maxBatches = "max_batches"
+        case allowForeground = "allow_foreground"
     }
 
-    public init(task: String, maxSteps: Int? = nil, maxBatches: Int? = nil) {
+    public init(task: String, maxSteps: Int? = nil, maxBatches: Int? = nil, allowForeground: Bool? = nil) {
         self.task = task
         self.maxSteps = maxSteps
         self.maxBatches = maxBatches
+        self.allowForeground = allowForeground
     }
 }
 
@@ -43,6 +48,18 @@ public struct RunResponse: Codable, Equatable, Sendable, ResponseEncodable {
     public let task: String
     public let createdAt: String
     public let updatedAt: String?
+    public let totalSteps: Int?
+    public let durationMs: Int?
+    public let ok: Bool?
+    public let error: String?
+    public let steps: [StepSummary]?
+    public let startedAt: String?
+    public let endedAt: String?
+    public let exitCode: Int?
+    public let result: RunResult?
+    public let intervention: InterventionData?
+    public let costTelemetry: TokenUsage?
+    public let schemaVersion: Int?
 
     enum CodingKeys: String, CodingKey {
         case runId = "run_id"
@@ -50,14 +67,56 @@ public struct RunResponse: Codable, Equatable, Sendable, ResponseEncodable {
         case task
         case createdAt = "created_at"
         case updatedAt = "updated_at"
+        case totalSteps = "total_steps"
+        case durationMs = "duration_ms"
+        case ok
+        case error
+        case steps
+        case startedAt = "started_at"
+        case endedAt = "ended_at"
+        case exitCode = "exit_code"
+        case result
+        case intervention
+        case costTelemetry = "cost_telemetry"
+        case schemaVersion = "schema_version"
     }
 
-    public init(runId: String, status: APIRunStatus, task: String, createdAt: String, updatedAt: String? = nil) {
+    public init(
+        runId: String,
+        status: APIRunStatus,
+        task: String,
+        createdAt: String,
+        updatedAt: String? = nil,
+        totalSteps: Int? = nil,
+        durationMs: Int? = nil,
+        ok: Bool? = nil,
+        error: String? = nil,
+        steps: [StepSummary]? = nil,
+        startedAt: String? = nil,
+        endedAt: String? = nil,
+        exitCode: Int? = nil,
+        result: RunResult? = nil,
+        intervention: InterventionData? = nil,
+        costTelemetry: TokenUsage? = nil,
+        schemaVersion: Int? = nil
+    ) {
         self.runId = runId
         self.status = status
         self.task = task
         self.createdAt = createdAt
         self.updatedAt = updatedAt
+        self.totalSteps = totalSteps
+        self.durationMs = durationMs
+        self.ok = ok
+        self.error = error
+        self.steps = steps
+        self.startedAt = startedAt
+        self.endedAt = endedAt
+        self.exitCode = exitCode
+        self.result = result
+        self.intervention = intervention
+        self.costTelemetry = costTelemetry
+        self.schemaVersion = schemaVersion
     }
 }
 
@@ -228,6 +287,68 @@ struct PersistedSSEEvent: Codable, Equatable, Sendable {
     }
 }
 
+// MARK: - StepSummary
+
+/// Summary of a single executed step within a run.
+public struct StepSummary: Codable, Equatable, Sendable {
+    public let index: Int
+    public let tool: String
+    public let purpose: String
+    public let success: Bool
+
+    public init(index: Int, tool: String, purpose: String, success: Bool) {
+        self.index = index
+        self.tool = tool
+        self.purpose = purpose
+        self.success = success
+    }
+}
+
+// MARK: - RunResult
+
+/// Structured result payload for a completed run.
+public struct RunResult: Codable, Equatable, Sendable {
+    public let kind: String
+    public let title: String
+    public let body: String
+    public let createdAt: String
+
+    enum CodingKeys: String, CodingKey {
+        case kind
+        case title
+        case body
+        case createdAt = "created_at"
+    }
+
+    public init(kind: String, title: String, body: String, createdAt: String) {
+        self.kind = kind
+        self.title = title
+        self.body = body
+        self.createdAt = createdAt
+    }
+}
+
+// MARK: - InterventionData
+
+/// Intervention payload when a run enters a paused/takeover state.
+public struct InterventionData: Codable, Equatable, Sendable {
+    public let reason: String
+    public let availableActions: [String]
+    public let blockingIssue: String
+
+    enum CodingKeys: String, CodingKey {
+        case reason
+        case availableActions = "available_actions"
+        case blockingIssue = "blocking_issue"
+    }
+
+    public init(reason: String, availableActions: [String], blockingIssue: String) {
+        self.reason = reason
+        self.availableActions = availableActions
+        self.blockingIssue = blockingIssue
+    }
+}
+
 // MARK: - TrackedRun
 
 /// Internal representation of a tracked run, stored in RunTracker.
@@ -241,6 +362,13 @@ public struct TrackedRun: Codable, Equatable, Sendable {
     public var durationMs: Int?
     public var resultText: String?
     public var error: String?
+    public var steps: [StepSummary]?
+    public var startedAt: String?
+    public var endedAt: String?
+    public var exitCode: Int?
+    public var result: RunResult?
+    public var intervention: InterventionData?
+    public var costTelemetry: TokenUsage?
 
     public init(
         runId: String,
@@ -251,7 +379,14 @@ public struct TrackedRun: Codable, Equatable, Sendable {
         totalSteps: Int = 0,
         durationMs: Int? = nil,
         resultText: String? = nil,
-        error: String? = nil
+        error: String? = nil,
+        steps: [StepSummary]? = nil,
+        startedAt: String? = nil,
+        endedAt: String? = nil,
+        exitCode: Int? = nil,
+        result: RunResult? = nil,
+        intervention: InterventionData? = nil,
+        costTelemetry: TokenUsage? = nil
     ) {
         self.runId = runId
         self.status = status
@@ -262,15 +397,34 @@ public struct TrackedRun: Codable, Equatable, Sendable {
         self.durationMs = durationMs
         self.resultText = resultText
         self.error = error
+        self.steps = steps
+        self.startedAt = startedAt
+        self.endedAt = endedAt
+        self.exitCode = exitCode
+        self.result = result
+        self.intervention = intervention
+        self.costTelemetry = costTelemetry
     }
 
-    func toResponse() -> RunResponse {
+    public func toResponse() -> RunResponse {
         RunResponse(
             runId: runId,
             status: status,
             task: task,
             createdAt: createdAt,
-            updatedAt: updatedAt
+            updatedAt: updatedAt,
+            totalSteps: totalSteps > 0 ? totalSteps : nil,
+            durationMs: durationMs,
+            ok: status == .completed,
+            error: error,
+            steps: steps,
+            startedAt: startedAt,
+            endedAt: endedAt,
+            exitCode: exitCode,
+            result: result,
+            intervention: intervention,
+            costTelemetry: costTelemetry,
+            schemaVersion: 1
         )
     }
 }
