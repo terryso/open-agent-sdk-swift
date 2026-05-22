@@ -534,6 +534,139 @@ final class SkillEvolutionTypesTests: XCTestCase {
         XCTAssertEqual(result.skippedSignals.first?.signalType, .deprecation)
     }
 
+    // MARK: - SkillProvenance
+
+    func testSkillProvenanceCases() {
+        XCTAssertEqual(SkillProvenance.allCases.count, 4)
+        XCTAssertEqual(SkillProvenance.agentCreated.rawValue, "agentCreated")
+        XCTAssertEqual(SkillProvenance.bundled.rawValue, "bundled")
+        XCTAssertEqual(SkillProvenance.userDefined.rawValue, "userDefined")
+        XCTAssertEqual(SkillProvenance.hubInstalled.rawValue, "hubInstalled")
+    }
+
+    // MARK: - SkillUsageData
+
+    func testSkillUsageDataDefaults() {
+        let data = SkillUsageData(skillName: "test")
+        XCTAssertEqual(data.skillName, "test")
+        XCTAssertEqual(data.viewCount, 0)
+        XCTAssertNil(data.lastViewedAt)
+        XCTAssertNil(data.lastManagedAt)
+        XCTAssertFalse(data.pinned)
+        XCTAssertEqual(data.provenance, .userDefined)
+    }
+
+    func testSkillUsageDataCustomInit() {
+        let date = Date()
+        let data = SkillUsageData(
+            skillName: "commit",
+            viewCount: 5,
+            lastViewedAt: date,
+            lastManagedAt: date,
+            pinned: true,
+            provenance: .bundled
+        )
+        XCTAssertEqual(data.skillName, "commit")
+        XCTAssertEqual(data.viewCount, 5)
+        XCTAssertEqual(data.lastViewedAt, date)
+        XCTAssertEqual(data.lastManagedAt, date)
+        XCTAssertTrue(data.pinned)
+        XCTAssertEqual(data.provenance, .bundled)
+    }
+
+    func testSkillUsageDataCodableRoundTrip() throws {
+        let date = Date(timeIntervalSince1970: 1700000000)
+        let data = SkillUsageData(
+            skillName: "review",
+            viewCount: 42,
+            lastViewedAt: date,
+            lastManagedAt: date,
+            pinned: true,
+            provenance: .agentCreated
+        )
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let jsonData = try encoder.encode(data)
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let decoded = try decoder.decode(SkillUsageData.self, from: jsonData)
+        XCTAssertEqual(decoded, data)
+    }
+
+    func testSkillUsageDataCurrentLifecycleStateNoViews() {
+        let data = SkillUsageData(skillName: "new")
+        XCTAssertEqual(data.currentLifecycleState, .experimental)
+    }
+
+    func testSkillUsageDataCurrentLifecycleStateRecent() {
+        let data = SkillUsageData(skillName: "active", viewCount: 10, lastViewedAt: Date())
+        XCTAssertEqual(data.currentLifecycleState, .active)
+    }
+
+    // MARK: - SkillUsageTrackerConfig
+
+    func testSkillUsageTrackerConfigDefaults() {
+        let config = SkillUsageTrackerConfig()
+        XCTAssertEqual(config.staleAfterDays, 30)
+        XCTAssertEqual(config.archiveAfterDays, 90)
+        XCTAssertTrue(config.protectExperimental)
+    }
+
+    func testSkillUsageTrackerConfigCustomInit() {
+        let config = SkillUsageTrackerConfig(
+            staleAfterDays: 14,
+            archiveAfterDays: 60,
+            protectExperimental: false
+        )
+        XCTAssertEqual(config.staleAfterDays, 14)
+        XCTAssertEqual(config.archiveAfterDays, 60)
+        XCTAssertFalse(config.protectExperimental)
+    }
+
+    func testSkillUsageTrackerConfigCodableRoundTrip() throws {
+        let config = SkillUsageTrackerConfig(staleAfterDays: 7, archiveAfterDays: 30, protectExperimental: false)
+        let data = try JSONEncoder().encode(config)
+        let decoded = try JSONDecoder().decode(SkillUsageTrackerConfig.self, from: data)
+        XCTAssertEqual(decoded, config)
+    }
+
+    // MARK: - SkillLifecycleTransition
+
+    func testSkillLifecycleTransitionConstruction() {
+        let date = Date(timeIntervalSince1970: 1700000000)
+        let transition = SkillLifecycleTransition(
+            skillName: "old-skill",
+            from: .active,
+            to: .deprecated,
+            reason: "Skill not viewed for 35 days (threshold: 30 days)",
+            evaluatedAt: date
+        )
+        XCTAssertEqual(transition.skillName, "old-skill")
+        XCTAssertEqual(transition.from, .active)
+        XCTAssertEqual(transition.to, .deprecated)
+        XCTAssertEqual(transition.reason, "Skill not viewed for 35 days (threshold: 30 days)")
+        XCTAssertEqual(transition.evaluatedAt, date)
+    }
+
+    func testSkillLifecycleTransitionCodableRoundTrip() throws {
+        let transition = SkillLifecycleTransition(
+            skillName: "test",
+            from: .deprecated,
+            to: .retired,
+            reason: "No longer used"
+        )
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let data = try encoder.encode(transition)
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let decoded = try decoder.decode(SkillLifecycleTransition.self, from: data)
+        XCTAssertEqual(decoded.skillName, transition.skillName)
+        XCTAssertEqual(decoded.from, transition.from)
+        XCTAssertEqual(decoded.to, transition.to)
+        XCTAssertEqual(decoded.reason, transition.reason)
+    }
+
     // MARK: - Mock SkillEvolver conformance (protocol is implementable)
 
     func testMockSkillEvolverConformance() async throws {

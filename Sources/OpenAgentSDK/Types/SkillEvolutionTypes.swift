@@ -283,6 +283,140 @@ public enum SkillLifecycleState: String, Codable, Sendable, Equatable, CaseItera
     case retired
 }
 
+// MARK: - SkillProvenance
+
+/// Origin of a skill definition.
+public enum SkillProvenance: String, Codable, Sendable, Equatable, CaseIterable {
+    /// Created by an agent through evolution.
+    case agentCreated
+    /// Built-in skill shipped with SDK.
+    case bundled
+    /// Manually created by a developer.
+    case userDefined
+    /// Installed from a skill hub/package.
+    case hubInstalled
+}
+
+// MARK: - SkillUsageData
+
+/// Tracks usage metrics and lifecycle metadata for a single skill.
+public struct SkillUsageData: Codable, Sendable, Equatable {
+
+    /// The skill name this data tracks.
+    public let skillName: String
+    /// Number of times the skill has been viewed/invoked.
+    public var viewCount: Int
+    /// When the skill was last viewed.
+    public var lastViewedAt: Date?
+    /// When the skill was last managed (edited, configured).
+    public var lastManagedAt: Date?
+    /// Whether the skill is pinned (protected from auto-transitions).
+    public var pinned: Bool
+    /// How this skill originated.
+    public var provenance: SkillProvenance
+
+    public init(
+        skillName: String,
+        viewCount: Int = 0,
+        lastViewedAt: Date? = nil,
+        lastManagedAt: Date? = nil,
+        pinned: Bool = false,
+        provenance: SkillProvenance = .userDefined
+    ) {
+        self.skillName = skillName
+        self.viewCount = viewCount
+        self.lastViewedAt = lastViewedAt
+        self.lastManagedAt = lastManagedAt
+        self.pinned = pinned
+        self.provenance = provenance
+    }
+
+    /// Derives the current lifecycle state from usage data.
+    ///
+    /// Uses fixed thresholds (30 days → deprecated, 90 days → retired) for quick lookups.
+    /// Note: ``SkillUsageTracker`` uses its own configurable thresholds via ``SkillUsageTrackerConfig``,
+    /// so this computed property may diverge from the tracker's evaluation. This property is
+    /// a convenience approximation, not the authoritative lifecycle state.
+    public var currentLifecycleState: SkillLifecycleState {
+        if viewCount == 0 && lastViewedAt == nil {
+            return .experimental
+        }
+        guard let lastView = lastViewedAt else {
+            return .experimental
+        }
+        let daysSinceView = Calendar.current.dateComponents([.day], from: lastView, to: Date()).day ?? 0
+        if daysSinceView >= 90 {
+            return .retired
+        }
+        if daysSinceView >= 30 {
+            return .deprecated
+        }
+        return .active
+    }
+}
+
+// MARK: - SkillUsageTrackerConfig
+
+/// Configuration for the skill usage tracker's lifecycle evaluation thresholds.
+public struct SkillUsageTrackerConfig: Sendable, Codable, Equatable {
+
+    /// Days without a view before transitioning active → deprecated. Defaults to 30.
+    public let staleAfterDays: Int
+
+    /// Days without a view before transitioning deprecated → retired. Defaults to 90.
+    public let archiveAfterDays: Int
+
+    /// When true, experimental skills skip lifecycle transitions. Defaults to true.
+    ///
+    /// Note: Currently has no effect because experimental skills (viewCount==0, lastViewedAt==nil)
+    /// are always caught by the "no data" rule regardless of this flag. Will become meaningful
+    /// once `SkillUsageData` supports an explicit stored lifecycle state.
+    public let protectExperimental: Bool
+
+    public init(
+        staleAfterDays: Int = 30,
+        archiveAfterDays: Int = 90,
+        protectExperimental: Bool = true
+    ) {
+        precondition(staleAfterDays > 0, "staleAfterDays must be positive")
+        precondition(archiveAfterDays > staleAfterDays, "archiveAfterDays must be greater than staleAfterDays")
+        self.staleAfterDays = staleAfterDays
+        self.archiveAfterDays = archiveAfterDays
+        self.protectExperimental = protectExperimental
+    }
+}
+
+// MARK: - SkillLifecycleTransition
+
+/// Describes a proposed lifecycle state change for a skill.
+public struct SkillLifecycleTransition: Sendable, Codable, Equatable {
+
+    /// The skill being transitioned.
+    public let skillName: String
+    /// The current lifecycle state.
+    public let from: SkillLifecycleState
+    /// The proposed new lifecycle state.
+    public let to: SkillLifecycleState
+    /// Human-readable explanation of why the transition is proposed.
+    public let reason: String
+    /// When this evaluation was performed.
+    public let evaluatedAt: Date
+
+    public init(
+        skillName: String,
+        from: SkillLifecycleState,
+        to: SkillLifecycleState,
+        reason: String,
+        evaluatedAt: Date = Date()
+    ) {
+        self.skillName = skillName
+        self.from = from
+        self.to = to
+        self.reason = reason
+        self.evaluatedAt = evaluatedAt
+    }
+}
+
 // MARK: - SkillEvolver Protocol
 
 /// Protocol for evolving a skill based on collected signals.

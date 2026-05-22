@@ -164,6 +164,11 @@ await ThinkingConfigE2ETests.run(apiKey: apiKey, model: model, baseURL: baseURL)
 await SkillEvolutionE2ETests.run(apiKey: apiKey, model: model, baseURL: baseURL)
 
 // ================================================================
+// SECTION 67-70: Skill Usage Tracker E2E Tests (Story 22.3: SkillUsageTracker)
+// ================================================================
+await SkillUsageTrackerE2ETests.run()
+
+// ================================================================
 // Results Summary
 // ================================================================
 print("\n=== E2E Test Results ===")
