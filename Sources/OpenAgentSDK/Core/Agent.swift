@@ -210,6 +210,30 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                 )
             }
         }
+
+        // Register MemoryReviewHook on sessionEnd when config is provided.
+        // Only supported with Anthropic provider (LLMExperienceExtractor uses Anthropic API).
+        if let memoryConfig = mergedOptions.memoryReviewConfig,
+           let hookRegistry = mergedOptions.hookRegistry,
+           mergedOptions.provider == .anthropic {
+            let extractor = LLMExperienceExtractor(client: self.client)
+            let factStore = FactStore()
+            let agent = self
+            let messageProvider: MessageHistoryProvider = { agent.getMessages() }
+            let hook = MemoryReviewHook(
+                extractor: extractor,
+                factStore: factStore,
+                config: memoryConfig,
+                messageProvider: messageProvider
+            )
+            let handler = hook.makeHandler()
+            // Registration requires await since HookRegistry is an actor.
+            // Using nonisolated(unsafe) to defer registration to first prompt/stream
+            // is safer; here we register synchronously via a detached Task.
+            _Concurrency.Task { [hookRegistry] in
+                await hookRegistry.register(.sessionEnd, definition: HookDefinition(handler: handler))
+            }
+        }
     }
 
     // MARK: - Dynamic Permission Switching

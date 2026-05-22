@@ -207,6 +207,53 @@ public struct ExtractionResult: Sendable, Codable, Equatable {
     }
 }
 
+// MARK: - MemoryReviewConfig
+
+/// Configuration for the automatic memory review hook.
+///
+/// Controls when and how the ``MemoryReviewHook`` extracts experience from conversations
+/// at session end.
+public struct MemoryReviewConfig: Sendable, Codable, Equatable {
+
+    /// Whether memory review is enabled. Defaults to `true`.
+    public var enabled: Bool
+
+    /// Configuration for the extraction phase.
+    public var extractionConfig: ExtractionConfig
+
+    /// Minimum number of messages required to trigger a review.
+    /// Conversations with fewer messages are skipped. Defaults to `4`.
+    public var minMessagesForReview: Int
+
+    /// Minimum seconds between reviews per domain. `nil` means every session.
+    public var reviewInterval: TimeInterval?
+
+    /// Restrict extraction to specific domains. `nil` means auto-detect from conversation.
+    public var domains: [String]?
+
+    public init(
+        enabled: Bool = true,
+        extractionConfig: ExtractionConfig = .init(),
+        minMessagesForReview: Int = 4,
+        reviewInterval: TimeInterval? = nil,
+        domains: [String]? = nil
+    ) {
+        self.enabled = enabled
+        self.extractionConfig = extractionConfig
+        self.minMessagesForReview = minMessagesForReview
+        self.reviewInterval = reviewInterval
+        self.domains = domains
+    }
+}
+
+// MARK: - MessageHistoryProvider
+
+/// A closure that provides the agent's current message history.
+///
+/// Used by ``MemoryReviewHook`` to decouple from `Core/Agent` internals.
+/// The agent wires its own message-access closure at initialization time.
+public typealias MessageHistoryProvider = @Sendable () async -> [SDKMessage]
+
 // MARK: - ExperienceExtractor Protocol
 
 /// Protocol for extracting experience signals from agent conversations.

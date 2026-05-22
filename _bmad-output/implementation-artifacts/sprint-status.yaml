@@ -250,7 +250,7 @@ development_status:
   epic-21: in-progress
   21-1-experience-extractor-protocol-signal-model: done
   21-2-llm-experience-extractor: done
-  21-3-memory-review-hook-session-end: backlog
+  21-3-memory-review-hook-session-end: done
   21-4-memory-security-scan-frozen-snapshot: backlog
   epic-21-retrospective: optional
 

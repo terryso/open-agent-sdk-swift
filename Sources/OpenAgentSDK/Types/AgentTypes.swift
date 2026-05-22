@@ -455,6 +455,12 @@ public struct AgentOptions: Sendable {
     /// `{traceBaseURL}/{runId}/trace.jsonl`. When `nil`, defaults to `~/.open-agent-sdk/traces/`.
     public var traceBaseURL: String?
 
+    /// Optional configuration for automatic memory review at session end.
+    /// When set, a ``MemoryReviewHook`` is registered on `.sessionEnd` to extract
+    /// experience from conversations and persist facts to the ``FactStore``.
+    /// `nil` (default) means no automatic memory review.
+    public var memoryReviewConfig: MemoryReviewConfig?
+
     // MARK: - Memberwise Init
 
     public init(
@@ -522,7 +528,8 @@ public struct AgentOptions: Sendable {
         onRunComplete: (@Sendable (RunCompleteContext) -> Void)? = nil,
         runId: String? = nil,
         traceEnabled: Bool = false,
-        traceBaseURL: String? = nil
+        traceBaseURL: String? = nil,
+        memoryReviewConfig: MemoryReviewConfig? = nil
     ) {
         self.apiKey = apiKey
         self.model = model
@@ -589,6 +596,7 @@ public struct AgentOptions: Sendable {
         self.runId = runId
         self.traceEnabled = traceEnabled
         self.traceBaseURL = traceBaseURL
+        self.memoryReviewConfig = memoryReviewConfig
     }
 
     // MARK: - Auto-Discover Skills
@@ -703,6 +711,7 @@ public struct AgentOptions: Sendable {
         self.runId = nil
         self.traceEnabled = false
         self.traceBaseURL = nil
+        self.memoryReviewConfig = nil
     }
 
     // MARK: - Validation
