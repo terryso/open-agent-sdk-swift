@@ -259,7 +259,7 @@ development_status:
   22-1-skill-signal-model-skill-evolver-protocol: done
   22-2-llm-skill-evolver: done
   22-3-skill-usage-tracker-lifecycle: done
-  22-4-skill-curator: backlog
+  22-4-skill-curator: done
   epic-22-retrospective: optional
 
   # Epic 23: 高级进化 — 插件生态（可选）

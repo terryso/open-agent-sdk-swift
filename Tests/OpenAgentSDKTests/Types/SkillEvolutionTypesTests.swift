@@ -667,6 +667,179 @@ final class SkillEvolutionTypesTests: XCTestCase {
         XCTAssertEqual(decoded.reason, transition.reason)
     }
 
+    // MARK: - CuratorState
+
+    func testCuratorStateDefaults() {
+        let state = CuratorState.defaultState()
+        XCTAssertNil(state.lastRunAt)
+        XCTAssertFalse(state.paused)
+        XCTAssertEqual(state.runCount, 0)
+        XCTAssertNil(state.lastRunDurationMs)
+        XCTAssertTrue(state.lastErrors.isEmpty)
+    }
+
+    func testCuratorStateCustomInit() {
+        let date = Date()
+        let state = CuratorState(
+            lastRunAt: date,
+            paused: true,
+            runCount: 3,
+            lastRunDurationMs: 142,
+            lastErrors: ["err1"]
+        )
+        XCTAssertEqual(state.lastRunAt, date)
+        XCTAssertTrue(state.paused)
+        XCTAssertEqual(state.runCount, 3)
+        XCTAssertEqual(state.lastRunDurationMs, 142)
+        XCTAssertEqual(state.lastErrors, ["err1"])
+    }
+
+    func testCuratorStateCodableRoundTrip() throws {
+        let date = Date(timeIntervalSince1970: 1700000000)
+        let state = CuratorState(
+            lastRunAt: date,
+            paused: true,
+            runCount: 5,
+            lastRunDurationMs: 200,
+            lastErrors: ["error A", "error B"]
+        )
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let data = try encoder.encode(state)
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let decoded = try decoder.decode(CuratorState.self, from: data)
+        XCTAssertEqual(decoded, state)
+    }
+
+    func testCuratorStateDefaultStateIsEqualToInit() {
+        let a = CuratorState.defaultState()
+        let b = CuratorState()
+        XCTAssertEqual(a, b)
+    }
+
+    // MARK: - SkillCuratorConfig
+
+    func testSkillCuratorConfigDefaults() {
+        let config = SkillCuratorConfig()
+        XCTAssertEqual(config.intervalHours, 168.0)
+        XCTAssertEqual(config.minIdleHours, 2.0)
+        XCTAssertEqual(config.staleAfterDays, 30)
+        XCTAssertEqual(config.archiveAfterDays, 90)
+        XCTAssertFalse(config.dryRun)
+        XCTAssertTrue(config.enabled)
+    }
+
+    func testSkillCuratorConfigCustomInit() {
+        let config = SkillCuratorConfig(
+            intervalHours: 24.0,
+            minIdleHours: 1.0,
+            staleAfterDays: 14,
+            archiveAfterDays: 60,
+            dryRun: true,
+            enabled: false
+        )
+        XCTAssertEqual(config.intervalHours, 24.0)
+        XCTAssertEqual(config.minIdleHours, 1.0)
+        XCTAssertEqual(config.staleAfterDays, 14)
+        XCTAssertEqual(config.archiveAfterDays, 60)
+        XCTAssertTrue(config.dryRun)
+        XCTAssertFalse(config.enabled)
+    }
+
+    func testSkillCuratorConfigCodableRoundTrip() throws {
+        let config = SkillCuratorConfig(
+            intervalHours: 48.0,
+            minIdleHours: 0.5,
+            staleAfterDays: 7,
+            archiveAfterDays: 30,
+            dryRun: true,
+            enabled: false
+        )
+        let data = try JSONEncoder().encode(config)
+        let decoded = try JSONDecoder().decode(SkillCuratorConfig.self, from: data)
+        XCTAssertEqual(decoded, config)
+    }
+
+    func testSkillCuratorConfigValidationBoundaryMinIdleZero() {
+        let config = SkillCuratorConfig(minIdleHours: 0)
+        XCTAssertEqual(config.minIdleHours, 0)
+    }
+
+    func testSkillCuratorConfigValidationBoundaryArchiveOneMoreThanStale() {
+        let config = SkillCuratorConfig(staleAfterDays: 30, archiveAfterDays: 31)
+        XCTAssertEqual(config.archiveAfterDays, 31)
+    }
+
+    // Note: precondition validation for invalid configs (intervalHours<=0,
+    // minIdleHours<0, staleAfterDays<=0, archiveAfterDays<=staleAfterDays)
+    // is enforced at runtime via precondition() calls and cannot be tested
+    // in-process since they trap the process. The guards exist in the
+    // implementation and fire at runtime.
+
+    // MARK: - CuratorRunResult
+
+    func testCuratorRunResultDefaults() {
+        let result = CuratorRunResult()
+        XCTAssertTrue(result.transitionsApplied.isEmpty)
+        XCTAssertEqual(result.skillsEvaluated, 0)
+        XCTAssertEqual(result.skillsSkipped, 0)
+        XCTAssertTrue(result.errors.isEmpty)
+        XCTAssertEqual(result.durationMs, 0)
+        XCTAssertFalse(result.dryRun)
+    }
+
+    func testCuratorRunResultCustomInit() {
+        let transition = SkillLifecycleTransition(
+            skillName: "old",
+            from: .active,
+            to: .deprecated,
+            reason: "stale"
+        )
+        let result = CuratorRunResult(
+            transitionsApplied: [transition],
+            skillsEvaluated: 5,
+            skillsSkipped: 3,
+            errors: ["err"],
+            durationMs: 100,
+            dryRun: true,
+            ranAt: Date(timeIntervalSince1970: 1700000000)
+        )
+        XCTAssertEqual(result.transitionsApplied.count, 1)
+        XCTAssertEqual(result.skillsEvaluated, 5)
+        XCTAssertEqual(result.skillsSkipped, 3)
+        XCTAssertEqual(result.errors, ["err"])
+        XCTAssertEqual(result.durationMs, 100)
+        XCTAssertTrue(result.dryRun)
+    }
+
+    func testCuratorRunResultCodableRoundTrip() throws {
+        let fixedDate = Date(timeIntervalSince1970: 1700000000)
+        let transition = SkillLifecycleTransition(
+            skillName: "test",
+            from: .deprecated,
+            to: .retired,
+            reason: "archived",
+            evaluatedAt: fixedDate
+        )
+        let result = CuratorRunResult(
+            transitionsApplied: [transition],
+            skillsEvaluated: 2,
+            skillsSkipped: 1,
+            errors: [],
+            durationMs: 50,
+            dryRun: false,
+            ranAt: fixedDate
+        )
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let data = try encoder.encode(result)
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let decoded = try decoder.decode(CuratorRunResult.self, from: data)
+        XCTAssertEqual(decoded, result)
+    }
+
     // MARK: - Mock SkillEvolver conformance (protocol is implementable)
 
     func testMockSkillEvolverConformance() async throws {

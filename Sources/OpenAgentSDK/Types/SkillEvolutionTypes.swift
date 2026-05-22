@@ -417,6 +417,120 @@ public struct SkillLifecycleTransition: Sendable, Codable, Equatable {
     }
 }
 
+// MARK: - CuratorState
+
+/// Persistent state for the automatic skill curation service.
+public struct CuratorState: Sendable, Codable, Equatable {
+
+    /// When the last curation run finished. `nil` if never run.
+    public var lastRunAt: Date?
+    /// Whether curation is paused by user request.
+    public var paused: Bool
+    /// Total number of completed curation runs.
+    public var runCount: Int
+    /// Wall-clock milliseconds of the most recent run.
+    public var lastRunDurationMs: Int?
+    /// Errors collected during the most recent run.
+    public var lastErrors: [String]
+
+    public init(
+        lastRunAt: Date? = nil,
+        paused: Bool = false,
+        runCount: Int = 0,
+        lastRunDurationMs: Int? = nil,
+        lastErrors: [String] = []
+    ) {
+        self.lastRunAt = lastRunAt
+        self.paused = paused
+        self.runCount = runCount
+        self.lastRunDurationMs = lastRunDurationMs
+        self.lastErrors = lastErrors
+    }
+
+    /// Returns a fresh state with all default values.
+    public static func defaultState() -> CuratorState {
+        CuratorState()
+    }
+}
+
+// MARK: - SkillCuratorConfig
+
+/// Configuration for the automatic skill curation service.
+public struct SkillCuratorConfig: Sendable, Codable, Equatable {
+
+    /// Hours between automatic curation runs. Defaults to 168 (7 days).
+    public let intervalHours: Double
+    /// Minimum hours of agent idle time before a run can start. Defaults to 2.
+    public let minIdleHours: Double
+    /// Days without a view before a skill is considered stale. Defaults to 30.
+    public let staleAfterDays: Int
+    /// Days without a view before a stale skill is archived. Defaults to 90.
+    public let archiveAfterDays: Int
+    /// When `true`, compute transitions but don't apply them. Defaults to `false`.
+    public let dryRun: Bool
+    /// Whether automatic curation is enabled. Defaults to `true`.
+    public let enabled: Bool
+
+    public init(
+        intervalHours: Double = 168.0,
+        minIdleHours: Double = 2.0,
+        staleAfterDays: Int = 30,
+        archiveAfterDays: Int = 90,
+        dryRun: Bool = false,
+        enabled: Bool = true
+    ) {
+        precondition(intervalHours > 0, "intervalHours must be positive")
+        precondition(minIdleHours >= 0, "minIdleHours must be non-negative")
+        precondition(staleAfterDays > 0, "staleAfterDays must be positive")
+        precondition(archiveAfterDays > staleAfterDays, "archiveAfterDays must be greater than staleAfterDays")
+        self.intervalHours = intervalHours
+        self.minIdleHours = minIdleHours
+        self.staleAfterDays = staleAfterDays
+        self.archiveAfterDays = archiveAfterDays
+        self.dryRun = dryRun
+        self.enabled = enabled
+    }
+}
+
+// MARK: - CuratorRunResult
+
+/// Result of a single curation pass.
+public struct CuratorRunResult: Sendable, Codable, Equatable {
+
+    /// Transitions that were computed (and applied if not dry-run).
+    public let transitionsApplied: [SkillLifecycleTransition]
+    /// Number of skills that were evaluated for transitions.
+    public let skillsEvaluated: Int
+    /// Number of skills skipped (pinned, bundled, user-defined, hub-installed).
+    public let skillsSkipped: Int
+    /// Non-fatal errors encountered during the run.
+    public let errors: [String]
+    /// Wall-clock duration of the run in milliseconds.
+    public let durationMs: Int
+    /// Whether this was a dry run (no mutations applied).
+    public let dryRun: Bool
+    /// When this run was executed.
+    public let ranAt: Date
+
+    public init(
+        transitionsApplied: [SkillLifecycleTransition] = [],
+        skillsEvaluated: Int = 0,
+        skillsSkipped: Int = 0,
+        errors: [String] = [],
+        durationMs: Int = 0,
+        dryRun: Bool = false,
+        ranAt: Date = Date()
+    ) {
+        self.transitionsApplied = transitionsApplied
+        self.skillsEvaluated = skillsEvaluated
+        self.skillsSkipped = skillsSkipped
+        self.errors = errors
+        self.durationMs = durationMs
+        self.dryRun = dryRun
+        self.ranAt = ranAt
+    }
+}
+
 // MARK: - SkillEvolver Protocol
 
 /// Protocol for evolving a skill based on collected signals.

@@ -169,6 +169,11 @@ await SkillEvolutionE2ETests.run(apiKey: apiKey, model: model, baseURL: baseURL)
 await SkillUsageTrackerE2ETests.run()
 
 // ================================================================
+// SECTION 71-75: Skill Curator E2E Tests (Story 22.4: SkillCurator)
+// ================================================================
+await SkillCuratorE2ETests.run()
+
+// ================================================================
 // Results Summary
 // ================================================================
 print("\n=== E2E Test Results ===")
