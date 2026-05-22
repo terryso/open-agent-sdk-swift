@@ -7,13 +7,15 @@ final class APITypesTests: XCTestCase {
 
     func testAPIRunStatusAllCases() {
         let allCases = APIRunStatus.allCases
-        XCTAssertEqual(allCases.count, 6)
+        XCTAssertEqual(allCases.count, 8)
         XCTAssertTrue(allCases.contains(.queued))
         XCTAssertTrue(allCases.contains(.running))
         XCTAssertTrue(allCases.contains(.completed))
         XCTAssertTrue(allCases.contains(.failed))
         XCTAssertTrue(allCases.contains(.cancelled))
         XCTAssertTrue(allCases.contains(.interventionNeeded))
+        XCTAssertTrue(allCases.contains(.userTakeover))
+        XCTAssertTrue(allCases.contains(.resuming))
     }
 
     func testAPIRunStatusRawValues() {
@@ -23,6 +25,8 @@ final class APITypesTests: XCTestCase {
         XCTAssertEqual(APIRunStatus.failed.rawValue, "failed")
         XCTAssertEqual(APIRunStatus.cancelled.rawValue, "cancelled")
         XCTAssertEqual(APIRunStatus.interventionNeeded.rawValue, "intervention_needed")
+        XCTAssertEqual(APIRunStatus.userTakeover.rawValue, "user_takeover")
+        XCTAssertEqual(APIRunStatus.resuming.rawValue, "resuming")
     }
 
     func testAPIRunStatusCodableRoundTrip() throws {
