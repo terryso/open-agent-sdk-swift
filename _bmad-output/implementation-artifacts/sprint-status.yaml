@@ -249,7 +249,7 @@ development_status:
   # Epic 21: 记忆进化 — ExperienceExtractor 与自动审查
   epic-21: in-progress
   21-1-experience-extractor-protocol-signal-model: done
-  21-2-llm-experience-extractor: backlog
+  21-2-llm-experience-extractor: done
   21-3-memory-review-hook-session-end: backlog
   21-4-memory-security-scan-frozen-snapshot: backlog
   epic-21-retrospective: optional

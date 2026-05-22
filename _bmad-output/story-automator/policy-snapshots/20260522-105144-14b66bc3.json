@@ -1,0 +1,246 @@
+{
+  "runtime": {
+    "merge": {
+      "arrays": "replace",
+      "maps": "deep"
+    },
+    "parser": {
+      "model": "haiku",
+      "provider": "claude",
+      "timeoutSeconds": 120
+    }
+  },
+  "snapshot": {
+    "relativeDir": "_bmad-output/story-automator/policy-snapshots"
+  },
+  "steps": {
+    "auto": {
+      "assets": {
+        "checklistCandidates": [
+          "checklist.md"
+        ],
+        "files": {
+          "checklist": ".claude/skills/bmad-qa-generate-e2e-tests/checklist.md",
+          "instructions": "",
+          "skill": ".claude/skills/bmad-qa-generate-e2e-tests/SKILL.md",
+          "template": "",
+          "workflow": ""
+        },
+        "instructionsCandidates": [],
+        "required": [],
+        "skillName": "bmad-qa-generate-e2e-tests",
+        "templateCandidates": [],
+        "workflowCandidates": [
+          "workflow.md",
+          "workflow.yaml"
+        ]
+      },
+      "label": "qa-generate-e2e-tests",
+      "parse": {
+        "schemaFile": "data/parse/auto.json",
+        "schemaHash": "c28f92c6",
+        "schemaPath": "/Users/nick/CascadeProjects/open-agent-sdk-swift/.claude/skills/bmad-story-automator/data/parse/auto.json"
+      },
+      "prompt": {
+        "interactionMode": "autonomous",
+        "templateFile": "data/prompts/auto.md",
+        "templateHash": "ea2800d0",
+        "templatePath": "/Users/nick/CascadeProjects/open-agent-sdk-swift/.claude/skills/bmad-story-automator/data/prompts/auto.md"
+      },
+      "success": {
+        "verifier": "session_exit"
+      }
+    },
+    "create": {
+      "assets": {
+        "checklistCandidates": [
+          "checklist.md"
+        ],
+        "files": {
+          "checklist": ".claude/skills/bmad-create-story/checklist.md",
+          "instructions": ".claude/skills/bmad-create-story/discover-inputs.md",
+          "skill": ".claude/skills/bmad-create-story/SKILL.md",
+          "template": ".claude/skills/bmad-create-story/template.md",
+          "workflow": ""
+        },
+        "instructionsCandidates": [
+          "discover-inputs.md"
+        ],
+        "required": [
+          "skill"
+        ],
+        "skillName": "bmad-create-story",
+        "templateCandidates": [
+          "template.md"
+        ],
+        "workflowCandidates": [
+          "workflow.md",
+          "workflow.yaml"
+        ]
+      },
+      "label": "create-story",
+      "parse": {
+        "schemaFile": "data/parse/create.json",
+        "schemaHash": "62942dd0",
+        "schemaPath": "/Users/nick/CascadeProjects/open-agent-sdk-swift/.claude/skills/bmad-story-automator/data/parse/create.json"
+      },
+      "prompt": {
+        "interactionMode": "autonomous",
+        "templateFile": "data/prompts/create.md",
+        "templateHash": "3237dfc2",
+        "templatePath": "/Users/nick/CascadeProjects/open-agent-sdk-swift/.claude/skills/bmad-story-automator/data/prompts/create.md"
+      },
+      "success": {
+        "config": {
+          "expectedMatches": 1,
+          "glob": "_bmad-output/implementation-artifacts/{story_prefix}-*.md"
+        },
+        "verifier": "create_story_artifact"
+      }
+    },
+    "dev": {
+      "assets": {
+        "checklistCandidates": [
+          "checklist.md"
+        ],
+        "files": {
+          "checklist": ".claude/skills/bmad-dev-story/checklist.md",
+          "instructions": "",
+          "skill": ".claude/skills/bmad-dev-story/SKILL.md",
+          "template": "",
+          "workflow": ""
+        },
+        "instructionsCandidates": [],
+        "required": [
+          "skill"
+        ],
+        "skillName": "bmad-dev-story",
+        "templateCandidates": [],
+        "workflowCandidates": [
+          "workflow.md",
+          "workflow.yaml"
+        ]
+      },
+      "label": "dev-story",
+      "parse": {
+        "schemaFile": "data/parse/dev.json",
+        "schemaHash": "c3ea8e93",
+        "schemaPath": "/Users/nick/CascadeProjects/open-agent-sdk-swift/.claude/skills/bmad-story-automator/data/parse/dev.json"
+      },
+      "prompt": {
+        "interactionMode": "autonomous",
+        "templateFile": "data/prompts/dev.md",
+        "templateHash": "40b6bb3d",
+        "templatePath": "/Users/nick/CascadeProjects/open-agent-sdk-swift/.claude/skills/bmad-story-automator/data/prompts/dev.md"
+      },
+      "success": {
+        "verifier": "session_exit"
+      }
+    },
+    "retro": {
+      "assets": {
+        "checklistCandidates": [],
+        "files": {
+          "checklist": "",
+          "instructions": "",
+          "skill": ".claude/skills/bmad-retrospective/SKILL.md",
+          "template": "",
+          "workflow": ""
+        },
+        "instructionsCandidates": [],
+        "required": [
+          "skill"
+        ],
+        "skillName": "bmad-retrospective",
+        "templateCandidates": [],
+        "workflowCandidates": [
+          "workflow.md",
+          "workflow.yaml"
+        ]
+      },
+      "label": "retrospective",
+      "parse": {
+        "schemaFile": "data/parse/retro.json",
+        "schemaHash": "c56d1f1b",
+        "schemaPath": "/Users/nick/CascadeProjects/open-agent-sdk-swift/.claude/skills/bmad-story-automator/data/parse/retro.json"
+      },
+      "prompt": {
+        "interactionMode": "autonomous",
+        "templateFile": "data/prompts/retro.md",
+        "templateHash": "b55e13a5",
+        "templatePath": "/Users/nick/CascadeProjects/open-agent-sdk-swift/.claude/skills/bmad-story-automator/data/prompts/retro.md"
+      },
+      "success": {
+        "verifier": "epic_complete"
+      }
+    },
+    "review": {
+      "assets": {
+        "checklistCandidates": [
+          "checklist.md"
+        ],
+        "files": {
+          "checklist": ".claude/skills/bmad-story-automator-review/checklist.md",
+          "instructions": ".claude/skills/bmad-story-automator-review/instructions.xml",
+          "skill": ".claude/skills/bmad-story-automator-review/SKILL.md",
+          "template": "",
+          "workflow": ".claude/skills/bmad-story-automator-review/workflow.yaml"
+        },
+        "instructionsCandidates": [
+          "instructions.xml"
+        ],
+        "required": [
+          "skill"
+        ],
+        "skillName": "bmad-story-automator-review",
+        "templateCandidates": [],
+        "workflowCandidates": [
+          "workflow.yaml",
+          "workflow.md"
+        ]
+      },
+      "label": "code-review",
+      "parse": {
+        "schemaFile": "data/parse/review.json",
+        "schemaHash": "563493d5",
+        "schemaPath": "/Users/nick/CascadeProjects/open-agent-sdk-swift/.claude/skills/bmad-story-automator/data/parse/review.json"
+      },
+      "prompt": {
+        "acceptExtraInstruction": true,
+        "defaultExtraInstruction": "auto-fix all issues without prompting",
+        "interactionMode": "autonomous",
+        "templateFile": "data/prompts/review.md",
+        "templateHash": "ae574cd3",
+        "templatePath": "/Users/nick/CascadeProjects/open-agent-sdk-swift/.claude/skills/bmad-story-automator/data/prompts/review.md"
+      },
+      "success": {
+        "contractFile": "<skills-root>/bmad-story-automator-review/contract.json",
+        "contractHash": "168addec",
+        "contractPath": "/Users/nick/CascadeProjects/open-agent-sdk-swift/.claude/skills/bmad-story-automator-review/contract.json",
+        "verifier": "review_completion"
+      }
+    }
+  },
+  "version": 1,
+  "workflow": {
+    "crash": {
+      "maxRetries": 2,
+      "onExhausted": "escalate"
+    },
+    "repeat": {
+      "review": {
+        "maxCycles": 5,
+        "onExhausted": "escalate",
+        "onIncomplete": "retry",
+        "successVerifier": "review_completion"
+      }
+    },
+    "sequence": [
+      "create",
+      "dev",
+      "auto",
+      "review",
+      "retro"
+    ]
+  }
+}
