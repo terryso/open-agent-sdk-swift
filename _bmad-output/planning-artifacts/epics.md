@@ -9,6 +9,9 @@ stepsCompleted:
   - step-10-final-validation
   - step-16-epic-design
   - step-16-story-creation
+  - step-21-epic-design
+  - step-22-epic-design
+  - step-23-epic-design
 inputDocuments:
   - _bmad-output/planning-artifacts/prd.md
   - _bmad-output/planning-artifacts/architecture.md
@@ -4044,3 +4047,690 @@ Axion（macOS 桌面自动化 Agent）作为 SDK 旗舰应用，经过 20 个 Ep
 **则** 累积状态，`finalize()` 时输出完整 JSON 结构
 
 **新增 FR74:** 开发者可以通过 SDKMessageOutputHandler 协议实现自定义输出格式，SDK 提供 Terminal 和 JSON 两种内置实现
+
+---
+
+## 设计哲学（从 Hermes 学到的）
+
+> 以下 Epic 21–23 基于 Hermes Agent 自进化机制深度解析系列的研究成果，为 OpenAgentSDK 规划分层、渐进式的自进化能力。
+
+1. **积极但克制** — 鼓励学习但明确划定边界（反模式清单）
+2. **可逆性优先** — 只归档不删除，用 replace 而非覆盖
+3. **成本意识** — 利用前缀缓存、辅助模型、间隔触发
+4. **可选而非强制** — 每层都可以独立开关
+5. **纵深防御** — 安全扫描在写入时和加载时都执行
+
+---
+
+## Epic 21: 记忆进化 — ExperienceExtractor 与自动审查
+
+**目标：** 让 Agent 在会话结束时自动从对话中提炼值得持久化的经验，写入 FactStore。
+
+**价值：** 用户花了 30 分钟教的偏好，下次对话全忘了——这是架构缺陷，不是模型能力问题。记忆进化是闭环学习的基础。
+
+**覆盖的 FR（新增）：** FR75
+**依赖：** Epic 19（Memory Store）、Epic 20（增强 Memory — Fact-based 生命周期与分类）
+
+### Story 21.1: ExperienceExtractor 协议与信号模型
+
+定义从对话中提取经验的抽象接口和数据模型。
+
+**产出：**
+- `ExperienceSignal` struct — 经验信号（内容、领域、类型、置信度）
+- `ExperienceExtractor` protocol — 抽象接口，输入 `[SDKMessage]`，输出 `[ExperienceSignal]`
+- `ExtractionConfig` — 配置项（反模式清单、信号阈值）
+
+**Hermes 参考：**
+- `agent/background_review.py` — `_MEMORY_REVIEW_PROMPT` 和 `_COMBINED_REVIEW_PROMPT` 定义了审查逻辑
+  - 重点关注：审查 prompt 的两段式结构（记忆审查 + 技能审查）
+  - 记忆审查聚焦两类信号：用户身份（persona, preferences）和用户期望（work style, behavior）
+  - 组合审查 prompt 的格式和措辞（"Be ACTIVE" vs "Nothing to save" 的平衡）
+
+**现有 SDK 基础：**
+- `Types/MemoryFact.swift` — `MemoryFact` 已有完整的生命周期（candidate→active→retired）、置信度、证据计数
+- `Types/MemoryTypes.swift` — `KnowledgeEntry` 和 `MemoryStoreProtocol` 已定义存储抽象
+- `Stores/FactStore.swift` — 持久化存储已实现（actor、JSON 文件、legacy 迁移）
+
+### Story 21.2: LLMExperienceExtractor — LLM 驱动的经验提取器
+
+用 LLM 调用来从对话中提取经验信号的内置实现。
+
+**产出：**
+- `LLMExperienceExtractor` — 基于 LLM 的 ExperienceExtractor 实现
+- 审查 prompt 模板（包含反模式清单）
+- 冻结快照模式：提取结果写入磁盘但不刷新当前 system prompt
+
+**Hermes 参考：**
+- `agent/background_review.py:1-145` — 完整的后台审查实现
+  - `_MEMORY_THREAT_PATTERNS` (第 34-37 行) — 提示注入检测模式
+  - `_COMBINED_REVIEW_PROMPT` — 组合审查 prompt，同时处理记忆和技能
+  - **反模式清单**（第 121-144 行）：
+    - 环境依赖的失败（missing binaries, command not found）
+    - 负面断言（"browser tools do not work"）
+    - 一次性瞬态错误（重试就好的那种）
+    - 一次性任务叙述（"summarize today's market"）
+  - **关键措辞**："If a tool failed because of setup state, capture the FIX — never 'this tool does not work' as a standalone constraint"
+- `tools/memory_tool.py:67-100` — 记忆安全扫描
+  - `_MEMORY_THREAT_PATTERNS` — 写入时的威胁模式检测（prompt injection, exfil, SSH backdoor）
+  - `_INVISIBLE_CHARS` — 不可见 Unicode 字符检测
+  - `_scan_memory_content()` — 写入时扫描函数
+
+**现有 SDK 基础：**
+- `API/LLMClient.swift` — 可复用现有 LLM 客户端做提取
+- `Utils/MemoryContextProvider.swift` — 已有将 facts 格式化为 prompt 的能力
+
+### Story 21.3: ReviewHook — sessionEnd 自动审查接入
+
+将 ExperienceExtractor 接入 HookRegistry 的 `sessionEnd` 事件，完成记忆进化的闭环。
+
+**产出：**
+- `MemoryReviewHook` — 注册到 `sessionEnd` 的 hook 实现
+- 间隔控制：不是每次会话都审查，通过配置控制间隔
+- 操作摘要：审查完成后生成人类可读的摘要
+
+**Hermes 参考：**
+- `agent/background_review.py:1-40` — 触发条件和间隔控制
+  - `_memory_nudge_interval` 和 `_skill_nudge_interval` — 审查间隔配置
+  - 三个条件同时满足才触发：有最终回复、对话未中断、达到审查间隔
+- `agent/background_review.py` — `spawn_background_review()` 函数
+  - Fork 审查代理，继承父代理的 `model`, `provider`, `api_key`, `base_url`
+  - **前缀缓存共享**：`review_agent._cached_system_prompt = agent._cached_system_prompt`
+  - `session_start` 和 `session_id` 固定以保证缓存一致
+  - 审查代理工具白名单：只允许 `memory`, `skill_manage`, `skill_view`, `skills_list`
+  - `summarize_background_review_actions()` — 提取人类可读的操作摘要
+
+**现有 SDK 基础：**
+- `Hooks/HookRegistry.swift` — 已有 `sessionEnd` 事件
+- `Types/HookTypes.swift` — `HookEvent.sessionEnd` 已定义
+
+### Story 21.4: 记忆安全扫描与冻结快照
+
+防止记忆被武器化，确保前缀缓存不被破坏。
+
+**产出：**
+- 写入时扫描：威胁模式检测（prompt injection、exfil、SSH backdoor）
+- 加载时扫描：系统提示词构建时扫描所有注入的上下文
+- 不可见 Unicode 字符检测
+- 冻结快照模式：会话中写入 fact 不刷新 system prompt
+
+**Hermes 参考：**
+- `tools/memory_tool.py:67-100` — 完整的安全扫描实现
+  - `_MEMORY_THREAT_PATTERNS` — 13 种威胁模式
+  - `_INVISIBLE_CHARS` — 6 种不可见 Unicode 字符
+  - `_scan_memory_content()` — 写入时扫描
+  - `_INVISIBLE_CHARS` 集合 — U+200B, U+200C, U+200D, U+2060, U+FEFF, U+202A-E
+- `tools/memory_tool.py` (docstring) — 冻结快照设计说明
+  - "Mid-session writes update files on disk immediately (durable) but do NOT change the system prompt — this preserves the prefix cache for the entire session."
+- `agent/background_review.py:70-75` — 缓存继承实现
+  - 审查代理继承 `_cached_system_prompt`、`session_start`、`session_id`
+  - 字节级一致保证前缀缓存命中
+  - PR #17276 分析：约 26% 端到端成本降低
+
+**现有 SDK 基础：**
+- `Stores/FactStore.swift` — 已有 `validateDomainName()` 做路径遍历防护
+- `Utils/MemoryContextProvider.swift` — 系统提示词注入的入口
+
+**新增 FR75:** 开发者可以通过 ExperienceExtractor 从对话中自动提取经验，通过 MemoryReviewHook 在会话结束时触发审查，通过安全扫描防止记忆被武器化
+
+---
+
+## Epic 22: 技能进化 — SkillEvolver 与生命周期管理
+
+**目标：** 让 Agent 能从对话中自动创建、更新、归档技能，实现「从经验中提炼可复用的操作指南」。
+
+**价值：** 记忆解决「你是谁、世界是什么样的」，技能解决「这类事该怎么做」。技能是 Agent 的程序性知识——跨会话可复用的操作指南。
+
+**覆盖的 FR（新增）：** FR76
+**依赖：** Epic 11（技能系统）、Epic 21（ExperienceExtractor）
+
+### Story 22.1: SkillSignal 模型与 SkillEvolver 协议
+
+定义技能变更信号和进化器接口。
+
+**产出：**
+- `SkillSignal` struct — 技能变更信号（skillName、signalType、content、confidence、source）
+- `SkillEvolver` protocol — 技能进化器抽象接口
+- `SkillLifecycleState` — active / deprecated / experimental / retired 状态机
+
+**Hermes 参考：**
+- `tools/skill_usage.py:1-100` — 技能生命周期管理
+  - `STATE_ACTIVE`, `STATE_STALE`, `STATE_ARCHIVED` — 三态定义
+  - `_usage_file()` → `~/.hermes/skills/.usage.json` — 使用追踪 sidecar 文件
+  - 设计决策：sidecar 而非 frontmatter，"keeps operational telemetry out of user-authored SKILL.md content"
+  - `provenance` 字段：`agent_created` / `bundled` / `hub_installed` — 来源追踪
+  - 原子写入：`tempfile + os.replace` 模式
+  - 文件锁：`fcntl` (Unix) / `msvcrt` (Windows) 跨进程序列化
+- `tools/skill_manager_tool.py:1-80` — 技能管理工具
+  - 动作定义：`create`, `edit`, `patch`, `delete`, `write_file`, `remove_file`
+  - 目录布局：`~/.hermes/skills/<skill>/SKILL.md + references/ + templates/ + scripts/`
+  - 安全扫描：`skills_guard.scan_skill()` 对外部安装的技能
+
+**现有 SDK 基础：**
+- `Types/SkillTypes.swift` — `Skill` struct 已有 `baseDir`, `supportingFiles` 字段
+- `Tools/SkillRegistry.swift` — 已有技能注册和查找
+- `Skills/SkillLoader.swift` — 已有从文件系统加载技能
+
+### Story 22.2: LLMSkillEvolver — LLM 驱动的技能进化
+
+用 LLM 调用来识别技能信号并执行技能变更。
+
+**产出：**
+- `LLMSkillEvolver` — 基于 LLM 的 SkillEvolver 实现
+- 技能审查 prompt（类级命名约束、优先修补策略、用户偏好嵌入）
+- 内存中 Skill 字段合并（promptTemplate、description、whenToUse 等字段级别的 partial override，不涉及文件系统操作）
+
+**Hermes 参考：**
+- `agent/background_review.py:45-145` — `_SKILL_REVIEW_PROMPT` 完整内容
+  - **触发信号**（4 类）：
+    1. 风格纠正（"stop doing X", "too verbose"）
+    2. 流程纠正（"先写测试再写代码"）
+    3. 新技术（workaround、debugging path）
+    4. 技能过时（loaded skill turned out wrong）
+  - **优先级顺序**：
+    1. UPDATE A CURRENTLY-LOADED SKILL
+    2. UPDATE AN EXISTING UMBRELLA
+    3. ADD A SUPPORT FILE
+    4. CREATE A NEW CLASS-LEVEL UMBRELLA（最后手段）
+  - **类级命名约束**：名称不能是 PR number、error string、feature codename
+  - **用户偏好嵌入**：preferences belong in SKILL.md body, not just in memory
+  - **三种支持文件**：`references/`（参考文档）、`templates/`（模板）、`scripts/`（脚本）
+- `tools/skill_manager_tool.py:1-80` — 技能文件操作
+  - `skill_manage(action="create/edit/patch/delete/write_file/remove_file")`
+  - `_guard_agent_created_enabled()` — 代理创建的技能安全扫描开关
+  - `_security_scan_skill()` — 安全扫描函数
+
+### Story 22.3: SkillUsageTracker — 使用追踪与生命周期转换
+
+追踪技能使用频率，自动执行生命周期状态转换。
+
+**产出：**
+- `SkillUsageTracker` — 追踪 view_count、last_viewed_at、last_managed_at
+- 生命周期转换：active → deprecated（30天）→ retired（90天）
+- Pinned 技能跳过所有自动转换
+- 使用追踪 sidecar 文件（与技能内容分离）
+
+**Hermes 参考：**
+- `tools/skill_usage.py:1-100` — 完整的使用追踪实现
+  - `bump_view(skill_name)` — 增加查看计数
+  - `bump_manage(skill_name)` — 更新管理时间戳
+  - `get_usage(skill_name)` — 获取使用数据
+  - `get_provenance(skill_name)` — 获取技能来源
+  - `set_provenance(skill_name, provenance)` — 设置来源
+  - `_usage_file_lock()` — 文件锁（fcntl/msvcrt）
+  - 原子写入：`tempfile + os.replace`（`.usage.json`）
+  - 追踪字段：`view_count`, `last_viewed_at`, `last_managed_at`, `state`, `pinned`, `provenance`
+
+**现有 SDK 基础：**
+- `Types/SkillTypes.swift` — `Skill` struct 可扩展 lifecycle state
+
+### Story 22.4: Curator — 自动策展人
+
+在 Agent 空闲时自动整理技能库：合并重叠、归档过期、修补技能。
+
+**产出：**
+- `SkillCurator` — 策展人服务
+- 触发条件：代理空闲 + 距上次策展超过配置间隔（默认 7 天）
+- 安全边界：只操作 agent_created 技能，不碰内置/Hub/用户 pinned 技能
+- 策展状态持久化（last_run_at、paused、run_count）
+- dry-run 模式
+
+**Hermes 参考：**
+- `agent/curator.py:1-200` — Curator 完整实现
+  - `_default_state()` — 默认状态（last_run_at, paused, run_count）
+  - `load_state()` / `save_state()` — 状态持久化（JSON + 原子写入）
+  - `is_enabled()` — 默认开启
+  - `get_interval_hours()` — 默认 7 天（168 小时）
+  - `get_min_idle_hours()` — 默认 2 小时
+  - `get_stale_after_days()` — 默认 30 天
+  - `get_archive_after_days()` — 默认 90 天
+  - `should_run_now()` — 判断是否该运行
+  - `_strip_aux_credential()` — 辅助模型凭据处理
+  - 不变量：只操作 agent_created 技能、永不自动删除、pinned 跳过转换
+
+**新增 FR76:** 开发者可以通过 SkillEvolver 从对话中自动进化技能，通过 SkillUsageTracker 追踪使用频率并执行生命周期转换，通过 SkillCurator 自动策展技能库
+
+---
+
+## Epic 23: 高级进化 — 插件生态（可选）
+
+**目标：** 提供插件化的高级自进化能力，让开发者按需集成。
+
+**价值：** 会话搜索、prompt 进化优化等是锦上添花的能力，不适合纳入核心 SDK，更适合作为可插拔模块。
+
+**覆盖的 FR（新增）：** FR77
+**依赖：** Epic 21（ExperienceExtractor）、Epic 22（SkillEvolver）
+
+### Story 23.1: SelfEvolutionPlugin 协议与插件注册
+
+定义自进化插件的统一接入协议。
+
+**产出：**
+- `SelfEvolutionPlugin` protocol — 统一接口
+- `PluginRegistry` — 插件注册和生命周期管理
+- 插件配置 schema（`AgentOptions` 中新增 `evolutionPlugins` 字段）
+
+**Hermes 参考：**
+- `tools/memory_tool.py` 中 `MemoryProvider` 抽象类（博客文章第二篇提到）
+  - `initialize(session_id)` — 会话初始化
+  - `system_prompt_block()` — 注入系统提示词
+  - `prefetch(query)` — 每轮预取
+  - `sync_turn(user_msg, assistant_resp)` — 每轮同步
+  - `get_tool_schemas()` / `handle_tool_call()` — 工具暴露
+  - `on_session_end(messages)` — 会话结束钩子
+  - `on_pre_compress(messages)` — 压缩前提取
+  - **一家一限制**：只允许一个外部记忆提供商
+
+**现有 SDK 基础：**
+- `Hooks/HookRegistry.swift` — 已有插件式 hook 注册机制
+- `Tools/MCP/MCPClientManager.swift` — MCP 外部工具集成的模式可参考
+
+### Story 23.2: SessionSearchPlugin — 会话全文搜索
+
+基于 SQLite FTS5 的会话搜索，让 Agent 回溯过往所有对话。
+
+**产出：**
+- `SessionSearchPlugin` — FTS5 全文搜索插件
+- 三种搜索模式：发现（关键词）、滚动（特定会话浏览）、浏览（最近会话）
+- 搜索结果带上下文窗口（匹配片段前后各 5 条消息）
+- 零 LLM 成本（纯数据库操作）
+- 暴露为 MCP 工具或内置工具
+
+**Hermes 参考：**
+- `agent/trajectory.py` — 会话存储和搜索（博客第五篇提到）
+  - SQLite 数据库存储所有对话
+  - FTS5 全文搜索引擎
+  - `session_search(query=)` — 关键词搜索
+  - `session_search(session_id=, around_message_id=)` — 会话内浏览
+  - `session_search()` — 最近会话列表
+  - 搜索结果结构：匹配片段 + 前后 5 条消息 + 会话开头 3 条 + 会话结尾 3 条
+
+**现有 SDK 基础：**
+- `Stores/SessionStore.swift` — 已有会话持久化
+- `HTTP/RunPersistenceService.swift` — Run 持久化
+- `Utils/TraceRecorder.swift` — JSONL 轨迹记录
+
+### Story 23.3: PromptEvolverPlugin — 进化式 Prompt 优化
+
+用进化算法优化 skill 的 promptTemplate，提升技能质量。
+
+**产出：**
+- `PromptEvolverPlugin` — 可选的 prompt 进化优化插件
+- Organism（有机体）/ Evaluator（评估者）/ Mutator（变异者）三组件
+- 进化参数配置（种群大小、轮次、适应度函数）
+- 适配 `Skill.promptTemplate` 作为进化目标
+
+**Hermes 参考：**
+- `agent/trajectory.py` + 可选技能 — Darwinian Evolver（博客第五篇提到）
+  - 来源：Imbue Research 的 `darwinian_evolver`
+  - 工作流：初始种群 → 评估适应度 → 选择最优 → LLM 变异 → 重复 N 轮
+  - Organism：被进化的对象（prompt 模板、正则、SQL、代码）
+  - Evaluator：打分函数 [0, 1]，区分"可训练失败"和"保留失败"
+  - Mutator：LLM 基于失败案例生成变体
+  - 成本：50-500 次 LLM 调用/次，适用于值得优化的 prompt
+
+**新增 FR77:** 开发者可以通过插件机制按需集成高级自进化能力，包括会话全文搜索和进化式 Prompt 优化
+
+---
+
+## 自进化架构总览
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                   OpenAgentSDK                          │
+│                                                         │
+│  ┌───────────────────────┐  ┌────────────────────────┐  │
+│  │  Epic 21: 记忆进化     │  │  Epic 22: 技能进化      │  │
+│  │                       │  │                        │  │
+│  │  ExperienceExtractor  │  │  SkillEvolver          │  │
+│  │  LLMExperienceExtract │  │  LLMSkillEvolver       │  │
+│  │  MemoryReviewHook     │  │  SkillUsageTracker     │  │
+│  │  记忆安全扫描          │  │  SkillCurator          │  │
+│  │  冻结快照模式          │  │  生命周期管理           │  │
+│  └───────────┬───────────┘  └────────────┬───────────┘  │
+│              │                           │              │
+│              └──────────┬────────────────┘              │
+│                         │                               │
+│              ┌──────────┴──────────┐                    │
+│              │    HookRegistry     │                    │
+│              │  sessionEnd hook    │                    │
+│              │  postToolUse hook   │                    │
+│              └─────────────────────┘                    │
+│                                                         │
+│  ┌─────────────────────────────────────────────────┐    │
+│  │  Epic 23: 高级进化插件（可选）                     │    │
+│  │  SessionSearchPlugin                             │    │
+│  │  PromptEvolverPlugin                             │    │
+│  │  ExternalMemoryPlugin (via MCP)                  │    │
+│  └─────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────┘
+```
+
+## 自进化能力对照（Hermes vs SDK）
+
+| 自进化能力 | Hermes 实现 | SDK 现状 | Epic |
+|-----------|------------|---------|------|
+| 持久记忆存储 | MEMORY.md + USER.md | `FactStore` + `MemoryFact` ✅ | 21 |
+| 经验提取引擎 | background_review.py | `LLMExperienceExtractor` + `ExperienceExtractor` protocol ✅ | 21 |
+| 记忆安全扫描 | memory_tool.py threat patterns | `MemorySecurityScanner` + `SecurityScanResult` ✅ | 21 |
+| 冻结快照模式 | 会话开始注入、中途不刷新 | `FrozenSnapshot` + `FactStore.snapshot/rollback` ✅ | 21 |
+| 技能定义与加载 | SKILL.md + SkillLoader | `Skill` + `SkillRegistry` ✅ | 22 |
+| 技能自动创建/更新 | skill_manage + background review | 缺 ❌ | 22 |
+| 技能使用追踪 | skill_usage.py sidecar | 缺 ❌ | 22 |
+| 技能生命周期 | active→stale→archived | 缺 ❌ | 22 |
+| 自动策展 | curator.py | 缺 ❌ | 22 |
+| 会话搜索 | SQLite FTS5 | 缺 ❌ | 23 |
+| Prompt 进化 | Darwinian Evolver | 缺 ❌ | 23 |
+| 轨迹压缩 | trajectory_compressor.py | `TraceRecorder` 部分 ✅ | 23 |
+
+## Hermes 关键源码索引
+
+| 文件 | 路径 | 核心内容 |
+|------|------|---------|
+| 后台审查 | `agent/background_review.py` | `_MEMORY_REVIEW_PROMPT`, `_SKILL_REVIEW_PROMPT`, `_COMBINED_REVIEW_PROMPT`, fork 逻辑 |
+| 记忆工具 | `tools/memory_tool.py` | 安全扫描、冻结快照、`§` 分隔符、字符限制 |
+| 技能管理 | `tools/skill_manager_tool.py` | create/edit/patch/delete/write_file 动作 |
+| 技能使用 | `tools/skill_usage.py` | 生命周期状态、使用追踪、文件锁、原子写入 |
+| 策展人 | `agent/curator.py` | 间隔触发、策展状态、安全边界、dry-run |
+| 轨迹压缩 | `trajectory_compressor.py` | 训练数据准备、结构化摘要 |
+
+---
+
+## Epic 24: 后台审查代理 — 闭环学习核心引擎
+
+**目标：** 实现 Hermes 式后台审查代理，使 SDK 具备"每次对话后 fork 一个隔离 Agent 回放并学习"的核心闭环能力。补齐 Epic 21–23 留下的关键缺口——PluginRegistry 只能在进程内同步调用，无法 fork 独立 Agent 实例执行审查。
+
+**价值：** 没有 forked review agent，SDK 的自进化只是"hook 链上跑一个 LLM 调用"——不是真正的闭环。Hermes 的闭环核心是：**对话结束 → fork 一个工具受限的审查 Agent → 回放对话快照 → 提取记忆/技能 → 下次对话自动加载**。这个闭环让 Agent 越用越懂用户，越用越擅长。
+
+**为什么现在做：**
+- Epic 21–23 已完成所有基础类型（ExperienceSignal、SkillSignal、PluginResult）和工具（LLMExperienceExtractor、LLMSkillEvolver、MemoryReviewHook、SkillCurator、PromptEvolverPlugin）
+- 但这些工具都是"被调用"的——没有一个"主动调度"的审查 Agent 来串联它们
+- 当前 PluginRegistry.dispatch() 在 sessionEnd 阶段只执行内存中的插件逻辑，不能启动独立 Agent、不能限制工具权限、不能共享前缀缓存
+- Axion 作为 SDK 旗舰参考实现，已经到了需要这个闭环才能体现差异化价值的阶段
+
+**覆盖的 FR（新增）：** FR78
+**依赖：** Epic 21（ExperienceExtractor、FactStore）、Epic 22（SkillEvolver、SkillUsageTracker）、Epic 23（SelfEvolutionPlugin、PluginRegistry）
+
+**Hermes 本地路径：** `/Users/nick/CascadeProjects/hermes-agent`
+
+### 缺口分析：Hermes 闭环 vs SDK 现状
+
+| 闭环环节 | Hermes 实现 | SDK 现状 | 差距 |
+|----------|------------|---------|------|
+| 触发时机 | conversation_loop.py 末尾，有间隔控制 | HookRegistry .sessionEnd 已有 | ✅ 触发点已有 |
+| 审查执行 | fork AIAgent 实例（独立模型调用循环） | PluginRegistry.dispatch() 进程内调用 | ❌ 无独立 Agent |
+| 工具限制 | 白名单（memory + skill_manage + skill_view） | 无工具限制机制 | ❌ 无工具白名单 |
+| 前缀缓存 | 继承父 Agent 的 _cached_system_prompt | 无缓存共享 API | ❌ 无缓存共享 |
+| 审查 prompt | 精心设计的 _COMBINED_REVIEW_PROMPT | MemoryReviewHook 有提取 prompt，但无"审查 Agent 级"的完整 prompt | ⚠️ 部分覆盖 |
+| 审查结果 | 操作摘要通知用户 | 无 | ❌ 无通知机制 |
+| 审查间隔 | _memory_nudge_interval / _skill_nudge_interval | 无间隔控制 | ❌ 无间隔控制 |
+
+### 关键设计约束
+
+实施前必须理解以下约束，它们影响 Story 之间如何组装：
+
+**1. SDK Agent 是 class（引用类型）** — `Agent` 是 `@unchecked Sendable` class（`Sources/OpenAgentSDK/Core/Agent.swift:18`）。fork 一个审查 Agent 意味着创建一个新的 `Agent` 实例，不是 struct copy。两个实例共享同一个 `LLMClient`（通过 `AgentOptions.client` 注入或从 `apiKey` 新建）。
+
+**2. SDK 没有线程（thread），只有 Task** — Hermes 用 Python `threading.Thread` 做 daemon thread。Swift 的对应物是 `Task.detached { ... }`（后台异步执行，不阻塞父 Agent）。审查 Agent 应该在 detached task 中运行，父 Agent 的 `prompt()` / `stream()` 返回后审查仍在后台执行。
+
+**3. 工具白名单通过 AgentOptions 已有字段实现** — `AgentOptions.allowedTools: [String]?`（`AgentTypes.swift:357`）和 `AgentOptions.disallowedTools: [String]?`（`AgentTypes.swift:362`）已经存在。审查 Agent 不需要新的过滤机制——只需要在 `AgentOptions` 中设置 `allowedTools` 为白名单列表即可。不需要 `ReviewToolFilter` 或 `canUseTool` hack。
+
+**4. 审查 Agent 的工具不是 SDK 内置工具** — SDK 的 `defineTool` 注册工具是给主 Agent 用的。审查 Agent 需要的是 **4 个专用审查工具**（save_memory、update_skill、create_skill、add_skill_file），它们调用 SDK 已有的 `FactStore` / `SkillEvolver` API，不经过 MCP。这些工具用 `defineTool` 定义后传入审查 Agent 的 `AgentOptions.tools`。
+
+**5. 前缀缓存共享需要共享 LLMClient** — Anthropic 的前缀缓存是 HTTP 级别的：如果两个请求的 system prompt 前缀字节级一致，第二个请求命中缓存。审查 Agent 要命中缓存，需要：(a) 使用同一个 `LLMClient`（共享 HTTP 连接和缓存 key），(b) 使用完全相同的 system prompt。不需要 `_cachedSystemPrompt` 属性暴露——只需要在构造审查 Agent 的 `AgentOptions` 时传入与父 Agent 相同的 `systemPrompt` 字符串。
+
+### Story 24.1: ReviewAgent — 独立审查 Agent 工厂
+
+创建一个工厂方法，从父 Agent fork 出一个工具受限的审查 Agent 实例，并构建审查 prompt。
+
+**产出：**
+
+`Sources/OpenAgentSDK/Utils/ReviewAgent.swift`：
+- `ReviewAgentConfig`（struct, Sendable, Codable）：
+  ```swift
+  public struct ReviewAgentConfig: Sendable, Codable {
+      public let reviewMemory: Bool       // 是否审查记忆（默认 true）
+      public let reviewSkills: Bool       // 是否审查技能（默认 true）
+      public let maxTurns: Int            // 审查 Agent 最大轮次（默认 16，与 Hermes 一致）
+      public let allowedTools: [String]   // 工具白名单
+  }
+  ```
+- `ReviewAgentResult`（struct, Sendable）：
+  ```swift
+  public struct ReviewAgentResult: Sendable {
+      public let memoryChanges: [String]      // 记忆变更描述列表
+      public let skillChanges: [String]       // 技能变更描述列表
+      public let summary: String              // 人类可读的操作摘要
+      public let reviewMessages: [SDKMessage] // 审查 Agent 的完整消息历史
+  }
+  ```
+- `Agent.createReviewAgent(config:)` — 从父 Agent fork 审查实例：
+  - **继承项**：model, provider, apiKey/baseURL, systemPrompt, LLMClient（共享引用）
+  - **不继承项**：tools（用审查专用工具替换）, hookRegistry（审查不触发用户 hooks）, maxTurns（用审查配置的值）, permissionMode（设为 .bypassPermissions）
+  - **新建项**：独立的 sessionId（`review-{parentSessionId}`）
+- `ReviewPromptBuilder`（enum, 无实例）：
+  - `static func memoryReviewPrompt() -> String` — 记忆审查 prompt
+  - `static func skillReviewPrompt() -> String` — 技能审查 prompt
+  - `static func combinedReviewPrompt() -> String` — 组合审查 prompt（默认使用）
+  - prompt 内容翻译自 Hermes，保留核心逻辑但适配 SDK 术语（如用 "domain" 替代 "memory target"，用 "Skill" 替代 "SKILL.md"）
+
+**Hermes 参考：**
+- `/Users/nick/CascadeProjects/hermes-agent/agent/background_review.py`（582 行）
+  - 行 30–145：`_MEMORY_REVIEW_PROMPT`、`_SKILL_REVIEW_PROMPT`、`_COMBINED_REVIEW_PROMPT` — 三个审查 prompt 完整文本，**必须逐行翻译为 Swift 版本**
+  - 行 393–405：fork AIAgent 配置 — `max_iterations=16, quiet_mode=True, parent_session_id=agent.session_id, skip_memory=True`
+  - 行 406–440：审查 Agent 继承项 — `_memory_write_origin`, `_memory_store`, `_memory_enabled`, `_user_profile_enabled`, `_cached_system_prompt`, `session_start`, `session_id`
+  - 行 448–453：工具白名单 — `get_tool_definitions(enabled_toolsets=["memory", "skills"])`
+  - 行 462–471：审查执行 — `review_agent.run_conversation(user_message=prompt + constraint, conversation_history=messages_snapshot)`
+  - 行 496–505：操作摘要 — `summarize_background_review_actions()` 提取 tool_result 中的操作信息，格式化为人类可读摘要
+  - 行 547–572：`spawn_background_review_thread()` — 构建 thread target + prompt
+
+**现有 SDK 基础：**
+- `Sources/OpenAgentSDK/Core/Agent.swift:18` — `Agent` class（@unchecked Sendable）
+- `Sources/OpenAgentSDK/Core/Agent.swift:125–160` — `Agent.init(options:)` / `Agent.init(definition:options:)` 工厂方法
+- `Sources/OpenAgentSDK/Core/Agent.swift:1035` — `Agent.prompt(_ text:)` 审查 Agent 可用此方法执行单次审查
+- `Sources/OpenAgentSDK/Core/Agent.swift:1792` — `Agent.stream(_ text:)` 审查 Agent 也可用流式执行
+- `Sources/OpenAgentSDK/Types/AgentTypes.swift:229` — `AgentOptions` struct（所有配置字段）
+- `Sources/OpenAgentSDK/Types/AgentTypes.swift:357–362` — `allowedTools` / `disallowedTools` 已有工具过滤字段
+- `Sources/OpenAgentSDK/Types/AgentTypes.swift:297` — `sessionId` 字段（审查 Agent 设置为 `review-{parent}`）
+- `Sources/OpenAgentSDK/LLM/LLMClient.swift` — `LLMClient` 可在两个 Agent 实例间共享（审查 Agent 继承父 Agent 的 client 引用）
+
+### Story 24.2: ReviewTools — 审查专用工具集
+
+定义 4 个审查专用工具，作为审查 Agent 唯一可调用的工具。这些工具直接调用 SDK 已有的 `FactStore` / `SkillEvolver` API，不经过 MCP。
+
+**产出：**
+
+`Sources/OpenAgentSDK/Tools/Review/` 目录：
+- `ReviewMemoryTool.swift` — `review_save_memory` 工具：
+  - 参数：`domain: String`, `content: String`, `kind: String`（affordance/avoid/observation）, `confidence: Double`
+  - 实现：调用 `FactStore.save(domain:fact:)` 保存 `ExperienceSignal.toFact()`
+  - 返回：`{"success": true, "message": "Memory saved to domain '{domain}'"}`
+- `ReviewSkillUpdateTool.swift` — `review_update_skill` 工具：
+  - 参数：`skillName: String`, `updates: String`（JSON，可含 promptTemplate/description/whenToUse/argumentHint）, `reason: String`
+  - 实现：构造 `SkillSignal`，调用 `SkillEvolver.evolve(skill:signals:config:)`
+  - 返回：`{"success": true, "message": "Skill '{skillName}' updated", "changes": [...]}`
+- `ReviewSkillCreateTool.swift` — `review_create_skill` 工具：
+  - 参数：`name: String`, `description: String`, `promptTemplate: String`, `whenToUse: String?`
+  - 实现：构造 `Skill` 实例，通过 `SkillRegistry` 注册
+  - 返回：`{"success": true, "message": "Skill '{name}' created"}`
+- `ReviewSkillFileTool.swift` — `review_add_skill_file` 工具：
+  - 参数：`skillName: String`, `filePath: String`, `content: String`
+  - 实现：在技能目录下创建支持文件（references/templates/scripts 前缀）
+  - 返回：`{"success": true, "message": "File added to skill '{skillName}'"}`
+
+**设计要点：**
+- 每个工具用 `defineTool` 定义，返回 JSON 字符串（与 Hermes 的 tool_result 格式一致）
+- 工具名以 `review_` 前缀命名，与主 Agent 的工具名不冲突
+- 工具构造时注入 `FactStore` / `SkillEvolver` / `SkillRegistry` 实例（依赖注入，不单例）
+- 所有工具操作完成后返回标准化的 JSON，供 `summarizeActions()` 解析
+
+**Hermes 参考：**
+- `/Users/nick/CascadeProjects/hermes-agent/tools/memory_tool.py`（586 行）
+  - 行 1–60：`memory(action=add/replace/remove/read, target=memory/user)` 工具定义
+  - 行 61–120：安全扫描 `_MEMORY_THREAT_PATTERNS`（审查工具无需重复，`MemorySecurityScanner` 已覆盖）
+  - 行 121–200：`§` 分隔符格式和字符限制
+- `/Users/nick/CascadeProjects/hermes-agent/tools/skill_manager_tool.py`（931 行）
+  - 行 1–80：`skill_manage(action=create/edit/patch/delete/write_file/remove_file)` 工具定义
+  - 行 80–200：文件操作（references/templates/scripts 目录布局）
+  - 行 200–300：`_guard_agent_created_enabled()` 安全扫描开关
+  - 行 300–400：`_security_scan_skill()` 安全扫描函数
+
+**现有 SDK 基础：**
+- `Sources/OpenAgentSDK/Tools/` — `defineTool` 工具定义模式
+- `Sources/OpenAgentSDK/Types/ExperienceTypes.swift:346` — `ExperienceExtractor` protocol
+- `Sources/OpenAgentSDK/Types/SkillEvolutionTypes.swift:540` — `SkillEvolver` protocol
+- `Sources/OpenAgentSDK/Utils/LLMExperienceExtractor.swift` — `LLMExperienceExtractor` 可被审查工具内部调用
+- `Sources/OpenAgentSDK/Utils/LLMSkillEvolver.swift` — `LLMSkillEvolver` 可被审查工具内部调用
+- `Sources/OpenAgentSDK/Memory/FactStore.swift` — `FactStore.save(domain:fact:)` 持久化接口
+- `Sources/OpenAgentSDK/Tools/SkillRegistry.swift` — `SkillRegistry` 注册和查找
+
+### Story 24.3: ReviewOrchestrator — 审查调度与间隔控制
+
+实现审查的触发、间隔控制和后台执行机制。将审查 Agent 的创建、执行、结果收集编排为一个完整流程。
+
+**产出：**
+
+`Sources/OpenAgentSDK/Utils/ReviewOrchestrator.swift`：
+- `ReviewScheduleConfig`（struct, Sendable, Codable）：
+  ```swift
+  public struct ReviewScheduleConfig: Sendable, Codable {
+      public var memoryReviewInterval: Int    // 每隔多少条消息触发记忆审查（默认 4）
+      public var skillReviewInterval: Int     // 每隔多少条消息触发技能审查（默认 6）
+      public var minMessagesForReview: Int    // 最少消息数（默认 4）
+      public var reviewModel: String?         // 审查模型（nil = 继承父 Agent）
+  }
+  ```
+- `ReviewOrchestrator`（struct, Sendable）：
+  - `init(scheduleConfig:factStore:skillRegistry:skillEvolver:)` — 注入依赖
+  - `shouldReview(sessionId:messageCount:config:) -> (memory: Bool, skill: Bool)` — 间隔判断
+  - `func executeReview(parentAgent:Agent, messages:[SDKMessage], config:ReviewAgentConfig) async -> ReviewAgentResult?` — 完整审查流程：
+    1. 调用 `ReviewPromptBuilder` 构建审查 prompt
+    2. 调用 `Agent.createReviewAgent(config:)` fork 审查 Agent
+    3. 在 `Task.detached` 中执行 `reviewAgent.prompt(reviewPrompt)` — 不阻塞父 Agent
+    4. 从审查 Agent 的消息历史中提取操作摘要
+    5. 返回 `ReviewAgentResult`
+  - `static func summarizeActions(_ messages: [SDKMessage], priorSnapshot: [SDKMessage]) -> [String]` — 从审查消息中提取操作描述
+- `ReviewOrchestrator` 注册到 `HookRegistry.sessionEnd`：
+  - 在 `Agent.init` 中检查 `AgentOptions.reviewScheduleConfig` 是否存在
+  - 如果存在，注册 `.sessionEnd` hook 调用 `orchestrator.executeReview()`
+  - hook handler 返回 `HookOutput(additionalContext: summary)` 将摘要注入输出流
+
+**Hermes 参考：**
+- `/Users/nick/CascadeProjects/hermes-agent/agent/background_review.py`（582 行）
+  - 行 347–370：触发条件检查 — `_memory_nudge_interval` / `_skill_nudge_interval` 间隔判断
+  - 行 547–572：`spawn_background_review_thread()` — 构建 thread target
+  - 行 569–571：`_target()` 调用 `_run_review_in_thread(agent, messages_snapshot, prompt)` — 后台执行
+  - 行 496–505：`summarize_background_review_actions()` — 操作摘要提取逻辑：
+    ```python
+    # 遍历审查消息，提取 tool_result 中 success=True 的操作
+    # 跳过 messages_snapshot 中已有的旧操作（避免重复）
+    # 返回去重后的操作列表
+    ```
+  - 行 501–513：摘要通知 — `agent._safe_print(f"💾 Self-improvement review: {summary}")`
+- `/Users/nick/CascadeProjects/hermes-agent/agent/conversation_loop.py` — 触发入口（在 `_spawn_background_review` 调用处）
+
+**现有 SDK 基础：**
+- `Sources/OpenAgentSDK/Hooks/HookRegistry.swift` — `.sessionEnd` hook 注册和执行
+- `Sources/OpenAgentSDK/Core/Agent.swift:217–236` — Agent.init 中已有 `.sessionEnd` hook 注册逻辑（MemoryReviewHook 的注册方式，审查 hook 可参照此模式）
+- `Sources/OpenAgentSDK/Core/Agent.swift:1479–1487` — `prompt()` 结尾触发 `.sessionEnd`，传入 `HookInput`（含消息历史）
+- `Sources/OpenAgentSDK/Core/Agent.swift:1751–1758` — `stream()` 结尾同样触发 `.sessionEnd`
+- `Sources/OpenAgentSDK/Types/HookTypes.swift:42–44` — `.preCompact` / `.postCompact` hook 事件类型
+
+**Swift 并发模型映射：**
+```
+Hermes: threading.Thread(daemon=True, target=_target)
+SDK:    Task.detached { await executeReview(...) }
+
+Hermes: messages_snapshot = list(messages)（拷贝）
+SDK:    let snapshot = messages（Swift Array 是 value type，自动拷贝）
+
+Hermes: suppress_status_output = True
+SDK:    审查 Agent 的 AgentOptions 不设 hookRegistry + permissionMode = .bypassPermissions
+```
+
+### Story 24.4: PrefixCacheSharing — 前缀缓存共享
+
+确保审查 Agent 的 API 请求命中 Anthropic/OpenRouter 的前缀缓存，降低审查成本。
+
+**产出：**
+
+不新增独立文件。修改 `Agent.createReviewAgent(config:)` 的实现逻辑：
+
+- **核心策略**：审查 Agent 的 `AgentOptions.systemPrompt` 必须与父 Agent 完全一致（字节级）
+  - 从父 Agent 的 `systemPrompt` 属性直接复制（公开只读属性，`Agent.swift:29`）
+  - 不注入时间戳、sessionId 等会变化的内容到 systemPrompt 中
+  - 如果父 Agent 的 systemPrompt 是动态构建的（含时间戳），审查 Agent 必须使用父 Agent **实际发送的** systemPrompt 快照，而非重新构建
+- **LLMClient 共享**：审查 Agent 复用父 Agent 的 `LLMClient` 实例（引用共享），确保 HTTP 连接和缓存 key 一致
+- **缓存验证**：添加 `Logger.shared.debug("ReviewAgent", "prefix_cache_sharing", data: ["parentModel": ..., "reviewModel": ..., "systemPromptHash": ...])` 用于调试缓存命中率
+- **成本追踪**：在 `AgentOptions` 新增 `agentLabel: String?` 字段（默认 nil），审查 Agent 设为 `"review"`。`CostTracker` 按 `agentLabel` 区分主 Agent 和审查 Agent 的 token 使用量
+
+**Hermes 参考：**
+- `/Users/nick/CascadeProjects/hermes-agent/agent/background_review.py:421–440` — 前缀缓存共享实现
+  - 行 421–430：注释解释为什么要共享缓存——审查 Agent 如果重建 system prompt（新的时间戳、新的 sessionId、不同的工具集），前缀缓存 key 不匹配，缓存命中率暴跌
+  - 行 431：`review_agent._cached_system_prompt = agent._cached_system_prompt` — 直接赋值字节级一致的 prompt
+  - 行 433–440：`review_agent.session_start = agent.session_start` + `review_agent.session_id = agent.session_id` — 防御性固定，确保即使有代码路径绕过缓存直接重建 prompt，仍然字节级一致
+  - **效果**：PR #17276 分析约 26% 端到端成本降低
+
+**现有 SDK 基础：**
+- `Sources/OpenAgentSDK/Core/Agent.swift:29` — `public let systemPrompt: String?` 公开只读，可直接复制
+- `Sources/OpenAgentSDK/Core/Agent.swift:165` — `private init(mergedOptions:client:)` 内部初始化器，`systemPrompt` 从 `mergedOptions.systemPrompt` 获取
+- `Sources/OpenAgentSDK/LLM/LLMClient.swift` — `LLMClient` 实例可在两个 Agent 间共享
+- `Sources/OpenAgentSDK/Core/Agent.swift:109` — 已有 `compactState` 跟踪压缩状态
+
+**新增 FR78:** 开发者可以通过 ReviewOrchestrator 在每次对话结束后自动 fork 一个工具受限的审查 Agent，审查 Agent 继承父 Agent 的 systemPrompt 命中前缀缓存降低成本，回放对话快照并通过 4 个专用审查工具提取记忆/技能，生成操作摘要通知用户。审查有间隔控制，不是每次都触发。审查在 detached task 中执行，失败不阻塞主对话。
+
+---
+
+## Epic 24 补充说明
+
+### 为什么这是独立 Epic 而不是 Epic 23 的延续
+
+Epic 21–23 构建了自进化的"砖块"（类型、协议、工具）。Epic 24 构建的是"建筑师"——把这些砖块组装成闭环的调度引擎。两者是不同抽象层的工作：
+
+- Epic 21–23：定义"能做什么"（extract experience, evolve skill, search sessions）
+- Epic 24：定义"谁来做、什么时候做、在什么限制下做"
+
+### Story 间的依赖关系
+
+```
+24.1 ReviewAgent（P0）
+  ├── 定义 ReviewAgentConfig、ReviewAgentResult、ReviewPromptBuilder
+  └── 定义 Agent.createReviewAgent() 工厂方法
+        │
+        ├──► 24.2 ReviewTools（P0）— 审查 Agent 的 allowedTools 引用这 4 个工具
+        │
+        └──► 24.3 ReviewOrchestrator（P1）— 调用 createReviewAgent() + 在 sessionEnd hook 中编排
+              │
+              └──► 24.4 PrefixCacheSharing（P2）— 修改 createReviewAgent() 的 systemPrompt 传递逻辑
+```
+
+建议实施顺序：24.1 → 24.2 → 24.3 → 24.4。24.1 和 24.2 可以并行开发（接口先行），24.3 依赖两者完成，24.4 最后做。
+
+### 实现优先级
+
+| Story | 优先级 | 理由 |
+|-------|--------|------|
+| 24.1 ReviewAgent | P0 | 闭环的核心——没有独立审查 Agent，其他都没有意义 |
+| 24.2 ReviewTools | P0 | 审查 Agent 的手脚——没有工具它什么都做不了 |
+| 24.3 ReviewOrchestrator | P1 | 调度和间隔控制——控制成本和频率 |
+| 24.4 PrefixCacheSharing | P2 | 成本优化——重要但不影响闭环建立 |
+
+### 更新后的自进化能力对照
+
+| 自进化能力 | Hermes 实现 | SDK 现状 | Epic |
+|-----------|------------|---------|------|
+| 持久记忆存储 | MEMORY.md + USER.md | `FactStore` + `MemoryFact` ✅ | 21 |
+| 经验提取引擎 | background_review.py | `LLMExperienceExtractor` + `ExperienceExtractor` protocol ✅ | 21 |
+| 记忆安全扫描 | memory_tool.py threat patterns | `MemorySecurityScanner` + `SecurityScanResult` ✅ | 21 |
+| 冻结快照模式 | 会话开始注入、中途不刷新 | `FrozenSnapshot` + `FactStore.snapshot/rollback` ✅ | 21 |
+| 技能定义与加载 | SKILL.md + SkillLoader | `Skill` + `SkillRegistry` ✅ | 22 |
+| 技能自动创建/更新 | skill_manage + background review | `LLMSkillEvolver` + `SkillSignal` ✅ | 22 |
+| 技能使用追踪 | skill_usage.py sidecar | `SkillUsageTracker` + `SkillUsageData` ✅ | 22 |
+| 技能生命周期 | active→stale→archived | `SkillLifecycleState` + transitions ✅ | 22 |
+| 自动策展 | curator.py | `SkillCurator` + `SkillCuratorStore` ✅ | 22 |
+| 会话搜索 | SQLite FTS5 | `SessionSearchPlugin` + `SessionSearchEngine` ✅ | 23 |
+| Prompt 进化 | Darwinian Evolver（种群变异） | `PromptEvolverPlugin`（单次 LLM 分析）⚠️ | 23 |
+| 上下文压缩 | 结构化摘要（75% 阈值） | `Compact.swift` + auto-compact ✅ | 核心SDK |
+| **后台审查 Agent** | **fork + 工具白名单 + 前缀缓存共享** | **缺 ❌** | **24** |
+| **审查专用工具** | **memory/skill tools** | **缺 ❌** | **24** |
+| **审查调度间隔** | **nudge_interval** | **缺 ❌** | **24** |
+| **前缀缓存共享** | **_cached_system_prompt 继承** | **缺 ❌** | **24** |
