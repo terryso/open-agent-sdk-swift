@@ -74,7 +74,12 @@ public actor PromptEvolverPlugin: SelfEvolutionPlugin {
 
     public func initialize(sessionId: String) async throws {
         accumulatedMessages = []
-        currentPrompt = nil
+        // Keep config-provided prompt; only clear if no config set it
+        if currentPrompt == nil {
+            if let cfg = pluginConfig?.config, let prompt = cfg["currentPrompt"] {
+                currentPrompt = prompt
+            }
+        }
     }
 
     public func onPhase(_ phase: PluginLifecyclePhase, context: PluginContext) async throws -> PluginResult {

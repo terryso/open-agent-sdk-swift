@@ -263,8 +263,8 @@ development_status:
   epic-22-retrospective: done
 
   # Epic 23: 高级进化 — 插件生态（可选）
-  epic-23: in-progress
+  epic-23: done
   23-1-self-evolution-plugin-protocol: done
   23-2-session-search-plugin: done
-  23-3-prompt-evolver-plugin: review
+  23-3-prompt-evolver-plugin: done
   epic-23-retrospective: optional
