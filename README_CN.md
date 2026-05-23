@@ -34,6 +34,7 @@
 - **HTTP API Server** — 将任意 Agent 暴露为 REST + SSE 服务，支持 Run 追踪、并发限制和认证
 - **成本与追踪** — 内置 CostTracker 进行 token/成本预算控制，TraceRecorder 记录 JSONL 执行可观测性
 - **增强 Memory** — 基于 Fact 的记忆系统，支持 candidate→active→retired 生命周期、证据驱动置信度和导入导出
+- **自我进化** — 后台审查 Agent 在每次会话后自动 fork，提取记忆并进化技能
 - **输出格式化** — SDKMessageOutputHandler 协议，提供 Terminal 和 JSON 输出格式化器
 
 ## 快速入门（15 分钟）
@@ -352,6 +353,70 @@ let agent = createAgent(options: AgentOptions(
 ))
 ```
 
+### HTTP API Server
+
+将任意 Agent 暴露为 REST + SSE HTTP 服务：
+
+```swift
+let agent = createAgent(options: AgentOptions(
+    apiKey: "sk-...",
+    tools: getAllBaseTools(tier: .core)
+))
+
+let server = AgentHTTPServer(
+    agent: agent,
+    host: "127.0.0.1",
+    port: 4242,
+    authKey: "my-secret-key",
+    maxConcurrentRuns: 5
+)
+
+try await server.start()
+// POST /v1/runs        — 提交任务（202 + run_id）
+// GET  /v1/runs        — 列出运行
+// GET  /v1/runs/{id}   — 获取运行状态
+// GET  /v1/runs/{id}/events — SSE 流
+// GET  /v1/health      — 健康检查
+```
+
+### 成本追踪与执行追踪
+
+监控 Agent 开销和执行轨迹：
+
+```swift
+let agent = createAgent(options: AgentOptions(
+    apiKey: "sk-...",
+    maxBudgetUsd: 0.50,
+    traceEnabled: true,
+    traceBaseURL: "/tmp/traces"
+))
+
+for await message in agent.stream("分析代码库") {
+    // CostTracker 自动累加各模型的 token/成本
+    // TraceRecorder 将 JSONL 事件写入 /tmp/traces/{runId}/trace.jsonl
+}
+```
+
+### 输出格式化
+
+将 SDK 消息流格式化为终端或 JSON 输出：
+
+```swift
+// 终端输出，带步骤计数
+let terminal = TerminalOutputHandler()
+for await message in agent.stream("总结这个项目") {
+    terminal.handle(message)
+}
+
+// JSON 输出，用于程序化消费
+let json = JSONOutputHandler(write: { print($0) })
+terminal.displayRunStart(runId: "run-1", task: "总结")
+for await message in agent.stream("总结这个项目") {
+    json.handle(message)
+}
+let result = json.finalize()  // [String: Any] 字典
+```
+
 ## 内置工具
 
 ### Core 工具（10 个）
@@ -414,11 +479,15 @@ graph TD
     C --> F
     C --> G
     C --> H
+    C --> I
+    C --> J
     D["<b>LLMClient 协议</b><br/>AnthropicClient &middot; OpenAIClient"]
     E["<b>34 个内置工具</b><br/>Core 10 &middot; Advanced 11 &middot; Specialist 13"]
     F["<b>MCP 服务器</b><br/>stdio &middot; SSE &middot; HTTP &middot; 进程内"]
     G["<b>会话存储</b><br/>JSON 持久化 &middot; 分叉 &middot; 恢复"]
     H["<b>钩子注册表</b><br/>20+ 生命周期事件"]
+    I["<b>HTTP API Server</b><br/>REST + SSE &middot; Run 追踪"]
+    J["<b>成本与追踪</b><br/>预算控制 &middot; JSONL 追踪"]
 
     style A fill:#0277bd,stroke:#01579b,color:#fff,stroke-width:2px
     style B fill:#ef6c00,stroke:#e65100,color:#fff,stroke-width:2px
@@ -428,6 +497,8 @@ graph TD
     style F fill:#00695c,stroke:#004d40,color:#fff,stroke-width:2px
     style G fill:#4a148c,stroke:#4a148c,color:#fff,stroke-width:2px
     style H fill:#e65100,stroke:#bf360c,color:#fff,stroke-width:2px
+    style I fill:#1565c0,stroke:#0d47a1,color:#fff,stroke-width:2px
+    style J fill:#880e4f,stroke:#560027,color:#fff,stroke-width:2px
 ```
 
 ## 环境变量
