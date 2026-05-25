@@ -189,6 +189,11 @@ await ReviewOrchestratorE2ETests.run(apiKey: apiKey, model: model, baseURL: base
 await AgentEventTypesE2ETests.run()
 
 // ================================================================
+// SECTION 127-140: EventBus E2E Tests (Story 26.6: In-Process Event Bus)
+// ================================================================
+await EventBusE2ETests.run()
+
+// ================================================================
 // Results Summary
 // ================================================================
 print("\n=== E2E Test Results ===")

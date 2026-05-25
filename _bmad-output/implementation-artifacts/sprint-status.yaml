@@ -1,5 +1,6 @@
 # generated: 2026-05-25
 # last_updated: 2026-05-26
+
 # project: open-agent-sdk-swift
 # project_key: NOKEY
 # tracking_system: file-system
@@ -293,7 +294,7 @@ development_status:
   26-3-agent-lifecycle-events: done
   26-4-tool-lifecycle-events: done
   26-5-llm-cost-events: done
-  26-6-eventbus-in-process-event-bus: backlog
+  26-6-eventbus-in-process-event-bus: done
   epic-26-retrospective: optional
 
   # Epic 27: Runtime Event Layer — Agent Event Emitter
