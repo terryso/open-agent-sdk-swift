@@ -125,6 +125,11 @@ let agent = createAgent(options: AgentOptions(
 ))
 ```
 
+## 基于 SDK 构建
+
+- [**SwiftWork**](https://github.com/terryso/SwiftWork) — 使用 Swift 构建的 macOS 原生应用，基于本 SDK 实现 AI 驱动的工作流。
+- [**axion**](https://github.com/terryso/axion) — Swift CLI 工具，使用本 SDK 作为其 Agent 引擎。
+
 ## 高级功能
 
 ### 多提供商支持

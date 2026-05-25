@@ -125,6 +125,11 @@ let agent = createAgent(options: AgentOptions(
 ))
 ```
 
+## Built With This SDK
+
+- [**SwiftWork**](https://github.com/terryso/SwiftWork) — A native macOS app built with Swift, powered by this SDK for AI-driven workflows.
+- [**axion**](https://github.com/terryso/axion) — A Swift CLI tool that uses this SDK as its agentic engine.
+
 ## Advanced Features
 
 ### Multi-Provider Support
