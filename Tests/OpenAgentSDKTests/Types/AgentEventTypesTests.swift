@@ -2149,3 +2149,524 @@ private extension AgentEventTypesTests {
     static let toolCompletedEchoActor = ToolCompletedEchoActor()
     static let toolFailedEchoActor = ToolFailedEchoActor()
 }
+
+// MARK: - LLM Cost Events
+
+extension AgentEventTypesTests {
+
+    // MARK: - LLMRequestStartedEvent (AC1)
+
+    func testLLMRequestStartedEventConstruction() {
+        let event = LLMRequestStartedEvent(sessionId: "sess-1", model: "claude-sonnet-4-6")
+        XCTAssertEqual(event.sessionId, "sess-1")
+        XCTAssertEqual(event.model, "claude-sonnet-4-6")
+        XCTAssertFalse(event.id.isEmpty)
+        XCTAssertNotNil(event.timestamp)
+    }
+
+    func testLLMRequestStartedEventNilSessionId() {
+        let event = LLMRequestStartedEvent(sessionId: nil, model: "glm-5.1")
+        XCTAssertNil(event.sessionId)
+    }
+
+    func testLLMRequestStartedEventAgentEventConformance() {
+        func acceptEvent<T: AgentEvent>(_ event: T) {
+            XCTAssertFalse(event.id.isEmpty)
+            XCTAssertNotNil(event.timestamp)
+        }
+        let event = LLMRequestStartedEvent(sessionId: "s", model: "m")
+        acceptEvent(event)
+    }
+
+    func testLLMRequestStartedEventSendable() {
+        func acceptSendable<T: Sendable>(_ value: T) { _ = value }
+        acceptSendable(LLMRequestStartedEvent(sessionId: nil, model: "m"))
+    }
+
+    func testLLMRequestStartedEventCodableRoundTrip() throws {
+        let event = LLMRequestStartedEvent(sessionId: "sess-42", model: "claude-opus-4-7")
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let data = try encoder.encode(event)
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let decoded = try decoder.decode(LLMRequestStartedEvent.self, from: data)
+
+        XCTAssertEqual(decoded.id, event.id)
+        XCTAssertEqual(decoded.sessionId, event.sessionId)
+        XCTAssertEqual(decoded.model, event.model)
+        XCTAssertEqual(decoded.timestamp.timeIntervalSince(event.timestamp), 0, accuracy: 1.0)
+    }
+
+    func testLLMRequestStartedEventSnakeCaseJsonKeys() throws {
+        let event = LLMRequestStartedEvent(sessionId: "s1", model: "m")
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let data = try encoder.encode(event)
+        let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
+
+        XCTAssertNotNil(json["session_id"], "JSON should use snake_case 'session_id'")
+        XCTAssertNotNil(json["model"])
+        XCTAssertNotNil(json["id"])
+        XCTAssertNotNil(json["timestamp"])
+    }
+
+    func testLLMRequestStartedEventEquatable() {
+        let id = "same-id"
+        let ts = Date(timeIntervalSince1970: 1700000000)
+        let e1 = LLMRequestStartedEvent(base: BaseAgentEvent(id: id, timestamp: ts), sessionId: "s", model: "m")
+        let e2 = LLMRequestStartedEvent(base: BaseAgentEvent(id: id, timestamp: ts), sessionId: "s", model: "m")
+        XCTAssertEqual(e1, e2)
+    }
+
+    func testLLMRequestStartedEventNotEqualDifferentModel() {
+        let id = "same-id"
+        let ts = Date(timeIntervalSince1970: 1700000000)
+        let e1 = LLMRequestStartedEvent(base: BaseAgentEvent(id: id, timestamp: ts), sessionId: "s", model: "model-a")
+        let e2 = LLMRequestStartedEvent(base: BaseAgentEvent(id: id, timestamp: ts), sessionId: "s", model: "model-b")
+        XCTAssertNotEqual(e1, e2)
+    }
+
+    func testLLMRequestStartedEventInitWithBase() {
+        let event = LLMRequestStartedEvent(base: BaseAgentEvent(id: "custom", timestamp: Date(timeIntervalSince1970: 0)), sessionId: "s", model: "m")
+        XCTAssertEqual(event.id, "custom")
+        XCTAssertEqual(event.timestamp, Date(timeIntervalSince1970: 0))
+    }
+
+    func testLLMRequestStartedEventDecodeFromRawJson() throws {
+        let jsonString = """
+        {"id":"raw-id","timestamp":"2024-01-15T12:00:00Z","session_id":"raw-sess","model":"claude-sonnet-4-6"}
+        """
+        let data = jsonString.data(using: .utf8)!
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let event = try decoder.decode(LLMRequestStartedEvent.self, from: data)
+
+        XCTAssertEqual(event.id, "raw-id")
+        XCTAssertEqual(event.sessionId, "raw-sess")
+        XCTAssertEqual(event.model, "claude-sonnet-4-6")
+    }
+
+    func testLLMRequestStartedEventDecodeMissingRequiredField() {
+        let jsonString = """
+        {"id":"bad","timestamp":"2024-01-15T12:00:00Z"}
+        """
+        let data = jsonString.data(using: .utf8)!
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        XCTAssertThrowsError(try decoder.decode(LLMRequestStartedEvent.self, from: data))
+    }
+
+    func testLLMRequestStartedEventDecodeNilSessionId() throws {
+        let jsonString = """
+        {"id":"n","timestamp":"2024-01-15T12:00:00Z","session_id":null,"model":"m"}
+        """
+        let data = jsonString.data(using: .utf8)!
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let event = try decoder.decode(LLMRequestStartedEvent.self, from: data)
+        XCTAssertNil(event.sessionId)
+        XCTAssertEqual(event.model, "m")
+    }
+
+    func testLLMRequestStartedEventImmutablePayload() {
+        let event = LLMRequestStartedEvent(sessionId: "s", model: "m")
+        XCTAssertEqual(event.model, "m")
+    }
+
+    // MARK: - LLMResponseReceivedEvent (AC2)
+
+    func testLLMResponseReceivedEventConstruction() {
+        let event = LLMResponseReceivedEvent(sessionId: "sess-1", model: "claude-sonnet-4-6", durationMs: 3500)
+        XCTAssertEqual(event.sessionId, "sess-1")
+        XCTAssertEqual(event.model, "claude-sonnet-4-6")
+        XCTAssertEqual(event.durationMs, 3500)
+        XCTAssertFalse(event.id.isEmpty)
+    }
+
+    func testLLMResponseReceivedEventNilSessionId() {
+        let event = LLMResponseReceivedEvent(sessionId: nil, model: "m", durationMs: 100)
+        XCTAssertNil(event.sessionId)
+    }
+
+    func testLLMResponseReceivedEventAgentEventConformance() {
+        func acceptEvent<T: AgentEvent>(_ event: T) {
+            XCTAssertFalse(event.id.isEmpty)
+        }
+        let event = LLMResponseReceivedEvent(sessionId: "s", model: "m", durationMs: 500)
+        acceptEvent(event)
+    }
+
+    func testLLMResponseReceivedEventSendable() {
+        func acceptSendable<T: Sendable>(_ value: T) { _ = value }
+        acceptSendable(LLMResponseReceivedEvent(sessionId: nil, model: "m", durationMs: 0))
+    }
+
+    func testLLMResponseReceivedEventCodableRoundTrip() throws {
+        let event = LLMResponseReceivedEvent(sessionId: "sess-1", model: "glm-5.1", durationMs: 4200)
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let data = try encoder.encode(event)
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let decoded = try decoder.decode(LLMResponseReceivedEvent.self, from: data)
+
+        XCTAssertEqual(decoded.id, event.id)
+        XCTAssertEqual(decoded.sessionId, event.sessionId)
+        XCTAssertEqual(decoded.model, event.model)
+        XCTAssertEqual(decoded.durationMs, event.durationMs)
+    }
+
+    func testLLMResponseReceivedEventSnakeCaseJsonKeys() throws {
+        let event = LLMResponseReceivedEvent(sessionId: "s1", model: "m", durationMs: 100)
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let data = try encoder.encode(event)
+        let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
+
+        XCTAssertNotNil(json["session_id"])
+        XCTAssertNotNil(json["model"])
+        XCTAssertNotNil(json["duration_ms"])
+    }
+
+    func testLLMResponseReceivedEventEquatable() {
+        let id = "eq-id"
+        let ts = Date(timeIntervalSince1970: 1700000000)
+        let e1 = LLMResponseReceivedEvent(base: BaseAgentEvent(id: id, timestamp: ts), sessionId: "s", model: "m", durationMs: 100)
+        let e2 = LLMResponseReceivedEvent(base: BaseAgentEvent(id: id, timestamp: ts), sessionId: "s", model: "m", durationMs: 100)
+        XCTAssertEqual(e1, e2)
+    }
+
+    func testLLMResponseReceivedEventNotEqualDifferentDuration() {
+        let id = "eq-id"
+        let ts = Date(timeIntervalSince1970: 1700000000)
+        let e1 = LLMResponseReceivedEvent(base: BaseAgentEvent(id: id, timestamp: ts), sessionId: "s", model: "m", durationMs: 100)
+        let e2 = LLMResponseReceivedEvent(base: BaseAgentEvent(id: id, timestamp: ts), sessionId: "s", model: "m", durationMs: 200)
+        XCTAssertNotEqual(e1, e2)
+    }
+
+    func testLLMResponseReceivedEventDecodeFromRawJson() throws {
+        let jsonString = """
+        {"id":"resp-id","timestamp":"2024-01-15T12:00:00Z","session_id":"resp-sess","model":"glm-5.1","duration_ms":2500}
+        """
+        let data = jsonString.data(using: .utf8)!
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let event = try decoder.decode(LLMResponseReceivedEvent.self, from: data)
+
+        XCTAssertEqual(event.id, "resp-id")
+        XCTAssertEqual(event.model, "glm-5.1")
+        XCTAssertEqual(event.durationMs, 2500)
+    }
+
+    func testLLMResponseReceivedEventDecodeMissingRequiredField() {
+        let jsonString = """
+        {"id":"bad","timestamp":"2024-01-15T12:00:00Z","model":"m"}
+        """
+        let data = jsonString.data(using: .utf8)!
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        XCTAssertThrowsError(try decoder.decode(LLMResponseReceivedEvent.self, from: data))
+    }
+
+    func testLLMResponseReceivedEventInitWithBase() {
+        let event = LLMResponseReceivedEvent(base: BaseAgentEvent(id: "custom", timestamp: Date(timeIntervalSince1970: 0)), sessionId: "s", model: "m", durationMs: 500)
+        XCTAssertEqual(event.id, "custom")
+        XCTAssertEqual(event.timestamp, Date(timeIntervalSince1970: 0))
+        XCTAssertEqual(event.durationMs, 500)
+    }
+
+    func testLLMResponseReceivedEventDecodeNilSessionId() throws {
+        let jsonString = """
+        {"id":"n","timestamp":"2024-01-15T12:00:00Z","session_id":null,"model":"m","duration_ms":100}
+        """
+        let data = jsonString.data(using: .utf8)!
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let event = try decoder.decode(LLMResponseReceivedEvent.self, from: data)
+        XCTAssertNil(event.sessionId)
+        XCTAssertEqual(event.model, "m")
+        XCTAssertEqual(event.durationMs, 100)
+    }
+
+    func testLLMResponseReceivedEventImmutablePayload() {
+        let event = LLMResponseReceivedEvent(sessionId: "s", model: "m", durationMs: 100)
+        XCTAssertEqual(event.durationMs, 100)
+    }
+
+    // MARK: - LLMCostEvent (AC3)
+
+    func testLLMCostEventConstruction() {
+        let event = LLMCostEvent(
+            sessionId: "sess-1",
+            model: "claude-sonnet-4-6",
+            inputTokens: 1500,
+            outputTokens: 800,
+            cacheCreationInputTokens: 200,
+            cacheReadInputTokens: 100,
+            estimatedCostUsd: 0.034
+        )
+        XCTAssertEqual(event.sessionId, "sess-1")
+        XCTAssertEqual(event.model, "claude-sonnet-4-6")
+        XCTAssertEqual(event.inputTokens, 1500)
+        XCTAssertEqual(event.outputTokens, 800)
+        XCTAssertEqual(event.cacheCreationInputTokens, 200)
+        XCTAssertEqual(event.cacheReadInputTokens, 100)
+        XCTAssertEqual(event.estimatedCostUsd, 0.034, accuracy: 0.0001)
+        XCTAssertFalse(event.id.isEmpty)
+    }
+
+    func testLLMCostEventNilSessionIdAndCacheTokens() {
+        let event = LLMCostEvent(
+            sessionId: nil,
+            model: "m",
+            inputTokens: 100,
+            outputTokens: 50,
+            cacheCreationInputTokens: nil,
+            cacheReadInputTokens: nil,
+            estimatedCostUsd: 0.01
+        )
+        XCTAssertNil(event.sessionId)
+        XCTAssertNil(event.cacheCreationInputTokens)
+        XCTAssertNil(event.cacheReadInputTokens)
+    }
+
+    func testLLMCostEventAgentEventConformance() {
+        func acceptEvent<T: AgentEvent>(_ event: T) {
+            XCTAssertFalse(event.id.isEmpty)
+        }
+        let event = LLMCostEvent(sessionId: "s", model: "m", inputTokens: 1, outputTokens: 1, cacheCreationInputTokens: nil, cacheReadInputTokens: nil, estimatedCostUsd: 0.0)
+        acceptEvent(event)
+    }
+
+    func testLLMCostEventSendable() {
+        func acceptSendable<T: Sendable>(_ value: T) { _ = value }
+        acceptSendable(LLMCostEvent(sessionId: nil, model: "m", inputTokens: 0, outputTokens: 0, cacheCreationInputTokens: nil, cacheReadInputTokens: nil, estimatedCostUsd: 0.0))
+    }
+
+    func testLLMCostEventCodableRoundTrip() throws {
+        let event = LLMCostEvent(
+            sessionId: "sess-1",
+            model: "claude-opus-4-7",
+            inputTokens: 5000,
+            outputTokens: 2000,
+            cacheCreationInputTokens: 1000,
+            cacheReadInputTokens: 500,
+            estimatedCostUsd: 0.15
+        )
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let data = try encoder.encode(event)
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let decoded = try decoder.decode(LLMCostEvent.self, from: data)
+
+        XCTAssertEqual(decoded.id, event.id)
+        XCTAssertEqual(decoded.sessionId, event.sessionId)
+        XCTAssertEqual(decoded.model, event.model)
+        XCTAssertEqual(decoded.inputTokens, event.inputTokens)
+        XCTAssertEqual(decoded.outputTokens, event.outputTokens)
+        XCTAssertEqual(decoded.cacheCreationInputTokens, event.cacheCreationInputTokens)
+        XCTAssertEqual(decoded.cacheReadInputTokens, event.cacheReadInputTokens)
+        XCTAssertEqual(decoded.estimatedCostUsd, event.estimatedCostUsd, accuracy: 0.0001)
+    }
+
+    func testLLMCostEventSnakeCaseJsonKeys() throws {
+        let event = LLMCostEvent(
+            sessionId: "s1",
+            model: "m",
+            inputTokens: 100,
+            outputTokens: 50,
+            cacheCreationInputTokens: 10,
+            cacheReadInputTokens: 5,
+            estimatedCostUsd: 0.01
+        )
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let data = try encoder.encode(event)
+        let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
+
+        XCTAssertNotNil(json["session_id"])
+        XCTAssertNotNil(json["model"])
+        XCTAssertNotNil(json["input_tokens"])
+        XCTAssertNotNil(json["output_tokens"])
+        XCTAssertNotNil(json["cache_creation_input_tokens"])
+        XCTAssertNotNil(json["cache_read_input_tokens"])
+        XCTAssertNotNil(json["estimated_cost_usd"])
+    }
+
+    func testLLMCostEventEquatable() {
+        let id = "eq-id"
+        let ts = Date(timeIntervalSince1970: 1700000000)
+        let e1 = LLMCostEvent(base: BaseAgentEvent(id: id, timestamp: ts), sessionId: "s", model: "m", inputTokens: 100, outputTokens: 50, cacheCreationInputTokens: nil, cacheReadInputTokens: nil, estimatedCostUsd: 0.01)
+        let e2 = LLMCostEvent(base: BaseAgentEvent(id: id, timestamp: ts), sessionId: "s", model: "m", inputTokens: 100, outputTokens: 50, cacheCreationInputTokens: nil, cacheReadInputTokens: nil, estimatedCostUsd: 0.01)
+        XCTAssertEqual(e1, e2)
+    }
+
+    func testLLMCostEventNotEqualDifferentTokens() {
+        let id = "eq-id"
+        let ts = Date(timeIntervalSince1970: 1700000000)
+        let e1 = LLMCostEvent(base: BaseAgentEvent(id: id, timestamp: ts), sessionId: "s", model: "m", inputTokens: 100, outputTokens: 50, cacheCreationInputTokens: nil, cacheReadInputTokens: nil, estimatedCostUsd: 0.01)
+        let e2 = LLMCostEvent(base: BaseAgentEvent(id: id, timestamp: ts), sessionId: "s", model: "m", inputTokens: 200, outputTokens: 50, cacheCreationInputTokens: nil, cacheReadInputTokens: nil, estimatedCostUsd: 0.01)
+        XCTAssertNotEqual(e1, e2)
+    }
+
+    func testLLMCostEventNotEqualDifferentCost() {
+        let id = "eq-id"
+        let ts = Date(timeIntervalSince1970: 1700000000)
+        let e1 = LLMCostEvent(base: BaseAgentEvent(id: id, timestamp: ts), sessionId: "s", model: "m", inputTokens: 100, outputTokens: 50, cacheCreationInputTokens: nil, cacheReadInputTokens: nil, estimatedCostUsd: 0.01)
+        let e2 = LLMCostEvent(base: BaseAgentEvent(id: id, timestamp: ts), sessionId: "s", model: "m", inputTokens: 100, outputTokens: 50, cacheCreationInputTokens: nil, cacheReadInputTokens: nil, estimatedCostUsd: 0.99)
+        XCTAssertNotEqual(e1, e2)
+    }
+
+    func testLLMCostEventDecodeFromRawJson() throws {
+        let jsonString = """
+        {"id":"cost-id","timestamp":"2024-01-15T12:00:00Z","session_id":"cost-sess","model":"glm-5.1","input_tokens":3000,"output_tokens":1500,"cache_creation_input_tokens":500,"cache_read_input_tokens":200,"estimated_cost_usd":0.075}
+        """
+        let data = jsonString.data(using: .utf8)!
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let event = try decoder.decode(LLMCostEvent.self, from: data)
+
+        XCTAssertEqual(event.id, "cost-id")
+        XCTAssertEqual(event.model, "glm-5.1")
+        XCTAssertEqual(event.inputTokens, 3000)
+        XCTAssertEqual(event.outputTokens, 1500)
+        XCTAssertEqual(event.cacheCreationInputTokens, 500)
+        XCTAssertEqual(event.cacheReadInputTokens, 200)
+        XCTAssertEqual(event.estimatedCostUsd, 0.075, accuracy: 0.0001)
+    }
+
+    func testLLMCostEventDecodeNilCacheTokens() throws {
+        let jsonString = """
+        {"id":"n","timestamp":"2024-01-15T12:00:00Z","session_id":null,"model":"m","input_tokens":100,"output_tokens":50,"cache_creation_input_tokens":null,"cache_read_input_tokens":null,"estimated_cost_usd":0.01}
+        """
+        let data = jsonString.data(using: .utf8)!
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let event = try decoder.decode(LLMCostEvent.self, from: data)
+        XCTAssertNil(event.sessionId)
+        XCTAssertNil(event.cacheCreationInputTokens)
+        XCTAssertNil(event.cacheReadInputTokens)
+    }
+
+    func testLLMCostEventDecodeMissingCacheTokensOmitted() throws {
+        let jsonString = """
+        {"id":"n","timestamp":"2024-01-15T12:00:00Z","model":"m","input_tokens":100,"output_tokens":50,"estimated_cost_usd":0.01}
+        """
+        let data = jsonString.data(using: .utf8)!
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let event = try decoder.decode(LLMCostEvent.self, from: data)
+        XCTAssertNil(event.sessionId)
+        XCTAssertNil(event.cacheCreationInputTokens)
+        XCTAssertNil(event.cacheReadInputTokens)
+        XCTAssertEqual(event.inputTokens, 100)
+    }
+
+    func testLLMCostEventDecodeMissingRequiredField() {
+        let jsonString = """
+        {"id":"bad","timestamp":"2024-01-15T12:00:00Z","model":"m"}
+        """
+        let data = jsonString.data(using: .utf8)!
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        XCTAssertThrowsError(try decoder.decode(LLMCostEvent.self, from: data))
+    }
+
+    func testLLMCostEventImmutablePayload() {
+        let event = LLMCostEvent(sessionId: "s", model: "m", inputTokens: 100, outputTokens: 50, cacheCreationInputTokens: nil, cacheReadInputTokens: nil, estimatedCostUsd: 0.01)
+        XCTAssertEqual(event.inputTokens, 100)
+        XCTAssertEqual(event.outputTokens, 50)
+        XCTAssertEqual(event.estimatedCostUsd, 0.01, accuracy: 0.0001)
+    }
+
+    // MARK: - LLM Events Existential Usage
+
+    func testLLMEventsAsAgentEventExistential() {
+        let events: [any AgentEvent] = [
+            LLMRequestStartedEvent(sessionId: "s1", model: "claude-sonnet-4-6"),
+            LLMResponseReceivedEvent(sessionId: "s2", model: "glm-5.1", durationMs: 500),
+            LLMCostEvent(sessionId: "s3", model: "claude-opus-4-7", inputTokens: 1000, outputTokens: 500, cacheCreationInputTokens: nil, cacheReadInputTokens: nil, estimatedCostUsd: 0.05),
+        ]
+        XCTAssertEqual(events.count, 3)
+        for event in events {
+            XCTAssertFalse(event.id.isEmpty)
+            XCTAssertNotNil(event.timestamp)
+        }
+    }
+
+    // MARK: - LLM Events Edge Cases
+
+    func testLLMRequestStartedEventEmptyModel() {
+        let event = LLMRequestStartedEvent(sessionId: nil, model: "")
+        XCTAssertTrue(event.model.isEmpty)
+    }
+
+    func testLLMResponseReceivedEventZeroDuration() {
+        let event = LLMResponseReceivedEvent(sessionId: nil, model: "m", durationMs: 0)
+        XCTAssertEqual(event.durationMs, 0)
+    }
+
+    func testLLMCostEventZeroTokens() {
+        let event = LLMCostEvent(sessionId: nil, model: "m", inputTokens: 0, outputTokens: 0, cacheCreationInputTokens: nil, cacheReadInputTokens: nil, estimatedCostUsd: 0.0)
+        XCTAssertEqual(event.inputTokens, 0)
+        XCTAssertEqual(event.outputTokens, 0)
+        XCTAssertEqual(event.estimatedCostUsd, 0.0)
+    }
+
+    func testLLMCostEventZeroCost() {
+        let event = LLMCostEvent(sessionId: "s", model: "m", inputTokens: 500, outputTokens: 200, cacheCreationInputTokens: 100, cacheReadInputTokens: 50, estimatedCostUsd: 0.0)
+        XCTAssertEqual(event.estimatedCostUsd, 0.0)
+    }
+
+    func testLLMCostEventZeroCacheTokens() {
+        let event = LLMCostEvent(sessionId: "s", model: "m", inputTokens: 100, outputTokens: 50, cacheCreationInputTokens: 0, cacheReadInputTokens: 0, estimatedCostUsd: 0.01)
+        XCTAssertEqual(event.cacheCreationInputTokens, 0)
+        XCTAssertEqual(event.cacheReadInputTokens, 0)
+    }
+
+    // MARK: - Actor Boundary (Sendable across actors)
+
+    func testLLMRequestStartedEventSendableAcrossActor() async {
+        let event = LLMRequestStartedEvent(sessionId: "s", model: "claude-sonnet-4-6")
+        let retrieved = await Self.llmRequestStartedEchoActor.send(event)
+        XCTAssertEqual(retrieved.model, "claude-sonnet-4-6")
+    }
+
+    func testLLMResponseReceivedEventSendableAcrossActor() async {
+        let event = LLMResponseReceivedEvent(sessionId: "s", model: "glm-5.1", durationMs: 1200)
+        let retrieved = await Self.llmResponseReceivedEchoActor.send(event)
+        XCTAssertEqual(retrieved.durationMs, 1200)
+    }
+
+    func testLLMCostEventSendableAcrossActor() async {
+        let event = LLMCostEvent(sessionId: "s", model: "claude-opus-4-7", inputTokens: 3000, outputTokens: 1500, cacheCreationInputTokens: 500, cacheReadInputTokens: 200, estimatedCostUsd: 0.12)
+        let retrieved = await Self.llmCostEchoActor.send(event)
+        XCTAssertEqual(retrieved.inputTokens, 3000)
+        XCTAssertEqual(retrieved.outputTokens, 1500)
+    }
+}
+
+// MARK: - LLM Event Test Helpers
+
+private extension AgentEventTypesTests {
+    actor LLMRequestStartedEchoActor {
+        func send(_ event: LLMRequestStartedEvent) -> LLMRequestStartedEvent { event }
+    }
+
+    actor LLMResponseReceivedEchoActor {
+        func send(_ event: LLMResponseReceivedEvent) -> LLMResponseReceivedEvent { event }
+    }
+
+    actor LLMCostEchoActor {
+        func send(_ event: LLMCostEvent) -> LLMCostEvent { event }
+    }
+
+    static let llmRequestStartedEchoActor = LLMRequestStartedEchoActor()
+    static let llmResponseReceivedEchoActor = LLMResponseReceivedEchoActor()
+    static let llmCostEchoActor = LLMCostEchoActor()
+}

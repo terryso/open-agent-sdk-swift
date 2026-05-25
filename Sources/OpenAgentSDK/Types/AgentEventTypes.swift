@@ -645,3 +645,155 @@ public struct ToolFailedEvent: AgentEvent, Equatable {
         try c.encode(error, forKey: .error)
     }
 }
+
+// MARK: - LLM Events
+
+/// Emitted when an LLM API request starts.
+public struct LLMRequestStartedEvent: AgentEvent, Equatable {
+    public let base: BaseAgentEvent
+    public let sessionId: String?
+    public let model: String
+
+    public var id: String { base.id }
+    public var timestamp: Date { base.timestamp }
+
+    enum CodingKeys: String, CodingKey {
+        case id, timestamp
+        case sessionId = "session_id"
+        case model
+    }
+
+    public init(base: BaseAgentEvent = BaseAgentEvent(), sessionId: String?, model: String) {
+        self.base = base
+        self.sessionId = sessionId
+        self.model = model
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        base = BaseAgentEvent(
+            id: try c.decode(String.self, forKey: .id),
+            timestamp: try c.decode(Date.self, forKey: .timestamp)
+        )
+        sessionId = try c.decodeIfPresent(String.self, forKey: .sessionId)
+        model = try c.decode(String.self, forKey: .model)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(base.id, forKey: .id)
+        try c.encode(base.timestamp, forKey: .timestamp)
+        try c.encodeIfPresent(sessionId, forKey: .sessionId)
+        try c.encode(model, forKey: .model)
+    }
+}
+
+/// Emitted when an LLM response is received.
+public struct LLMResponseReceivedEvent: AgentEvent, Equatable {
+    public let base: BaseAgentEvent
+    public let sessionId: String?
+    public let model: String
+    public let durationMs: Int
+
+    public var id: String { base.id }
+    public var timestamp: Date { base.timestamp }
+
+    enum CodingKeys: String, CodingKey {
+        case id, timestamp
+        case sessionId = "session_id"
+        case model
+        case durationMs = "duration_ms"
+    }
+
+    public init(base: BaseAgentEvent = BaseAgentEvent(), sessionId: String?, model: String, durationMs: Int) {
+        self.base = base
+        self.sessionId = sessionId
+        self.model = model
+        self.durationMs = durationMs
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        base = BaseAgentEvent(
+            id: try c.decode(String.self, forKey: .id),
+            timestamp: try c.decode(Date.self, forKey: .timestamp)
+        )
+        sessionId = try c.decodeIfPresent(String.self, forKey: .sessionId)
+        model = try c.decode(String.self, forKey: .model)
+        durationMs = try c.decode(Int.self, forKey: .durationMs)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(base.id, forKey: .id)
+        try c.encode(base.timestamp, forKey: .timestamp)
+        try c.encodeIfPresent(sessionId, forKey: .sessionId)
+        try c.encode(model, forKey: .model)
+        try c.encode(durationMs, forKey: .durationMs)
+    }
+}
+
+/// Emitted when token/cost data is available for an LLM call.
+public struct LLMCostEvent: AgentEvent, Equatable {
+    public let base: BaseAgentEvent
+    public let sessionId: String?
+    public let model: String
+    public let inputTokens: Int
+    public let outputTokens: Int
+    public let cacheCreationInputTokens: Int?
+    public let cacheReadInputTokens: Int?
+    public let estimatedCostUsd: Double
+
+    public var id: String { base.id }
+    public var timestamp: Date { base.timestamp }
+
+    enum CodingKeys: String, CodingKey {
+        case id, timestamp
+        case sessionId = "session_id"
+        case model
+        case inputTokens = "input_tokens"
+        case outputTokens = "output_tokens"
+        case cacheCreationInputTokens = "cache_creation_input_tokens"
+        case cacheReadInputTokens = "cache_read_input_tokens"
+        case estimatedCostUsd = "estimated_cost_usd"
+    }
+
+    public init(base: BaseAgentEvent = BaseAgentEvent(), sessionId: String?, model: String, inputTokens: Int, outputTokens: Int, cacheCreationInputTokens: Int?, cacheReadInputTokens: Int?, estimatedCostUsd: Double) {
+        self.base = base
+        self.sessionId = sessionId
+        self.model = model
+        self.inputTokens = inputTokens
+        self.outputTokens = outputTokens
+        self.cacheCreationInputTokens = cacheCreationInputTokens
+        self.cacheReadInputTokens = cacheReadInputTokens
+        self.estimatedCostUsd = estimatedCostUsd
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        base = BaseAgentEvent(
+            id: try c.decode(String.self, forKey: .id),
+            timestamp: try c.decode(Date.self, forKey: .timestamp)
+        )
+        sessionId = try c.decodeIfPresent(String.self, forKey: .sessionId)
+        model = try c.decode(String.self, forKey: .model)
+        inputTokens = try c.decode(Int.self, forKey: .inputTokens)
+        outputTokens = try c.decode(Int.self, forKey: .outputTokens)
+        cacheCreationInputTokens = try c.decodeIfPresent(Int.self, forKey: .cacheCreationInputTokens)
+        cacheReadInputTokens = try c.decodeIfPresent(Int.self, forKey: .cacheReadInputTokens)
+        estimatedCostUsd = try c.decode(Double.self, forKey: .estimatedCostUsd)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(base.id, forKey: .id)
+        try c.encode(base.timestamp, forKey: .timestamp)
+        try c.encodeIfPresent(sessionId, forKey: .sessionId)
+        try c.encode(model, forKey: .model)
+        try c.encode(inputTokens, forKey: .inputTokens)
+        try c.encode(outputTokens, forKey: .outputTokens)
+        try c.encodeIfPresent(cacheCreationInputTokens, forKey: .cacheCreationInputTokens)
+        try c.encodeIfPresent(cacheReadInputTokens, forKey: .cacheReadInputTokens)
+        try c.encode(estimatedCostUsd, forKey: .estimatedCostUsd)
+    }
+}

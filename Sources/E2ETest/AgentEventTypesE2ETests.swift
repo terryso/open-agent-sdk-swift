@@ -38,6 +38,20 @@ struct AgentEventTypesE2ETests {
         await testToolFailedEvent_codableRoundTrip()
         await testToolFullLifecycle_sequence()
         await testCrossCategoryExistentialDispatch()
+        section("114-126. LLM Cost Events (E2E — Story 26.5)")
+        await testLLMRequestStartedEvent_fullLifecycle()
+        await testLLMResponseReceivedEvent_codableRoundTrip()
+        await testLLMCostEvent_fullLifecycle()
+        await testLLMCostEvent_nilCacheTokens()
+        await testLLMRequestStartedEvent_concurrentUsage()
+        await testLLMResponseReceivedEvent_concurrentUsage()
+        await testLLMCostEvent_concurrentUsage()
+        await testLLMEvents_existentialDispatch()
+        await testLLMEvents_jsonFormatSseCompatible()
+        await testLLMFullLifecycle_sequence()
+        await testLLMCostEvent_datePrecision()
+        await testCrossCategoryExistentialDispatch_withLLM()
+        await testLLMCostEvent_mixedCacheTokensAndJsonTypes()
     }
 
     // MARK: Test 87: SessionCreatedEvent full lifecycle
@@ -1019,6 +1033,545 @@ struct AgentEventTypesE2ETests {
 
         pass("113. Cross-category existential dispatch (all 13 event types: session + agent + tool)")
     }
+
+    // MARK: - Tests 114-125: LLM Cost Events (Story 26.5)
+
+    // MARK: Test 114: LLMRequestStartedEvent full lifecycle with Date precision
+
+    static func testLLMRequestStartedEvent_fullLifecycle() async {
+        let event = LLMRequestStartedEvent(
+            sessionId: "e2e-llm-start-\(UUID().uuidString)",
+            model: "claude-sonnet-4-6"
+        )
+
+        guard !event.id.isEmpty else {
+            fail("LLMRequestStartedEvent lifecycle", "id is empty")
+            return
+        }
+        guard event.sessionId != nil else {
+            fail("LLMRequestStartedEvent lifecycle", "sessionId should not be nil")
+            return
+        }
+
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+
+        do {
+            let data = try encoder.encode(event)
+            let decoded = try decoder.decode(LLMRequestStartedEvent.self, from: data)
+
+            guard decoded.id == event.id else {
+                fail("LLMRequestStartedEvent lifecycle", "id mismatch")
+                return
+            }
+            guard decoded.sessionId == event.sessionId else {
+                fail("LLMRequestStartedEvent lifecycle", "sessionId mismatch")
+                return
+            }
+            guard decoded.model == "claude-sonnet-4-6" else {
+                fail("LLMRequestStartedEvent lifecycle", "model mismatch")
+                return
+            }
+            let delta = abs(decoded.timestamp.timeIntervalSince(event.timestamp))
+            guard delta < 1.0 else {
+                fail("LLMRequestStartedEvent lifecycle", "Date drift: \(delta)s")
+                return
+            }
+            pass("114. LLMRequestStartedEvent full lifecycle with Date precision (construct → encode → decode → verify)")
+        } catch {
+            fail("LLMRequestStartedEvent lifecycle", "Codable error: \(error)")
+        }
+    }
+
+    // MARK: Test 115: LLMResponseReceivedEvent Codable round-trip with Date precision
+
+    static func testLLMResponseReceivedEvent_codableRoundTrip() async {
+        let event = LLMResponseReceivedEvent(
+            sessionId: "e2e-llm-resp-\(UUID().uuidString)",
+            model: "glm-5.1",
+            durationMs: 4200
+        )
+
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+
+        do {
+            let data = try encoder.encode(event)
+            let decoded = try decoder.decode(LLMResponseReceivedEvent.self, from: data)
+
+            guard decoded.model == "glm-5.1" else {
+                fail("LLMResponseReceivedEvent Codable", "model mismatch: \(decoded.model)")
+                return
+            }
+            guard decoded.durationMs == 4200 else {
+                fail("LLMResponseReceivedEvent Codable", "durationMs mismatch: \(decoded.durationMs)")
+                return
+            }
+            let delta = abs(decoded.timestamp.timeIntervalSince(event.timestamp))
+            guard delta < 1.0 else {
+                fail("LLMResponseReceivedEvent Codable", "Date drift: \(delta)s")
+                return
+            }
+            pass("115. LLMResponseReceivedEvent Codable round-trip with Date precision")
+        } catch {
+            fail("LLMResponseReceivedEvent Codable", "error: \(error)")
+        }
+    }
+
+    // MARK: Test 116: LLMCostEvent full lifecycle with all fields
+
+    static func testLLMCostEvent_fullLifecycle() async {
+        let event = LLMCostEvent(
+            sessionId: "e2e-llm-cost-\(UUID().uuidString)",
+            model: "claude-opus-4-7",
+            inputTokens: 5000,
+            outputTokens: 2000,
+            cacheCreationInputTokens: 1000,
+            cacheReadInputTokens: 500,
+            estimatedCostUsd: 0.15
+        )
+
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+
+        do {
+            let data = try encoder.encode(event)
+            let decoded = try decoder.decode(LLMCostEvent.self, from: data)
+
+            guard decoded.inputTokens == 5000 else {
+                fail("LLMCostEvent lifecycle", "inputTokens mismatch: \(decoded.inputTokens)")
+                return
+            }
+            guard decoded.outputTokens == 2000 else {
+                fail("LLMCostEvent lifecycle", "outputTokens mismatch: \(decoded.outputTokens)")
+                return
+            }
+            guard decoded.cacheCreationInputTokens == 1000 else {
+                fail("LLMCostEvent lifecycle", "cacheCreationInputTokens mismatch")
+                return
+            }
+            guard decoded.cacheReadInputTokens == 500 else {
+                fail("LLMCostEvent lifecycle", "cacheReadInputTokens mismatch")
+                return
+            }
+            guard abs(decoded.estimatedCostUsd - 0.15) < 0.0001 else {
+                fail("LLMCostEvent lifecycle", "estimatedCostUsd mismatch: \(decoded.estimatedCostUsd)")
+                return
+            }
+            pass("116. LLMCostEvent full lifecycle (all fields including cache tokens)")
+        } catch {
+            fail("LLMCostEvent lifecycle", "Codable error: \(error)")
+        }
+    }
+
+    // MARK: Test 117: LLMCostEvent with nil cache tokens
+
+    static func testLLMCostEvent_nilCacheTokens() async {
+        let event = LLMCostEvent(
+            sessionId: "e2e-llm-cost-nil-\(UUID().uuidString)",
+            model: "glm-5.1",
+            inputTokens: 500,
+            outputTokens: 200,
+            cacheCreationInputTokens: nil,
+            cacheReadInputTokens: nil,
+            estimatedCostUsd: 0.01
+        )
+
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+
+        do {
+            let data = try encoder.encode(event)
+            let decoded = try decoder.decode(LLMCostEvent.self, from: data)
+
+            guard decoded.cacheCreationInputTokens == nil else {
+                fail("LLMCostEvent nil cache", "cacheCreationInputTokens should be nil")
+                return
+            }
+            guard decoded.cacheReadInputTokens == nil else {
+                fail("LLMCostEvent nil cache", "cacheReadInputTokens should be nil")
+                return
+            }
+            guard decoded.inputTokens == 500, decoded.outputTokens == 200 else {
+                fail("LLMCostEvent nil cache", "token counts mismatch")
+                return
+            }
+            pass("117. LLMCostEvent with nil cache tokens round-trips correctly")
+        } catch {
+            fail("LLMCostEvent nil cache", "error: \(error)")
+        }
+    }
+
+    // MARK: Test 118: LLMRequestStartedEvent concurrent usage
+
+    static func testLLMRequestStartedEvent_concurrentUsage() async {
+        let event = LLMRequestStartedEvent(
+            sessionId: "e2e-llm-conc-start-\(UUID().uuidString)",
+            model: "claude-sonnet-4-6"
+        )
+        let retrieved = await Self.testActor.sendLLMRequestStarted(event)
+        guard retrieved.model == "claude-sonnet-4-6", retrieved.sessionId == event.sessionId else {
+            fail("LLMRequestStartedEvent concurrent", "data corrupted after actor crossing")
+            return
+        }
+        pass("118. LLMRequestStartedEvent concurrent usage across actor boundary")
+    }
+
+    // MARK: Test 119: LLMResponseReceivedEvent concurrent usage
+
+    static func testLLMResponseReceivedEvent_concurrentUsage() async {
+        let event = LLMResponseReceivedEvent(
+            sessionId: "e2e-llm-conc-resp-\(UUID().uuidString)",
+            model: "glm-5.1",
+            durationMs: 3200
+        )
+        let retrieved = await Self.testActor.sendLLMResponseReceived(event)
+        guard retrieved.durationMs == 3200, retrieved.model == "glm-5.1" else {
+            fail("LLMResponseReceivedEvent concurrent", "data corrupted after actor crossing")
+            return
+        }
+        pass("119. LLMResponseReceivedEvent concurrent usage across actor boundary")
+    }
+
+    // MARK: Test 120: LLMCostEvent concurrent usage
+
+    static func testLLMCostEvent_concurrentUsage() async {
+        let event = LLMCostEvent(
+            sessionId: "e2e-llm-conc-cost-\(UUID().uuidString)",
+            model: "claude-opus-4-7",
+            inputTokens: 8000,
+            outputTokens: 3000,
+            cacheCreationInputTokens: 2000,
+            cacheReadInputTokens: 1000,
+            estimatedCostUsd: 0.25
+        )
+        let retrieved = await Self.testActor.sendLLMCost(event)
+        guard retrieved.inputTokens == 8000, retrieved.outputTokens == 3000 else {
+            fail("LLMCostEvent concurrent", "token counts corrupted after actor crossing")
+            return
+        }
+        guard retrieved.cacheCreationInputTokens == 2000, retrieved.cacheReadInputTokens == 1000 else {
+            fail("LLMCostEvent concurrent", "cache tokens corrupted after actor crossing")
+            return
+        }
+        pass("120. LLMCostEvent concurrent usage across actor boundary")
+    }
+
+    // MARK: Test 121: All LLM events as existential AgentEvent
+
+    static func testLLMEvents_existentialDispatch() async {
+        let events: [any AgentEvent] = [
+            LLMRequestStartedEvent(sessionId: "e2e-ex-llm1", model: "claude-sonnet-4-6"),
+            LLMResponseReceivedEvent(sessionId: "e2e-ex-llm2", model: "glm-5.1", durationMs: 1000),
+            LLMCostEvent(sessionId: "e2e-ex-llm3", model: "claude-opus-4-7", inputTokens: 2000, outputTokens: 1000, cacheCreationInputTokens: 500, cacheReadInputTokens: 200, estimatedCostUsd: 0.08),
+        ]
+
+        for event in events {
+            guard !event.id.isEmpty else {
+                fail("LLM existential dispatch", "event has empty id: \(type(of: event))")
+                return
+            }
+        }
+
+        func dispatch(_ event: any AgentEvent) -> String { event.id }
+        let ids = events.map { dispatch($0) }
+        guard ids.count == 3, ids.allSatisfy({ !$0.isEmpty }) else {
+            fail("LLM existential dispatch", "id extraction failed")
+            return
+        }
+        pass("121. All 3 LLM events work as existential AgentEvent")
+    }
+
+    // MARK: Test 122: LLM events JSON format SSE-compatible
+
+    static func testLLMEvents_jsonFormatSseCompatible() async {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+
+        // LLMRequestStartedEvent
+        do {
+            let event = LLMRequestStartedEvent(sessionId: "s1", model: "claude-sonnet-4-6")
+            let data = try encoder.encode(event)
+            let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
+
+            guard json["id"] != nil else { fail("SSE format LLMRequestStarted", "missing 'id'"); return }
+            guard json["timestamp"] != nil else { fail("SSE format LLMRequestStarted", "missing 'timestamp'"); return }
+            guard json["session_id"] != nil else { fail("SSE format LLMRequestStarted", "missing 'session_id'"); return }
+            guard json["model"] != nil else { fail("SSE format LLMRequestStarted", "missing 'model'"); return }
+            guard json["base"] == nil else { fail("SSE format LLMRequestStarted", "should not have nested 'base'"); return }
+        } catch {
+            fail("SSE format LLMRequestStarted", "error: \(error)")
+            return
+        }
+
+        // LLMResponseReceivedEvent
+        do {
+            let event = LLMResponseReceivedEvent(sessionId: "s2", model: "glm-5.1", durationMs: 500)
+            let data = try encoder.encode(event)
+            let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
+
+            guard json["duration_ms"] != nil else { fail("SSE format LLMResponseReceived", "missing 'duration_ms'"); return }
+            guard json["base"] == nil else { fail("SSE format LLMResponseReceived", "should not have nested 'base'"); return }
+        } catch {
+            fail("SSE format LLMResponseReceived", "error: \(error)")
+            return
+        }
+
+        // LLMCostEvent
+        do {
+            let event = LLMCostEvent(sessionId: "s3", model: "claude-opus-4-7", inputTokens: 1000, outputTokens: 500, cacheCreationInputTokens: 100, cacheReadInputTokens: 50, estimatedCostUsd: 0.05)
+            let data = try encoder.encode(event)
+            let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
+
+            guard json["input_tokens"] != nil else { fail("SSE format LLMCost", "missing 'input_tokens'"); return }
+            guard json["output_tokens"] != nil else { fail("SSE format LLMCost", "missing 'output_tokens'"); return }
+            guard json["cache_creation_input_tokens"] != nil else { fail("SSE format LLMCost", "missing 'cache_creation_input_tokens'"); return }
+            guard json["cache_read_input_tokens"] != nil else { fail("SSE format LLMCost", "missing 'cache_read_input_tokens'"); return }
+            guard json["estimated_cost_usd"] != nil else { fail("SSE format LLMCost", "missing 'estimated_cost_usd'"); return }
+            guard json["base"] == nil else { fail("SSE format LLMCost", "should not have nested 'base'"); return }
+        } catch {
+            fail("SSE format LLMCost", "error: \(error)")
+            return
+        }
+
+        pass("122. LLM events JSON format SSE-compatible (flat, snake_case, no nested base)")
+    }
+
+    // MARK: Test 123: Full LLM lifecycle sequence (RequestStarted → ResponseReceived → Cost)
+
+    static func testLLMFullLifecycle_sequence() async {
+        let sessionId = "e2e-llm-lifecycle-\(UUID().uuidString)"
+
+        let started = LLMRequestStartedEvent(
+            sessionId: sessionId,
+            model: "claude-sonnet-4-6"
+        )
+        let response = LLMResponseReceivedEvent(
+            sessionId: sessionId,
+            model: "claude-sonnet-4-6",
+            durationMs: 3500
+        )
+        let cost = LLMCostEvent(
+            sessionId: sessionId,
+            model: "claude-sonnet-4-6",
+            inputTokens: 5000,
+            outputTokens: 2000,
+            cacheCreationInputTokens: 1000,
+            cacheReadInputTokens: 500,
+            estimatedCostUsd: 0.15
+        )
+
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+
+        do {
+            let decodedStarted = try decoder.decode(LLMRequestStartedEvent.self, from: encoder.encode(started))
+            let decodedResponse = try decoder.decode(LLMResponseReceivedEvent.self, from: encoder.encode(response))
+            let decodedCost = try decoder.decode(LLMCostEvent.self, from: encoder.encode(cost))
+
+            // All share same sessionId
+            guard decodedStarted.sessionId == sessionId,
+                  decodedResponse.sessionId == sessionId,
+                  decodedCost.sessionId == sessionId else {
+                fail("LLM lifecycle sequence", "sessionId mismatch across events")
+                return
+            }
+
+            // All share same model
+            guard decodedStarted.model == "claude-sonnet-4-6",
+                  decodedResponse.model == "claude-sonnet-4-6",
+                  decodedCost.model == "claude-sonnet-4-6" else {
+                fail("LLM lifecycle sequence", "model mismatch across events")
+                return
+            }
+
+            // Verify response fields
+            guard decodedResponse.durationMs == 3500 else {
+                fail("LLM lifecycle sequence", "durationMs mismatch")
+                return
+            }
+
+            // Verify cost fields
+            guard decodedCost.inputTokens == 5000,
+                  decodedCost.outputTokens == 2000,
+                  decodedCost.cacheCreationInputTokens == 1000,
+                  decodedCost.cacheReadInputTokens == 500 else {
+                fail("LLM lifecycle sequence", "cost token fields mismatch")
+                return
+            }
+
+            pass("123. Full LLM lifecycle sequence (RequestStarted → ResponseReceived → Cost)")
+        } catch {
+            fail("LLM lifecycle sequence", "Codable error: \(error)")
+        }
+    }
+
+    // MARK: Test 124: LLMCostEvent Codable Date precision
+
+    static func testLLMCostEvent_datePrecision() async {
+        let event = LLMCostEvent(
+            sessionId: "e2e-llm-date-\(UUID().uuidString)",
+            model: "glm-5.1",
+            inputTokens: 100,
+            outputTokens: 50,
+            cacheCreationInputTokens: nil,
+            cacheReadInputTokens: nil,
+            estimatedCostUsd: 0.001
+        )
+
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+
+        do {
+            let data = try encoder.encode(event)
+            let decoded = try decoder.decode(LLMCostEvent.self, from: data)
+
+            let delta = abs(decoded.timestamp.timeIntervalSince(event.timestamp))
+            guard delta < 1.0 else {
+                fail("LLMCostEvent Date precision", "Date drift: \(delta)s")
+                return
+            }
+            pass("124. LLMCostEvent Codable Date precision preserved")
+        } catch {
+            fail("LLMCostEvent Date precision", "error: \(error)")
+        }
+    }
+
+    // MARK: Test 125: Cross-category existential dispatch including LLM events (16 types)
+
+    static func testCrossCategoryExistentialDispatch_withLLM() async {
+        let events: [any AgentEvent] = [
+            // Session events (4)
+            SessionCreatedEvent(sessionId: "cross-1", task: "cross test", model: "m"),
+            SessionRestoredEvent(sessionId: "cross-2", messageCount: 1, originalCreatedAt: Date()),
+            SessionClosedEvent(sessionId: "cross-3", finalStatus: .completed),
+            SessionAutoSavedEvent(sessionId: "cross-4", messageCount: 2),
+            // Agent events (5)
+            AgentStartedEvent(sessionId: "cross-5", task: "start"),
+            AgentCompletedEvent(sessionId: "cross-6", totalSteps: 1, durationMs: 100, resultText: "done"),
+            AgentFailedEvent(sessionId: "cross-7", error: "fail", stepsCompleted: 0),
+            AgentInterruptedEvent(sessionId: "cross-8", stepsCompleted: 1),
+            AgentResumedEvent(sessionId: "cross-9", resumeContext: "resume"),
+            // Tool events (4)
+            ToolStartedEvent(sessionId: "cross-10", toolName: "BashTool", toolUseId: "tu-1", input: nil),
+            ToolStreamingEvent(sessionId: "cross-11", toolUseId: "tu-2", chunk: "data"),
+            ToolCompletedEvent(sessionId: "cross-12", toolUseId: "tu-3", toolName: "FileTool", durationMs: 50, isError: false),
+            ToolFailedEvent(sessionId: "cross-13", toolUseId: "tu-4", toolName: "GrepTool", error: "err"),
+            // LLM events (3)
+            LLMRequestStartedEvent(sessionId: "cross-14", model: "claude-sonnet-4-6"),
+            LLMResponseReceivedEvent(sessionId: "cross-15", model: "glm-5.1", durationMs: 500),
+            LLMCostEvent(sessionId: "cross-16", model: "claude-opus-4-7", inputTokens: 1000, outputTokens: 500, cacheCreationInputTokens: nil, cacheReadInputTokens: nil, estimatedCostUsd: 0.05),
+        ]
+
+        guard events.count == 16 else {
+            fail("Cross-category with LLM", "expected 16 events, got \(events.count)")
+            return
+        }
+
+        for event in events {
+            guard !event.id.isEmpty else {
+                fail("Cross-category with LLM", "event has empty id: \(type(of: event))")
+                return
+            }
+        }
+
+        func dispatch(_ event: any AgentEvent) -> String { event.id }
+        let ids = events.map { dispatch($0) }
+        guard ids.count == 16, ids.allSatisfy({ !$0.isEmpty }) else {
+            fail("Cross-category with LLM", "id extraction failed")
+            return
+        }
+
+        let uniqueIds = Set(ids)
+        guard uniqueIds.count == 16 else {
+            fail("Cross-category with LLM", "IDs should all be unique, got \(uniqueIds.count) unique out of \(ids.count)")
+            return
+        }
+
+        pass("125. Cross-category existential dispatch (all 16 event types: session + agent + tool + LLM)")
+    }
+
+    // MARK: Test 126: LLMCostEvent mixed nil/non-nil cache tokens + JSON value types
+
+    static func testLLMCostEvent_mixedCacheTokensAndJsonTypes() async {
+        // Test 1: One cache token nil, other present
+        let event = LLMCostEvent(
+            sessionId: "e2e-llm-mixed-\(UUID().uuidString)",
+            model: "claude-sonnet-4-6",
+            inputTokens: 2000,
+            outputTokens: 800,
+            cacheCreationInputTokens: 500,
+            cacheReadInputTokens: nil,
+            estimatedCostUsd: 0.045
+        )
+
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+
+        do {
+            let data = try encoder.encode(event)
+            let decoded = try decoder.decode(LLMCostEvent.self, from: data)
+
+            guard decoded.cacheCreationInputTokens == 500 else {
+                fail("LLMCostEvent mixed cache", "cacheCreationInputTokens should be 500, got \(String(describing: decoded.cacheCreationInputTokens))")
+                return
+            }
+            guard decoded.cacheReadInputTokens == nil else {
+                fail("LLMCostEvent mixed cache", "cacheReadInputTokens should be nil")
+                return
+            }
+            guard decoded.inputTokens == 2000 else {
+                fail("LLMCostEvent mixed cache", "inputTokens mismatch")
+                return
+            }
+            guard abs(decoded.estimatedCostUsd - 0.045) < 0.0001 else {
+                fail("LLMCostEvent mixed cache", "estimatedCostUsd mismatch: \(decoded.estimatedCostUsd)")
+                return
+            }
+
+            // Test 2: Verify JSON value types (Int fields are numbers, Double is number)
+            let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
+            guard json["input_tokens"] is Int else {
+                fail("LLMCostEvent JSON types", "input_tokens should be Int")
+                return
+            }
+            guard json["output_tokens"] is Int else {
+                fail("LLMCostEvent JSON types", "output_tokens should be Int")
+                return
+            }
+            guard json["cache_creation_input_tokens"] is Int else {
+                fail("LLMCostEvent JSON types", "cache_creation_input_tokens should be Int")
+                return
+            }
+            guard json["estimated_cost_usd"] is Double else {
+                fail("LLMCostEvent JSON types", "estimated_cost_usd should be Double")
+                return
+            }
+            // nil field should be absent from JSON
+            guard json["cache_read_input_tokens"] == nil else {
+                fail("LLMCostEvent JSON types", "cache_read_input_tokens should be absent when nil")
+                return
+            }
+
+            pass("126. LLMCostEvent mixed nil/non-nil cache tokens + JSON value types verified")
+        } catch {
+            fail("LLMCostEvent mixed cache", "error: \(error)")
+        }
+    }
 }
 
 // MARK: - E2E Test Helpers
@@ -1035,6 +1588,9 @@ private extension AgentEventTypesE2ETests {
         func sendToolStreaming(_ event: ToolStreamingEvent) -> ToolStreamingEvent { event }
         func sendToolCompleted(_ event: ToolCompletedEvent) -> ToolCompletedEvent { event }
         func sendToolFailed(_ event: ToolFailedEvent) -> ToolFailedEvent { event }
+        func sendLLMRequestStarted(_ event: LLMRequestStartedEvent) -> LLMRequestStartedEvent { event }
+        func sendLLMResponseReceived(_ event: LLMResponseReceivedEvent) -> LLMResponseReceivedEvent { event }
+        func sendLLMCost(_ event: LLMCostEvent) -> LLMCostEvent { event }
     }
     static let testActor = TestActor()
 }
