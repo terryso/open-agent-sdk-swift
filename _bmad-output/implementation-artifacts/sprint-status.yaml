@@ -1,5 +1,5 @@
 # generated: 2026-05-25
-# last_updated: 2026-05-27
+# last_updated: 2026-05-26
 
 # project: open-agent-sdk-swift
 # project_key: NOKEY
@@ -36,7 +36,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-05-25
-last_updated: 2026-05-27
+last_updated: 2026-05-26
 project: open-agent-sdk-swift
 project_key: NOKEY
 tracking_system: file-system
@@ -300,7 +300,7 @@ development_status:
   # Epic 27: Runtime Event Layer — Agent Event Emitter
   epic-27: in-progress
   27-1-agent-options-eventbus-parameter: done
-  27-2-agent-startup-completion-event-emit: backlog
+  27-2-agent-startup-completion-event-emit: done
   27-3-tool-lifecycle-event-emit: backlog
   27-4-llm-cost-event-emit: backlog
   27-5-session-lifecycle-event-emit: backlog

@@ -254,4 +254,286 @@ final class EventBusTests: XCTestCase {
         await bus.publish(AgentStartedEvent(sessionId: "s", task: "after"))
         XCTAssertTrue(true)
     }
+
+    // MARK: - Agent Lifecycle Event Emit Tests
+
+    /// Mock LLM client that returns a simple end_turn response.
+    private struct MockLLMClient: LLMClient, @unchecked Sendable {
+        let response: [String: Any]
+
+        init(response: [String: Any]? = nil) {
+            self.response = response ?? [
+                "content": [["type": "text", "text": "done"]],
+                "stop_reason": "end_turn",
+                "usage": ["input_tokens": 10, "output_tokens": 5],
+            ]
+        }
+
+        nonisolated func sendMessage(
+            model: String, messages: [[String: Any]], maxTokens: Int,
+            system: String?, tools: [[String: Any]]?, toolChoice: [String: Any]?,
+            thinking: [String: Any]?, temperature: Double?
+        ) async throws -> [String: Any] {
+            return response
+        }
+
+        nonisolated func streamMessage(
+            model: String, messages: [[String: Any]], maxTokens: Int,
+            system: String?, tools: [[String: Any]]?, toolChoice: [String: Any]?,
+            thinking: [String: Any]?, temperature: Double?
+        ) async throws -> AsyncThrowingStream<SSEEvent, Error> {
+            let events: [SSEEvent] = [
+                .messageStart(message: ["type": "message_start"]),
+                .contentBlockStart(index: 0, contentBlock: ["type": "text", "text": ""]),
+                .contentBlockDelta(index: 0, delta: ["type": "text_delta", "text": "done"]),
+                .contentBlockStop(index: 0),
+                .messageDelta(delta: ["stop_reason": "end_turn"], usage: ["output_tokens": 5]),
+                .messageStop,
+            ]
+            return AsyncThrowingStream { continuation in
+                for event in events { continuation.yield(event) }
+                continuation.finish()
+            }
+        }
+    }
+
+    /// Mock LLM client that always throws an error.
+    private struct FailingLLMClient: LLMClient, Sendable {
+        nonisolated func sendMessage(
+            model: String, messages: [[String: Any]], maxTokens: Int,
+            system: String?, tools: [[String: Any]]?, toolChoice: [String: Any]?,
+            thinking: [String: Any]?, temperature: Double?
+        ) async throws -> [String: Any] {
+            throw SDKError.apiError(statusCode: 500, message: "API error")
+        }
+
+        nonisolated func streamMessage(
+            model: String, messages: [[String: Any]], maxTokens: Int,
+            system: String?, tools: [[String: Any]]?, toolChoice: [String: Any]?,
+            thinking: [String: Any]?, temperature: Double?
+        ) async throws -> AsyncThrowingStream<SSEEvent, Error> {
+            throw SDKError.apiError(statusCode: 500, message: "API error")
+        }
+    }
+
+    private func makeAgentWithEventBus(eventBus: EventBus) -> Agent {
+        Agent(
+            options: AgentOptions(
+                apiKey: "test-key",
+                model: "claude-sonnet-4-6",
+                systemPrompt: "You are a helper.",
+                eventBus: eventBus
+            ),
+            client: MockLLMClient()
+        )
+    }
+
+    // AC1 + AC2: prompt() emits AgentStartedEvent + AgentCompletedEvent
+    func testPromptEmitsStartedAndCompletedEvents() async {
+        let bus = EventBus()
+        let (_, stream) = await bus.subscribe()
+        let agent = makeAgentWithEventBus(eventBus: bus)
+
+        _ = await agent.prompt("hello")
+
+        var collected: [any AgentEvent] = []
+        for await event in stream {
+            collected.append(event)
+            if collected.count >= 2 { break }
+        }
+
+        XCTAssertEqual(collected.count, 2)
+        XCTAssertTrue(collected[0] is AgentStartedEvent)
+        XCTAssertTrue(collected[1] is AgentCompletedEvent)
+
+        let started = collected[0] as! AgentStartedEvent
+        XCTAssertEqual(started.task, "hello")
+
+        let completed = collected[1] as! AgentCompletedEvent
+        XCTAssertEqual(completed.totalSteps, 1)
+        XCTAssertGreaterThanOrEqual(completed.durationMs, 0)
+        XCTAssertEqual(completed.resultText, "done")
+    }
+
+    // AC3: prompt() emits AgentFailedEvent on API error
+    func testPromptEmitsFailedEventOnError() async {
+        let bus = EventBus()
+        let (_, stream) = await bus.subscribe()
+        let agent = Agent(
+            options: AgentOptions(
+                apiKey: "test-key",
+                model: "claude-sonnet-4-6",
+                systemPrompt: "You are a helper.",
+                eventBus: bus
+            ),
+            client: FailingLLMClient()
+        )
+
+        _ = await agent.prompt("hello")
+
+        var collected: [any AgentEvent] = []
+        for await event in stream {
+            collected.append(event)
+            if collected.count >= 2 { break }
+        }
+
+        XCTAssertTrue(collected[0] is AgentStartedEvent)
+        XCTAssertTrue(collected[1] is AgentFailedEvent)
+
+        let failed = collected[1] as! AgentFailedEvent
+        XCTAssertTrue(failed.error.contains("API error"))
+        XCTAssertEqual(failed.stepsCompleted, 0)
+    }
+
+    // AC1 + AC2: stream() emits AgentStartedEvent + AgentCompletedEvent
+    func testStreamEmitsStartedAndCompletedEvents() async {
+        let bus = EventBus()
+        let (_, stream) = await bus.subscribe()
+        let agent = makeAgentWithEventBus(eventBus: bus)
+
+        let messageStream = agent.stream("hello")
+        // Consume the stream to drive it to completion
+        for await _ in messageStream {}
+
+        var collected: [any AgentEvent] = []
+        for await event in stream {
+            collected.append(event)
+            if collected.count >= 2 { break }
+        }
+
+        XCTAssertEqual(collected.count, 2)
+        XCTAssertTrue(collected[0] is AgentStartedEvent)
+        XCTAssertTrue(collected[1] is AgentCompletedEvent)
+
+        let started = collected[0] as! AgentStartedEvent
+        XCTAssertEqual(started.task, "hello")
+
+        let completed = collected[1] as! AgentCompletedEvent
+        XCTAssertGreaterThanOrEqual(completed.totalSteps, 1)
+        XCTAssertGreaterThanOrEqual(completed.durationMs, 0)
+    }
+
+    // AC3: stream() emits AgentFailedEvent on API error
+    func testStreamEmitsFailedEventOnError() async {
+        let bus = EventBus()
+        let (_, stream) = await bus.subscribe()
+        let agent = Agent(
+            options: AgentOptions(
+                apiKey: "test-key",
+                model: "claude-sonnet-4-6",
+                systemPrompt: "You are a helper.",
+                eventBus: bus
+            ),
+            client: FailingLLMClient()
+        )
+
+        let messageStream = agent.stream("hello")
+        for await _ in messageStream {}
+
+        var collected: [any AgentEvent] = []
+        for await event in stream {
+            collected.append(event)
+            if collected.count >= 2 { break }
+        }
+
+        XCTAssertTrue(collected[0] is AgentStartedEvent)
+        XCTAssertTrue(collected[1] is AgentFailedEvent)
+    }
+
+    // AC7: promptImpl path emits lifecycle events (verified via prompt() above)
+    // This test ensures the sessionId is properly forwarded
+    func testPromptEventContainsSessionId() async {
+        let bus = EventBus()
+        let (_, stream) = await bus.subscribe()
+        let sessionId = "test-session-123"
+        let agent = Agent(
+            options: AgentOptions(
+                apiKey: "test-key",
+                model: "claude-sonnet-4-6",
+                systemPrompt: "You are a helper.",
+                sessionId: sessionId,
+                eventBus: bus
+            ),
+            client: MockLLMClient()
+        )
+
+        _ = await agent.prompt("hello")
+
+        var collected: [any AgentEvent] = []
+        for await event in stream {
+            collected.append(event)
+            if collected.count >= 2 { break }
+        }
+
+        let started = collected[0] as! AgentStartedEvent
+        XCTAssertEqual(started.sessionId, sessionId)
+        let completed = collected[1] as! AgentCompletedEvent
+        XCTAssertEqual(completed.sessionId, sessionId)
+    }
+
+    // AC5: resume() emits AgentResumedEvent
+    func testResumeEmitsResumedEvent() async throws {
+        let bus = EventBus()
+        let (_, stream) = await bus.subscribe()
+        let sessionId = "test-resume-session"
+        let agent = Agent(
+            options: AgentOptions(
+                apiKey: "test-key",
+                model: "claude-sonnet-4-6",
+                systemPrompt: "You are a helper.",
+                sessionId: sessionId,
+                eventBus: bus
+            ),
+            client: MockLLMClient()
+        )
+
+        agent.pause(reason: "test pause")
+        try await _Concurrency.Task.sleep(nanoseconds: 100_000_000) // 100ms for pause state
+        agent.resume(context: "test resume context")
+
+        // Fire-and-forget Task needs brief delay
+        try await _Concurrency.Task.sleep(nanoseconds: 200_000_000) // 200ms
+
+        var collected: [any AgentEvent] = []
+        for await event in stream {
+            collected.append(event)
+            if collected.count >= 1 { break }
+        }
+
+        XCTAssertEqual(collected.count, 1)
+        let resumed = collected[0] as! AgentResumedEvent
+        XCTAssertEqual(resumed.sessionId, sessionId)
+        XCTAssertEqual(resumed.resumeContext, "test resume context")
+    }
+
+    // Stream sessionId forwarding
+    func testStreamEventContainsSessionId() async {
+        let bus = EventBus()
+        let (_, stream) = await bus.subscribe()
+        let sessionId = "stream-session-456"
+        let agent = Agent(
+            options: AgentOptions(
+                apiKey: "test-key",
+                model: "claude-sonnet-4-6",
+                systemPrompt: "You are a helper.",
+                sessionId: sessionId,
+                eventBus: bus
+            ),
+            client: MockLLMClient()
+        )
+
+        let messageStream = agent.stream("hello")
+        for await _ in messageStream {}
+
+        var collected: [any AgentEvent] = []
+        for await event in stream {
+            collected.append(event)
+            if collected.count >= 2 { break }
+        }
+
+        let started = collected[0] as! AgentStartedEvent
+        XCTAssertEqual(started.sessionId, sessionId)
+        let completed = collected[1] as! AgentCompletedEvent
+        XCTAssertEqual(completed.sessionId, sessionId)
+    }
 }

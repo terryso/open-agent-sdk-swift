@@ -194,6 +194,11 @@ await AgentEventTypesE2ETests.run()
 await EventBusE2ETests.run()
 
 // ================================================================
+// SECTION 141-142: Agent Lifecycle Event Emit E2E Tests (Story 27.2)
+// ================================================================
+await AgentLifecycleEmitE2ETests.run(apiKey: apiKey, model: model, baseURL: baseURL)
+
+// ================================================================
 // Results Summary
 // ================================================================
 print("\n=== E2E Test Results ===")
