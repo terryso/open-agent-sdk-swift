@@ -607,6 +607,16 @@ open Package.swift
 
 本项目灵感来自 [open-agent-sdk-typescript](https://github.com/codeany-ai/open-agent-sdk-typescript)，该项目为 TypeScript/Node.js 生态提供了相同的 Agent 架构。
 
+## Star History
+
+<a href="https://www.star-history.com/?repos=terryso%2Fopen-agent-sdk-swift&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=terryso/open-agent-sdk-swift&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=terryso/open-agent-sdk-swift&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=terryso/open-agent-sdk-swift&type=date&legend=top-left" />
+ </picture>
+</a>
+
 ## 许可证
 
 [MIT](./LICENSE)
