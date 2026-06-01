@@ -127,7 +127,8 @@ extension XCTestCase {
         maxTurns: Int = 10,
         maxTokens: Int = 4096,
         sessionStore: SessionStore? = nil,
-        sessionId: String? = nil
+        sessionId: String? = nil,
+        eventBus: EventBus? = nil
     ) -> Agent {
         let sessionConfig = URLSessionConfiguration.ephemeral
         sessionConfig.protocolClasses = [SessionRestoreMockURLProtocol.self]
@@ -143,7 +144,8 @@ extension XCTestCase {
             maxTokens: maxTokens,
             retryConfig: RetryConfig(maxRetries: 3, baseDelayMs: 1, maxDelayMs: 1, retryableStatusCodes: [429, 500, 502, 503, 529]),
             sessionStore: sessionStore,
-            sessionId: sessionId
+            sessionId: sessionId,
+            eventBus: eventBus
         )
 
         return Agent(options: options, client: client)
@@ -587,6 +589,72 @@ final class AgentStreamSessionRestoreTests: XCTestCase {
         // Original: 2 messages. After restore + new: should be > 2
         XCTAssertGreaterThan(loaded?.messages.count ?? 0, 2,
             "Auto-saved session should have more messages than original history after stream")
+    }
+
+    /// AC2 [P0]: stream() completion text should describe only the current invocation,
+    /// not restored assistant history from earlier turns in the same session.
+    func testStreamCompletionText_excludesRestoredAssistantHistory() async throws {
+        let store = SessionStore(sessionsDir: tempDir)
+        let sessionId = "restore-stream-completion-\(UUID().uuidString)"
+        let historyMessages: [[String: Any]] = [
+            ["role": "user", "content": "旧问题"],
+            ["role": "assistant", "content": [["type": "text", "text": "旧答案"]] as [[String: Any]]],
+        ]
+        let metadata = PartialSessionMetadata(cwd: "/tmp", model: "claude-sonnet-4-6")
+        try await store.save(sessionId: sessionId, messages: historyMessages, metadata: metadata)
+
+        let sseResponse = """
+        event: message_start
+        data: {"type":"message_start","message":{"id":"msg_stream_restore_completion","type":"message","role":"assistant","content":[],"model":"claude-sonnet-4-6","stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":30,"output_tokens":0}}}
+
+        event: content_block_start
+        data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"新答案"}}
+
+        event: content_block_stop
+        data: {"type":"content_block_stop","index":0}
+
+        event: message_delta
+        data: {"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null},"usage":{"output_tokens":20}}
+
+        event: message_stop
+        data: {"type":"message_stop"}
+        """
+        let sseData = sseResponse.data(using: .utf8)!
+        SessionRestoreMockURLProtocol.mockResponses["https://api.anthropic.com/v1/messages"] = (
+            statusCode: 200,
+            headers: ["content-type": "text/event-stream"],
+            body: sseData
+        )
+
+        let bus = EventBus()
+        let (_, eventStream) = await bus.subscribe()
+        let agent = makeSessionRestoreSUT(sessionStore: store, sessionId: sessionId, eventBus: bus)
+        let stream = agent.stream("新问题")
+
+        var resultEvent: SDKMessage.ResultData?
+        for await message in stream {
+            if case .result(let data) = message {
+                resultEvent = data
+            }
+        }
+
+        XCTAssertEqual(resultEvent?.text, "新答案")
+
+        var iterator = eventStream.makeAsyncIterator()
+        var completed: AgentCompletedEvent?
+        for _ in 0..<5 {
+            guard let event = await iterator.next() else { break }
+            if let matched = event as? AgentCompletedEvent {
+                completed = matched
+                break
+            }
+        }
+
+        let unwrappedCompleted = try XCTUnwrap(completed)
+        XCTAssertEqual(unwrappedCompleted.resultText, "新答案")
     }
 }
 

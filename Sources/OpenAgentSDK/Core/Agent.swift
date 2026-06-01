@@ -2152,6 +2152,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                     messages.append(["role": "user", "content": text])
                 }
 
+                let currentInvocationMessageStartIndex = messages.count
+
                 // Hook: sessionStart — trigger before any agent work begins
                 if let hookRegistry = capturedHookRegistry {
                     let hookInput = HookInput(event: .sessionStart, cwd: capturedCwd)
@@ -2235,7 +2237,10 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                         if let eventBus = capturedEventBus {
                             await eventBus.publish(AgentInterruptedEvent(sessionId: resolvedSessionId, stepsCompleted: turnCount))
                         }
-                        let finalText = Self.extractCollectedText(messages: messages)
+                        let finalText = Self.extractCollectedText(
+                            messages: messages,
+                            startingAt: currentInvocationMessageStartIndex
+                        )
                         await Self.yieldStreamCancelled(
                             continuation: continuation,
                             text: finalText,
@@ -2402,13 +2407,11 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                                 if streamBudgetExceeded {
                                     let elapsed = ContinuousClock.now - startTime
                                     let durationMs = Self.computeDurationMs(elapsed)
-                                    let previousText = messages.compactMap { msg -> String? in
-                                        guard let content = msg["content"] as? [[String: Any]] else { return nil }
-                                        return content
-                                            .filter { $0["type"] as? String == "text" }
-                                            .compactMap { $0["text"] as? String }
-                                            .joined()
-                                    }.joined(separator: " ")
+                                    let previousText = Self.extractCollectedText(
+                                        messages: messages,
+                                        startingAt: currentInvocationMessageStartIndex,
+                                        separator: " "
+                                    )
 
                                     // Structured log for budget exceeded
                                     Logger.shared.warn("QueryEngine", "budget_exceeded", data: [
@@ -2551,13 +2554,11 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                                 if deltaBudgetExceeded {
                                     let elapsed = ContinuousClock.now - startTime
                                     let durationMs = Self.computeDurationMs(elapsed)
-                                    let previousText = messages.compactMap { msg -> String? in
-                                        guard let content = msg["content"] as? [[String: Any]] else { return nil }
-                                        return content
-                                            .filter { $0["type"] as? String == "text" }
-                                            .compactMap { $0["text"] as? String }
-                                            .joined()
-                                    }.joined(separator: " ")
+                                    let previousText = Self.extractCollectedText(
+                                        messages: messages,
+                                        startingAt: currentInvocationMessageStartIndex,
+                                        separator: " "
+                                    )
                                     let finalText = previousText.isEmpty ? accumulatedText : "\(previousText) \(accumulatedText)"
 
                                     // Structured log for budget exceeded
@@ -2612,7 +2613,10 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                                         await hookRegistry.execute(.stop, input: stopInput)
                                     }
 
-                                    let previousText = Self.extractCollectedText(messages: messages)
+                                    let previousText = Self.extractCollectedText(
+                                        messages: messages,
+                                        startingAt: currentInvocationMessageStartIndex
+                                    )
                                     let finalText = previousText.isEmpty ? accumulatedText : "\(previousText) \(accumulatedText)"
 
                                     let maxCallsResultMsg = SDKMessage.result(SDKMessage.ResultData(
@@ -2705,7 +2709,10 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                             if let eventBus = capturedEventBus {
                                 await eventBus.publish(AgentInterruptedEvent(sessionId: resolvedSessionId, stepsCompleted: turnCount))
                             }
-                            let previousText = Self.extractCollectedText(messages: messages)
+                            let previousText = Self.extractCollectedText(
+                                messages: messages,
+                                startingAt: currentInvocationMessageStartIndex
+                            )
                             let finalText = previousText.isEmpty ? accumulatedText : "\(previousText) \(accumulatedText)"
                             await Self.yieldStreamCancelled(
                                 continuation: continuation,
@@ -2748,7 +2755,10 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                         if let eventBus = capturedEventBus {
                             await eventBus.publish(AgentInterruptedEvent(sessionId: resolvedSessionId, stepsCompleted: turnCount))
                         }
-                        let finalText = Self.extractCollectedText(messages: messages)
+                        let finalText = Self.extractCollectedText(
+                            messages: messages,
+                            startingAt: currentInvocationMessageStartIndex
+                        )
                         let partialText = finalText.isEmpty ? accumulatedText : "\(finalText) \(accumulatedText)"
                         await Self.yieldStreamCancelled(
                             continuation: continuation,
@@ -2927,13 +2937,10 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                 }
 
                 // Collect all assistant text from conversation history
-                let finalText = messages.compactMap { msg -> String? in
-                    guard let content = msg["content"] as? [[String: Any]] else { return nil }
-                    return content
-                        .filter { $0["type"] as? String == "text" }
-                        .compactMap { $0["text"] as? String }
-                        .joined()
-                }.joined()
+                let finalText = Self.extractCollectedText(
+                    messages: messages,
+                    startingAt: currentInvocationMessageStartIndex
+                )
 
                 let resultSubtype: SDKMessage.ResultData.Subtype =
                     (!loopExitedCleanly && turnCount >= capturedMaxTurns) ? .errorMaxTurns : .success
@@ -3220,15 +3227,24 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
             + Int(elapsed.components.attoseconds / 1_000_000_000_000)
     }
 
-    /// Extract all assistant text from the messages array for cancellation result events.
-    private static func extractCollectedText(messages: [[String: Any]]) -> String {
-        messages.compactMap { msg -> String? in
+    /// Extract assistant text generated during the current invocation.
+    /// - Parameters:
+    ///   - messages: Full conversation messages, including restored history.
+    ///   - startingAt: Index where current invocation output can begin.
+    ///   - separator: Separator used when joining assistant messages.
+    private static func extractCollectedText(
+        messages: [[String: Any]],
+        startingAt startIndex: Int = 0,
+        separator: String = ""
+    ) -> String {
+        let slice = startIndex < messages.count ? messages[startIndex...] : []
+        return slice.compactMap { msg -> String? in
             guard let content = msg["content"] as? [[String: Any]] else { return nil }
             return content
                 .filter { $0["type"] as? String == "text" }
                 .compactMap { $0["text"] as? String }
                 .joined()
-        }.joined()
+        }.joined(separator: separator)
     }
 
     /// Extract plain text from Anthropic API response content blocks.
