@@ -264,6 +264,8 @@ public actor FileBasedMemoryStore: MemoryStoreProtocol {
 
         for entry in entries {
             guard entry.hasSuffix(".json") else { continue }
+            // Skip files managed by downstream apps (e.g. AxionFactStore's *-facts.json)
+            guard !entry.hasSuffix("-facts.json") else { continue }
             let domainName = String(entry.dropLast(5)) // Remove ".json"
 
             let filePath = (memoryDir as NSString).appendingPathComponent(entry)
