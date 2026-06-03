@@ -153,14 +153,16 @@ public func createBashTool() -> ToolProtocol {
         if input.runInBackground == true {
             return launchBackgroundProcess(
                 command: input.command,
-                cwd: context.cwd
+                cwd: context.cwd,
+                env: context.env
             )
         }
 
         return await executeBashProcess(
             command: input.command,
             cwd: context.cwd,
-            timeoutMs: timeoutMs
+            timeoutMs: timeoutMs,
+            env: context.env
         )
     }
 }
@@ -175,15 +177,23 @@ public func createBashTool() -> ToolProtocol {
 /// - Parameters:
 ///   - command: The shell command to execute.
 ///   - cwd: The working directory for the process.
+///   - env: Optional custom environment variables to merge into the process environment.
 /// - Returns: A `ToolExecuteResult` containing the background task ID.
 private func launchBackgroundProcess(
     command: String,
-    cwd: String
+    cwd: String,
+    env: [String: String]? = nil
 ) -> ToolExecuteResult {
     let process = Process()
     process.executableURL = URL(fileURLWithPath: "/bin/bash")
     process.arguments = ["-c", command]
     process.currentDirectoryURL = URL(fileURLWithPath: cwd)
+
+    if let env, !env.isEmpty {
+        var merged = ProcessInfo.processInfo.environment
+        for (key, value) in env { merged[key] = value }
+        process.environment = merged
+    }
 
     // Discard output for background processes
     let devNull = FileHandle.nullDevice
@@ -223,11 +233,13 @@ private func launchBackgroundProcess(
 ///   - command: The shell command to execute.
 ///   - cwd: The working directory for the process.
 ///   - timeoutMs: Timeout in milliseconds.
+///   - env: Optional custom environment variables to merge into the process environment.
 /// - Returns: A `ToolExecuteResult` with captured output or error information.
 private func executeBashProcess(
     command: String,
     cwd: String,
-    timeoutMs: Int
+    timeoutMs: Int,
+    env: [String: String]? = nil
 ) async -> ToolExecuteResult {
     return await withCheckedContinuation { continuation in
         let accumulator = ProcessOutputAccumulator()
@@ -240,6 +252,12 @@ private func executeBashProcess(
         process.currentDirectoryURL = URL(fileURLWithPath: cwd)
         process.standardOutput = stdoutPipe
         process.standardError = stderrPipe
+
+        if let env, !env.isEmpty {
+            var merged = ProcessInfo.processInfo.environment
+            for (key, value) in env { merged[key] = value }
+            process.environment = merged
+        }
 
         stdoutPipe.fileHandleForReading.readabilityHandler = { handler in
             accumulator.stdoutData.append(handler.availableData)
