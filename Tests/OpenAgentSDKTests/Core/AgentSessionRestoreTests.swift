@@ -645,7 +645,7 @@ final class AgentStreamSessionRestoreTests: XCTestCase {
 
         var iterator = eventStream.makeAsyncIterator()
         var completed: AgentCompletedEvent?
-        for _ in 0..<5 {
+        for _ in 0..<10 {
             guard let event = await iterator.next() else { break }
             if let matched = event as? AgentCompletedEvent {
                 completed = matched

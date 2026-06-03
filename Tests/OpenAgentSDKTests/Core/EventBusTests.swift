@@ -299,7 +299,7 @@ final class EventBusTests: XCTestCase {
 
         _ = await agent.prompt("hello")
 
-        let collected = await collectEventsWithTimeout(stream: stream, count: 3)
+        let collected = await collectEventsWithTimeout(stream: stream, count: 4)
 
         XCTAssertGreaterThanOrEqual(collected.count, 2)
         XCTAssertTrue(collected[0] is AgentStartedEvent)
@@ -307,7 +307,7 @@ final class EventBusTests: XCTestCase {
         let started = collected[0] as! AgentStartedEvent
         XCTAssertEqual(started.task, "hello")
 
-        let completed = collected.last as! AgentCompletedEvent
+        let completed = collected.first { $0 is AgentCompletedEvent } as! AgentCompletedEvent
         XCTAssertEqual(completed.totalSteps, 1)
         XCTAssertGreaterThanOrEqual(completed.durationMs, 0)
         XCTAssertEqual(completed.resultText, "done")
@@ -330,12 +330,10 @@ final class EventBusTests: XCTestCase {
 
         _ = await agent.prompt("hello")
 
-        let collected = await collectEventsWithTimeout(stream: stream, count: 2)
+        let collected = await collectEventsWithTimeout(stream: stream, count: 3)
 
         XCTAssertTrue(collected[0] is AgentStartedEvent)
-        XCTAssertTrue(collected[1] is AgentFailedEvent)
-
-        let failed = collected[1] as! AgentFailedEvent
+        let failed = collected.first { $0 is AgentFailedEvent } as! AgentFailedEvent
         XCTAssertTrue(failed.error.contains("API error"))
         XCTAssertEqual(failed.stepsCompleted, 0)
     }
@@ -350,7 +348,7 @@ final class EventBusTests: XCTestCase {
         // Consume the stream to drive it to completion
         for await _ in messageStream {}
 
-        let collected = await collectEventsWithTimeout(stream: stream, count: 3)
+        let collected = await collectEventsWithTimeout(stream: stream, count: 4)
 
         XCTAssertGreaterThanOrEqual(collected.count, 2)
         XCTAssertTrue(collected[0] is AgentStartedEvent)
@@ -358,7 +356,7 @@ final class EventBusTests: XCTestCase {
         let started = collected[0] as! AgentStartedEvent
         XCTAssertEqual(started.task, "hello")
 
-        let completed = collected.last as! AgentCompletedEvent
+        let completed = collected.first { $0 is AgentCompletedEvent } as! AgentCompletedEvent
         XCTAssertGreaterThanOrEqual(completed.totalSteps, 1)
         XCTAssertGreaterThanOrEqual(completed.durationMs, 0)
     }
@@ -381,10 +379,10 @@ final class EventBusTests: XCTestCase {
         let messageStream = agent.stream("hello")
         for await _ in messageStream {}
 
-        let collected = await collectEventsWithTimeout(stream: stream, count: 2)
+        let collected = await collectEventsWithTimeout(stream: stream, count: 3)
 
         XCTAssertTrue(collected[0] is AgentStartedEvent)
-        XCTAssertTrue(collected[1] is AgentFailedEvent)
+        XCTAssertNotNil(collected.first { $0 is AgentFailedEvent })
     }
 
     // AC7: promptImpl path emits lifecycle events (verified via prompt() above)
@@ -406,11 +404,11 @@ final class EventBusTests: XCTestCase {
 
         _ = await agent.prompt("hello")
 
-        let collected = await collectEventsWithTimeout(stream: stream, count: 3)
+        let collected = await collectEventsWithTimeout(stream: stream, count: 4)
 
         let started = collected[0] as! AgentStartedEvent
         XCTAssertEqual(started.sessionId, sessionId)
-        let completed = collected.last as! AgentCompletedEvent
+        let completed = collected.first { $0 is AgentCompletedEvent } as! AgentCompletedEvent
         XCTAssertEqual(completed.sessionId, sessionId)
     }
 
@@ -464,11 +462,11 @@ final class EventBusTests: XCTestCase {
         let messageStream = agent.stream("hello")
         for await _ in messageStream {}
 
-        let collected = await collectEventsWithTimeout(stream: stream, count: 3)
+        let collected = await collectEventsWithTimeout(stream: stream, count: 4)
 
         let started = collected[0] as! AgentStartedEvent
         XCTAssertEqual(started.sessionId, sessionId)
-        let completed = collected.last as! AgentCompletedEvent
+        let completed = collected.first { $0 is AgentCompletedEvent } as! AgentCompletedEvent
         XCTAssertEqual(completed.sessionId, sessionId)
     }
 
@@ -898,7 +896,7 @@ final class EventBusTests: XCTestCase {
         _ = await agent.prompt("second")
         _ = await agent.prompt("third")
 
-        let collected = await collectEventsWithTimeout(stream: stream, count: 9) { events in
+        let collected = await collectEventsWithTimeout(stream: stream, count: 12) { events in
             events.compactMap { $0 as? LLMCostEvent }
         }
 
