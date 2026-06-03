@@ -1459,6 +1459,30 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                 let retryApiTools = apiTools
                 let retryCfg = self.options.retryConfig ?? RetryConfig.default
                 let retryThinking = Self.computeThinkingConfig(from: self.options)
+
+                // Emit LLMRequestStartedEvent with message summaries
+                if let eventBus = options.eventBus {
+                    let summaries: [MessageSummary] = messages.flatMap { msg -> [MessageSummary] in
+                        guard let role = msg["role"] as? String else { return [] }
+                        let length: Int
+                        if let content = msg["content"] as? String {
+                            length = content.count
+                        } else if let content = msg["content"] as? [[String: Any]] {
+                            length = content.reduce(0) { $0 + (($1["text"] as? String)?.count ?? 0) }
+                        } else {
+                            length = 0
+                        }
+                        return [MessageSummary(role: role, contentLength: length)]
+                    }
+                    await eventBus.publish(LLMRequestStartedEvent(
+                        sessionId: resolvedSessionId,
+                        model: retryModel,
+                        systemPromptLength: retrySystemPrompt?.count ?? 0,
+                        messageCount: messages.count,
+                        messages: summaries
+                    ))
+                }
+
                 response = try await withRetry({
                     try await retryClient.sendMessage(
                         model: retryModel,
@@ -2284,6 +2308,30 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                         let retryApiTools = decodedApiTools
                         let retryCfg = capturedRetryConfig
                         let retryThinking = Self.computeThinkingConfig(from: self.options)
+
+                        // Emit LLMRequestStartedEvent with message summaries
+                        if let eventBus = capturedEventBus {
+                            let summaries: [MessageSummary] = retryMessages.flatMap { msg -> [MessageSummary] in
+                                guard let role = msg["role"] as? String else { return [] }
+                                let length: Int
+                                if let content = msg["content"] as? String {
+                                    length = content.count
+                                } else if let content = msg["content"] as? [[String: Any]] {
+                                    length = content.reduce(0) { $0 + (($1["text"] as? String)?.count ?? 0) }
+                                } else {
+                                    length = 0
+                                }
+                                return [MessageSummary(role: role, contentLength: length)]
+                            }
+                            await eventBus.publish(LLMRequestStartedEvent(
+                                sessionId: capturedSessionId,
+                                model: retryModel,
+                                systemPromptLength: retrySystemPrompt?.count ?? 0,
+                                messageCount: retryMessages.count,
+                                messages: summaries
+                            ))
+                        }
+
                         eventStream = try await withRetry({
                             try await retryClient.streamMessage(
                                 model: retryModel,

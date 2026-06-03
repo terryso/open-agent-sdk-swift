@@ -653,11 +653,25 @@ public struct ToolFailedEvent: AgentEvent, Equatable {
 
 // MARK: - LLM Events
 
+/// Summary of a single message in the request array.
+public struct MessageSummary: Codable, Equatable, Sendable {
+    public let role: String
+    public let contentLength: Int
+
+    public init(role: String, contentLength: Int) {
+        self.role = role
+        self.contentLength = contentLength
+    }
+}
+
 /// Emitted when an LLM API request starts.
 public struct LLMRequestStartedEvent: AgentEvent, Equatable {
     public let base: BaseAgentEvent
     public let sessionId: String?
     public let model: String
+    public let systemPromptLength: Int
+    public let messageCount: Int
+    public let messages: [MessageSummary]
 
     public var id: String { base.id }
     public var timestamp: Date { base.timestamp }
@@ -666,12 +680,18 @@ public struct LLMRequestStartedEvent: AgentEvent, Equatable {
         case id, timestamp
         case sessionId = "session_id"
         case model
+        case systemPromptLength = "system_prompt_length"
+        case messageCount = "message_count"
+        case messages
     }
 
-    public init(base: BaseAgentEvent = BaseAgentEvent(), sessionId: String?, model: String) {
+    public init(base: BaseAgentEvent = BaseAgentEvent(), sessionId: String?, model: String, systemPromptLength: Int = 0, messageCount: Int = 0, messages: [MessageSummary] = []) {
         self.base = base
         self.sessionId = sessionId
         self.model = model
+        self.systemPromptLength = systemPromptLength
+        self.messageCount = messageCount
+        self.messages = messages
     }
 
     public init(from decoder: Decoder) throws {
@@ -682,6 +702,9 @@ public struct LLMRequestStartedEvent: AgentEvent, Equatable {
         )
         sessionId = try c.decodeIfPresent(String.self, forKey: .sessionId)
         model = try c.decode(String.self, forKey: .model)
+        systemPromptLength = try c.decodeIfPresent(Int.self, forKey: .systemPromptLength) ?? 0
+        messageCount = try c.decodeIfPresent(Int.self, forKey: .messageCount) ?? 0
+        messages = try c.decodeIfPresent([MessageSummary].self, forKey: .messages) ?? []
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -690,6 +713,9 @@ public struct LLMRequestStartedEvent: AgentEvent, Equatable {
         try c.encode(base.timestamp, forKey: .timestamp)
         try c.encodeIfPresent(sessionId, forKey: .sessionId)
         try c.encode(model, forKey: .model)
+        try c.encode(systemPromptLength, forKey: .systemPromptLength)
+        try c.encode(messageCount, forKey: .messageCount)
+        try c.encode(messages, forKey: .messages)
     }
 }
 
