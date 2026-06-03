@@ -124,8 +124,11 @@ public struct ReviewOrchestrator: Sendable {
         messages: [SDKMessage],
         config: ReviewAgentConfig
     ) async -> ReviewAgentResult? {
-        // 1. Build review prompt
-        let reviewPrompt = ReviewPromptBuilder.selectPrompt(config: config)
+        // 1. Build review prompt (+ optional caller suffix)
+        var reviewPrompt = ReviewPromptBuilder.selectPrompt(config: config)
+        if let suffix = config.promptSuffix, !suffix.isEmpty {
+            reviewPrompt += "\n\n" + suffix
+        }
 
         // 2. Fork review agent from parent
         let reviewAgent = parentAgent.createReviewAgent(config: config)

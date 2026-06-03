@@ -26,6 +26,13 @@ public struct ReviewAgentConfig: Sendable, Codable, Equatable {
         didSet { precondition(!allowedTools.isEmpty, "ReviewAgentConfig.allowedTools must not be empty") }
     }
 
+    /// Optional suffix appended to the built-in review prompt.
+    ///
+    /// Use this to extend the review agent's instructions — for example, guiding it
+    /// to use additional tools injected via ``ReviewOrchestrator/additionalReviewTools``.
+    /// The suffix is appended after the built-in prompt but before the conversation transcript.
+    public var promptSuffix: String?
+
     public init(
         reviewMemory: Bool = true,
         reviewSkills: Bool = true,
@@ -36,7 +43,8 @@ public struct ReviewAgentConfig: Sendable, Codable, Equatable {
             "review_create_skill",
             "review_add_skill_file",
             "curator_archive_skill",
-        ]
+        ],
+        promptSuffix: String? = nil
     ) {
         precondition(maxTurns > 0, "ReviewAgentConfig.maxTurns must be greater than zero")
         precondition(!allowedTools.isEmpty, "ReviewAgentConfig.allowedTools must not be empty")
@@ -44,6 +52,7 @@ public struct ReviewAgentConfig: Sendable, Codable, Equatable {
         self.reviewSkills = reviewSkills
         self.maxTurns = maxTurns
         self.allowedTools = allowedTools
+        self.promptSuffix = promptSuffix
     }
 }
 
