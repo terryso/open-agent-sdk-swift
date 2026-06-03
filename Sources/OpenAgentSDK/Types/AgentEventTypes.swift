@@ -657,10 +657,12 @@ public struct ToolFailedEvent: AgentEvent, Equatable {
 public struct MessageSummary: Codable, Equatable, Sendable {
     public let role: String
     public let contentLength: Int
+    public let preview: String
 
-    public init(role: String, contentLength: Int) {
+    public init(role: String, contentLength: Int, preview: String) {
         self.role = role
         self.contentLength = contentLength
+        self.preview = preview
     }
 }
 

@@ -1464,15 +1464,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                 if let eventBus = options.eventBus {
                     let summaries: [MessageSummary] = messages.flatMap { msg -> [MessageSummary] in
                         guard let role = msg["role"] as? String else { return [] }
-                        let length: Int
-                        if let content = msg["content"] as? String {
-                            length = content.count
-                        } else if let content = msg["content"] as? [[String: Any]] {
-                            length = content.reduce(0) { $0 + (($1["text"] as? String)?.count ?? 0) }
-                        } else {
-                            length = 0
-                        }
-                        return [MessageSummary(role: role, contentLength: length)]
+                        let (length, preview) = Self.extractContentInfo(from: msg)
+                        return [MessageSummary(role: role, contentLength: length, preview: preview)]
                     }
                     await eventBus.publish(LLMRequestStartedEvent(
                         sessionId: resolvedSessionId,
@@ -2313,15 +2306,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                         if let eventBus = capturedEventBus {
                             let summaries: [MessageSummary] = retryMessages.flatMap { msg -> [MessageSummary] in
                                 guard let role = msg["role"] as? String else { return [] }
-                                let length: Int
-                                if let content = msg["content"] as? String {
-                                    length = content.count
-                                } else if let content = msg["content"] as? [[String: Any]] {
-                                    length = content.reduce(0) { $0 + (($1["text"] as? String)?.count ?? 0) }
-                                } else {
-                                    length = 0
-                                }
-                                return [MessageSummary(role: role, contentLength: length)]
+                                let (length, preview) = Self.extractContentInfo(from: msg)
+                                return [MessageSummary(role: role, contentLength: length, preview: preview)]
                             }
                             await eventBus.publish(LLMRequestStartedEvent(
                                 sessionId: capturedSessionId,
@@ -3123,6 +3109,45 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
     /// Priority: explicit `thinking` config > `effort` level > `nil`.
     /// When `effort` is set, it maps to a thinking config with the corresponding budget tokens.
     ///
+    /// Extract content length and preview from a raw API message dict.
+    private static func extractContentInfo(from msg: [String: Any]) -> (length: Int, preview: String) {
+        let maxPreview = 150
+        if let content = msg["content"] as? String {
+            let preview = String(content.prefix(maxPreview)).replacingOccurrences(of: "\n", with: "\\n")
+            return (content.count, preview)
+        }
+        if let blocks = msg["content"] as? [[String: Any]] {
+            var totalLength = 0
+            var previewParts: [String] = []
+            for block in blocks {
+                if let text = block["text"] as? String {
+                    totalLength += text.count
+                    if previewParts.count < 2 {
+                        previewParts.append(String(text.prefix(80)).replacingOccurrences(of: "\n", with: "\\n"))
+                    }
+                } else if block["type"] as? String == "tool_use", let name = block["name"] as? String {
+                    let inputStr: String
+                    if let input = block["input"] as? [String: Any] {
+                        let vals = input.values.compactMap { $0 as? String }.map { String($0.prefix(30)) }
+                        inputStr = vals.joined(separator: ", ")
+                    } else {
+                        inputStr = ""
+                    }
+                    previewParts.append("\(name)(\(inputStr))")
+                } else if block["type"] as? String == "tool_result" {
+                    if let content = block["content"] as? String {
+                        totalLength += content.count
+                        if previewParts.count < 2 {
+                            previewParts.append("result: " + String(content.prefix(60)).replacingOccurrences(of: "\n", with: "\\n"))
+                        }
+                    }
+                }
+            }
+            return (totalLength, previewParts.joined(separator: " | "))
+        }
+        return (0, "")
+    }
+
     /// - Parameter options: The agent options to derive thinking config from.
     /// - Returns: The thinking configuration dictionary, or nil if neither is set.
     private static func computeThinkingConfig(from options: AgentOptions) -> [String: Any]? {
