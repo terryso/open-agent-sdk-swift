@@ -13,15 +13,18 @@ private struct ReviewSkillUpdateInput: Codable {
 /// Creates the `review_update_skill` tool for the forked review agent.
 ///
 /// Looks up the skill in the registry, constructs a `SkillSignal` with `.refinement` type,
-/// delegates to `SkillEvolver.evolve()`, and replaces the skill if evolution produces a result.
+/// delegates to `SkillEvolver.evolve()`, replaces the skill if evolution produces a result,
+/// and persists the updated skill to disk.
 ///
 /// - Parameters:
 ///   - skillRegistry: The registry to look up and replace skills.
 ///   - skillEvolver: The evolver to apply skill changes.
+///   - skillsDir: Root directory for skill storage (used when `baseDir` is nil).
 /// - Returns: A `ToolProtocol` instance named `review_update_skill`.
 public func createReviewSkillUpdateTool(
     skillRegistry: SkillRegistry,
-    skillEvolver: any SkillEvolver
+    skillEvolver: any SkillEvolver,
+    skillsDir: String
 ) -> ToolProtocol {
     defineTool(
         name: "review_update_skill",
@@ -70,11 +73,37 @@ public func createReviewSkillUpdateTool(
         do {
             let result = try await skillEvolver.evolve(skill: skill, signals: [signal], config: config)
             if let evolved = result.evolvedSkill {
-                skillRegistry.replace(evolved)
+                // Persist to disk
+                let resolvedSkillsDir: String
+                if let baseDir = evolved.baseDir, !baseDir.isEmpty {
+                    resolvedSkillsDir = (baseDir as NSString).deletingLastPathComponent
+                } else {
+                    resolvedSkillsDir = skillsDir
+                }
+                let skillDir = try SkillWriter.write(skill: evolved, to: resolvedSkillsDir)
+
+                // Update registry with correct baseDir
+                let updatedSkill = Skill(
+                    name: evolved.name,
+                    description: evolved.description,
+                    aliases: evolved.aliases,
+                    userInvocable: evolved.userInvocable,
+                    toolRestrictions: evolved.toolRestrictions,
+                    modelOverride: evolved.modelOverride,
+                    promptTemplate: evolved.promptTemplate,
+                    whenToUse: evolved.whenToUse,
+                    argumentHint: evolved.argumentHint,
+                    baseDir: skillDir,
+                    supportingFiles: evolved.supportingFiles,
+                    lifecycleState: evolved.lifecycleState
+                )
+                skillRegistry.replace(updatedSkill)
+
                 return reviewJSONResponse([
                     "success": true,
                     "message": "Skill '\(input.skillName)' updated",
-                    "changes": result.changes
+                    "changes": result.changes,
+                    "path": skillDir,
                 ] as [String: Any])
             }
             return reviewJSONResponse([

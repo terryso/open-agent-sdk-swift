@@ -17,11 +17,17 @@ private let allowedFilePathPrefixes = ["references/", "templates/", "scripts/"]
 /// Creates the `review_add_skill_file` tool for the forked review agent.
 ///
 /// Validates that the file path starts with an allowed prefix (`references/`, `templates/`, `scripts/`),
-/// resolves the absolute path from the skill's `baseDir`, and writes the file.
+/// resolves the absolute path from the skill's `baseDir` (or creates one under `skillsDir`),
+/// and writes the file.
 ///
-/// - Parameter skillRegistry: The registry to look up skills.
+/// - Parameters:
+///   - skillRegistry: The registry to look up skills.
+///   - skillsDir: Root directory for skill storage (used when skill has no `baseDir`).
 /// - Returns: A `ToolProtocol` instance named `review_add_skill_file`.
-public func createReviewSkillFileTool(skillRegistry: SkillRegistry) -> ToolProtocol {
+public func createReviewSkillFileTool(
+    skillRegistry: SkillRegistry,
+    skillsDir: String
+) -> ToolProtocol {
     defineTool(
         name: "review_add_skill_file",
         description: "Add a supporting file (reference, template, or script) to an existing skill. Only files under references/, templates/, or scripts/ paths are allowed.",
@@ -63,11 +69,36 @@ public func createReviewSkillFileTool(skillRegistry: SkillRegistry) -> ToolProto
             ] as [String: Any])
         }
 
-        guard let baseDir = skill.baseDir else {
-            return reviewJSONResponse([
-                "success": false,
-                "error": "Skill '\(input.skillName)' has no base directory (programmatically created skills cannot have files added)"
-            ] as [String: Any])
+        let baseDir: String
+        if let existingBaseDir = skill.baseDir {
+            baseDir = existingBaseDir
+        } else {
+            // Skill was created programmatically — materialize it on disk first
+            do {
+                let skillDir = try SkillWriter.write(skill: skill, to: skillsDir)
+                baseDir = skillDir
+                // Update registry with the new baseDir
+                let updatedSkill = Skill(
+                    name: skill.name,
+                    description: skill.description,
+                    aliases: skill.aliases,
+                    userInvocable: skill.userInvocable,
+                    toolRestrictions: skill.toolRestrictions,
+                    modelOverride: skill.modelOverride,
+                    promptTemplate: skill.promptTemplate,
+                    whenToUse: skill.whenToUse,
+                    argumentHint: skill.argumentHint,
+                    baseDir: skillDir,
+                    supportingFiles: skill.supportingFiles,
+                    lifecycleState: skill.lifecycleState
+                )
+                skillRegistry.replace(updatedSkill)
+            } catch {
+                return reviewJSONResponse([
+                    "success": false,
+                    "error": "Failed to create skill directory: \(error.localizedDescription)"
+                ] as [String: Any])
+            }
         }
 
         let absolutePath = (baseDir as NSString).appendingPathComponent(input.filePath)

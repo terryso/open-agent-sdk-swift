@@ -20,7 +20,8 @@ final class ReviewToolsTests: XCTestCase {
             factStore: factStore,
             skillRegistry: registry,
             skillEvolver: evolver,
-            usageStore: usageStore
+            usageStore: usageStore,
+            skillsDir: tempDir
         )
 
         XCTAssertEqual(tools.count, 5)
@@ -44,7 +45,8 @@ final class ReviewToolsTests: XCTestCase {
             factStore: factStore,
             skillRegistry: registry,
             skillEvolver: evolver,
-            usageStore: usageStore
+            usageStore: usageStore,
+            skillsDir: tempDir
         )
 
         for tool in tools {

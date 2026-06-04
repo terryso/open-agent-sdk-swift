@@ -21,6 +21,7 @@ func reviewJSONResponse(_ fields: [String: Any]) -> String {
 ///   - skillRegistry: The registry for skill lookups, registration, and replacement.
 ///   - skillEvolver: The evolver for applying skill updates.
 ///   - usageStore: The store for reading/writing skill usage data (used by CuratorArchiveTool).
+///   - skillsDir: Root directory for skill persistence (e.g., `~/.axion/skills`).
 /// - Returns: An array of five `ToolProtocol` instances: review_save_memory,
 ///   review_update_skill, review_create_skill, review_add_skill_file, and
 ///   curator_archive_skill.
@@ -28,13 +29,14 @@ public func createReviewTools(
     factStore: FactStore,
     skillRegistry: SkillRegistry,
     skillEvolver: any SkillEvolver,
-    usageStore: SkillUsageStore
+    usageStore: SkillUsageStore,
+    skillsDir: String
 ) -> [ToolProtocol] {
     [
         createReviewMemoryTool(factStore: factStore),
-        createReviewSkillUpdateTool(skillRegistry: skillRegistry, skillEvolver: skillEvolver),
-        createReviewSkillCreateTool(skillRegistry: skillRegistry),
-        createReviewSkillFileTool(skillRegistry: skillRegistry),
-        createCuratorArchiveTool(skillRegistry: skillRegistry, usageStore: usageStore),
+        createReviewSkillUpdateTool(skillRegistry: skillRegistry, skillEvolver: skillEvolver, skillsDir: skillsDir),
+        createReviewSkillCreateTool(skillRegistry: skillRegistry, usageStore: usageStore, skillsDir: skillsDir),
+        createReviewSkillFileTool(skillRegistry: skillRegistry, skillsDir: skillsDir),
+        createCuratorArchiveTool(skillRegistry: skillRegistry, usageStore: usageStore, skillsDir: skillsDir),
     ]
 }

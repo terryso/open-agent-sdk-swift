@@ -11,17 +11,22 @@ private struct CuratorArchiveInput: Codable {
 
 /// Creates the `curator_archive_skill` tool for the curator agent.
 ///
-/// Archives a skill by setting its `lifecycleState` to `.retired` and recording
-/// the merge relationship in `SkillUsageData.absorbedInto`. Only agent-created
-/// skills that are not pinned may be archived.
+/// Archives a skill by moving its directory to `.archived/` and unregistering it from
+/// the skill registry. Records the merge relationship in `SkillUsageData.absorbedInto`.
+/// Only agent-created skills that are not pinned may be archived.
+///
+/// If the skill's `baseDir` is outside `skillsDir` (e.g., `~/.claude/skills/`), falls
+/// back to registry-level retirement without moving files.
 ///
 /// - Parameters:
-///   - skillRegistry: The registry to look up and replace skills.
+///   - skillRegistry: The registry to look up and unregister skills.
 ///   - usageStore: The store for reading/writing skill usage data.
+///   - skillsDir: Root skills directory (e.g., `~/.axion/skills`).
 /// - Returns: A `ToolProtocol` instance named `curator_archive_skill`.
 public func createCuratorArchiveTool(
     skillRegistry: SkillRegistry,
-    usageStore: SkillUsageStore
+    usageStore: SkillUsageStore,
+    skillsDir: String
 ) -> ToolProtocol {
     defineTool(
         name: "curator_archive_skill",
@@ -54,25 +59,35 @@ public func createCuratorArchiveTool(
             return reviewJSONResponse(["success": false, "error": "Skill '\(skillName)' not found"] as [String: Any])
         }
 
-        let archived = Skill(
-            name: skill.name,
-            description: skill.description,
-            aliases: skill.aliases,
-            userInvocable: skill.userInvocable,
-            toolRestrictions: skill.toolRestrictions,
-            modelOverride: skill.modelOverride,
-            promptTemplate: skill.promptTemplate,
-            whenToUse: skill.whenToUse,
-            argumentHint: skill.argumentHint,
-            baseDir: skill.baseDir,
-            supportingFiles: skill.supportingFiles,
-            lifecycleState: .retired
-        )
-        skillRegistry.replace(archived)
-
         let absorbedValue = input.absorbedInto?.trimmingCharacters(in: .whitespacesAndNewlines)
         let resolvedAbsorbed = (absorbedValue?.isEmpty ?? true) ? nil : absorbedValue
 
+        // Try to move directory to .archived/ if baseDir is under skillsDir
+        var archivedViaMove = false
+        if let baseDir = skill.baseDir, baseDir.hasPrefix(skillsDir) {
+            let archivedDir = (skillsDir as NSString).appendingPathComponent(".archived")
+            let destPath = (archivedDir as NSString).appendingPathComponent(skillName)
+
+            do {
+                try FileManager.default.createDirectory(
+                    atPath: archivedDir,
+                    withIntermediateDirectories: true
+                )
+                // Remove existing archived version if any
+                if FileManager.default.fileExists(atPath: destPath) {
+                    try FileManager.default.removeItem(atPath: destPath)
+                }
+                try FileManager.default.moveItem(atPath: baseDir, toPath: destPath)
+                archivedViaMove = true
+            } catch {
+                // Fall through to registry-only retirement
+            }
+        }
+
+        // Unregister from registry
+        skillRegistry.unregister(skillName)
+
+        // Update usage data
         var updatedData = usageData
         updatedData.absorbedInto = resolvedAbsorbed
         updatedData.lastManagedAt = Date()
@@ -84,7 +99,7 @@ public func createCuratorArchiveTool(
 
         return reviewJSONResponse([
             "success": true,
-            "message": "Skill '\(skillName)' archived",
+            "message": "Skill '\(skillName)' archived\(archivedViaMove ? " (moved to .archived/)" : " (registry only)")",
             "absorbedInto": resolvedAbsorbed as Any
         ] as [String: Any])
     }

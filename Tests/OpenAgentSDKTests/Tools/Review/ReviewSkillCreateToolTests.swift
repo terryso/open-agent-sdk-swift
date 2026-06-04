@@ -10,7 +10,7 @@ final class ReviewSkillCreateToolTests: XCTestCase {
         promptTemplate: String,
         whenToUse: String? = nil
     ) async -> String {
-        let tool = createReviewSkillCreateTool(skillRegistry: registry)
+        let tool = createReviewSkillCreateTool(skillRegistry: registry, usageStore: SkillUsageStore(skillsDir: "/tmp/test-create-(UUID().uuidString)"), skillsDir: "/tmp/test-skills-(UUID().uuidString)")
         var input: [String: Any] = [
             "name": name,
             "description": description,

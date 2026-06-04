@@ -32,7 +32,7 @@ final class ReviewSkillUpdateToolTests: XCTestCase {
         updates: String,
         reason: String
     ) async -> String {
-        let tool = createReviewSkillUpdateTool(skillRegistry: registry, skillEvolver: evolver)
+        let tool = createReviewSkillUpdateTool(skillRegistry: registry, skillEvolver: evolver, skillsDir: "/tmp/test-skills-(UUID().uuidString)")
         let input: [String: Any] = [
             "skillName": skillName,
             "updates": updates,

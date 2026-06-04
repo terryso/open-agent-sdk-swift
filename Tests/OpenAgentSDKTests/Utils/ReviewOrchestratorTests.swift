@@ -26,7 +26,8 @@ final class ReviewOrchestratorTests: XCTestCase {
             factStore: FactStore(),
             skillRegistry: SkillRegistry(),
             skillEvolver: skillEvolver,
-            usageStore: SkillUsageStore(skillsDir: tempDir)
+            usageStore: SkillUsageStore(skillsDir: tempDir),
+            skillsDir: tempDir
         )
     }
 

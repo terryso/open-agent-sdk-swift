@@ -193,7 +193,9 @@ public final class SkillRegistry: @unchecked Sendable {
             orderedNames.compactMap { name -> Skill? in
                 guard let skill = skills[name],
                       skill.userInvocable,
-                      skill.isAvailable() else {
+                      skill.isAvailable(),
+                      skill.lifecycleState != .retired,
+                      skill.lifecycleState != .deprecated else {
                     return nil
                 }
                 return skill

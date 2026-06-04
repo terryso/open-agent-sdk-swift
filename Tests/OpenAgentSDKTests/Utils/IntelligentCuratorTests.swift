@@ -92,7 +92,8 @@ final class IntelligentCuratorTests: XCTestCase {
             skillRegistry: SkillRegistry(),
             skillEvolver: MockSkillEvolver(),
             usageStore: us,
-            curatorStore: cs
+            curatorStore: cs,
+            skillsDir: "/tmp/test-skills-\(UUID().uuidString)"
         )
     }
 
@@ -490,7 +491,8 @@ final class IntelligentCuratorTests: XCTestCase {
             factStore: FactStore(),
             skillRegistry: SkillRegistry(),
             skillEvolver: MockSkillEvolver(),
-            usageStore: makeUsageStore()
+            usageStore: makeUsageStore(),
+            skillsDir: "/tmp/test-skills-\(UUID().uuidString)"
         )
         XCTAssertEqual(tools.count, 5)
 

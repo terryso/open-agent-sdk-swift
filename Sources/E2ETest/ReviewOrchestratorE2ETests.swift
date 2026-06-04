@@ -117,7 +117,8 @@ struct ReviewOrchestratorE2ETests {
             factStore: FactStore(),
             skillRegistry: SkillRegistry(),
             skillEvolver: StubSkillEvolver(),
-            usageStore: SkillUsageStore(skillsDir: "/tmp/e2e-review-orch-usage-\(UUID().uuidString)")
+            usageStore: SkillUsageStore(skillsDir: "/tmp/e2e-review-orch-usage-\(UUID().uuidString)"),
+            skillsDir: "/tmp/e2e-review-orch-skills"
         )
 
         // Triggers memory at interval multiple
@@ -438,7 +439,8 @@ struct ReviewOrchestratorE2ETests {
             factStore: FactStore(),
             skillRegistry: SkillRegistry(),
             skillEvolver: skillEvolver,
-            usageStore: SkillUsageStore(skillsDir: "/tmp/e2e-review-orch-usage-\(UUID().uuidString)")
+            usageStore: SkillUsageStore(skillsDir: "/tmp/e2e-review-orch-usage-\(UUID().uuidString)"),
+            skillsDir: "/tmp/e2e-review-orch-skills"
         )
 
         // Execute review with memory+skill enabled, low maxTurns for speed
@@ -554,7 +556,8 @@ struct ReviewOrchestratorE2ETests {
             factStore: FactStore(),
             skillRegistry: SkillRegistry(),
             skillEvolver: LLMSkillEvolver(client: client, evolutionModel: model),
-            usageStore: SkillUsageStore(skillsDir: "/tmp/e2e-review-orch-usage-\(UUID().uuidString)")
+            usageStore: SkillUsageStore(skillsDir: "/tmp/e2e-review-orch-usage-\(UUID().uuidString)"),
+            skillsDir: "/tmp/e2e-review-orch-skills"
         )
 
         // Register sessionEnd hook manually (mirrors Agent.init pattern)

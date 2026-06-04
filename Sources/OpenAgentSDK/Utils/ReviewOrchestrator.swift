@@ -68,6 +68,9 @@ public struct ReviewOrchestrator: Sendable {
     /// Usage store for skill usage data.
     public let usageStore: SkillUsageStore
 
+    /// Root directory for skill persistence.
+    public let skillsDir: String
+
     /// Additional tools to inject alongside the built-in review tools.
     ///
     /// Use this to extend the review agent with domain-specific memory tools
@@ -81,6 +84,7 @@ public struct ReviewOrchestrator: Sendable {
         skillRegistry: SkillRegistry,
         skillEvolver: any SkillEvolver,
         usageStore: SkillUsageStore,
+        skillsDir: String,
         additionalReviewTools: [ToolProtocol] = []
     ) {
         self.scheduleConfig = scheduleConfig
@@ -88,6 +92,7 @@ public struct ReviewOrchestrator: Sendable {
         self.skillRegistry = skillRegistry
         self.skillEvolver = skillEvolver
         self.usageStore = usageStore
+        self.skillsDir = skillsDir
         self.additionalReviewTools = additionalReviewTools
     }
 
@@ -138,7 +143,8 @@ public struct ReviewOrchestrator: Sendable {
             factStore: factStore,
             skillRegistry: skillRegistry,
             skillEvolver: skillEvolver,
-            usageStore: usageStore
+            usageStore: usageStore,
+            skillsDir: skillsDir
         )
         reviewAgent.options.tools = reviewTools + additionalReviewTools
 

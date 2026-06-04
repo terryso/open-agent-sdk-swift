@@ -9,7 +9,7 @@ final class ReviewSkillFileToolTests: XCTestCase {
         filePath: String,
         content: String
     ) async -> String {
-        let tool = createReviewSkillFileTool(skillRegistry: registry)
+        let tool = createReviewSkillFileTool(skillRegistry: registry, skillsDir: "/tmp/test-skills-(UUID().uuidString)")
         let input: [String: Any] = [
             "skillName": skillName,
             "filePath": filePath,
@@ -147,6 +147,10 @@ final class ReviewSkillFileToolTests: XCTestCase {
     }
 
     func testBaseDirIsNil() async {
+        let skillsDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString).path
+        defer { try? FileManager.default.removeItem(atPath: skillsDir) }
+
         let registry = SkillRegistry()
         registry.register(Skill(
             name: "no-dir-skill",
@@ -155,15 +159,23 @@ final class ReviewSkillFileToolTests: XCTestCase {
             baseDir: nil
         ))
 
-        let output = await callTool(
-            registry: registry,
-            skillName: "no-dir-skill",
-            filePath: "references/guide.md",
-            content: "content"
-        )
+        let tool = createReviewSkillFileTool(skillRegistry: registry, skillsDir: skillsDir)
+        let input: [String: Any] = [
+            "skillName": "no-dir-skill",
+            "filePath": "references/guide.md",
+            "content": "content",
+        ]
+        let context = ToolContext(cwd: "/tmp")
+        let result = await tool.call(input: input, context: context)
+        let output = result.content
 
-        XCTAssertTrue(output.contains("\"success\":false"))
-        XCTAssertTrue(output.contains("no base directory"))
+        XCTAssertTrue(output.contains("\"success\":true"), "Expected success but got: \(output)")
+
+        let skillDir = (skillsDir as NSString).appendingPathComponent("no-dir-skill")
+        let filePath = (skillDir as NSString).appendingPathComponent("references/guide.md")
+        let content = try? String(contentsOfFile: filePath)
+        XCTAssertNotNil(content, "File should exist on disk after materialization")
+        XCTAssertEqual(content, "content")
     }
 
     func testEmptySkillName() async {

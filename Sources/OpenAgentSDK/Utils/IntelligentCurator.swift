@@ -93,6 +93,8 @@ public struct IntelligentCurator: Sendable {
     public let usageStore: SkillUsageStore
     /// Curator state persistence store.
     public let curatorStore: SkillCuratorStore
+    /// Root directory for skill persistence.
+    public let skillsDir: String
 
     public init(
         skillCurator: SkillCurator,
@@ -100,7 +102,8 @@ public struct IntelligentCurator: Sendable {
         skillRegistry: SkillRegistry,
         skillEvolver: any SkillEvolver,
         usageStore: SkillUsageStore,
-        curatorStore: SkillCuratorStore
+        curatorStore: SkillCuratorStore,
+        skillsDir: String
     ) {
         self.skillCurator = skillCurator
         self.factStore = factStore
@@ -108,6 +111,7 @@ public struct IntelligentCurator: Sendable {
         self.skillEvolver = skillEvolver
         self.usageStore = usageStore
         self.curatorStore = curatorStore
+        self.skillsDir = skillsDir
     }
 
     /// Execute the two-phase curation pipeline.
@@ -168,7 +172,8 @@ public struct IntelligentCurator: Sendable {
                 factStore: factStore,
                 skillRegistry: skillRegistry,
                 skillEvolver: skillEvolver,
-                usageStore: usageStore
+                usageStore: usageStore,
+                skillsDir: skillsDir
             )
             curatorAgent.options.tools = reviewTools
 

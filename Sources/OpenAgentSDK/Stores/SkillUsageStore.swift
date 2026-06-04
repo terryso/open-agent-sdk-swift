@@ -92,10 +92,8 @@ public actor SkillUsageStore {
 
     // MARK: - Private: Path Resolution
 
-    nonisolated private static func resolveSkillsDir(customDir: String?) -> String {
-        if let custom = customDir {
-            return custom
-        }
+    /// The default skills directory path when no custom directory is provided.
+    public static let defaultSkillsDir: String = {
         let home: String
         #if os(Linux)
         if let homeEnv = getenv("HOME") {
@@ -107,6 +105,13 @@ public actor SkillUsageStore {
         home = NSHomeDirectory()
         #endif
         return (home as NSString).appendingPathComponent(".open-agent-sdk/skills")
+    }()
+
+    nonisolated private static func resolveSkillsDir(customDir: String?) -> String {
+        if let custom = customDir {
+            return custom
+        }
+        return defaultSkillsDir
     }
 
     private func getSkillsDir() -> String {

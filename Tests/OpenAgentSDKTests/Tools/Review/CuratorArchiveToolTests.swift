@@ -26,7 +26,7 @@ final class CuratorArchiveToolTests: XCTestCase {
         skillName: String,
         absorbedInto: String? = nil
     ) async -> String {
-        let tool = createCuratorArchiveTool(skillRegistry: registry, usageStore: store)
+        let tool = createCuratorArchiveTool(skillRegistry: registry, usageStore: store, skillsDir: "/tmp/test-skills-(UUID().uuidString)")
         var input: [String: Any] = ["skillName": skillName]
         if let absorbedInto { input["absorbedInto"] = absorbedInto }
         let context = ToolContext(cwd: "/tmp")
@@ -58,7 +58,7 @@ final class CuratorArchiveToolTests: XCTestCase {
         XCTAssertTrue(output.contains("archived"))
 
         let archived = registry.find("test-skill")
-        XCTAssertEqual(archived?.lifecycleState, .retired)
+        XCTAssertNil(archived, "Skill should be unregistered after archive")
 
         let usage = await store.getUsage(skillName: "test-skill")
         XCTAssertNotNil(usage.lastManagedAt)

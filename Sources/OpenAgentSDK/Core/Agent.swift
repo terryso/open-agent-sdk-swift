@@ -263,7 +263,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                 factStore: FactStore(),
                 skillRegistry: mergedOptions.skillRegistry ?? SkillRegistry(),
                 skillEvolver: LLMSkillEvolver(client: self.client),
-                usageStore: SkillUsageStore()
+                usageStore: SkillUsageStore(),
+                skillsDir: SkillUsageStore.defaultSkillsDir
             )
             let agent = self
             let handler: @Sendable (HookInput) async -> HookOutput? = { _ in
