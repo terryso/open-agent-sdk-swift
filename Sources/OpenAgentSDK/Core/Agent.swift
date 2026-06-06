@@ -930,6 +930,20 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
 
         let (sdkTools, externalServers) = await Self.processMcpConfigs(mcpServers)
 
+        // Reuse existing MCP connections if manager is already connected
+        if let existing = mcpClientManager {
+            let mcpTools = await existing.getMCPTools()
+            let allMCPTools = sdkTools + mcpTools
+            let pool = assembleToolPool(
+                baseTools: getAllBaseTools(tier: .core) + getAllBaseTools(tier: .specialist),
+                customTools: baseTools,
+                mcpTools: allMCPTools,
+                allowed: options.allowedTools,
+                disallowed: options.disallowedTools
+            )
+            return (pool, existing)
+        }
+
         // Connect external MCP servers (stdio, sse, http)
         var externalTools: [ToolProtocol] = []
         var manager: MCPClientManager? = nil
@@ -1990,7 +2004,22 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
         let capturedModel = model
         let capturedMaxTokens = maxTokens
         let capturedSystemPrompt = buildSystemPrompt()
-        let capturedMessages = buildMessages(prompt: text)
+
+        // Session-aware message loading: reuse conversation history when
+        // sessionStore + sessionId are configured, same as promptImpl().
+        // Falls back to buildMessages() for single-query usage.
+        let preCapturedSessionStore = options.sessionStore
+        let preCapturedSessionId = options.sessionId
+        let capturedMessages: [[String: Any]] = await {
+            if let store = preCapturedSessionStore, let sid = preCapturedSessionId {
+                if let data = try? await store.load(sessionId: sid) {
+                    var msgs = data.messages
+                    msgs.append(["role": "user", "content": text])
+                    return msgs
+                }
+            }
+            return buildMessages(prompt: text)
+        }()
         let capturedClient = client
         let capturedMaxBudgetUsd = options.maxBudgetUsd
         let capturedToolProtocols: [ToolProtocol] = options.tools ?? []
