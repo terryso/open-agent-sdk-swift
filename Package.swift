@@ -271,6 +271,26 @@ let package = Package(
             path: "Examples/SSEBridgeExample"
         ),
         .executableTarget(
+            name: "SkillWriterExample",
+            dependencies: ["OpenAgentSDK"],
+            path: "Examples/SkillWriterExample"
+        ),
+        .executableTarget(
+            name: "ReviewOrchestratorExample",
+            dependencies: ["OpenAgentSDK"],
+            path: "Examples/ReviewOrchestratorExample"
+        ),
+        .executableTarget(
+            name: "EnvInjectionExample",
+            dependencies: ["OpenAgentSDK"],
+            path: "Examples/EnvInjectionExample"
+        ),
+        .executableTarget(
+            name: "MessageSummaryExample",
+            dependencies: ["OpenAgentSDK"],
+            path: "Examples/MessageSummaryExample"
+        ),
+        .executableTarget(
             name: "ScaffoldCLI",
             dependencies: [
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),

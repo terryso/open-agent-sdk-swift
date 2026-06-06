@@ -774,6 +774,121 @@ let agent = createAgent(options: AgentOptions(
 ))
 ```
 
+### 34. SkillWriterExample — Skill Persistence to Disk
+
+Demonstrates `SkillWriter` for persisting skills to the filesystem as `SKILL.md` files with YAML frontmatter.
+
+```bash
+swift run SkillWriterExample
+```
+
+**No API key required** — pure local file operations.
+
+**What you'll learn:**
+- Writing skills to disk with `SkillWriter.write(skill:to:)`
+- Previewing SKILL.md content with `SkillWriter.buildSKILLMd()`
+- YAML frontmatter generation (name, description, aliases, model override)
+- Complex skills with special characters in descriptions
+
+**Key code:**
+```swift
+let skill = Skill(
+    name: "summarize",
+    description: "Summarize a file or text into key points",
+    aliases: ["sum"],
+    promptTemplate: "Read the content and produce a summary..."
+)
+let skillDir = try SkillWriter.write(skill: skill, to: skillsDir)
+```
+
+---
+
+### 35. ReviewOrchestratorExample — Review Scheduling & Configuration
+
+Demonstrates `ReviewOrchestrator` configuration including `promptSuffix` for extending review prompts and `additionalReviewTools` for injecting custom tools.
+
+```bash
+swift run ReviewOrchestratorExample
+```
+
+**No API key required** — demonstrates configuration and scheduling logic only.
+
+**What you'll learn:**
+- Configuring `ReviewScheduleConfig` (intervals, min messages, model override)
+- Extending review agent instructions with `ReviewAgentConfig.promptSuffix`
+- Injecting custom tools via `additionalReviewTools`
+- Simulating `shouldReview()` scheduling with different message counts
+
+**Key code:**
+```swift
+let orchestrator = ReviewOrchestrator(
+    scheduleConfig: ReviewScheduleConfig(memoryReviewInterval: 4, skillReviewInterval: 6),
+    factStore: factStore,
+    skillRegistry: registry,
+    skillEvolver: evolver,
+    usageStore: usageStore,
+    skillsDir: "/path/to/skills",
+    additionalReviewTools: [customMemoryTool]
+)
+let (doMemory, doSkill) = orchestrator.shouldReview(sessionId: "s1", messageCount: 8, config: config)
+```
+
+---
+
+### 36. EnvInjectionExample — Environment Variable Injection
+
+Demonstrates how to inject custom environment variables into tool execution context via `AgentOptions.env`, automatically forwarded to BashTool subprocesses and accessible in custom tools via `ToolContext.env`.
+
+```bash
+swift run EnvInjectionExample
+```
+
+**Requires API key** — set `CODEANY_API_KEY` or `ANTHROPIC_API_KEY`.
+
+**What you'll learn:**
+- Setting `AgentOptions.env` to inject custom environment variables
+- BashTool automatically receives `ToolContext.env` in subprocess environment
+- Reading injected env vars from custom tools via `context.env`
+
+**Key code:**
+```swift
+let agent = createAgent(options: AgentOptions(
+    apiKey: apiKey,
+    env: ["MY_APP_STAGE": "staging", "MY_APP_REGION": "us-west-2"]
+))
+// BashTool subprocess sees MY_APP_STAGE and MY_APP_REGION
+// Custom tools read via: context.env?["MY_APP_STAGE"]
+```
+
+---
+
+### 37. MessageSummaryExample — Message Summaries in LLM Events
+
+Demonstrates `MessageSummary` with content preview in `LLMRequestStartedEvent`, showing role, content length, and text preview for each message sent to the LLM.
+
+```bash
+swift run MessageSummaryExample
+```
+
+**Requires API key** — set `CODEANY_API_KEY` or `ANTHROPIC_API_KEY`.
+
+**What you'll learn:**
+- `MessageSummary` fields: `role`, `contentLength`, `preview`
+- Subscribing to `LLMRequestStartedEvent` via type-filtered `EventBus.subscribe()`
+- Observing how message summaries grow across multi-turn conversations
+
+**Key code:**
+```swift
+let eventBus = EventBus()
+let stream = await eventBus.subscribe(LLMRequestStartedEvent.self)
+// Each event carries event.messages: [MessageSummary]
+for summary in event.messages {
+    print("\(summary.role) (\(summary.contentLength) chars): \"\(summary.preview)\"")
+}
+```
+
+---
+
 ## Example Dependencies
 
 | Example                  | Requires MCP dependency | Extra setup              |
@@ -812,6 +927,10 @@ let agent = createAgent(options: AgentOptions(
 | CompatSandbox            | No                     | None                     |
 | EventBusExample          | No                     | None (synthetic events)  |
 | SSEBridgeExample         | No                     | API key required         |
+| SkillWriterExample       | No                     | None (local files)       |
+| ReviewOrchestratorExample| No                     | None (config only)       |
+| EnvInjectionExample      | No                     | API key required         |
+| MessageSummaryExample    | No                     | API key required         |
 
 All examples are defined as executable targets in `Package.swift` — no additional configuration needed.
 
@@ -828,8 +947,11 @@ Five essential scenarios every developer should understand. Each links to the re
 | 5 | **Memory (Cross-Task Learning)** — store, query, domain-based | `MemoryStoreExample/` | `swift run MemoryStoreExample` |
 | 6 | **Self-Evolution** — experience extraction, skill evolution, curation | `SelfEvolutionExample/` | `swift run SelfEvolutionExample` |
 | 7 | **Runtime Events** — EventBus, typed events, SSE bridge | `EventBusExample/`, `SSEBridgeExample/` | `swift run EventBusExample` |
+| 8 | **Skill Persistence** — SkillWriter, SKILL.md files | `SkillWriterExample/` | `swift run SkillWriterExample` |
+| 9 | **Review Pipeline** — ReviewOrchestrator, promptSuffix, additional tools | `ReviewOrchestratorExample/` | `swift run ReviewOrchestratorExample` |
+| 10 | **Env Injection** — AgentOptions.env, ToolContext.env | `EnvInjectionExample/` | `swift run EnvInjectionExample` |
 
-> **Tip:** Start with scenario 1 (BasicAgent), then explore each scenario in order. The full learning path below covers all 33 examples.
+> **Tip:** Start with scenario 1 (BasicAgent), then explore each scenario in order. The full learning path below covers all 37 examples.
 
 ## Recommended Learning Path
 
@@ -841,6 +963,8 @@ BasicAgent → StreamingAgent → CustomTools → CustomSystemPromptExample
     → LoggerExample → ModelSwitchingExample → QueryAbortExample
     → ContextInjectionExample → MultiTurnExample → OpenAICompatExample
     → PolyvLiveExample → EventBusExample → SSEBridgeExample
+    → SkillWriterExample → ReviewOrchestratorExample
+    → EnvInjectionExample → MessageSummaryExample
 ```
 
 1. **Start here:** BasicAgent, StreamingAgent — understand the core prompt/stream APIs
@@ -858,6 +982,8 @@ BasicAgent → StreamingAgent → CustomTools → CustomSystemPromptExample
 13. **HTTP API Server:** AgentHTTPServerExample — expose an Agent as a REST + SSE HTTP service
 14. **SDK compat verification:** Compat* examples — verify TypeScript SDK API parity (for SDK contributors)
 15. **Runtime events:** EventBusExample, SSEBridgeExample — EventBus publish/subscribe, SSE bridge pipeline, token streaming
+16. **Skill persistence & review:** SkillWriterExample, ReviewOrchestratorExample — persist skills to disk, configure review scheduling
+17. **Env injection & message summaries:** EnvInjectionExample, MessageSummaryExample — inject env vars, observe LLM request summaries
 
 ## Troubleshooting
 

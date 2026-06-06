@@ -774,6 +774,121 @@ let agent = createAgent(options: AgentOptions(
 ))
 ```
 
+### 34. SkillWriterExample — 技能持久化到磁盘
+
+演示 `SkillWriter` 将技能以 `SKILL.md` 文件（含 YAML frontmatter）的形式持久化到文件系统。
+
+```bash
+swift run SkillWriterExample
+```
+
+**无需 API Key** — 纯本地文件操作。
+
+**你将学到：**
+- 使用 `SkillWriter.write(skill:to:)` 将技能写入磁盘
+- 使用 `SkillWriter.buildSKILLMd()` 预览 SKILL.md 内容
+- YAML frontmatter 生成（name、description、aliases、model override）
+- 包含特殊字符的复杂技能
+
+**关键代码：**
+```swift
+let skill = Skill(
+    name: "summarize",
+    description: "Summarize a file or text into key points",
+    aliases: ["sum"],
+    promptTemplate: "Read the content and produce a summary..."
+)
+let skillDir = try SkillWriter.write(skill: skill, to: skillsDir)
+```
+
+---
+
+### 35. ReviewOrchestratorExample — 审查调度与配置
+
+演示 `ReviewOrchestrator` 的配置，包括 `promptSuffix` 扩展审查提示词和 `additionalReviewTools` 注入自定义审查工具。
+
+```bash
+swift run ReviewOrchestratorExample
+```
+
+**无需 API Key** — 仅演示配置与调度逻辑。
+
+**你将学到：**
+- 配置 `ReviewScheduleConfig`（间隔、最小消息数、模型覆盖）
+- 使用 `ReviewAgentConfig.promptSuffix` 扩展审查 agent 的指令
+- 通过 `additionalReviewTools` 注入自定义审查工具
+- 模拟 `shouldReview()` 在不同消息数下的调度行为
+
+**关键代码：**
+```swift
+let orchestrator = ReviewOrchestrator(
+    scheduleConfig: ReviewScheduleConfig(memoryReviewInterval: 4, skillReviewInterval: 6),
+    factStore: factStore,
+    skillRegistry: registry,
+    skillEvolver: evolver,
+    usageStore: usageStore,
+    skillsDir: "/path/to/skills",
+    additionalReviewTools: [customMemoryTool]
+)
+let (doMemory, doSkill) = orchestrator.shouldReview(sessionId: "s1", messageCount: 8, config: config)
+```
+
+---
+
+### 36. EnvInjectionExample — 环境变量注入
+
+演示如何通过 `AgentOptions.env` 注入自定义环境变量，BashTool 自动将其转发到子进程，自定义工具可通过 `ToolContext.env` 读取。
+
+```bash
+swift run EnvInjectionExample
+```
+
+**需要 API Key** — 设置 `CODEANY_API_KEY` 或 `ANTHROPIC_API_KEY`。
+
+**你将学到：**
+- 设置 `AgentOptions.env` 注入自定义环境变量
+- BashTool 子进程自动接收 `ToolContext.env`
+- 自定义工具通过 `context.env` 读取注入的变量
+
+**关键代码：**
+```swift
+let agent = createAgent(options: AgentOptions(
+    apiKey: apiKey,
+    env: ["MY_APP_STAGE": "staging", "MY_APP_REGION": "us-west-2"]
+))
+// BashTool 子进程可看到 MY_APP_STAGE 和 MY_APP_REGION
+// 自定义工具读取：context.env?["MY_APP_STAGE"]
+```
+
+---
+
+### 37. MessageSummaryExample — LLM 事件中的消息摘要
+
+演示 `MessageSummary` 在 `LLMRequestStartedEvent` 中的内容预览功能，包含 role、contentLength 和文本预览。
+
+```bash
+swift run MessageSummaryExample
+```
+
+**需要 API Key** — 设置 `CODEANY_API_KEY` 或 `ANTHROPIC_API_KEY`。
+
+**你将学到：**
+- `MessageSummary` 字段：`role`、`contentLength`、`preview`
+- 通过类型过滤的 `EventBus.subscribe()` 订阅 `LLMRequestStartedEvent`
+- 观察多轮对话中消息摘要的增长
+
+**关键代码：**
+```swift
+let eventBus = EventBus()
+let stream = await eventBus.subscribe(LLMRequestStartedEvent.self)
+// 每个 event 携带 event.messages: [MessageSummary]
+for summary in event.messages {
+    print("\(summary.role) (\(summary.contentLength) chars): \"\(summary.preview)\"")
+}
+```
+
+---
+
 ## 示例依赖
 
 | 示例                     | 需要 MCP 依赖          | 额外配置                  |
@@ -813,6 +928,10 @@ let agent = createAgent(options: AgentOptions(
 | CompatSandbox            | 否                     | 无                        |
 | EventBusExample          | 否                     | 无（合成事件）            |
 | SSEBridgeExample         | 否                     | 需要 API Key              |
+| SkillWriterExample       | 否                     | 无（本地文件）            |
+| ReviewOrchestratorExample| 否                     | 无（仅配置）              |
+| EnvInjectionExample      | 否                     | 需要 API Key              |
+| MessageSummaryExample    | 否                     | 需要 API Key              |
 
 所有示例都已作为可执行目标定义在 `Package.swift` 中 — 无需额外配置。
 
@@ -829,8 +948,11 @@ let agent = createAgent(options: AgentOptions(
 | 5 | **Memory（跨任务学习）** — store、query、domain | `MemoryStoreExample/` | `swift run MemoryStoreExample` |
 | 6 | **自进化** — 经验提取、技能进化、智能策展 | `SelfEvolutionExample/` | `swift run SelfEvolutionExample` |
 | 7 | **Runtime 事件** — EventBus、类型化事件、SSE 桥接 | `EventBusExample/`、`SSEBridgeExample/` | `swift run EventBusExample` |
+| 8 | **技能持久化** — SkillWriter、SKILL.md 文件 | `SkillWriterExample/` | `swift run SkillWriterExample` |
+| 9 | **审查管道** — ReviewOrchestrator、promptSuffix、额外工具 | `ReviewOrchestratorExample/` | `swift run ReviewOrchestratorExample` |
+| 10 | **环境变量注入** — AgentOptions.env、ToolContext.env | `EnvInjectionExample/` | `swift run EnvInjectionExample` |
 
-> **提示：** 从场景 1（BasicAgent）开始，按顺序探索每个场景。下方的完整学习路径覆盖全部 33 个示例。
+> **提示：** 从场景 1（BasicAgent）开始，按顺序探索每个场景。下方的完整学习路径覆盖全部 37 个示例。
 
 ## 推荐学习路径
 
@@ -842,6 +964,8 @@ BasicAgent → StreamingAgent → CustomTools → CustomSystemPromptExample
     → LoggerExample → ModelSwitchingExample → QueryAbortExample
     → ContextInjectionExample → MultiTurnExample → OpenAICompatExample
     → PolyvLiveExample → EventBusExample → SSEBridgeExample
+    → SkillWriterExample → ReviewOrchestratorExample
+    → EnvInjectionExample → MessageSummaryExample
 ```
 
 1. **从这里开始：** BasicAgent、StreamingAgent — 理解核心 prompt/stream API
@@ -858,6 +982,8 @@ BasicAgent → StreamingAgent → CustomTools → CustomSystemPromptExample
 12. **OpenAI 兼容：** OpenAICompatExample — 使用 DeepSeek、Qwen、Ollama 等 OpenAI 兼容 API
 13. **SDK 兼容性验证：** Compat* 示例 — 验证 TypeScript SDK API 对齐（适合 SDK 贡献者）
 14. **Runtime 事件：** EventBusExample、SSEBridgeExample — EventBus 发布/订阅、SSE 桥接管道、Token 流式输出
+15. **技能持久化与审查：** SkillWriterExample、ReviewOrchestratorExample — 技能写入磁盘、审查调度配置
+16. **环境注入与消息摘要：** EnvInjectionExample、MessageSummaryExample — 环境变量注入、LLM 请求摘要观察
 
 ## 常见问题
 
