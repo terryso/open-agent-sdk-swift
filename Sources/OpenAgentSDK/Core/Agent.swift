@@ -2008,18 +2008,11 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
         // Session-aware message loading: reuse conversation history when
         // sessionStore + sessionId are configured, same as promptImpl().
         // Falls back to buildMessages() for single-query usage.
+        // Captured as Optional; resolved inside the AsyncStream closure
+        // so we don't need `async` on stream() itself.
         let preCapturedSessionStore = options.sessionStore
         let preCapturedSessionId = options.sessionId
-        let capturedMessages: [[String: Any]] = await {
-            if let store = preCapturedSessionStore, let sid = preCapturedSessionId {
-                if let data = try? await store.load(sessionId: sid) {
-                    var msgs = data.messages
-                    msgs.append(["role": "user", "content": text])
-                    return msgs
-                }
-            }
-            return buildMessages(prompt: text)
-        }()
+        let fallbackMessages = buildMessages(prompt: text)
         let capturedClient = client
         let capturedMaxBudgetUsd = options.maxBudgetUsd
         let capturedToolProtocols: [ToolProtocol] = options.tools ?? []
@@ -2081,9 +2074,10 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
             return toApiTools(registeredTools)
         }()
 
-        // Serialize captured messages to Data for Sendable compliance across
+        // Serialize fallback messages to Data for Sendable compliance across
         // the AsyncStream closure boundary, then deserialize inside the Task.
-        guard let messagesData = try? JSONSerialization.data(withJSONObject: capturedMessages, options: []) else {
+        // If sessionStore is configured, actual messages are loaded async inside the Task.
+        guard let fallbackMessagesData = try? JSONSerialization.data(withJSONObject: fallbackMessages, options: []) else {
             // If serialization fails, return an immediately-finishing stream
             return AsyncStream<SDKMessage> { $0.finish() }
         }
@@ -2093,10 +2087,21 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
 
         return AsyncStream<SDKMessage> { [self] continuation in
             let task = _Concurrency.Task {
-                // Deserialize messages inside the isolated Task context
-                guard let decodedMessages = try? JSONSerialization.jsonObject(with: messagesData, options: []) as? [[String: Any]] else {
-                    continuation.finish()
-                    return
+                // Session-aware message loading: if sessionStore + sessionId are
+                // configured, load history from disk and append the new user message.
+                // Otherwise fall back to the pre-built single-query messages.
+                let decodedMessages: [[String: Any]]
+                if let store = preCapturedSessionStore, let sid = preCapturedSessionId,
+                   let data = try? await store.load(sessionId: sid) {
+                    var msgs = data.messages
+                    msgs.append(["role": "user", "content": text])
+                    decodedMessages = msgs
+                } else {
+                    guard let fallback = try? JSONSerialization.jsonObject(with: fallbackMessagesData, options: []) as? [[String: Any]] else {
+                        continuation.finish()
+                        return
+                    }
+                    decodedMessages = fallback
                 }
                 // Deserialize tools inside the isolated Task context
                 var decodedApiTools: [[String: Any]]? = toolsData.flatMap { data in
