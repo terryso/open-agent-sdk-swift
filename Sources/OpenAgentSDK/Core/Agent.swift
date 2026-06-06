@@ -2108,22 +2108,24 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                     try? JSONSerialization.jsonObject(with: data, options: []) as? [[String: Any]]
                 }
 
-                // MCP integration: connect MCP servers and merge tools
+                // MCP integration: reuse existing connections or connect MCP servers
                 var allToolProtocols = capturedToolProtocols
-                var mcpManager: MCPClientManager? = nil
                 if let mcpServers = capturedMcpServers, !mcpServers.isEmpty {
                     let (sdkTools, externalServers) = await Self.processMcpConfigs(mcpServers)
 
+                    // Reuse cached MCPClientManager if already connected
                     var externalTools: [ToolProtocol] = []
                     if !externalServers.isEmpty {
-                        let manager = MCPClientManager()
-                        await manager.connectAll(servers: externalServers)
+                        let manager: MCPClientManager
+                        if let existing = self.mcpClientManager {
+                            manager = existing
+                        } else {
+                            manager = MCPClientManager()
+                            await manager.connectAll(servers: externalServers)
+                            self.mcpClientManager = manager
+                        }
                         externalTools = await manager.getMCPTools()
-                        mcpManager = manager
                     }
-
-                    // Store for MCP runtime management methods
-                    self.mcpClientManager = mcpManager
 
                     let mcpTools = sdkTools + externalTools
                     if !mcpTools.isEmpty {
@@ -2134,19 +2136,6 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                             decodedApiTools = existing
                         } else {
                             decodedApiTools = mcpApiTools
-                        }
-                    }
-                }
-                let mcpManagerForCleanup = mcpManager
-
-                // Ensure MCP connections are always cleaned up, regardless of exit path.
-                // defer cannot be async, so fire-and-forget Task is used as a safety net
-                // for early returns. The primary cleanup is done synchronously via await
-                // after the main loop exits (before continuation.finish()).
-                defer {
-                    if let mcpManagerForCleanup {
-                        _Concurrency.Task {
-                            await mcpManagerForCleanup.shutdown()
                         }
                     }
                 }
@@ -2703,9 +2692,6 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                                         await trace.record(event: mapped.event, payload: mapped.payload)
                                     }
 
-                                    if let mcpManagerForCleanup {
-                                        await mcpManagerForCleanup.shutdown()
-                                    }
                                     if let hookRegistry = capturedHookRegistry {
                                         let endInput = HookInput(event: .sessionEnd, cwd: capturedCwd)
                                         await hookRegistry.execute(.sessionEnd, input: endInput)
@@ -3066,12 +3052,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                     )
                     onRunComplete(context)
                 }
-                // MCP cleanup handled by defer block above
-                // Primary MCP cleanup — synchronous await on the main exit path.
-                // The defer above acts as a safety net for early returns only.
-                if let mcpManagerForCleanup {
-                    await mcpManagerForCleanup.shutdown()
-                }
+                // MCP cleanup: connections are cached on self.mcpClientManager and
+                // reused across stream() calls. Cleanup happens in agent.close().
                 // Session auto-save: persist updated messages if sessionStore is configured and persistSession is true
                 if let sessionStore = capturedSessionStore, let sessionId = resolvedSessionId, capturedPersistSession {
                     let metadata = PartialSessionMetadata(
