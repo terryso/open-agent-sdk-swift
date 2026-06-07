@@ -852,6 +852,25 @@ public enum SDKMessage: Sendable, Equatable {
         }
     }
 
+    /// Result of a manual compaction request via ``Agent/compactNow()``.
+    public struct CompactResult: Sendable, Equatable {
+        /// Whether the compaction succeeded.
+        public let success: Bool
+        /// Token count before compaction.
+        public let preTokens: Int
+        /// Token count after compaction (equals `preTokens` on failure).
+        public let postTokens: Int
+        /// Error message when compaction failed, `nil` on success.
+        public let error: String?
+
+        public init(success: Bool, preTokens: Int, postTokens: Int, error: String? = nil) {
+            self.success = success
+            self.preTokens = preTokens
+            self.postTokens = postTokens
+            self.error = error
+        }
+    }
+
     /// Task notification data for system/task_notification events (TS SDK: `SDKTaskNotificationMessage`).
     public struct TaskNotificationInfo: Sendable, Equatable {
         /// Task notification status.

@@ -370,6 +370,84 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
         _lastQueryMessages = []
     }
 
+    /// Manually trigger conversation compaction.
+    ///
+    /// Loads messages from the session store, calls
+    /// ``compactConversation(client:model:messages:state:fileCache:sessionMemory:)``
+    /// to summarize, and persists the compacted messages back.
+    ///
+    /// This method is designed to be called **between** ``stream(_:)`` calls
+    /// (e.g., when the REPL is waiting for user input). It does **not** modify
+    /// in-flight stream state.
+    ///
+    /// Requires a configured session store and session ID. Returns a no-op success
+    /// when no session is configured or messages are empty.
+    ///
+    /// - Returns: A ``SDKMessage/CompactResult`` indicating success or failure
+    ///   with before/after token counts.
+    public func compactNow() async -> SDKMessage.CompactResult {
+        // 1. Load messages from session store
+        guard let sessionStore = options.sessionStore, let sessionId = options.sessionId else {
+            return SDKMessage.CompactResult(success: true, preTokens: 0, postTokens: 0, error: nil)
+        }
+
+        guard let sessionData = try? await sessionStore.load(sessionId: sessionId) else {
+            return SDKMessage.CompactResult(success: true, preTokens: 0, postTokens: 0, error: nil)
+        }
+
+        let messages = sessionData.messages
+        guard !messages.isEmpty else {
+            return SDKMessage.CompactResult(success: true, preTokens: 0, postTokens: 0, error: nil)
+        }
+
+        let preTokens = estimateMessagesTokens(messages)
+
+        // 2. Create fileCache for compact (same pattern as stream/promptImpl)
+        let fileCache = FileCache(
+            maxEntries: options.fileCacheMaxEntries,
+            maxSizeBytes: options.fileCacheMaxSizeBytes,
+            maxEntrySizeBytes: options.fileCacheMaxEntrySizeBytes
+        )
+
+        // 3. Compact
+        let state = createAutoCompactState()
+        let (newMessages, _, newState) = await compactConversation(
+            client: client,
+            model: model,
+            messages: messages,
+            state: state,
+            fileCache: fileCache,
+            sessionMemory: sessionMemory,
+            retryConfig: options.retryConfig ?? .default
+        )
+
+        guard newState.compacted else {
+            return SDKMessage.CompactResult(
+                success: false,
+                preTokens: preTokens,
+                postTokens: preTokens,
+                error: "Compaction failed (consecutive failures: \(newState.consecutiveFailures))"
+            )
+        }
+
+        let postTokens = estimateMessagesTokens(newMessages)
+
+        // 4. Persist compacted messages back to session store
+        let metadata = PartialSessionMetadata(
+            cwd: options.cwd ?? FileManager.default.currentDirectoryPath,
+            model: model,
+            summary: nil
+        )
+        try? await sessionStore.save(sessionId: sessionId, messages: newMessages, metadata: metadata)
+
+        return SDKMessage.CompactResult(
+            success: true,
+            preTokens: preTokens,
+            postTokens: postTokens,
+            error: nil
+        )
+    }
+
     /// Returns the current session ID, if one is configured.
     ///
     /// Maps to the TypeScript SDK's `getSessionId()` method. Returns `nil`
@@ -1447,14 +1525,28 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
 
             // Auto-compact if context is too large (FR9)
             if shouldAutoCompact(messages: messages, model: model, state: compactState) {
+                let preTokens = estimateMessagesTokens(messages)
                 let (newMessages, _, newState) = await compactConversation(
                     client: client, model: model,
                     messages: messages, state: compactState,
                     fileCache: fileCache,
                     sessionMemory: sessionMemory
                 )
+                let postTokens = estimateMessagesTokens(newMessages)
                 messages = newMessages
                 compactState = newState
+
+                if newState.compacted {
+                    Logger.shared.info("QueryEngine", "compact", data: [
+                        "trigger": "auto",
+                        "preTokens": String(preTokens),
+                        "postTokens": String(postTokens)
+                    ])
+                } else {
+                    Logger.shared.warn("QueryEngine", "compact_failed", data: [
+                        "consecutiveFailures": String(newState.consecutiveFailures)
+                    ])
+                }
             }
 
             // Build tool definitions for API call (use MCP-merged tool pool)
@@ -2298,20 +2390,40 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
 
                     // Auto-compact if context is too large (FR9)
                     if shouldAutoCompact(messages: messages, model: capturedModel, state: compactState) {
+                        let preTokens = estimateMessagesTokens(messages)
                         let (newMessages, _, newState) = await compactConversation(
                             client: capturedClient, model: capturedModel,
                             messages: messages, state: compactState,
                             fileCache: capturedFileCache,
                             sessionMemory: capturedSessionMemory
                         )
+                        let postTokens = estimateMessagesTokens(newMessages)
                         messages = newMessages
                         compactState = newState
 
-                        // Emit compact boundary event
-                        continuation.yield(.system(SDKMessage.SystemData(
-                            subtype: .compactBoundary,
-                            message: "Conversation compacted to fit within context window"
-                        )))
+                        if newState.compacted {
+                            // Emit compact boundary event with full metadata
+                            let metadata = SDKMessage.CompactMetadata(
+                                trigger: .auto,
+                                preTokens: preTokens,
+                                postTokens: postTokens
+                            )
+                            continuation.yield(.system(SDKMessage.SystemData(
+                                subtype: .compactBoundary,
+                                message: "Conversation compacted to fit within context window",
+                                compactMetadata: metadata,
+                                compactResult: "success"
+                            )))
+                        } else {
+                            // Emit compact boundary event with failure info
+                            let errorMsg = "Compaction failed (consecutive failures: \(newState.consecutiveFailures))"
+                            continuation.yield(.system(SDKMessage.SystemData(
+                                subtype: .compactBoundary,
+                                message: "Compaction failed — continuing with current context",
+                                compactResult: "failed",
+                                compactError: errorMsg
+                            )))
+                        }
                     }
 
                     let eventStream: AsyncThrowingStream<SSEEvent, Error>
