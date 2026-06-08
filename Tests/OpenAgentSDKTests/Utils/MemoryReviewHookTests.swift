@@ -1,7 +1,7 @@
 import XCTest
 @testable import OpenAgentSDK
 
-final class MemoryReviewHookTests: XCTestCase {
+final class MemoryReviewHookTests: TempDirTestCase {
 
     // MARK: - Mock Extractor
 
@@ -23,20 +23,6 @@ final class MemoryReviewHookTests: XCTestCase {
     }
 
     // MARK: - Helpers
-
-    private var tempDir: String!
-
-    override func setUp() {
-        super.setUp()
-        tempDir = NSTemporaryDirectory().appending("MemoryReviewHookTests-\(UUID().uuidString)")
-        try? FileManager.default.createDirectory(atPath: tempDir, withIntermediateDirectories: true)
-    }
-
-    override func tearDown() {
-        try? FileManager.default.removeItem(atPath: tempDir)
-        tempDir = nil
-        super.tearDown()
-    }
 
     private func makeFactStore() -> FactStore {
         FactStore(memoryDir: tempDir)

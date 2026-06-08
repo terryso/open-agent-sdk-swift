@@ -11,24 +11,7 @@ import XCTest
 ///   - Directory detection, image file detection, and pagination are implemented
 ///   - POSIX path resolution against ToolContext.cwd works
 /// TDD Phase: RED (feature not implemented yet)
-final class FileReadToolTests: XCTestCase {
-
-    var tempDir: String!
-
-    override func setUp() {
-        super.setUp()
-        tempDir = NSTemporaryDirectory()
-            .appending("OpenAgentSDKTests-FileRead-\(UUID().uuidString)")
-        try! FileManager.default.createDirectory(
-            atPath: tempDir,
-            withIntermediateDirectories: true
-        )
-    }
-
-    override func tearDown() {
-        try? FileManager.default.removeItem(atPath: tempDir)
-        super.tearDown()
-    }
+final class FileReadToolTests: TempDirTestCase {
 
     // MARK: - Helpers
 
