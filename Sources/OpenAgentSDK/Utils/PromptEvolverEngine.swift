@@ -121,16 +121,7 @@ public struct PromptEvolverEngine: Sendable {
         _ text: String,
         config: PromptEvolutionConfig
     ) -> PromptEvolutionResult {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else {
-            return PromptEvolutionResult.noEvolution()
-        }
-
-        let jsonText = stripCodeFences(trimmed)
-
-        guard let data = jsonText.data(using: .utf8),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-        else {
+        guard let json = parseLLMResponseAsObject(text) else {
             return PromptEvolutionResult.noEvolution()
         }
 

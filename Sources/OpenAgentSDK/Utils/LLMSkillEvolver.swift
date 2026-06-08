@@ -216,17 +216,7 @@ public struct LLMSkillEvolver: SkillEvolver, Sendable {
     }
 
     private func parseEvolutionResponse(_ text: String) -> ParsedEvolution {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        guard !trimmed.isEmpty else {
-            return ParsedEvolution(shouldEvolve: false, evolvedSkill: nil, changes: [])
-        }
-
-        let jsonText = stripCodeFences(trimmed)
-
-        guard let data = jsonText.data(using: .utf8),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-        else {
+        guard let json = parseLLMResponseAsObject(text) else {
             Logger.shared.warn("LLMSkillEvolver", "malformed_json_response", data: [
                 "responsePreview": String(text.prefix(200)),
             ])
