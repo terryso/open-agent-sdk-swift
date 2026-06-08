@@ -7,50 +7,16 @@ import Foundation
 
 final class CustomSystemPromptExampleComplianceTests: XCTestCase {
 
-    // MARK: - Helper: Resolve project root
-
-    /// Walk upward from this test file to find the directory containing Package.swift.
-    private func projectRoot() -> String {
-        let fileManager = FileManager.default
-        let testFileDir = URL(fileURLWithPath: #file).deletingLastPathComponent().path
-        var dir = testFileDir
-        for _ in 0..<10 {
-            let packagePath = dir + "/Package.swift"
-            if fileManager.fileExists(atPath: packagePath) {
-                return dir
-            }
-            let parent = URL(fileURLWithPath: dir).deletingLastPathComponent().path
-            if parent == dir { break }
-            dir = parent
-        }
-        return testFileDir
-    }
-
-    private func examplesDir() -> String {
-        return projectRoot() + "/Examples"
-    }
+    // MARK: - Helpers
 
     private func examplePath() -> String {
-        return examplesDir() + "/CustomSystemPromptExample/main.swift"
-    }
-
-    private func fileContent(_ path: String) -> String? {
-        return try? String(contentsOfFile: path, encoding: .utf8)
-    }
-
-    private func packageSwiftContent() -> String {
-        let path = projectRoot() + "/Package.swift"
-        guard let content = try? String(contentsOfFile: path, encoding: .utf8) else {
-            XCTFail("Package.swift should be readable")
-            return ""
-        }
-        return content
+        return DocumentationTestHelpers.examplesDir() + "/CustomSystemPromptExample/main.swift"
     }
 
     // MARK: - AC5: Package.swift executableTarget Configured
 
     func testPackageSwiftContainsCustomSystemPromptExampleTarget() {
-        let content = packageSwiftContent()
+        let content = DocumentationTestHelpers.packageSwiftContent()
         XCTAssertTrue(
             content.contains("CustomSystemPromptExample"),
             "Package.swift should contain CustomSystemPromptExample executable target"
@@ -58,7 +24,7 @@ final class CustomSystemPromptExampleComplianceTests: XCTestCase {
     }
 
     func testCustomSystemPromptExampleTargetDependsOnOpenAgentSDK() {
-        let content = packageSwiftContent()
+        let content = DocumentationTestHelpers.packageSwiftContent()
         XCTAssertTrue(
             content.contains("CustomSystemPromptExample"),
             "Package.swift should contain CustomSystemPromptExample target before checking dependencies"
@@ -78,7 +44,7 @@ final class CustomSystemPromptExampleComplianceTests: XCTestCase {
     }
 
     func testCustomSystemPromptExampleTargetSpecifiesCorrectPath() {
-        let content = packageSwiftContent()
+        let content = DocumentationTestHelpers.packageSwiftContent()
         XCTAssertTrue(
             content.contains("CustomSystemPromptExample"),
             "Package.swift should contain CustomSystemPromptExample target before checking path"
@@ -103,7 +69,7 @@ final class CustomSystemPromptExampleComplianceTests: XCTestCase {
         let fileManager = FileManager.default
         var isDir: ObjCBool = false
         let exists = fileManager.fileExists(
-            atPath: examplesDir() + "/CustomSystemPromptExample",
+            atPath: DocumentationTestHelpers.examplesDir() + "/CustomSystemPromptExample",
             isDirectory: &isDir
         )
         XCTAssertTrue(exists, "Examples/CustomSystemPromptExample/ directory should exist")
@@ -119,7 +85,7 @@ final class CustomSystemPromptExampleComplianceTests: XCTestCase {
     }
 
     func testCustomSystemPromptExampleImportsOpenAgentSDK() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/CustomSystemPromptExample/main.swift should be readable")
             return
         }
@@ -130,7 +96,7 @@ final class CustomSystemPromptExampleComplianceTests: XCTestCase {
     }
 
     func testCustomSystemPromptExampleImportsFoundation() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/CustomSystemPromptExample/main.swift should be readable")
             return
         }
@@ -141,7 +107,7 @@ final class CustomSystemPromptExampleComplianceTests: XCTestCase {
     }
 
     func testCustomSystemPromptExampleUsesCreateAgent() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/CustomSystemPromptExample/main.swift should be readable")
             return
         }
@@ -152,7 +118,7 @@ final class CustomSystemPromptExampleComplianceTests: XCTestCase {
     }
 
     func testCustomSystemPromptExampleUsesBypassPermissions() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/CustomSystemPromptExample/main.swift should be readable")
             return
         }
@@ -165,7 +131,7 @@ final class CustomSystemPromptExampleComplianceTests: XCTestCase {
     // MARK: - AC2: Uses Blocking API (agent.prompt())
 
     func testCustomSystemPromptExampleUsesBlockingPromptAPI() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/CustomSystemPromptExample/main.swift should be readable")
             return
         }
@@ -176,7 +142,7 @@ final class CustomSystemPromptExampleComplianceTests: XCTestCase {
     }
 
     func testCustomSystemPromptExampleDoesNotUseStreamingAPI() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/CustomSystemPromptExample/main.swift should be readable")
             return
         }
@@ -191,7 +157,7 @@ final class CustomSystemPromptExampleComplianceTests: XCTestCase {
     // MARK: - AC3: Agent Reply Style Matches System Prompt
 
     func testCustomSystemPromptExampleDefinesSpecializedSystemPrompt() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/CustomSystemPromptExample/main.swift should be readable")
             return
         }
@@ -214,7 +180,7 @@ final class CustomSystemPromptExampleComplianceTests: XCTestCase {
     }
 
     func testCustomSystemPromptExampleSystemPromptGuidesFormat() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/CustomSystemPromptExample/main.swift should be readable")
             return
         }
@@ -233,7 +199,7 @@ final class CustomSystemPromptExampleComplianceTests: XCTestCase {
     }
 
     func testCustomSystemPromptExampleDoesNotRegisterTools() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/CustomSystemPromptExample/main.swift should be readable")
             return
         }
@@ -248,7 +214,7 @@ final class CustomSystemPromptExampleComplianceTests: XCTestCase {
     // MARK: - AC4: Demonstrates Complete QueryResult Fields
 
     func testCustomSystemPromptExampleDisplaysResponseText() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/CustomSystemPromptExample/main.swift should be readable")
             return
         }
@@ -260,7 +226,7 @@ final class CustomSystemPromptExampleComplianceTests: XCTestCase {
     }
 
     func testCustomSystemPromptExampleDisplaysStatus() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/CustomSystemPromptExample/main.swift should be readable")
             return
         }
@@ -271,7 +237,7 @@ final class CustomSystemPromptExampleComplianceTests: XCTestCase {
     }
 
     func testCustomSystemPromptExampleDisplaysNumTurns() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/CustomSystemPromptExample/main.swift should be readable")
             return
         }
@@ -282,7 +248,7 @@ final class CustomSystemPromptExampleComplianceTests: XCTestCase {
     }
 
     func testCustomSystemPromptExampleDisplaysDurationMs() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/CustomSystemPromptExample/main.swift should be readable")
             return
         }
@@ -293,7 +259,7 @@ final class CustomSystemPromptExampleComplianceTests: XCTestCase {
     }
 
     func testCustomSystemPromptExampleDisplaysTokenUsage() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/CustomSystemPromptExample/main.swift should be readable")
             return
         }
@@ -308,7 +274,7 @@ final class CustomSystemPromptExampleComplianceTests: XCTestCase {
     }
 
     func testCustomSystemPromptExampleDisplaysCost() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/CustomSystemPromptExample/main.swift should be readable")
             return
         }
@@ -321,7 +287,7 @@ final class CustomSystemPromptExampleComplianceTests: XCTestCase {
     // MARK: - AC6: Uses Actual Public API
 
     func testCustomSystemPromptExampleAgentOptionsUsesRealParameterNames() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/CustomSystemPromptExample/main.swift should be readable")
             return
         }
@@ -344,7 +310,7 @@ final class CustomSystemPromptExampleComplianceTests: XCTestCase {
     }
 
     func testCustomSystemPromptExampleQueryResultMatchesSourceType() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/CustomSystemPromptExample/main.swift should be readable")
             return
         }
@@ -359,7 +325,7 @@ final class CustomSystemPromptExampleComplianceTests: XCTestCase {
     }
 
     func testCustomSystemPromptExampleUsesAwaitForPrompt() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/CustomSystemPromptExample/main.swift should be readable")
             return
         }
@@ -372,7 +338,7 @@ final class CustomSystemPromptExampleComplianceTests: XCTestCase {
     // MARK: - AC7: Clear Comments and No Exposed Keys
 
     func testCustomSystemPromptExampleHasTopLevelDescriptionComment() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/CustomSystemPromptExample/main.swift should be readable")
             return
         }
@@ -384,7 +350,7 @@ final class CustomSystemPromptExampleComplianceTests: XCTestCase {
     }
 
     func testCustomSystemPromptExampleHasMultipleInlineComments() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/CustomSystemPromptExample/main.swift should be readable")
             return
         }
@@ -398,7 +364,7 @@ final class CustomSystemPromptExampleComplianceTests: XCTestCase {
     }
 
     func testCustomSystemPromptExampleDoesNotExposeRealAPIKeys() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/CustomSystemPromptExample/main.swift should be readable")
             return
         }
@@ -422,7 +388,7 @@ final class CustomSystemPromptExampleComplianceTests: XCTestCase {
     }
 
     func testCustomSystemPromptExampleUsesPlaceholderOrEnvVarForAPIKey() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/CustomSystemPromptExample/main.swift should be readable")
             return
         }
@@ -438,7 +404,7 @@ final class CustomSystemPromptExampleComplianceTests: XCTestCase {
     }
 
     func testCustomSystemPromptExampleDoesNotUseForceUnwrap() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/CustomSystemPromptExample/main.swift should be readable")
             return
         }

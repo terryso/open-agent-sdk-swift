@@ -7,50 +7,16 @@ import Foundation
 
 final class OpenAICompatExampleComplianceTests: XCTestCase {
 
-    // MARK: - Helper: Resolve project root
-
-    /// Walk upward from this test file to find the directory containing Package.swift.
-    private func projectRoot() -> String {
-        let fileManager = FileManager.default
-        let testFileDir = URL(fileURLWithPath: #file).deletingLastPathComponent().path
-        var dir = testFileDir
-        for _ in 0..<10 {
-            let packagePath = dir + "/Package.swift"
-            if fileManager.fileExists(atPath: packagePath) {
-                return dir
-            }
-            let parent = URL(fileURLWithPath: dir).deletingLastPathComponent().path
-            if parent == dir { break }
-            dir = parent
-        }
-        return testFileDir
-    }
-
-    private func examplesDir() -> String {
-        return projectRoot() + "/Examples"
-    }
+    // MARK: - Helpers
 
     private func examplePath() -> String {
-        return examplesDir() + "/OpenAICompatExample/main.swift"
-    }
-
-    private func fileContent(_ path: String) -> String? {
-        return try? String(contentsOfFile: path, encoding: .utf8)
-    }
-
-    private func packageSwiftContent() -> String {
-        let path = projectRoot() + "/Package.swift"
-        guard let content = try? String(contentsOfFile: path, encoding: .utf8) else {
-            XCTFail("Package.swift should be readable")
-            return ""
-        }
-        return content
+        return DocumentationTestHelpers.examplesDir() + "/OpenAICompatExample/main.swift"
     }
 
     // MARK: - AC7: Package.swift executableTarget Configured
 
     func testPackageSwiftContainsOpenAICompatExampleTarget() {
-        let content = packageSwiftContent()
+        let content = DocumentationTestHelpers.packageSwiftContent()
         XCTAssertTrue(
             content.contains("OpenAICompatExample"),
             "Package.swift should contain OpenAICompatExample executable target"
@@ -58,7 +24,7 @@ final class OpenAICompatExampleComplianceTests: XCTestCase {
     }
 
     func testOpenAICompatExampleTargetDependsOnOpenAgentSDK() {
-        let content = packageSwiftContent()
+        let content = DocumentationTestHelpers.packageSwiftContent()
         XCTAssertTrue(
             content.contains("OpenAICompatExample"),
             "Package.swift should contain OpenAICompatExample target before checking dependencies"
@@ -78,7 +44,7 @@ final class OpenAICompatExampleComplianceTests: XCTestCase {
     }
 
     func testOpenAICompatExampleTargetSpecifiesCorrectPath() {
-        let content = packageSwiftContent()
+        let content = DocumentationTestHelpers.packageSwiftContent()
         XCTAssertTrue(
             content.contains("OpenAICompatExample"),
             "Package.swift should contain OpenAICompatExample target before checking path"
@@ -103,7 +69,7 @@ final class OpenAICompatExampleComplianceTests: XCTestCase {
         let fileManager = FileManager.default
         var isDir: ObjCBool = false
         let exists = fileManager.fileExists(
-            atPath: examplesDir() + "/OpenAICompatExample",
+            atPath: DocumentationTestHelpers.examplesDir() + "/OpenAICompatExample",
             isDirectory: &isDir
         )
         XCTAssertTrue(exists, "Examples/OpenAICompatExample/ directory should exist")
@@ -119,7 +85,7 @@ final class OpenAICompatExampleComplianceTests: XCTestCase {
     }
 
     func testOpenAICompatExampleImportsOpenAgentSDK() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
             return
         }
@@ -130,7 +96,7 @@ final class OpenAICompatExampleComplianceTests: XCTestCase {
     }
 
     func testOpenAICompatExampleImportsFoundation() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
             return
         }
@@ -143,7 +109,7 @@ final class OpenAICompatExampleComplianceTests: XCTestCase {
     // MARK: - AC1: Code Quality
 
     func testOpenAICompatExampleHasTopLevelDescriptionComment() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
             return
         }
@@ -155,7 +121,7 @@ final class OpenAICompatExampleComplianceTests: XCTestCase {
     }
 
     func testOpenAICompatExampleHasMultipleInlineComments() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
             return
         }
@@ -169,7 +135,7 @@ final class OpenAICompatExampleComplianceTests: XCTestCase {
     }
 
     func testOpenAICompatExampleHasMarkSections() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
             return
         }
@@ -181,7 +147,7 @@ final class OpenAICompatExampleComplianceTests: XCTestCase {
     }
 
     func testOpenAICompatExampleDoesNotUseForceUnwrap() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
             return
         }
@@ -198,7 +164,7 @@ final class OpenAICompatExampleComplianceTests: XCTestCase {
     }
 
     func testOpenAICompatExampleDoesNotExposeRealAPIKeys() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
             return
         }
@@ -209,7 +175,7 @@ final class OpenAICompatExampleComplianceTests: XCTestCase {
     }
 
     func testOpenAICompatExampleUsesLoadDotEnvPattern() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
             return
         }
@@ -220,7 +186,7 @@ final class OpenAICompatExampleComplianceTests: XCTestCase {
     }
 
     func testOpenAICompatExampleUsesGetEnvPattern() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
             return
         }
@@ -231,7 +197,7 @@ final class OpenAICompatExampleComplianceTests: XCTestCase {
     }
 
     func testOpenAICompatExampleUsesAssertions() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
             return
         }
@@ -244,7 +210,7 @@ final class OpenAICompatExampleComplianceTests: XCTestCase {
     // MARK: - AC2: OpenAI Provider Configuration
 
     func testOpenAICompatExampleUsesOpenAIProvider() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
             return
         }
@@ -255,7 +221,7 @@ final class OpenAICompatExampleComplianceTests: XCTestCase {
     }
 
     func testOpenAICompatExampleConfiguresBaseURL() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
             return
         }
@@ -266,7 +232,7 @@ final class OpenAICompatExampleComplianceTests: XCTestCase {
     }
 
     func testOpenAICompatExampleUsesCodeAnyEnvVars() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
             return
         }
@@ -281,7 +247,7 @@ final class OpenAICompatExampleComplianceTests: XCTestCase {
     }
 
     func testOpenAICompatExampleDetectsUseOpenAIFlag() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
             return
         }
@@ -294,7 +260,7 @@ final class OpenAICompatExampleComplianceTests: XCTestCase {
     // MARK: - AC3: Prompt with OpenAI Provider
 
     func testOpenAICompatExampleUsesCreateAgent() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
             return
         }
@@ -305,7 +271,7 @@ final class OpenAICompatExampleComplianceTests: XCTestCase {
     }
 
     func testOpenAICompatExampleUsesBypassPermissions() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
             return
         }
@@ -316,7 +282,7 @@ final class OpenAICompatExampleComplianceTests: XCTestCase {
     }
 
     func testOpenAICompatExampleUsesPrompt() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
             return
         }
@@ -327,7 +293,7 @@ final class OpenAICompatExampleComplianceTests: XCTestCase {
     }
 
     func testOpenAICompatExampleUsesAwait() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
             return
         }
@@ -338,7 +304,7 @@ final class OpenAICompatExampleComplianceTests: XCTestCase {
     }
 
     func testOpenAICompatExamplePrintsResponseText() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
             return
         }
@@ -349,7 +315,7 @@ final class OpenAICompatExampleComplianceTests: XCTestCase {
     }
 
     func testOpenAICompatExamplePrintsUsageStats() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
             return
         }
@@ -366,7 +332,7 @@ final class OpenAICompatExampleComplianceTests: XCTestCase {
     // MARK: - AC4: Streaming with OpenAI Provider
 
     func testOpenAICompatExampleUsesStream() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
             return
         }
@@ -377,7 +343,7 @@ final class OpenAICompatExampleComplianceTests: XCTestCase {
     }
 
     func testOpenAICompatExampleCollectsSDKMessageEvents() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
             return
         }
@@ -391,7 +357,7 @@ final class OpenAICompatExampleComplianceTests: XCTestCase {
     }
 
     func testOpenAICompatExampleHandlesPartialMessage() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
             return
         }
@@ -402,7 +368,7 @@ final class OpenAICompatExampleComplianceTests: XCTestCase {
     }
 
     func testOpenAICompatExampleHandlesResultCase() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
             return
         }
@@ -413,7 +379,7 @@ final class OpenAICompatExampleComplianceTests: XCTestCase {
     }
 
     func testOpenAICompatExampleAssertsStreamingResponseNonEmpty() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
             return
         }
@@ -433,7 +399,7 @@ final class OpenAICompatExampleComplianceTests: XCTestCase {
     // MARK: - AC5: Tool Use with OpenAI Provider
 
     func testOpenAICompatExampleUsesDefineTool() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
             return
         }
@@ -444,7 +410,7 @@ final class OpenAICompatExampleComplianceTests: XCTestCase {
     }
 
     func testOpenAICompatExampleDefinesCodableInputStruct() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
             return
         }
@@ -456,7 +422,7 @@ final class OpenAICompatExampleComplianceTests: XCTestCase {
     }
 
     func testOpenAICompatExampleDefinesInputSchema() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
             return
         }
@@ -467,7 +433,7 @@ final class OpenAICompatExampleComplianceTests: XCTestCase {
     }
 
     func testOpenAICompatExampleCreatesAgentWithTools() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
             return
         }
@@ -478,7 +444,7 @@ final class OpenAICompatExampleComplianceTests: XCTestCase {
     }
 
     func testOpenAICompatExampleTriggersToolCall() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
             return
         }
@@ -493,7 +459,7 @@ final class OpenAICompatExampleComplianceTests: XCTestCase {
     // MARK: - AC6: Provider Comparison
 
     func testOpenAICompatExampleShowsAnthropicProviderConfig() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
             return
         }
@@ -504,7 +470,7 @@ final class OpenAICompatExampleComplianceTests: XCTestCase {
     }
 
     func testOpenAICompatExampleShowsBothProviderOptions() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
             return
         }
@@ -518,7 +484,7 @@ final class OpenAICompatExampleComplianceTests: XCTestCase {
     // MARK: - AC1: Structure Validation
 
     func testOpenAICompatExampleHasFourParts() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
             return
         }
@@ -532,7 +498,7 @@ final class OpenAICompatExampleComplianceTests: XCTestCase {
     }
 
     func testOpenAICompatExampleUsesAgentOptions() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
             return
         }

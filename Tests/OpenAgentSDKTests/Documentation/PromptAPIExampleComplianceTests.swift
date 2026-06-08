@@ -7,50 +7,16 @@ import Foundation
 
 final class PromptAPIExampleComplianceTests: XCTestCase {
 
-    // MARK: - Helper: Resolve project root
-
-    /// Walk upward from this test file to find the directory containing Package.swift.
-    private func projectRoot() -> String {
-        let fileManager = FileManager.default
-        let testFileDir = URL(fileURLWithPath: #file).deletingLastPathComponent().path
-        var dir = testFileDir
-        for _ in 0..<10 {
-            let packagePath = dir + "/Package.swift"
-            if fileManager.fileExists(atPath: packagePath) {
-                return dir
-            }
-            let parent = URL(fileURLWithPath: dir).deletingLastPathComponent().path
-            if parent == dir { break }
-            dir = parent
-        }
-        return testFileDir
-    }
-
-    private func examplesDir() -> String {
-        return projectRoot() + "/Examples"
-    }
+    // MARK: - Helpers
 
     private func examplePath() -> String {
-        return examplesDir() + "/PromptAPIExample/main.swift"
-    }
-
-    private func fileContent(_ path: String) -> String? {
-        return try? String(contentsOfFile: path, encoding: .utf8)
-    }
-
-    private func packageSwiftContent() -> String {
-        let path = projectRoot() + "/Package.swift"
-        guard let content = try? String(contentsOfFile: path, encoding: .utf8) else {
-            XCTFail("Package.swift should be readable")
-            return ""
-        }
-        return content
+        return DocumentationTestHelpers.examplesDir() + "/PromptAPIExample/main.swift"
     }
 
     // MARK: - AC5: Package.swift executableTarget Configured
 
     func testPackageSwiftContainsPromptAPIExampleTarget() {
-        let content = packageSwiftContent()
+        let content = DocumentationTestHelpers.packageSwiftContent()
         XCTAssertTrue(
             content.contains("PromptAPIExample"),
             "Package.swift should contain PromptAPIExample executable target"
@@ -58,7 +24,7 @@ final class PromptAPIExampleComplianceTests: XCTestCase {
     }
 
     func testPromptAPIExampleTargetDependsOnOpenAgentSDK() {
-        let content = packageSwiftContent()
+        let content = DocumentationTestHelpers.packageSwiftContent()
         XCTAssertTrue(
             content.contains("PromptAPIExample"),
             "Package.swift should contain PromptAPIExample target before checking dependencies"
@@ -78,7 +44,7 @@ final class PromptAPIExampleComplianceTests: XCTestCase {
     }
 
     func testPromptAPIExampleTargetSpecifiesCorrectPath() {
-        let content = packageSwiftContent()
+        let content = DocumentationTestHelpers.packageSwiftContent()
         XCTAssertTrue(
             content.contains("PromptAPIExample"),
             "Package.swift should contain PromptAPIExample target before checking path"
@@ -103,7 +69,7 @@ final class PromptAPIExampleComplianceTests: XCTestCase {
         let fileManager = FileManager.default
         var isDir: ObjCBool = false
         let exists = fileManager.fileExists(
-            atPath: examplesDir() + "/PromptAPIExample",
+            atPath: DocumentationTestHelpers.examplesDir() + "/PromptAPIExample",
             isDirectory: &isDir
         )
         XCTAssertTrue(exists, "Examples/PromptAPIExample/ directory should exist")
@@ -119,7 +85,7 @@ final class PromptAPIExampleComplianceTests: XCTestCase {
     }
 
     func testPromptAPIExampleImportsOpenAgentSDK() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/PromptAPIExample/main.swift should be readable")
             return
         }
@@ -130,7 +96,7 @@ final class PromptAPIExampleComplianceTests: XCTestCase {
     }
 
     func testPromptAPIExampleImportsFoundation() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/PromptAPIExample/main.swift should be readable")
             return
         }
@@ -141,7 +107,7 @@ final class PromptAPIExampleComplianceTests: XCTestCase {
     }
 
     func testPromptAPIExampleUsesCreateAgent() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/PromptAPIExample/main.swift should be readable")
             return
         }
@@ -152,7 +118,7 @@ final class PromptAPIExampleComplianceTests: XCTestCase {
     }
 
     func testPromptAPIExampleUsesBypassPermissions() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/PromptAPIExample/main.swift should be readable")
             return
         }
@@ -165,7 +131,7 @@ final class PromptAPIExampleComplianceTests: XCTestCase {
     // MARK: - AC2: Uses Blocking agent.prompt() API
 
     func testPromptAPIExampleUsesBlockingPromptAPI() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/PromptAPIExample/main.swift should be readable")
             return
         }
@@ -176,7 +142,7 @@ final class PromptAPIExampleComplianceTests: XCTestCase {
     }
 
     func testPromptAPIExampleDoesNotUseStreamingAPI() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/PromptAPIExample/main.swift should be readable")
             return
         }
@@ -191,7 +157,7 @@ final class PromptAPIExampleComplianceTests: XCTestCase {
     // MARK: - AC3: Displays Complete QueryResult Fields
 
     func testPromptAPIExampleDisplaysResponseText() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/PromptAPIExample/main.swift should be readable")
             return
         }
@@ -202,7 +168,7 @@ final class PromptAPIExampleComplianceTests: XCTestCase {
     }
 
     func testPromptAPIExampleDisplaysStatus() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/PromptAPIExample/main.swift should be readable")
             return
         }
@@ -213,7 +179,7 @@ final class PromptAPIExampleComplianceTests: XCTestCase {
     }
 
     func testPromptAPIExampleDisplaysNumTurns() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/PromptAPIExample/main.swift should be readable")
             return
         }
@@ -224,7 +190,7 @@ final class PromptAPIExampleComplianceTests: XCTestCase {
     }
 
     func testPromptAPIExampleDisplaysDurationMs() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/PromptAPIExample/main.swift should be readable")
             return
         }
@@ -235,7 +201,7 @@ final class PromptAPIExampleComplianceTests: XCTestCase {
     }
 
     func testPromptAPIExampleDisplaysTokenUsage() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/PromptAPIExample/main.swift should be readable")
             return
         }
@@ -250,7 +216,7 @@ final class PromptAPIExampleComplianceTests: XCTestCase {
     }
 
     func testPromptAPIExampleDisplaysCost() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/PromptAPIExample/main.swift should be readable")
             return
         }
@@ -263,7 +229,7 @@ final class PromptAPIExampleComplianceTests: XCTestCase {
     // MARK: - AC4: Registers Core Tools for Agent Tool Execution
 
     func testPromptAPIExampleRegistersCoreTools() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/PromptAPIExample/main.swift should be readable")
             return
         }
@@ -274,7 +240,7 @@ final class PromptAPIExampleComplianceTests: XCTestCase {
     }
 
     func testPromptAPIExamplePassesToolsToAgentOptions() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/PromptAPIExample/main.swift should be readable")
             return
         }
@@ -287,7 +253,7 @@ final class PromptAPIExampleComplianceTests: XCTestCase {
     }
 
     func testPromptAPIExampleDefinesSystemPrompt() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/PromptAPIExample/main.swift should be readable")
             return
         }
@@ -300,7 +266,7 @@ final class PromptAPIExampleComplianceTests: XCTestCase {
     // MARK: - AC6: Uses Actual Public API Signatures
 
     func testPromptAPIExampleAgentOptionsUsesRealParameterNames() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/PromptAPIExample/main.swift should be readable")
             return
         }
@@ -323,7 +289,7 @@ final class PromptAPIExampleComplianceTests: XCTestCase {
     }
 
     func testPromptAPIExampleQueryResultMatchesSourceType() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/PromptAPIExample/main.swift should be readable")
             return
         }
@@ -338,7 +304,7 @@ final class PromptAPIExampleComplianceTests: XCTestCase {
     }
 
     func testPromptAPIExampleUsesAwaitForPrompt() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/PromptAPIExample/main.swift should be readable")
             return
         }
@@ -349,7 +315,7 @@ final class PromptAPIExampleComplianceTests: XCTestCase {
     }
 
     func testPromptAPIExampleUsesCreateAgentWithOptions() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/PromptAPIExample/main.swift should be readable")
             return
         }
@@ -362,7 +328,7 @@ final class PromptAPIExampleComplianceTests: XCTestCase {
     // MARK: - AC7: Clear Comments and No Exposed Keys
 
     func testPromptAPIExampleHasTopLevelDescriptionComment() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/PromptAPIExample/main.swift should be readable")
             return
         }
@@ -374,7 +340,7 @@ final class PromptAPIExampleComplianceTests: XCTestCase {
     }
 
     func testPromptAPIExampleHasMultipleInlineComments() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/PromptAPIExample/main.swift should be readable")
             return
         }
@@ -388,7 +354,7 @@ final class PromptAPIExampleComplianceTests: XCTestCase {
     }
 
     func testPromptAPIExampleDoesNotExposeRealAPIKeys() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/PromptAPIExample/main.swift should be readable")
             return
         }
@@ -412,7 +378,7 @@ final class PromptAPIExampleComplianceTests: XCTestCase {
     }
 
     func testPromptAPIExampleUsesPlaceholderOrEnvVarForAPIKey() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/PromptAPIExample/main.swift should be readable")
             return
         }
@@ -428,7 +394,7 @@ final class PromptAPIExampleComplianceTests: XCTestCase {
     }
 
     func testPromptAPIExampleDoesNotUseForceUnwrap() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/PromptAPIExample/main.swift should be readable")
             return
         }
