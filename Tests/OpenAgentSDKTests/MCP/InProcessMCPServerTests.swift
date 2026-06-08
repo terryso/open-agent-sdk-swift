@@ -15,14 +15,6 @@ final class InProcessMCPServerTests: XCTestCase {
 
     // MARK: - Helpers
 
-    /// Creates a basic ToolContext with just cwd (no stores needed for MCP tests).
-    private func makeContext(toolUseId: String = "test-tool-use-id") -> ToolContext {
-        return ToolContext(
-            cwd: "/tmp",
-            toolUseId: toolUseId
-        )
-    }
-
     /// Creates a simple mock tool for testing.
     private func makeMockTool(
         name: String = "test_tool",

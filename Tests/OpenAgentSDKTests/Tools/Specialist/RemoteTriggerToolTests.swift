@@ -12,16 +12,6 @@ import XCTest
 /// TDD Phase: RED (feature not implemented yet)
 final class RemoteTriggerToolTests: XCTestCase {
 
-    // MARK: - Helpers
-
-    /// Creates a basic ToolContext with just cwd (no stores needed for RemoteTrigger tool).
-    private func makeContext() -> ToolContext {
-        return ToolContext(
-            cwd: "/tmp",
-            toolUseId: "test-tool-use-id"
-        )
-    }
-
     // MARK: - AC10: RemoteTriggerTool Registration
 
     /// AC10 [P0]: createRemoteTriggerTool() returns a ToolProtocol with name "RemoteTrigger".
@@ -146,7 +136,7 @@ final class RemoteTriggerToolTests: XCTestCase {
     /// AC11 [P0]: RemoteTrigger list action returns stub message.
     func testRemoteTrigger_list_returnsStubMessage() async throws {
         let tool = createRemoteTriggerTool()
-        let context = makeContext()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = ["action": "list"]
         let result = await tool.call(input: input, context: context)
@@ -165,7 +155,7 @@ final class RemoteTriggerToolTests: XCTestCase {
     /// AC11 [P0]: RemoteTrigger get action returns stub message.
     func testRemoteTrigger_get_returnsStubMessage() async throws {
         let tool = createRemoteTriggerTool()
-        let context = makeContext()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = ["action": "get", "id": "trigger-1"]
         let result = await tool.call(input: input, context: context)
@@ -180,7 +170,7 @@ final class RemoteTriggerToolTests: XCTestCase {
     /// AC11 [P0]: RemoteTrigger create action returns stub message.
     func testRemoteTrigger_create_returnsStubMessage() async throws {
         let tool = createRemoteTriggerTool()
-        let context = makeContext()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = [
             "action": "create",
@@ -200,7 +190,7 @@ final class RemoteTriggerToolTests: XCTestCase {
     /// AC11 [P0]: RemoteTrigger update action returns stub message.
     func testRemoteTrigger_update_returnsStubMessage() async throws {
         let tool = createRemoteTriggerTool()
-        let context = makeContext()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = [
             "action": "update",
@@ -219,7 +209,7 @@ final class RemoteTriggerToolTests: XCTestCase {
     /// AC11 [P0]: RemoteTrigger run action returns stub message.
     func testRemoteTrigger_run_returnsStubMessage() async throws {
         let tool = createRemoteTriggerTool()
-        let context = makeContext()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = ["action": "run", "id": "trigger-1"]
         let result = await tool.call(input: input, context: context)
@@ -234,7 +224,7 @@ final class RemoteTriggerToolTests: XCTestCase {
     /// AC11 [P0]: All stub messages mention CronCreate/CronList/CronDelete alternatives.
     func testRemoteTrigger_stubMentionsCronAlternatives() async throws {
         let tool = createRemoteTriggerTool()
-        let context = makeContext()
+        let context = makeTestToolContext()
 
         let actions = ["list", "get", "create", "update", "run"]
         for action in actions {
@@ -253,7 +243,7 @@ final class RemoteTriggerToolTests: XCTestCase {
     /// AC15 [P0]: RemoteTrigger tool never throws -- always returns ToolResult even with malformed input.
     func testRemoteTriggerTool_neverThrows_malformedInput() async throws {
         let tool = createRemoteTriggerTool()
-        let context = makeContext()
+        let context = makeTestToolContext()
 
         let badInputs: [[String: Any]] = [
             [:],                              // empty dict (missing action)

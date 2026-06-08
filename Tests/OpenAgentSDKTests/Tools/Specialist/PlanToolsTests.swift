@@ -24,14 +24,6 @@ final class PlanToolsTests: XCTestCase {
         )
     }
 
-    /// Creates a ToolContext without any PlanStore (nil).
-    private func makeTestToolContext() -> ToolContext {
-        return ToolContext(
-            cwd: "/tmp",
-            toolUseId: "test-tool-use-id"
-        )
-    }
-
     // MARK: - AC2: EnterPlanMode Tool -- Factory
 
     /// AC2 [P0]: createEnterPlanModeTool() returns a ToolProtocol with name "EnterPlanMode".

@@ -15,11 +15,6 @@ final class CompatToolSystemTests: XCTestCase {
 
     // MARK: - Helpers
 
-    /// Standard ToolContext for testing (no external dependencies).
-    private func makeContext(toolUseId: String = "compat-test-tu") -> ToolContext {
-        ToolContext(cwd: "/tmp", toolUseId: toolUseId)
-    }
-
     /// Extracts the "properties" dictionary from a tool's inputSchema.
     private func extractProperties(from tool: ToolProtocol) -> [String: Any]? {
         let schema = tool.inputSchema
@@ -63,7 +58,7 @@ final class CompatToolSystemTests: XCTestCase {
         XCTAssertTrue(tool.isReadOnly)
 
         // And: tool execution decodes input and returns String
-        let result = await tool.call(input: ["name": "World"], context: makeContext())
+        let result = await tool.call(input: ["name": "World"], context: makeTestToolContext())
         XCTAssertFalse(result.isError)
         XCTAssertEqual(result.content, "Hello, World!")
     }
@@ -99,7 +94,7 @@ final class CompatToolSystemTests: XCTestCase {
         // Then: success path returns content with isError=false
         let successResult = await tool.call(
             input: ["numerator": 10, "denominator": 2],
-            context: makeContext()
+            context: makeTestToolContext()
         )
         XCTAssertFalse(successResult.isError)
         XCTAssertEqual(successResult.content, "5.0")
@@ -107,7 +102,7 @@ final class CompatToolSystemTests: XCTestCase {
         // And: error path returns content with isError=true
         let errorResult = await tool.call(
             input: ["numerator": 10, "denominator": 0],
-            context: makeContext()
+            context: makeTestToolContext()
         )
         XCTAssertTrue(errorResult.isError)
         XCTAssertTrue(errorResult.content.contains("division by zero"))
@@ -127,7 +122,7 @@ final class CompatToolSystemTests: XCTestCase {
         }
 
         // Then: tool produces valid result without input
-        let result = await tool.call(input: [:], context: makeContext())
+        let result = await tool.call(input: [:], context: makeTestToolContext())
         XCTAssertFalse(result.isError)
         XCTAssertEqual(result.content, "OK")
     }
@@ -157,7 +152,7 @@ final class CompatToolSystemTests: XCTestCase {
         // Then: raw dictionary is passed directly to closure
         let result = await tool.call(
             input: ["key": "timeout", "value": 30],
-            context: makeContext()
+            context: makeTestToolContext()
         )
         XCTAssertFalse(result.isError)
         XCTAssertEqual(result.content, "Set timeout")
@@ -210,7 +205,7 @@ final class CompatToolSystemTests: XCTestCase {
 
         // And: all can be called successfully
         for tool in tools {
-            let result = await tool.call(input: ["x": 1], context: makeContext())
+            let result = await tool.call(input: ["x": 1], context: makeTestToolContext())
             XCTAssertFalse(result.isError, "Tool \(tool.name) should execute without error")
         }
     }
@@ -818,7 +813,7 @@ final class CompatToolSystemTests: XCTestCase {
         }
 
         // When: closure throws
-        let result = await tool.call(input: ["x": -1], context: makeContext())
+        let result = await tool.call(input: ["x": -1], context: makeTestToolContext())
 
         // Then: error is captured as isError=true
         XCTAssertTrue(result.isError, "Thrown error should result in isError=true")
