@@ -298,45 +298,26 @@ public enum AgentSSEEvent: Equatable, Sendable {
 /// Codable wrapper for persisting SSEEvent to JSONL.
 struct PersistedSSEEvent: Codable, Equatable, Sendable {
     let eventType: String
-    let stepStarted: StepStartedData?
-    let stepCompleted: StepCompletedData?
-    let runStarted: RunStartedData?
-    let runCompleted: RunCompletedData?
-    let costUpdate: CostUpdateData?
+    var stepStarted: StepStartedData?
+    var stepCompleted: StepCompletedData?
+    var runStarted: RunStartedData?
+    var runCompleted: RunCompletedData?
+    var costUpdate: CostUpdateData?
 
     init(from event: AgentSSEEvent) {
         self.eventType = event.eventType
+        self.stepStarted = nil
+        self.stepCompleted = nil
+        self.runStarted = nil
+        self.runCompleted = nil
+        self.costUpdate = nil
+
         switch event {
-        case .stepStarted(let data):
-            self.stepStarted = data
-            self.stepCompleted = nil
-            self.runStarted = nil
-            self.runCompleted = nil
-            self.costUpdate = nil
-        case .stepCompleted(let data):
-            self.stepStarted = nil
-            self.stepCompleted = data
-            self.runStarted = nil
-            self.runCompleted = nil
-            self.costUpdate = nil
-        case .runStarted(let data):
-            self.stepStarted = nil
-            self.stepCompleted = nil
-            self.runStarted = data
-            self.runCompleted = nil
-            self.costUpdate = nil
-        case .runCompleted(let data):
-            self.stepStarted = nil
-            self.stepCompleted = nil
-            self.runStarted = nil
-            self.runCompleted = data
-            self.costUpdate = nil
-        case .costUpdate(let data):
-            self.stepStarted = nil
-            self.stepCompleted = nil
-            self.runStarted = nil
-            self.runCompleted = nil
-            self.costUpdate = data
+        case .stepStarted(let data): self.stepStarted = data
+        case .stepCompleted(let data): self.stepCompleted = data
+        case .runStarted(let data): self.runStarted = data
+        case .runCompleted(let data): self.runCompleted = data
+        case .costUpdate(let data): self.costUpdate = data
         }
     }
 
