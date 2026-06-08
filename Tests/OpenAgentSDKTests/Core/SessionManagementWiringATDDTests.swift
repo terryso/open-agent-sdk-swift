@@ -198,20 +198,14 @@ extension XCTestCase {
 /// Tests for Story 17-7 AC1: continueRecentSession wiring in Agent runtime.
 /// When continueRecentSession is true and sessionStore is set (but sessionId is nil/empty),
 /// the Agent resolves the most recent session from SessionStore.list().
-final class ContinueRecentSessionWiringTests: XCTestCase {
-
-    private var tempDir: String!
+final class ContinueRecentSessionWiringTests: TempDirTestCase {
 
     override func setUp() {
         super.setUp()
         SessionWiringMockURLProtocol.reset()
-        tempDir = (NSTemporaryDirectory() as NSString)
-            .appendingPathComponent("continue-recent-wiring-\(UUID().uuidString)")
-        try? FileManager.default.createDirectory(atPath: tempDir, withIntermediateDirectories: true)
     }
 
     override func tearDown() {
-        if let tempDir { try? FileManager.default.removeItem(atPath: tempDir) }
         SessionWiringMockURLProtocol.reset()
         super.tearDown()
     }
@@ -393,20 +387,14 @@ final class ContinueRecentSessionWiringTests: XCTestCase {
 /// Tests for Story 17-7 AC2: forkSession wiring in Agent runtime.
 /// When forkSession=true and sessionStore+sessionId are configured,
 /// the Agent forks the session before restoring history.
-final class ForkSessionWiringTests: XCTestCase {
-
-    private var tempDir: String!
+final class ForkSessionWiringTests: TempDirTestCase {
 
     override func setUp() {
         super.setUp()
         SessionWiringMockURLProtocol.reset()
-        tempDir = (NSTemporaryDirectory() as NSString)
-            .appendingPathComponent("fork-wiring-\(UUID().uuidString)")
-        try? FileManager.default.createDirectory(atPath: tempDir, withIntermediateDirectories: true)
     }
 
     override func tearDown() {
-        if let tempDir { try? FileManager.default.removeItem(atPath: tempDir) }
         SessionWiringMockURLProtocol.reset()
         super.tearDown()
     }
@@ -507,20 +495,14 @@ final class ForkSessionWiringTests: XCTestCase {
 
 /// Tests for Story 17-7 AC3: resumeSessionAt wiring in Agent runtime.
 /// When resumeSessionAt is set to a message UUID, the Agent truncates history at that point.
-final class ResumeSessionAtWiringTests: XCTestCase {
-
-    private var tempDir: String!
+final class ResumeSessionAtWiringTests: TempDirTestCase {
 
     override func setUp() {
         super.setUp()
         SessionWiringMockURLProtocol.reset()
-        tempDir = (NSTemporaryDirectory() as NSString)
-            .appendingPathComponent("resume-at-wiring-\(UUID().uuidString)")
-        try? FileManager.default.createDirectory(atPath: tempDir, withIntermediateDirectories: true)
     }
 
     override func tearDown() {
-        if let tempDir { try? FileManager.default.removeItem(atPath: tempDir) }
         SessionWiringMockURLProtocol.reset()
         super.tearDown()
     }
