@@ -244,19 +244,7 @@ public actor MCPClientManager {
         await withTaskGroup(of: Void.self) { group in
             for (name, config) in servers {
                 group.addTask {
-                    switch config {
-                    case .stdio(let stdioConfig):
-                        await self.connect(name: name, config: stdioConfig)
-                    case .sse(let sseConfig):
-                        await self.connect(name: name, config: sseConfig, streaming: true)
-                    case .http(let httpConfig):
-                        await self.connect(name: name, config: httpConfig, streaming: false)
-                    case .sdk:
-                        // SDK servers are handled directly by Agent, not via MCPClientManager
-                        break
-                    case .claudeAIProxy(let proxyConfig):
-                        await self.connectClaudeAIProxy(name: name, config: proxyConfig)
-                    }
+                    await self.connectUsingConfig(name: name, config: config)
                 }
             }
         }
@@ -366,18 +354,7 @@ public actor MCPClientManager {
         disabledServers.remove(name)
 
         // Reconnect using stored config
-        switch config {
-        case .stdio(let stdioConfig):
-            await connect(name: name, config: stdioConfig)
-        case .sse(let sseConfig):
-            await connect(name: name, config: sseConfig, streaming: true)
-        case .http(let httpConfig):
-            await connect(name: name, config: httpConfig, streaming: false)
-        case .sdk:
-            break
-        case .claudeAIProxy(let proxyConfig):
-            await connectClaudeAIProxy(name: name, config: proxyConfig)
-        }
+        await connectUsingConfig(name: name, config: config)
     }
 
     /// Enables or disables a specific MCP server.
@@ -430,10 +407,7 @@ public actor MCPClientManager {
 
         // Remove servers no longer in the new set
         for name in removedNames {
-            await cleanupConnection(name: name)
-            connections.removeValue(forKey: name)
-            originalConfigs.removeValue(forKey: name)
-            disabledServers.remove(name)
+            await fullyRemoveServer(name: name)
         }
 
         // Detect changed configs (same name, different config)
@@ -443,10 +417,7 @@ public actor MCPClientManager {
 
         // Treat changed servers as remove + add
         for name in changedNames {
-            await cleanupConnection(name: name)
-            connections.removeValue(forKey: name)
-            originalConfigs.removeValue(forKey: name)
-            disabledServers.remove(name)
+            await fullyRemoveServer(name: name)
         }
 
         let effectiveAdded = addedNames.union(changedNames)
@@ -456,18 +427,7 @@ public actor MCPClientManager {
             guard let config = servers[name] else { continue }
             originalConfigs[name] = config
 
-            switch config {
-            case .stdio(let stdioConfig):
-                await connect(name: name, config: stdioConfig)
-            case .sse(let sseConfig):
-                await connect(name: name, config: sseConfig, streaming: true)
-            case .http(let httpConfig):
-                await connect(name: name, config: httpConfig, streaming: false)
-            case .sdk:
-                break
-            case .claudeAIProxy(let proxyConfig):
-                await connectClaudeAIProxy(name: name, config: proxyConfig)
-            }
+            await connectUsingConfig(name: name, config: config)
 
             // Check if connection failed
             if let connection = connections[name], connection.status == .error {
@@ -505,6 +465,34 @@ public actor MCPClientManager {
     }
 
     // MARK: - Private Helpers
+
+    /// Dispatches to the appropriate connect method based on the server config type.
+    ///
+    /// Centralizes the `McpServerConfig` switch that was duplicated across
+    /// `connectAll`, `reconnect`, and `setServers`.
+    private func connectUsingConfig(name: String, config: McpServerConfig) async {
+        switch config {
+        case .stdio(let stdioConfig):
+            await connect(name: name, config: stdioConfig)
+        case .sse(let sseConfig):
+            await connect(name: name, config: sseConfig, streaming: true)
+        case .http(let httpConfig):
+            await connect(name: name, config: httpConfig, streaming: false)
+        case .sdk:
+            // SDK servers are handled directly by Agent, not via MCPClientManager
+            break
+        case .claudeAIProxy(let proxyConfig):
+            await connectClaudeAIProxy(name: name, config: proxyConfig)
+        }
+    }
+
+    /// Fully removes a server: cleans up connection, removes from all tracking dictionaries.
+    private func fullyRemoveServer(name: String) async {
+        await cleanupConnection(name: name)
+        connections.removeValue(forKey: name)
+        originalConfigs.removeValue(forKey: name)
+        disabledServers.remove(name)
+    }
 
     /// Cleans up a single connection: disconnects MCPClient and terminates transport.
     private func cleanupConnection(name: String) async {
