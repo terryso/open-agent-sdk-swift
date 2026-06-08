@@ -11,19 +11,12 @@ import XCTest
 ///   - `SDKConfiguration` and `AgentOptions` gain `projectRoot` field
 ///   - `Agent.buildSystemPrompt()` integrates project document context injection
 /// TDD Phase: RED (feature not implemented yet)
-final class ProjectDocumentDiscoveryTests: XCTestCase {
+final class ProjectDocumentDiscoveryTests: TempDirTestCase {
 
-    var tempDir: String!
     var projectDir: String!
 
     override func setUp() {
         super.setUp()
-        tempDir = NSTemporaryDirectory()
-            .appending("OpenAgentSDKTests-ProjectDoc-\(UUID().uuidString)")
-        try! FileManager.default.createDirectory(
-            atPath: tempDir,
-            withIntermediateDirectories: true
-        )
 
         // Create a project directory with Git init for tests that need .git discovery
         projectDir = (tempDir as NSString).appendingPathComponent("myproject")
@@ -31,11 +24,6 @@ final class ProjectDocumentDiscoveryTests: XCTestCase {
             atPath: projectDir,
             withIntermediateDirectories: true
         )
-    }
-
-    override func tearDown() {
-        try? FileManager.default.removeItem(atPath: tempDir)
-        super.tearDown()
     }
 
     // MARK: - Helpers

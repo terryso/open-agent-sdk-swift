@@ -12,6 +12,11 @@ class TempDirTestCase: XCTestCase {
     /// Automatically cleaned up in tearDown.
     private(set) var tempDir: String!
 
+    /// URL representation of tempDir, for tests that need URL-based APIs.
+    var tempDirURL: URL {
+        URL(fileURLWithPath: tempDir)
+    }
+
     override func setUp() {
         super.setUp()
         tempDir = (NSTemporaryDirectory() as NSString)

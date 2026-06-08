@@ -1,30 +1,16 @@
 import XCTest
 @testable import OpenAgentSDK
 
-final class TraceRecorderTests: XCTestCase {
-
-    var tempDir: URL!
-
-    override func setUp() {
-        super.setUp()
-        tempDir = URL(fileURLWithPath: NSTemporaryDirectory())
-            .appendingPathComponent("TraceRecorderTests-\(UUID().uuidString)", isDirectory: true)
-        try? FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
-    }
-
-    override func tearDown() {
-        try? FileManager.default.removeItem(at: tempDir)
-        super.tearDown()
-    }
+final class TraceRecorderTests: TempDirTestCase {
 
     // MARK: - File creation and JSONL format
 
     func testCreatesJSONLFile() async throws {
-        let recorder = try TraceRecorder(runId: "test-run", baseURL: tempDir)
+        let recorder = try TraceRecorder(runId: "test-run", baseURL: tempDirURL)
         await recorder.record(event: "step_start", payload: ["tool": "Bash"])
         await recorder.close()
 
-        let fileURL = tempDir.appendingPathComponent("test-run/trace.jsonl")
+        let fileURL = tempDirURL.appendingPathComponent("test-run/trace.jsonl")
         let content = try String(contentsOf: fileURL, encoding: .utf8)
         XCTAssertFalse(content.isEmpty)
 
@@ -38,11 +24,11 @@ final class TraceRecorderTests: XCTestCase {
     }
 
     func testAutoTimestampAndEventFields() async throws {
-        let recorder = try TraceRecorder(runId: "ts-test", baseURL: tempDir)
+        let recorder = try TraceRecorder(runId: "ts-test", baseURL: tempDirURL)
         await recorder.record(event: "run_done", payload: ["status": "success"])
         await recorder.close()
 
-        let fileURL = tempDir.appendingPathComponent("ts-test/trace.jsonl")
+        let fileURL = tempDirURL.appendingPathComponent("ts-test/trace.jsonl")
         let content = try String(contentsOf: fileURL, encoding: .utf8)
         let json = try JSONSerialization.jsonObject(with: content.data(using: .utf8)!) as! [String: Any]
 
@@ -54,12 +40,12 @@ final class TraceRecorderTests: XCTestCase {
     }
 
     func testMultipleRecords() async throws {
-        let recorder = try TraceRecorder(runId: "multi-test", baseURL: tempDir)
+        let recorder = try TraceRecorder(runId: "multi-test", baseURL: tempDirURL)
         await recorder.record(event: "step_start", payload: ["tool": "Bash", "toolUseId": "tu_1"])
         await recorder.record(event: "step_done", payload: ["tool": "Bash", "success": true, "toolUseId": "tu_1"])
         await recorder.close()
 
-        let fileURL = tempDir.appendingPathComponent("multi-test/trace.jsonl")
+        let fileURL = tempDirURL.appendingPathComponent("multi-test/trace.jsonl")
         let content = try String(contentsOf: fileURL, encoding: .utf8)
         let lines = content.trimmingCharacters(in: .whitespacesAndNewlines).components(separatedBy: "\n")
         XCTAssertEqual(lines.count, 2)
@@ -68,7 +54,7 @@ final class TraceRecorderTests: XCTestCase {
     // MARK: - Sanitization
 
     func testSanitizationStripsSensitiveKeys() async throws {
-        let recorder = try TraceRecorder(runId: "sanitize-test", baseURL: tempDir)
+        let recorder = try TraceRecorder(runId: "sanitize-test", baseURL: tempDirURL)
         await recorder.record(event: "test", payload: [
             "apiKey": "sk-12345",
             "api_key": "secret-key",
@@ -81,7 +67,7 @@ final class TraceRecorderTests: XCTestCase {
         ])
         await recorder.close()
 
-        let fileURL = tempDir.appendingPathComponent("sanitize-test/trace.jsonl")
+        let fileURL = tempDirURL.appendingPathComponent("sanitize-test/trace.jsonl")
         let content = try String(contentsOf: fileURL, encoding: .utf8)
         let json = try JSONSerialization.jsonObject(with: content.data(using: .utf8)!) as! [String: Any]
 
@@ -98,7 +84,7 @@ final class TraceRecorderTests: XCTestCase {
     }
 
     func testSanitizationRedactsSensitivePatterns() async throws {
-        let recorder = try TraceRecorder(runId: "redact-test", baseURL: tempDir)
+        let recorder = try TraceRecorder(runId: "redact-test", baseURL: tempDirURL)
         await recorder.record(event: "test", payload: [
             "model": "claude-sonnet-4-6",
             "key_input": "sk-ant-apikey12345",
@@ -106,7 +92,7 @@ final class TraceRecorderTests: XCTestCase {
         ])
         await recorder.close()
 
-        let fileURL = tempDir.appendingPathComponent("redact-test/trace.jsonl")
+        let fileURL = tempDirURL.appendingPathComponent("redact-test/trace.jsonl")
         let content = try String(contentsOf: fileURL, encoding: .utf8)
         let json = try JSONSerialization.jsonObject(with: content.data(using: .utf8)!) as! [String: Any]
 
@@ -118,7 +104,7 @@ final class TraceRecorderTests: XCTestCase {
     // MARK: - Close and cleanup
 
     func testCloseIsIdempotent() async throws {
-        let recorder = try TraceRecorder(runId: "close-test", baseURL: tempDir)
+        let recorder = try TraceRecorder(runId: "close-test", baseURL: tempDirURL)
         await recorder.record(event: "test", payload: [:])
         await recorder.close()
         await recorder.close() // Should not crash
