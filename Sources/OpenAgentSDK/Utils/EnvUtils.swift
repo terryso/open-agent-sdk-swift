@@ -73,6 +73,73 @@ internal func validatePathSafeIdentifier(_ value: String, label: String) throws 
     }
 }
 
+/// The default skills directory path (`~/.open-agent-sdk/skills`).
+internal let defaultSkillsDir: String = {
+    let home: String
+    #if os(Linux)
+    if let homeEnv = getenv("HOME") {
+        home = String(cString: homeEnv)
+    } else {
+        home = "/tmp"
+    }
+    #else
+    home = NSHomeDirectory()
+    #endif
+    return (home as NSString).appendingPathComponent(".open-agent-sdk/skills")
+}()
+
+/// Resolve the skills directory from a custom path or the default.
+///
+/// - Parameter customDir: Optional custom directory path. Falls back to ``defaultSkillsDir``.
+/// - Returns: The resolved skills directory path.
+internal func resolveSkillsDir(customDir: String?) -> String {
+    if let custom = customDir {
+        return custom
+    }
+    return defaultSkillsDir
+}
+
+/// Atomically write data to a file in the given directory.
+///
+/// Creates the directory if needed (with 0o700 permissions), writes to a temporary file,
+/// then renames to the final path. Cleans up the temp file on failure.
+///
+/// - Parameters:
+///   - data: The data to write.
+///   - directory: The directory to write in.
+///   - fileName: The final file name (e.g., ".usage.json").
+///   - contentType: Human-readable description for error messages (e.g., "skill usage data").
+internal func atomicWriteJSON(data: Data, toDirectory directory: String, fileName: String, contentType: String) throws {
+    do {
+        try FileManager.default.createDirectory(
+            atPath: directory,
+            withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o700]
+        )
+    } catch {
+        throw SDKError.sessionError(
+            message: "Failed to create directory: \(error.localizedDescription)"
+        )
+    }
+
+    let tempFileName = "\(fileName).tmp.\(UUID().uuidString)"
+    let tempFilePath = (directory as NSString).appendingPathComponent(tempFileName)
+    let filePath = (directory as NSString).appendingPathComponent(fileName)
+
+    do {
+        try data.write(to: URL(fileURLWithPath: tempFilePath), options: .atomic)
+        if FileManager.default.fileExists(atPath: filePath) {
+            try FileManager.default.removeItem(atPath: filePath)
+        }
+        try FileManager.default.moveItem(atPath: tempFilePath, toPath: filePath)
+    } catch {
+        try? FileManager.default.removeItem(atPath: tempFilePath)
+        throw SDKError.sessionError(
+            message: "Failed to write \(contentType) at \(filePath): \(error.localizedDescription)"
+        )
+    }
+}
+
 /// Get the default OpenAI-compatible base URL.
 ///
 /// Priority: `CODEANY_BASE_URL` environment variable > built-in default.
