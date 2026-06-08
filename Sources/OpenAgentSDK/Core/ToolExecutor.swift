@@ -115,6 +115,133 @@ enum ToolExecutor {
         _ = await hookRegistry.execute(hookEvent, input: hookInput)
     }
 
+    // MARK: - Tool Event Helpers
+
+    /// Emits a `ToolFailedEvent` and returns a matching error `ToolResult`.
+    ///
+    /// Used at every point where tool execution is rejected (unknown tool,
+    /// hook block, permission deny, etc.) to avoid duplicating the
+    /// event-publish + error-result pattern.
+    static func returnToolError(
+        sessionId: String?,
+        toolUseId: String,
+        toolName: String,
+        message: String,
+        eventBus: EventBus?
+    ) async -> ToolResult {
+        if let eventBus = eventBus, let sessionId = sessionId {
+            await eventBus.publish(ToolFailedEvent(
+                sessionId: sessionId,
+                toolUseId: toolUseId,
+                toolName: toolName,
+                error: message
+            ))
+        }
+        return ToolResult(
+            toolUseId: toolUseId,
+            content: message,
+            isError: true
+        )
+    }
+
+    /// Emits a `ToolStartedEvent` before tool execution.
+    ///
+    /// Serializes the tool input as JSON for the event payload.
+    static func emitToolStarted(
+        sessionId: String?,
+        toolName: String,
+        toolUseId: String,
+        input: Any,
+        eventBus: EventBus?
+    ) async {
+        guard let eventBus = eventBus, let sessionId = sessionId else { return }
+        let inputStr: String? = {
+            if let dict = input as? [String: Any],
+               let data = try? JSONSerialization.data(withJSONObject: dict, options: [.sortedKeys]),
+               let str = String(data: data, encoding: .utf8) {
+                return str
+            }
+            return nil
+        }()
+        await eventBus.publish(ToolStartedEvent(
+            sessionId: sessionId,
+            toolName: toolName,
+            toolUseId: toolUseId,
+            input: inputStr
+        ))
+    }
+
+    /// Executes a tool call and emits the full lifecycle of events:
+    /// `ToolStartedEvent` → tool execution → structured log → post-hook →
+    /// `ToolCompletedEvent` / `ToolFailedEvent`.
+    ///
+    /// Centralizes the execution path shared between the canUseTool allow
+    /// path and the normal (permissionMode) path.
+    static func executeToolWithLifecycle(
+        tool: ToolProtocol,
+        block: ToolUseBlock,
+        input: Any,
+        context: ToolContext
+    ) async -> ToolResult {
+        // Emit ToolStartedEvent
+        await emitToolStarted(
+            sessionId: context.sessionId,
+            toolName: block.name,
+            toolUseId: block.id,
+            input: input,
+            eventBus: context.eventBus
+        )
+
+        // Execute tool
+        let toolStart = Date()
+        let result = await tool.call(input: input, context: context)
+        let durationMs = Int(Date().timeIntervalSince(toolStart) * 1000)
+
+        // Structured log
+        Logger.shared.debug("ToolExecutor", "tool_result", data: [
+            "tool": block.name,
+            "durationMs": String(durationMs),
+            "outputSize": String(result.content.utf8.count)
+        ])
+
+        // PostToolUse / PostToolUseFailure hook
+        await firePostToolHook(
+            hookRegistry: context.hookRegistry,
+            block: block,
+            toolInput: input,
+            result: result,
+            context: context
+        )
+
+        // Emit completed/failed event
+        if let eventBus = context.eventBus, let sessionId = context.sessionId {
+            if result.isError {
+                await eventBus.publish(ToolFailedEvent(
+                    sessionId: sessionId,
+                    toolUseId: block.id,
+                    toolName: block.name,
+                    error: result.content
+                ))
+            } else {
+                await eventBus.publish(ToolCompletedEvent(
+                    sessionId: sessionId,
+                    toolUseId: block.id,
+                    toolName: block.name,
+                    durationMs: durationMs,
+                    isError: false,
+                    output: result.content
+                ))
+            }
+        }
+
+        return ToolResult(
+            toolUseId: block.id,
+            content: result.content,
+            typedContent: result.typedContent,
+            isError: result.isError
+        )
+    }
+
     // MARK: - Extract tool_use Blocks
 
     /// Extracts `tool_use` content blocks from an Anthropic API response content array.
@@ -305,18 +432,12 @@ enum ToolExecutor {
     ) async -> ToolResult {
         // Unknown tool handling
         guard let tool = tool else {
-            if let eventBus = context.eventBus {
-                await eventBus.publish(ToolFailedEvent(
-                    sessionId: context.sessionId,
-                    toolUseId: block.id,
-                    toolName: block.name,
-                    error: "Error: Unknown tool \"\(block.name)\""
-                ))
-            }
-            return ToolResult(
+            return await returnToolError(
+                sessionId: context.sessionId,
                 toolUseId: block.id,
-                content: "Error: Unknown tool \"\(block.name)\"",
-                isError: true
+                toolName: block.name,
+                message: "Error: Unknown tool \"\(block.name)\"",
+                eventBus: context.eventBus
             )
         }
 
@@ -333,18 +454,12 @@ enum ToolExecutor {
             let hookResults = await hookRegistry.execute(.preToolUse, input: hookInput)
             if hookResults.contains(where: { $0.block }) {
                 let blockMessage = hookResults.compactMap { $0.message }.first ?? "Tool execution blocked by hook"
-                if let eventBus = context.eventBus {
-                    await eventBus.publish(ToolFailedEvent(
-                        sessionId: context.sessionId,
-                        toolUseId: block.id,
-                        toolName: block.name,
-                        error: "Error: \(blockMessage)"
-                    ))
-                }
-                return ToolResult(
+                return await returnToolError(
+                    sessionId: context.sessionId,
                     toolUseId: block.id,
-                    content: "Error: \(blockMessage)",
-                    isError: true
+                    toolName: block.name,
+                    message: "Error: \(blockMessage)",
+                    eventBus: context.eventBus
                 )
             }
         }
@@ -364,84 +479,21 @@ enum ToolExecutor {
             if let result = await canUseTool(tool, block.input, context) {
                 if result.behavior == .deny {
                     let denyMessage = result.message ?? "Permission denied for tool \"\(block.name)\""
-                    if let eventBus = context.eventBus {
-                        await eventBus.publish(ToolFailedEvent(
-                            sessionId: context.sessionId,
-                            toolUseId: block.id,
-                            toolName: block.name,
-                            error: denyMessage
-                        ))
-                    }
-                    return ToolResult(
+                    return await returnToolError(
+                        sessionId: context.sessionId,
                         toolUseId: block.id,
-                        content: denyMessage,
-                        isError: true
+                        toolName: block.name,
+                        message: denyMessage,
+                        eventBus: context.eventBus
                     )
                 }
                 // allow — may have updatedInput
                 let effectiveInput = result.updatedInput ?? block.input
-                if let eventBus = context.eventBus {
-                    let inputStr: String? = {
-                        if let dict = effectiveInput as? [String: Any],
-                           let data = try? JSONSerialization.data(withJSONObject: dict, options: [.sortedKeys]),
-                           let str = String(data: data, encoding: .utf8) {
-                            return str
-                        }
-                        return nil
-                    }()
-                    await eventBus.publish(ToolStartedEvent(
-                        sessionId: context.sessionId,
-                        toolName: block.name,
-                        toolUseId: block.id,
-                        input: inputStr
-                    ))
-                }
-                let toolStart = Date()
-                let execResult = await tool.call(input: effectiveInput, context: context)
-                let durationMs = Int(Date().timeIntervalSince(toolStart) * 1000)
-
-                // Structured log for tool execution
-                Logger.shared.debug("ToolExecutor", "tool_result", data: [
-                    "tool": block.name,
-                    "durationMs": String(durationMs),
-                    "outputSize": String(execResult.content.utf8.count)
-                ])
-
-                // PostToolUse / PostToolUseFailure hook
-                await firePostToolHook(
-                    hookRegistry: context.hookRegistry,
+                return await executeToolWithLifecycle(
+                    tool: tool,
                     block: block,
-                    toolInput: effectiveInput,
-                    result: execResult,
+                    input: effectiveInput,
                     context: context
-                )
-
-                // Emit tool completed/failed event
-                if let eventBus = context.eventBus {
-                    if execResult.isError {
-                        await eventBus.publish(ToolFailedEvent(
-                            sessionId: context.sessionId,
-                            toolUseId: block.id,
-                            toolName: block.name,
-                            error: execResult.content
-                        ))
-                    } else {
-                        await eventBus.publish(ToolCompletedEvent(
-                            sessionId: context.sessionId,
-                            toolUseId: block.id,
-                            toolName: block.name,
-                            durationMs: durationMs,
-                            isError: false,
-                            output: execResult.content
-                        ))
-                    }
-                }
-
-                return ToolResult(
-                    toolUseId: block.id,
-                    content: execResult.content,
-                    typedContent: execResult.typedContent,
-                    isError: execResult.isError
                 )
             }
             // canUseTool returned nil → fall back to permissionMode
@@ -453,102 +505,23 @@ enum ToolExecutor {
             switch decision {
             case .allow:
                 break // Continue to execute
-            case .block(let message):
-                if let eventBus = context.eventBus {
-                    await eventBus.publish(ToolFailedEvent(
-                        sessionId: context.sessionId,
-                        toolUseId: block.id,
-                        toolName: block.name,
-                        error: message
-                    ))
-                }
-                return ToolResult(
+            case .block(let message), .deny(let message):
+                return await returnToolError(
+                    sessionId: context.sessionId,
                     toolUseId: block.id,
-                    content: message,
-                    isError: true
-                )
-            case .deny(let message):
-                if let eventBus = context.eventBus {
-                    await eventBus.publish(ToolFailedEvent(
-                        sessionId: context.sessionId,
-                        toolUseId: block.id,
-                        toolName: block.name,
-                        error: message
-                    ))
-                }
-                return ToolResult(
-                    toolUseId: block.id,
-                    content: message,
-                    isError: true
+                    toolName: block.name,
+                    message: message,
+                    eventBus: context.eventBus
                 )
             }
         }
 
-        // Emit ToolStartedEvent before execution
-        if let eventBus = context.eventBus {
-            let inputStr: String? = {
-                if let dict = block.input as? [String: Any],
-                   let data = try? JSONSerialization.data(withJSONObject: dict, options: [.sortedKeys]),
-                   let str = String(data: data, encoding: .utf8) {
-                    return str
-                }
-                return nil
-            }()
-            await eventBus.publish(ToolStartedEvent(
-                sessionId: context.sessionId,
-                toolName: block.name,
-                toolUseId: block.id,
-                input: inputStr
-            ))
-        }
-
-        // Execute tool — errors are captured in ToolResult, not thrown
-        let toolStart = Date()
-        let result = await tool.call(input: block.input, context: context)
-        let durationMs = Int(Date().timeIntervalSince(toolStart) * 1000)
-
-        // Structured log for tool execution
-        Logger.shared.debug("ToolExecutor", "tool_result", data: [
-            "tool": block.name,
-            "durationMs": String(durationMs),
-            "outputSize": String(result.content.utf8.count)
-        ])
-
-        // PostToolUse / PostToolUseFailure hook
-        await firePostToolHook(
-            hookRegistry: context.hookRegistry,
+        // Execute tool via the full lifecycle helper (started → exec → log → hook → completed/failed)
+        return await executeToolWithLifecycle(
+            tool: tool,
             block: block,
-            toolInput: block.input,
-            result: result,
+            input: block.input,
             context: context
-        )
-
-        // Emit tool completed/failed event
-        if let eventBus = context.eventBus {
-            if result.isError {
-                await eventBus.publish(ToolFailedEvent(
-                    sessionId: context.sessionId,
-                    toolUseId: block.id,
-                    toolName: block.name,
-                    error: result.content
-                ))
-            } else {
-                await eventBus.publish(ToolCompletedEvent(
-                    sessionId: context.sessionId,
-                    toolUseId: block.id,
-                    toolName: block.name,
-                    durationMs: durationMs,
-                    isError: false,
-                    output: result.content
-                ))
-            }
-        }
-
-        return ToolResult(
-            toolUseId: block.id,
-            content: result.content,
-            typedContent: result.typedContent,
-            isError: result.isError
         )
     }
 
