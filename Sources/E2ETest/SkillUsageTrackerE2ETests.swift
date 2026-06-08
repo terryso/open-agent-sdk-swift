@@ -18,27 +18,10 @@ struct SkillUsageTrackerE2ETests {
         await testCheckAllLifecyclesE2E()
     }
 
-    // MARK: - Helpers
-
-    private static func makeTempDir() -> String {
-        let dir = (NSTemporaryDirectory() as NSString)
-            .appendingPathComponent("e2e-skill-usage-\(UUID().uuidString)")
-        try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
-        return dir
-    }
-
-    private static func cleanup(_ dir: String) {
-        try? FileManager.default.removeItem(atPath: dir)
-    }
-
-    private static func date(daysAgo: Int) -> Date {
-        Calendar.current.date(byAdding: .day, value: -daysAgo, to: Date())!
-    }
-
     // MARK: - Test 67: Store Real Persistence
 
     private static func testStoreRealPersistenceE2E() async {
-        let tempDir = makeTempDir()
+        let tempDir = makeTempDir(prefix: "e2e-skill-usage")
         defer { cleanup(tempDir) }
 
         do {
@@ -123,7 +106,7 @@ struct SkillUsageTrackerE2ETests {
     // MARK: - Test 68: Active → Deprecated Transition
 
     private static func testActiveToDeprecatedTransitionE2E() async {
-        let tempDir = makeTempDir()
+        let tempDir = makeTempDir(prefix: "e2e-skill-usage")
         defer { cleanup(tempDir) }
 
         do {
@@ -217,7 +200,7 @@ struct SkillUsageTrackerE2ETests {
     // MARK: - Test 69: Skip Rules & Retired Transition
 
     private static func testSkipRulesAndRetiredTransitionE2E() async {
-        let tempDir = makeTempDir()
+        let tempDir = makeTempDir(prefix: "e2e-skill-usage")
         defer { cleanup(tempDir) }
 
         do {
@@ -306,7 +289,7 @@ struct SkillUsageTrackerE2ETests {
     // MARK: - Test 70: checkAllLifecycles Multi-Skill
 
     private static func testCheckAllLifecyclesE2E() async {
-        let tempDir = makeTempDir()
+        let tempDir = makeTempDir(prefix: "e2e-skill-usage")
         defer { cleanup(tempDir) }
 
         do {

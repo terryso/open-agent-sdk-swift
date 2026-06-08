@@ -58,3 +58,20 @@ struct CalculatorInput: Codable {
 struct EchoInput: Codable {
     let message: String
 }
+
+// MARK: - Shared Temp Directory & Date Helpers
+
+func makeTempDir(prefix: String = "e2e-test") -> String {
+    let dir = (NSTemporaryDirectory() as NSString)
+        .appendingPathComponent("\(prefix)-\(UUID().uuidString)")
+    try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+    return dir
+}
+
+func cleanup(_ dir: String) {
+    try? FileManager.default.removeItem(atPath: dir)
+}
+
+func date(daysAgo: Int) -> Date {
+    Calendar.current.date(byAdding: .day, value: -daysAgo, to: Date())!
+}
