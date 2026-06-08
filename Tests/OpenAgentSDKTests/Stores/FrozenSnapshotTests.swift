@@ -1,7 +1,7 @@
 import XCTest
 @testable import OpenAgentSDK
 
-final class FrozenSnapshotTests: XCTestCase {
+final class FrozenSnapshotTests: TempDirTestCase {
 
     // MARK: - FrozenSnapshot
 
@@ -42,20 +42,6 @@ final class FrozenSnapshotTests: XCTestCase {
     }
 
     // MARK: - FactStore.snapshot()
-
-    private var tempDir: String!
-
-    override func setUp() {
-        super.setUp()
-        tempDir = NSTemporaryDirectory().appending("FrozenSnapshotTests-\(UUID().uuidString)")
-        try? FileManager.default.createDirectory(atPath: tempDir, withIntermediateDirectories: true)
-    }
-
-    override func tearDown() {
-        try? FileManager.default.removeItem(atPath: tempDir)
-        tempDir = nil
-        super.tearDown()
-    }
 
     private func makeFactStore() -> FactStore {
         FactStore(memoryDir: tempDir)
