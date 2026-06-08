@@ -334,13 +334,8 @@ public enum SandboxChecker {
         }
 
         // Strip leading backslash and quotes from the first token
-        if firstToken.hasPrefix("\\") {
-            firstToken = String(firstToken.dropFirst())
-        }
-        if (firstToken.hasPrefix("\"") && firstToken.hasSuffix("\""))
-            || (firstToken.hasPrefix("'") && firstToken.hasSuffix("'")) {
-            firstToken = String(firstToken.dropFirst().dropLast())
-        }
+        firstToken = stripLeadingBackslash(firstToken)
+        firstToken = stripSurroundingQuotes(firstToken)
 
         // Extract basename if it's a path
         let basename: String
@@ -391,11 +386,7 @@ public enum SandboxChecker {
         var afterC = afterFlag
 
         // Strip surrounding quotes from the -c argument
-        if afterC.hasPrefix("\"") && afterC.hasSuffix("\"") {
-            afterC = String(afterC.dropFirst().dropLast())
-        } else if afterC.hasPrefix("'") && afterC.hasSuffix("'") {
-            afterC = String(afterC.dropFirst().dropLast())
-        }
+        afterC = stripSurroundingQuotes(afterC)
 
         // Check for nested subshell patterns (unparseable)
         // If the inner command itself starts with a shell binary, it's deeply nested
@@ -490,6 +481,20 @@ public enum SandboxChecker {
         }
     }
 
+    /// Strip a leading backslash from a command token (e.g. `\rm` → `rm`).
+    private static func stripLeadingBackslash(_ s: String) -> String {
+        s.hasPrefix("\\") ? String(s.dropFirst()) : s
+    }
+
+    /// Strip surrounding double or single quotes from a token (e.g. `"rm"` → `rm`).
+    private static func stripSurroundingQuotes(_ s: String) -> String {
+        if (s.hasPrefix("\"") && s.hasSuffix("\""))
+            || (s.hasPrefix("'") && s.hasSuffix("'")) {
+            return String(s.dropFirst().dropLast())
+        }
+        return s
+    }
+
     /// Check prefix match with path-segment boundary enforcement.
     ///
     /// A configured path `/project/` matches input `/project/src/file.swift`
@@ -531,15 +536,10 @@ public enum SandboxChecker {
         var cmd = command.trimmingCharacters(in: .whitespaces)
 
         // Strip leading backslash
-        if cmd.hasPrefix("\\") {
-            cmd = String(cmd.dropFirst())
-        }
+        cmd = stripLeadingBackslash(cmd)
 
         // Strip surrounding quotes from the first token
-        if (cmd.hasPrefix("\"") && cmd.hasSuffix("\""))
-            || (cmd.hasPrefix("'") && cmd.hasSuffix("'")) {
-            cmd = String(cmd.dropFirst().dropLast())
-        }
+        cmd = stripSurroundingQuotes(cmd)
 
         // Extract only the first token (the command) before any arguments
         if let spaceRange = cmd.rangeOfCharacter(from: .whitespaces) {
@@ -548,10 +548,7 @@ public enum SandboxChecker {
 
         // Strip surrounding quotes from the isolated first token
         // (handles cases like `"rm" -rf` where quotes only wrap the command)
-        if (cmd.hasPrefix("\"") && cmd.hasSuffix("\""))
-            || (cmd.hasPrefix("'") && cmd.hasSuffix("'")) {
-            cmd = String(cmd.dropFirst().dropLast())
-        }
+        cmd = stripSurroundingQuotes(cmd)
 
         // Extract basename from path
         if cmd.contains("/") {
