@@ -171,6 +171,46 @@ internal func resolveMemoryDir(customDir: String?) -> String {
     return defaultMemoryDir
 }
 
+/// djb2 hash algorithm for deterministic string hashing.
+///
+/// Produces a hex string hash of the input using the djb2 algorithm.
+/// Used for generating deterministic IDs from content strings.
+///
+/// - Parameter string: The string to hash.
+/// - Returns: A hexadecimal string representation of the hash.
+internal func djb2Hash(_ string: String) -> String {
+    var hash: UInt64 = 5381
+    for byte in string.utf8 {
+        hash = ((hash &<< 5) &+ hash) &+ UInt64(byte)
+    }
+    return String(hash, radix: 16)
+}
+
+/// Create a pre-configured JSON encoder with SDK-standard settings.
+///
+/// Returns a `JSONEncoder` with `.prettyPrinted` and `.sortedKeys` output formatting
+/// and `.iso8601` date encoding strategy. Each call creates a fresh instance.
+///
+/// - Returns: A configured `JSONEncoder`.
+internal func makeSDKJSONEncoder() -> JSONEncoder {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+    encoder.dateEncodingStrategy = .iso8601
+    return encoder
+}
+
+/// Create a pre-configured JSON decoder with SDK-standard settings.
+///
+/// Returns a `JSONDecoder` with `.iso8601` date decoding strategy.
+/// Each call creates a fresh instance.
+///
+/// - Returns: A configured `JSONDecoder`.
+internal func makeSDKJSONDecoder() -> JSONDecoder {
+    let decoder = JSONDecoder()
+    decoder.dateDecodingStrategy = .iso8601
+    return decoder
+}
+
 /// Get the default OpenAI-compatible base URL.
 ///
 /// Priority: `CODEANY_BASE_URL` environment variable > built-in default.

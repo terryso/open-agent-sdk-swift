@@ -28,17 +28,8 @@ public actor FactStore {
 
     private let customMemoryDir: String?
     private var cache: [String: [MemoryFact]] = [:]
-    private let jsonEncoder: JSONEncoder = {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        encoder.dateEncodingStrategy = .iso8601
-        return encoder
-    }()
-    private let jsonDecoder: JSONDecoder = {
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return decoder
-    }()
+    private let jsonEncoder = makeSDKJSONEncoder()
+    private let jsonDecoder = makeSDKJSONDecoder()
     private let legacyDateFormatter = makeISO8601DateFormatter()
 
     // MARK: - Initialization
@@ -49,11 +40,7 @@ public actor FactStore {
     public init(memoryDir: String? = nil) {
         self.customMemoryDir = memoryDir
         let resolvedDir = resolveMemoryDir(customDir: memoryDir)
-        self.cache = Self.loadAllDomainsSync(from: resolvedDir, decoder: {
-            let d = JSONDecoder()
-            d.dateDecodingStrategy = .iso8601
-            return d
-        }(), legacyDateFormatter: makeISO8601DateFormatter())
+        self.cache = Self.loadAllDomainsSync(from: resolvedDir, decoder: makeSDKJSONDecoder(), legacyDateFormatter: makeISO8601DateFormatter())
     }
 
     // MARK: - Public API

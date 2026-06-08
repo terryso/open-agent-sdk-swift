@@ -118,13 +118,6 @@ public struct SkillSignal: Codable, Sendable, Equatable {
         return djb2Hash(input)
     }
 
-    private static func djb2Hash(_ string: String) -> String {
-        var hash: UInt64 = 5381
-        for byte in string.utf8 {
-            hash = ((hash &<< 5) &+ hash) &+ UInt64(byte)
-        }
-        return String(hash, radix: 16)
-    }
 }
 
 // MARK: - SkillEvolutionConfig
