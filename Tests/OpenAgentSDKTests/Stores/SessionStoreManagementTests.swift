@@ -12,30 +12,7 @@ import XCTest
 ///   - `SessionStore.tag(sessionId:tag:) throws` is implemented
 ///   - `save()` serializes tag field, `load()` deserializes tag field
 /// TDD Phase: RED (feature not implemented yet)
-final class SessionStoreManagementTests: XCTestCase {
-
-    // MARK: - Properties
-
-    private var tempDir: String!
-
-    // MARK: - Setup / Teardown
-
-    override func setUp() {
-        super.setUp()
-        tempDir = (NSTemporaryDirectory() as NSString)
-            .appendingPathComponent("session-mgmt-tests-\(UUID().uuidString)")
-        try? FileManager.default.createDirectory(
-            atPath: tempDir,
-            withIntermediateDirectories: true
-        )
-    }
-
-    override func tearDown() {
-        if let tempDir {
-            try? FileManager.default.removeItem(atPath: tempDir)
-        }
-        super.tearDown()
-    }
+final class SessionStoreManagementTests: TempDirTestCase {
 
     // MARK: - Helpers
 

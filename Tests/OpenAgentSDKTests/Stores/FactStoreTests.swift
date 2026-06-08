@@ -1,26 +1,7 @@
 import XCTest
 @testable import OpenAgentSDK
 
-final class FactStoreTests: XCTestCase {
-
-    private var tempDir: String!
-
-    override func setUp() {
-        super.setUp()
-        tempDir = (NSTemporaryDirectory() as NSString)
-            .appendingPathComponent("fact-store-tests-\(UUID().uuidString)")
-        try? FileManager.default.createDirectory(
-            atPath: tempDir,
-            withIntermediateDirectories: true
-        )
-    }
-
-    override func tearDown() {
-        if let tempDir {
-            try? FileManager.default.removeItem(atPath: tempDir)
-        }
-        super.tearDown()
-    }
+final class FactStoreTests: TempDirTestCase {
 
     private func makeFact(
         domain: String = "test",

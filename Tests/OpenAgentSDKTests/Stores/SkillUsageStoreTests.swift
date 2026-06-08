@@ -1,26 +1,7 @@
 import XCTest
 @testable import OpenAgentSDK
 
-final class SkillUsageStoreTests: XCTestCase {
-
-    private var tempDir: String!
-
-    override func setUp() {
-        super.setUp()
-        tempDir = (NSTemporaryDirectory() as NSString)
-            .appendingPathComponent("skill-usage-store-tests-\(UUID().uuidString)")
-        try? FileManager.default.createDirectory(
-            atPath: tempDir,
-            withIntermediateDirectories: true
-        )
-    }
-
-    override func tearDown() {
-        if let tempDir {
-            try? FileManager.default.removeItem(atPath: tempDir)
-        }
-        super.tearDown()
-    }
+final class SkillUsageStoreTests: TempDirTestCase {
 
     // MARK: - Initial State
 
