@@ -3,6 +3,20 @@ import XCTest
 
 final class AgentEventTypesTests: XCTestCase {
 
+    // MARK: - Shared Test Encoder/Decoder
+
+    private static let testEncoder: JSONEncoder = {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        return encoder
+    }()
+
+    private static let testDecoder: JSONDecoder = {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return decoder
+    }()
+
     // MARK: - AgentEvent Protocol (AC1)
 
     func testAgentEventProtocolConformance() {
@@ -56,12 +70,10 @@ final class AgentEventTypesTests: XCTestCase {
 
     func testBaseAgentEventCodableRoundTrip() throws {
         let event = BaseAgentEvent(id: "test-id", timestamp: Date(timeIntervalSince1970: 1700000000))
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
+        let encoder = Self.testEncoder
         let data = try encoder.encode(event)
 
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = Self.testDecoder
         let decoded = try decoder.decode(BaseAgentEvent.self, from: data)
 
         XCTAssertEqual(decoded.id, event.id)
@@ -204,8 +216,7 @@ final class AgentEventTypesTests: XCTestCase {
     /// Epic 28 will rely on these key names for SSE mapping.
     func testBaseAgentEventJsonKeyStructure() throws {
         let event = BaseAgentEvent(id: "json-test", timestamp: Date(timeIntervalSince1970: 1700000000))
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
+        let encoder = Self.testEncoder
         let data = try encoder.encode(event)
         let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
 
@@ -219,8 +230,7 @@ final class AgentEventTypesTests: XCTestCase {
         {"id":"decoded-id","timestamp":"2023-11-15T00:00:00Z"}
         """
         let data = jsonString.data(using: .utf8)!
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = Self.testDecoder
         let event = try decoder.decode(BaseAgentEvent.self, from: data)
 
         XCTAssertEqual(event.id, "decoded-id")
@@ -351,12 +361,10 @@ extension AgentEventTypesTests {
 
     func testSessionCreatedEventCodableRoundTrip() throws {
         let event = SessionCreatedEvent(sessionId: "sess-42", task: "write tests", model: "claude-sonnet-4-6")
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
+        let encoder = Self.testEncoder
         let data = try encoder.encode(event)
 
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = Self.testDecoder
         let decoded = try decoder.decode(SessionCreatedEvent.self, from: data)
 
         XCTAssertEqual(decoded.id, event.id)
@@ -368,8 +376,7 @@ extension AgentEventTypesTests {
 
     func testSessionCreatedEventSnakeCaseJsonKeys() throws {
         let event = SessionCreatedEvent(sessionId: "s1", task: "t", model: "m")
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
+        let encoder = Self.testEncoder
         let data = try encoder.encode(event)
         let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
 
@@ -426,12 +433,10 @@ extension AgentEventTypesTests {
     func testSessionRestoredEventCodableRoundTrip() throws {
         let createdAt = Date(timeIntervalSince1970: 1700000000)
         let event = SessionRestoredEvent(sessionId: "sess-1", messageCount: 10, originalCreatedAt: createdAt)
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
+        let encoder = Self.testEncoder
         let data = try encoder.encode(event)
 
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = Self.testDecoder
         let decoded = try decoder.decode(SessionRestoredEvent.self, from: data)
 
         XCTAssertEqual(decoded.sessionId, event.sessionId)
@@ -441,8 +446,7 @@ extension AgentEventTypesTests {
 
     func testSessionRestoredEventSnakeCaseJsonKeys() throws {
         let event = SessionRestoredEvent(sessionId: "s", messageCount: 5, originalCreatedAt: Date())
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
+        let encoder = Self.testEncoder
         let data = try encoder.encode(event)
         let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
 
@@ -481,12 +485,10 @@ extension AgentEventTypesTests {
 
     func testSessionClosedEventCodableRoundTrip() throws {
         let event = SessionClosedEvent(sessionId: "sess-1", finalStatus: .failed)
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
+        let encoder = Self.testEncoder
         let data = try encoder.encode(event)
 
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = Self.testDecoder
         let decoded = try decoder.decode(SessionClosedEvent.self, from: data)
 
         XCTAssertEqual(decoded.sessionId, event.sessionId)
@@ -495,8 +497,7 @@ extension AgentEventTypesTests {
 
     func testSessionClosedEventSnakeCaseJsonKeys() throws {
         let event = SessionClosedEvent(sessionId: "s", finalStatus: .completed)
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
+        let encoder = Self.testEncoder
         let data = try encoder.encode(event)
         let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
 
@@ -533,12 +534,10 @@ extension AgentEventTypesTests {
 
     func testSessionAutoSavedEventCodableRoundTrip() throws {
         let event = SessionAutoSavedEvent(sessionId: "sess-1", messageCount: 7)
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
+        let encoder = Self.testEncoder
         let data = try encoder.encode(event)
 
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = Self.testDecoder
         let decoded = try decoder.decode(SessionAutoSavedEvent.self, from: data)
 
         XCTAssertEqual(decoded.sessionId, event.sessionId)
@@ -547,8 +546,7 @@ extension AgentEventTypesTests {
 
     func testSessionAutoSavedEventSnakeCaseJsonKeys() throws {
         let event = SessionAutoSavedEvent(sessionId: "s", messageCount: 3)
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
+        let encoder = Self.testEncoder
         let data = try encoder.encode(event)
         let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
 
@@ -700,8 +698,7 @@ extension AgentEventTypesTests {
         {"id":"raw-id","timestamp":"2024-01-15T12:00:00Z","session_id":"raw-sess","task":"raw task","model":"raw-model"}
         """
         let data = jsonString.data(using: .utf8)!
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = Self.testDecoder
         let event = try decoder.decode(SessionCreatedEvent.self, from: data)
 
         XCTAssertEqual(event.id, "raw-id")
@@ -715,8 +712,7 @@ extension AgentEventTypesTests {
         {"id":"rest-id","timestamp":"2024-01-15T12:00:00Z","session_id":"rest-sess","message_count":15,"original_created_at":"2023-06-01T00:00:00Z"}
         """
         let data = jsonString.data(using: .utf8)!
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = Self.testDecoder
         let event = try decoder.decode(SessionRestoredEvent.self, from: data)
 
         XCTAssertEqual(event.id, "rest-id")
@@ -729,8 +725,7 @@ extension AgentEventTypesTests {
         {"id":"close-id","timestamp":"2024-01-15T12:00:00Z","session_id":"close-sess","final_status":"interrupted"}
         """
         let data = jsonString.data(using: .utf8)!
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = Self.testDecoder
         let event = try decoder.decode(SessionClosedEvent.self, from: data)
 
         XCTAssertEqual(event.id, "close-id")
@@ -742,8 +737,7 @@ extension AgentEventTypesTests {
         {"id":"auto-id","timestamp":"2024-01-15T12:00:00Z","session_id":"auto-sess","message_count":8}
         """
         let data = jsonString.data(using: .utf8)!
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = Self.testDecoder
         let event = try decoder.decode(SessionAutoSavedEvent.self, from: data)
 
         XCTAssertEqual(event.id, "auto-id")
@@ -757,8 +751,7 @@ extension AgentEventTypesTests {
         {"id":"n","timestamp":"2024-01-15T12:00:00Z","session_id":null,"final_status":"completed"}
         """
         let data = jsonString.data(using: .utf8)!
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = Self.testDecoder
         let event = try decoder.decode(SessionClosedEvent.self, from: data)
         XCTAssertNil(event.sessionId)
         XCTAssertEqual(event.finalStatus, .completed)
@@ -769,8 +762,7 @@ extension AgentEventTypesTests {
         {"id":"n","timestamp":"2024-01-15T12:00:00Z","session_id":null,"message_count":3}
         """
         let data = jsonString.data(using: .utf8)!
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = Self.testDecoder
         let event = try decoder.decode(SessionAutoSavedEvent.self, from: data)
         XCTAssertNil(event.sessionId)
         XCTAssertEqual(event.messageCount, 3)
@@ -783,8 +775,7 @@ extension AgentEventTypesTests {
         {"id":"bad","timestamp":"2024-01-15T12:00:00Z"}
         """
         let data = jsonString.data(using: .utf8)!
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = Self.testDecoder
         XCTAssertThrowsError(try decoder.decode(SessionCreatedEvent.self, from: data))
     }
 
@@ -793,8 +784,7 @@ extension AgentEventTypesTests {
         {"id":"bad","timestamp":"2024-01-15T12:00:00Z","final_status":"unknown_status"}
         """
         let data = jsonString.data(using: .utf8)!
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = Self.testDecoder
         XCTAssertThrowsError(try decoder.decode(SessionClosedEvent.self, from: data))
     }
 
@@ -812,8 +802,7 @@ extension AgentEventTypesTests {
         {"id":"n","timestamp":"2024-01-15T12:00:00Z","session_id":null,"message_count":0,"original_created_at":"2024-01-01T00:00:00Z"}
         """
         let data = jsonString.data(using: .utf8)!
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = Self.testDecoder
         let event = try decoder.decode(SessionRestoredEvent.self, from: data)
         XCTAssertNil(event.sessionId)
     }
@@ -857,8 +846,7 @@ extension AgentEventTypesTests {
 
     func testSessionCreatedEventEncodedJsonValueTypes() throws {
         let event = SessionCreatedEvent(sessionId: "s1", task: "t", model: "m")
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
+        let encoder = Self.testEncoder
         let data = try encoder.encode(event)
         let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
 
@@ -874,8 +862,7 @@ extension AgentEventTypesTests {
 
     func testSessionClosedEventEncodedFinalStatusValue() throws {
         let event = SessionClosedEvent(sessionId: "s", finalStatus: .completed)
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
+        let encoder = Self.testEncoder
         let data = try encoder.encode(event)
         let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
 
@@ -943,12 +930,10 @@ extension AgentEventTypesTests {
 
     func testAgentStartedEventCodableRoundTrip() throws {
         let event = AgentStartedEvent(sessionId: "sess-42", task: "write tests")
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
+        let encoder = Self.testEncoder
         let data = try encoder.encode(event)
 
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = Self.testDecoder
         let decoded = try decoder.decode(AgentStartedEvent.self, from: data)
 
         XCTAssertEqual(decoded.id, event.id)
@@ -959,8 +944,7 @@ extension AgentEventTypesTests {
 
     func testAgentStartedEventSnakeCaseJsonKeys() throws {
         let event = AgentStartedEvent(sessionId: "s1", task: "t")
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
+        let encoder = Self.testEncoder
         let data = try encoder.encode(event)
         let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
 
@@ -1024,12 +1008,10 @@ extension AgentEventTypesTests {
 
     func testAgentCompletedEventCodableRoundTrip() throws {
         let event = AgentCompletedEvent(sessionId: "sess-1", totalSteps: 10, durationMs: 3500, resultText: "success")
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
+        let encoder = Self.testEncoder
         let data = try encoder.encode(event)
 
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = Self.testDecoder
         let decoded = try decoder.decode(AgentCompletedEvent.self, from: data)
 
         XCTAssertEqual(decoded.id, event.id)
@@ -1041,8 +1023,7 @@ extension AgentEventTypesTests {
 
     func testAgentCompletedEventSnakeCaseJsonKeys() throws {
         let event = AgentCompletedEvent(sessionId: "s1", totalSteps: 3, durationMs: 100, resultText: "r")
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
+        let encoder = Self.testEncoder
         let data = try encoder.encode(event)
         let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
 
@@ -1098,12 +1079,10 @@ extension AgentEventTypesTests {
 
     func testAgentFailedEventCodableRoundTrip() throws {
         let event = AgentFailedEvent(sessionId: "sess-1", error: "api failure", stepsCompleted: 7)
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
+        let encoder = Self.testEncoder
         let data = try encoder.encode(event)
 
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = Self.testDecoder
         let decoded = try decoder.decode(AgentFailedEvent.self, from: data)
 
         XCTAssertEqual(decoded.id, event.id)
@@ -1114,8 +1093,7 @@ extension AgentEventTypesTests {
 
     func testAgentFailedEventSnakeCaseJsonKeys() throws {
         let event = AgentFailedEvent(sessionId: "s1", error: "e", stepsCompleted: 5)
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
+        let encoder = Self.testEncoder
         let data = try encoder.encode(event)
         let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
 
@@ -1169,12 +1147,10 @@ extension AgentEventTypesTests {
 
     func testAgentInterruptedEventCodableRoundTrip() throws {
         let event = AgentInterruptedEvent(sessionId: "sess-1", stepsCompleted: 6)
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
+        let encoder = Self.testEncoder
         let data = try encoder.encode(event)
 
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = Self.testDecoder
         let decoded = try decoder.decode(AgentInterruptedEvent.self, from: data)
 
         XCTAssertEqual(decoded.id, event.id)
@@ -1184,8 +1160,7 @@ extension AgentEventTypesTests {
 
     func testAgentInterruptedEventSnakeCaseJsonKeys() throws {
         let event = AgentInterruptedEvent(sessionId: "s1", stepsCompleted: 3)
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
+        let encoder = Self.testEncoder
         let data = try encoder.encode(event)
         let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
 
@@ -1238,12 +1213,10 @@ extension AgentEventTypesTests {
 
     func testAgentResumedEventCodableRoundTrip() throws {
         let event = AgentResumedEvent(sessionId: "sess-1", resumeContext: "pick up where left off")
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
+        let encoder = Self.testEncoder
         let data = try encoder.encode(event)
 
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = Self.testDecoder
         let decoded = try decoder.decode(AgentResumedEvent.self, from: data)
 
         XCTAssertEqual(decoded.id, event.id)
@@ -1253,8 +1226,7 @@ extension AgentEventTypesTests {
 
     func testAgentResumedEventSnakeCaseJsonKeys() throws {
         let event = AgentResumedEvent(sessionId: "s1", resumeContext: "ctx")
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
+        let encoder = Self.testEncoder
         let data = try encoder.encode(event)
         let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
 
@@ -1333,8 +1305,7 @@ extension AgentEventTypesTests {
         {"id":"raw-id","timestamp":"2024-01-15T12:00:00Z","session_id":"raw-sess","task":"raw task"}
         """
         let data = jsonString.data(using: .utf8)!
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = Self.testDecoder
         let event = try decoder.decode(AgentStartedEvent.self, from: data)
 
         XCTAssertEqual(event.id, "raw-id")
@@ -1347,8 +1318,7 @@ extension AgentEventTypesTests {
         {"id":"comp-id","timestamp":"2024-01-15T12:00:00Z","session_id":"comp-sess","total_steps":8,"duration_ms":2500,"result_text":"ok"}
         """
         let data = jsonString.data(using: .utf8)!
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = Self.testDecoder
         let event = try decoder.decode(AgentCompletedEvent.self, from: data)
 
         XCTAssertEqual(event.id, "comp-id")
@@ -1362,8 +1332,7 @@ extension AgentEventTypesTests {
         {"id":"fail-id","timestamp":"2024-01-15T12:00:00Z","session_id":"fail-sess","error":"timeout","steps_completed":4}
         """
         let data = jsonString.data(using: .utf8)!
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = Self.testDecoder
         let event = try decoder.decode(AgentFailedEvent.self, from: data)
 
         XCTAssertEqual(event.id, "fail-id")
@@ -1376,8 +1345,7 @@ extension AgentEventTypesTests {
         {"id":"int-id","timestamp":"2024-01-15T12:00:00Z","session_id":"int-sess","steps_completed":2}
         """
         let data = jsonString.data(using: .utf8)!
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = Self.testDecoder
         let event = try decoder.decode(AgentInterruptedEvent.self, from: data)
 
         XCTAssertEqual(event.id, "int-id")
@@ -1389,8 +1357,7 @@ extension AgentEventTypesTests {
         {"id":"res-id","timestamp":"2024-01-15T12:00:00Z","session_id":"res-sess","resume_context":"continue"}
         """
         let data = jsonString.data(using: .utf8)!
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = Self.testDecoder
         let event = try decoder.decode(AgentResumedEvent.self, from: data)
 
         XCTAssertEqual(event.id, "res-id")
@@ -1404,8 +1371,7 @@ extension AgentEventTypesTests {
         {"id":"n","timestamp":"2024-01-15T12:00:00Z","session_id":null,"task":"hello"}
         """
         let data = jsonString.data(using: .utf8)!
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = Self.testDecoder
         let event = try decoder.decode(AgentStartedEvent.self, from: data)
         XCTAssertNil(event.sessionId)
         XCTAssertEqual(event.task, "hello")
@@ -1416,8 +1382,7 @@ extension AgentEventTypesTests {
         {"id":"n","timestamp":"2024-01-15T12:00:00Z","session_id":null,"total_steps":1,"duration_ms":50,"result_text":null}
         """
         let data = jsonString.data(using: .utf8)!
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = Self.testDecoder
         let event = try decoder.decode(AgentCompletedEvent.self, from: data)
         XCTAssertNil(event.sessionId)
         XCTAssertNil(event.resultText)
@@ -1429,8 +1394,7 @@ extension AgentEventTypesTests {
         {"id":"n","timestamp":"2024-01-15T12:00:00Z","session_id":null,"error":"err","steps_completed":0}
         """
         let data = jsonString.data(using: .utf8)!
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = Self.testDecoder
         let event = try decoder.decode(AgentFailedEvent.self, from: data)
         XCTAssertNil(event.sessionId)
     }
@@ -1440,8 +1404,7 @@ extension AgentEventTypesTests {
         {"id":"n","timestamp":"2024-01-15T12:00:00Z","session_id":null,"steps_completed":5}
         """
         let data = jsonString.data(using: .utf8)!
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = Self.testDecoder
         let event = try decoder.decode(AgentInterruptedEvent.self, from: data)
         XCTAssertNil(event.sessionId)
         XCTAssertEqual(event.stepsCompleted, 5)
@@ -1452,8 +1415,7 @@ extension AgentEventTypesTests {
         {"id":"n","timestamp":"2024-01-15T12:00:00Z","session_id":null,"resume_context":"retry"}
         """
         let data = jsonString.data(using: .utf8)!
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = Self.testDecoder
         let event = try decoder.decode(AgentResumedEvent.self, from: data)
         XCTAssertNil(event.sessionId)
         XCTAssertEqual(event.resumeContext, "retry")
@@ -1464,8 +1426,7 @@ extension AgentEventTypesTests {
         {"id":"n","timestamp":"2024-01-15T12:00:00Z","session_id":"s1","total_steps":3,"duration_ms":100}
         """
         let data = jsonString.data(using: .utf8)!
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = Self.testDecoder
         let event = try decoder.decode(AgentCompletedEvent.self, from: data)
         XCTAssertNil(event.resultText)
         XCTAssertEqual(event.totalSteps, 3)
@@ -1478,8 +1439,7 @@ extension AgentEventTypesTests {
         {"id":"bad","timestamp":"2024-01-15T12:00:00Z"}
         """
         let data = jsonString.data(using: .utf8)!
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = Self.testDecoder
         XCTAssertThrowsError(try decoder.decode(AgentStartedEvent.self, from: data))
     }
 
@@ -1488,8 +1448,7 @@ extension AgentEventTypesTests {
         {"id":"bad","timestamp":"2024-01-15T12:00:00Z","total_steps":1}
         """
         let data = jsonString.data(using: .utf8)!
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = Self.testDecoder
         XCTAssertThrowsError(try decoder.decode(AgentCompletedEvent.self, from: data))
     }
 
@@ -1498,8 +1457,7 @@ extension AgentEventTypesTests {
         {"id":"bad","timestamp":"2024-01-15T12:00:00Z","steps_completed":1}
         """
         let data = jsonString.data(using: .utf8)!
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = Self.testDecoder
         XCTAssertThrowsError(try decoder.decode(AgentFailedEvent.self, from: data))
     }
 
@@ -1508,8 +1466,7 @@ extension AgentEventTypesTests {
         {"id":"bad","timestamp":"2024-01-15T12:00:00Z","session_id":"s"}
         """
         let data = jsonString.data(using: .utf8)!
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = Self.testDecoder
         XCTAssertThrowsError(try decoder.decode(AgentInterruptedEvent.self, from: data))
     }
 
@@ -1518,8 +1475,7 @@ extension AgentEventTypesTests {
         {"id":"bad","timestamp":"2024-01-15T12:00:00Z","session_id":"s"}
         """
         let data = jsonString.data(using: .utf8)!
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = Self.testDecoder
         XCTAssertThrowsError(try decoder.decode(AgentResumedEvent.self, from: data))
     }
 
@@ -1624,12 +1580,10 @@ extension AgentEventTypesTests {
 
     func testToolStartedEventCodableRoundTrip() throws {
         let event = ToolStartedEvent(sessionId: "sess-42", toolName: "BashTool", toolUseId: "tu-99", input: "{\"cmd\":\"pwd\"}")
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
+        let encoder = Self.testEncoder
         let data = try encoder.encode(event)
 
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = Self.testDecoder
         let decoded = try decoder.decode(ToolStartedEvent.self, from: data)
 
         XCTAssertEqual(decoded.id, event.id)
@@ -1642,8 +1596,7 @@ extension AgentEventTypesTests {
 
     func testToolStartedEventSnakeCaseJsonKeys() throws {
         let event = ToolStartedEvent(sessionId: "s1", toolName: "BashTool", toolUseId: "tu-1", input: "inp")
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
+        let encoder = Self.testEncoder
         let data = try encoder.encode(event)
         let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
 
@@ -1682,8 +1635,7 @@ extension AgentEventTypesTests {
         {"id":"raw-id","timestamp":"2024-01-15T12:00:00Z","session_id":"raw-sess","tool_name":"BashTool","tool_use_id":"tu-1","input":"ls"}
         """
         let data = jsonString.data(using: .utf8)!
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = Self.testDecoder
         let event = try decoder.decode(ToolStartedEvent.self, from: data)
 
         XCTAssertEqual(event.id, "raw-id")
@@ -1698,8 +1650,7 @@ extension AgentEventTypesTests {
         {"id":"n","timestamp":"2024-01-15T12:00:00Z","session_id":null,"tool_name":"t","tool_use_id":"tu","input":null}
         """
         let data = jsonString.data(using: .utf8)!
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = Self.testDecoder
         let event = try decoder.decode(ToolStartedEvent.self, from: data)
         XCTAssertNil(event.sessionId)
         XCTAssertNil(event.input)
@@ -1710,8 +1661,7 @@ extension AgentEventTypesTests {
         {"id":"bad","timestamp":"2024-01-15T12:00:00Z"}
         """
         let data = jsonString.data(using: .utf8)!
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = Self.testDecoder
         XCTAssertThrowsError(try decoder.decode(ToolStartedEvent.self, from: data))
     }
 
@@ -1753,12 +1703,10 @@ extension AgentEventTypesTests {
 
     func testToolStreamingEventCodableRoundTrip() throws {
         let event = ToolStreamingEvent(sessionId: "sess-1", toolUseId: "tu-5", chunk: "streaming data")
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
+        let encoder = Self.testEncoder
         let data = try encoder.encode(event)
 
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = Self.testDecoder
         let decoded = try decoder.decode(ToolStreamingEvent.self, from: data)
 
         XCTAssertEqual(decoded.id, event.id)
@@ -1769,8 +1717,7 @@ extension AgentEventTypesTests {
 
     func testToolStreamingEventSnakeCaseJsonKeys() throws {
         let event = ToolStreamingEvent(sessionId: "s1", toolUseId: "tu-1", chunk: "c")
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
+        let encoder = Self.testEncoder
         let data = try encoder.encode(event)
         let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
 
@@ -1800,8 +1747,7 @@ extension AgentEventTypesTests {
         {"id":"raw-id","timestamp":"2024-01-15T12:00:00Z","session_id":"raw-sess","tool_use_id":"tu-1","chunk":"data"}
         """
         let data = jsonString.data(using: .utf8)!
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = Self.testDecoder
         let event = try decoder.decode(ToolStreamingEvent.self, from: data)
 
         XCTAssertEqual(event.id, "raw-id")
@@ -1814,8 +1760,7 @@ extension AgentEventTypesTests {
         {"id":"bad","timestamp":"2024-01-15T12:00:00Z"}
         """
         let data = jsonString.data(using: .utf8)!
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = Self.testDecoder
         XCTAssertThrowsError(try decoder.decode(ToolStreamingEvent.self, from: data))
     }
 
@@ -1857,12 +1802,10 @@ extension AgentEventTypesTests {
 
     func testToolCompletedEventCodableRoundTrip() throws {
         let event = ToolCompletedEvent(sessionId: "sess-1", toolUseId: "tu-5", toolName: "BashTool", durationMs: 3500, isError: true)
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
+        let encoder = Self.testEncoder
         let data = try encoder.encode(event)
 
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = Self.testDecoder
         let decoded = try decoder.decode(ToolCompletedEvent.self, from: data)
 
         XCTAssertEqual(decoded.id, event.id)
@@ -1875,8 +1818,7 @@ extension AgentEventTypesTests {
 
     func testToolCompletedEventSnakeCaseJsonKeys() throws {
         let event = ToolCompletedEvent(sessionId: "s1", toolUseId: "tu-1", toolName: "BashTool", durationMs: 100, isError: true)
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
+        let encoder = Self.testEncoder
         let data = try encoder.encode(event)
         let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
 
@@ -1908,8 +1850,7 @@ extension AgentEventTypesTests {
         {"id":"comp-id","timestamp":"2024-01-15T12:00:00Z","session_id":"comp-sess","tool_use_id":"tu-1","tool_name":"BashTool","duration_ms":2500,"is_error":false}
         """
         let data = jsonString.data(using: .utf8)!
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = Self.testDecoder
         let event = try decoder.decode(ToolCompletedEvent.self, from: data)
 
         XCTAssertEqual(event.id, "comp-id")
@@ -1923,8 +1864,7 @@ extension AgentEventTypesTests {
         {"id":"n","timestamp":"2024-01-15T12:00:00Z","session_id":null,"tool_use_id":"tu","tool_name":"t","duration_ms":0,"is_error":true}
         """
         let data = jsonString.data(using: .utf8)!
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = Self.testDecoder
         let event = try decoder.decode(ToolCompletedEvent.self, from: data)
         XCTAssertNil(event.sessionId)
         XCTAssertTrue(event.isError)
@@ -1935,8 +1875,7 @@ extension AgentEventTypesTests {
         {"id":"bad","timestamp":"2024-01-15T12:00:00Z","tool_use_id":"tu"}
         """
         let data = jsonString.data(using: .utf8)!
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = Self.testDecoder
         XCTAssertThrowsError(try decoder.decode(ToolCompletedEvent.self, from: data))
     }
 
@@ -1977,12 +1916,10 @@ extension AgentEventTypesTests {
 
     func testToolFailedEventCodableRoundTrip() throws {
         let event = ToolFailedEvent(sessionId: "sess-1", toolUseId: "tu-5", toolName: "BashTool", error: "timeout")
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
+        let encoder = Self.testEncoder
         let data = try encoder.encode(event)
 
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = Self.testDecoder
         let decoded = try decoder.decode(ToolFailedEvent.self, from: data)
 
         XCTAssertEqual(decoded.id, event.id)
@@ -1994,8 +1931,7 @@ extension AgentEventTypesTests {
 
     func testToolFailedEventSnakeCaseJsonKeys() throws {
         let event = ToolFailedEvent(sessionId: "s1", toolUseId: "tu-1", toolName: "BashTool", error: "err")
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
+        let encoder = Self.testEncoder
         let data = try encoder.encode(event)
         let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
 
@@ -2026,8 +1962,7 @@ extension AgentEventTypesTests {
         {"id":"fail-id","timestamp":"2024-01-15T12:00:00Z","session_id":"fail-sess","tool_use_id":"tu-1","tool_name":"BashTool","error":"permission denied"}
         """
         let data = jsonString.data(using: .utf8)!
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = Self.testDecoder
         let event = try decoder.decode(ToolFailedEvent.self, from: data)
 
         XCTAssertEqual(event.id, "fail-id")
@@ -2040,8 +1975,7 @@ extension AgentEventTypesTests {
         {"id":"bad","timestamp":"2024-01-15T12:00:00Z","tool_use_id":"tu","tool_name":"t"}
         """
         let data = jsonString.data(using: .utf8)!
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = Self.testDecoder
         XCTAssertThrowsError(try decoder.decode(ToolFailedEvent.self, from: data))
     }
 
@@ -2185,12 +2119,10 @@ extension AgentEventTypesTests {
 
     func testLLMRequestStartedEventCodableRoundTrip() throws {
         let event = LLMRequestStartedEvent(sessionId: "sess-42", model: "claude-opus-4-7")
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
+        let encoder = Self.testEncoder
         let data = try encoder.encode(event)
 
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = Self.testDecoder
         let decoded = try decoder.decode(LLMRequestStartedEvent.self, from: data)
 
         XCTAssertEqual(decoded.id, event.id)
@@ -2201,8 +2133,7 @@ extension AgentEventTypesTests {
 
     func testLLMRequestStartedEventSnakeCaseJsonKeys() throws {
         let event = LLMRequestStartedEvent(sessionId: "s1", model: "m")
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
+        let encoder = Self.testEncoder
         let data = try encoder.encode(event)
         let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
 
@@ -2239,8 +2170,7 @@ extension AgentEventTypesTests {
         {"id":"raw-id","timestamp":"2024-01-15T12:00:00Z","session_id":"raw-sess","model":"claude-sonnet-4-6"}
         """
         let data = jsonString.data(using: .utf8)!
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = Self.testDecoder
         let event = try decoder.decode(LLMRequestStartedEvent.self, from: data)
 
         XCTAssertEqual(event.id, "raw-id")
@@ -2253,8 +2183,7 @@ extension AgentEventTypesTests {
         {"id":"bad","timestamp":"2024-01-15T12:00:00Z"}
         """
         let data = jsonString.data(using: .utf8)!
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = Self.testDecoder
         XCTAssertThrowsError(try decoder.decode(LLMRequestStartedEvent.self, from: data))
     }
 
@@ -2263,8 +2192,7 @@ extension AgentEventTypesTests {
         {"id":"n","timestamp":"2024-01-15T12:00:00Z","session_id":null,"model":"m"}
         """
         let data = jsonString.data(using: .utf8)!
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = Self.testDecoder
         let event = try decoder.decode(LLMRequestStartedEvent.self, from: data)
         XCTAssertNil(event.sessionId)
         XCTAssertEqual(event.model, "m")
@@ -2305,12 +2233,10 @@ extension AgentEventTypesTests {
 
     func testLLMResponseReceivedEventCodableRoundTrip() throws {
         let event = LLMResponseReceivedEvent(sessionId: "sess-1", model: "glm-5.1", durationMs: 4200)
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
+        let encoder = Self.testEncoder
         let data = try encoder.encode(event)
 
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = Self.testDecoder
         let decoded = try decoder.decode(LLMResponseReceivedEvent.self, from: data)
 
         XCTAssertEqual(decoded.id, event.id)
@@ -2321,8 +2247,7 @@ extension AgentEventTypesTests {
 
     func testLLMResponseReceivedEventSnakeCaseJsonKeys() throws {
         let event = LLMResponseReceivedEvent(sessionId: "s1", model: "m", durationMs: 100)
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
+        let encoder = Self.testEncoder
         let data = try encoder.encode(event)
         let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
 
@@ -2352,8 +2277,7 @@ extension AgentEventTypesTests {
         {"id":"resp-id","timestamp":"2024-01-15T12:00:00Z","session_id":"resp-sess","model":"glm-5.1","duration_ms":2500}
         """
         let data = jsonString.data(using: .utf8)!
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = Self.testDecoder
         let event = try decoder.decode(LLMResponseReceivedEvent.self, from: data)
 
         XCTAssertEqual(event.id, "resp-id")
@@ -2366,8 +2290,7 @@ extension AgentEventTypesTests {
         {"id":"bad","timestamp":"2024-01-15T12:00:00Z","model":"m"}
         """
         let data = jsonString.data(using: .utf8)!
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = Self.testDecoder
         XCTAssertThrowsError(try decoder.decode(LLMResponseReceivedEvent.self, from: data))
     }
 
@@ -2383,8 +2306,7 @@ extension AgentEventTypesTests {
         {"id":"n","timestamp":"2024-01-15T12:00:00Z","session_id":null,"model":"m","duration_ms":100}
         """
         let data = jsonString.data(using: .utf8)!
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = Self.testDecoder
         let event = try decoder.decode(LLMResponseReceivedEvent.self, from: data)
         XCTAssertNil(event.sessionId)
         XCTAssertEqual(event.model, "m")
@@ -2456,12 +2378,10 @@ extension AgentEventTypesTests {
             cacheReadInputTokens: 500,
             estimatedCostUsd: 0.15
         )
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
+        let encoder = Self.testEncoder
         let data = try encoder.encode(event)
 
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = Self.testDecoder
         let decoded = try decoder.decode(LLMCostEvent.self, from: data)
 
         XCTAssertEqual(decoded.id, event.id)
@@ -2484,8 +2404,7 @@ extension AgentEventTypesTests {
             cacheReadInputTokens: 5,
             estimatedCostUsd: 0.01
         )
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
+        let encoder = Self.testEncoder
         let data = try encoder.encode(event)
         let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
 
@@ -2527,8 +2446,7 @@ extension AgentEventTypesTests {
         {"id":"cost-id","timestamp":"2024-01-15T12:00:00Z","session_id":"cost-sess","model":"glm-5.1","input_tokens":3000,"output_tokens":1500,"cache_creation_input_tokens":500,"cache_read_input_tokens":200,"estimated_cost_usd":0.075}
         """
         let data = jsonString.data(using: .utf8)!
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = Self.testDecoder
         let event = try decoder.decode(LLMCostEvent.self, from: data)
 
         XCTAssertEqual(event.id, "cost-id")
@@ -2545,8 +2463,7 @@ extension AgentEventTypesTests {
         {"id":"n","timestamp":"2024-01-15T12:00:00Z","session_id":null,"model":"m","input_tokens":100,"output_tokens":50,"cache_creation_input_tokens":null,"cache_read_input_tokens":null,"estimated_cost_usd":0.01}
         """
         let data = jsonString.data(using: .utf8)!
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = Self.testDecoder
         let event = try decoder.decode(LLMCostEvent.self, from: data)
         XCTAssertNil(event.sessionId)
         XCTAssertNil(event.cacheCreationInputTokens)
@@ -2558,8 +2475,7 @@ extension AgentEventTypesTests {
         {"id":"n","timestamp":"2024-01-15T12:00:00Z","model":"m","input_tokens":100,"output_tokens":50,"estimated_cost_usd":0.01}
         """
         let data = jsonString.data(using: .utf8)!
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = Self.testDecoder
         let event = try decoder.decode(LLMCostEvent.self, from: data)
         XCTAssertNil(event.sessionId)
         XCTAssertNil(event.cacheCreationInputTokens)
@@ -2572,8 +2488,7 @@ extension AgentEventTypesTests {
         {"id":"bad","timestamp":"2024-01-15T12:00:00Z","model":"m"}
         """
         let data = jsonString.data(using: .utf8)!
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = Self.testDecoder
         XCTAssertThrowsError(try decoder.decode(LLMCostEvent.self, from: data))
     }
 
