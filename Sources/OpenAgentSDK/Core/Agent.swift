@@ -1418,52 +1418,15 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
         let (mcpTools, mcpManager) = await assembleFullToolPool()
 
         // Session lifecycle wiring (Story 17-7)
-        // Resolve the active session ID based on continueRecentSession / forkSession options.
-        // Execution order: continueRecentSession → forkSession → session restore → resumeSessionAt
-        var resolvedSessionId = options.sessionId
-        if let sessionStore = options.sessionStore {
-            // continueRecentSession: if no explicit sessionId, resolve most recent session
-            if options.continueRecentSession,
-               resolvedSessionId == nil || resolvedSessionId?.isEmpty == true {
-                if let sessions = try? await sessionStore.list(), let mostRecent = sessions.first {
-                    resolvedSessionId = mostRecent.id
-                }
-                // If no sessions exist, resolvedSessionId stays nil → new session behavior
-            }
-
-            // forkSession: fork the resolved session into a new copy
-            if options.forkSession, let sourceId = resolvedSessionId {
-                if let forkedId = try? await sessionStore.fork(sourceSessionId: sourceId) {
-                    resolvedSessionId = forkedId
-                }
-                // If fork returns nil (source doesn't exist), keep original sessionId
-            }
-        }
-
-        // Session restore: load history if sessionStore and resolvedSessionId are configured
-        var messages: [[String: Any]]
-        if let sessionStore = options.sessionStore, let sessionId = resolvedSessionId {
-            if let sessionData = try? await sessionStore.load(sessionId: sessionId) {
-                messages = sessionData.messages
-            } else {
-                messages = []
-            }
-
-            // resumeSessionAt: truncate history to the message with matching UUID
-            if let resumeAt = options.resumeSessionAt, !messages.isEmpty {
-                if let truncateIndex = messages.firstIndex(where: { msg in
-                    (msg["uuid"] as? String) == resumeAt || (msg["id"] as? String) == resumeAt
-                }) {
-                    messages = Array(messages[0...truncateIndex])
-                }
-                // If UUID not found, keep full history (no truncation, no error)
-            }
-
-            // Append new user message to restored (or empty) history
-            messages.append(["role": "user", "content": text])
-        } else {
-            messages = buildMessages(prompt: text)
-        }
+        let (resolvedSessionId, resolvedMessages) = await Self.resolveSessionMessages(
+            sessionStore: options.sessionStore,
+            sessionId: options.sessionId,
+            continueRecentSession: options.continueRecentSession,
+            forkSession: options.forkSession,
+            resumeSessionAt: options.resumeSessionAt,
+            text: text
+        )
+        var messages: [[String: Any]] = resolvedMessages ?? buildMessages(prompt: text)
 
         var totalUsage = TokenUsage(inputTokens: 0, outputTokens: 0)
         var totalCostUsd: Double = 0.0
@@ -1490,12 +1453,11 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
         var costTracker = CostTracker(model: model, maxBudgetUsd: options.maxBudgetUsd, label: options.agentLabel)
 
         // TraceRecorder: opt-in execution trace (JSONL)
-        var traceRecorder: TraceRecorder? = nil
-        if options.traceEnabled {
-            let traceBaseURL: URL? = options.traceBaseURL.map { URL(fileURLWithPath: $0) }
-            let runIdForTrace = options.runId ?? UUID().uuidString
-            traceRecorder = try? TraceRecorder(runId: runIdForTrace, baseURL: traceBaseURL)
-        }
+        let traceRecorder: TraceRecorder? = Self.createTraceRecorder(
+            enabled: options.traceEnabled,
+            baseURL: options.traceBaseURL,
+            runId: options.runId
+        )
         var traceStepIndex = 0
 
         // Emit SessionCreatedEvent (zero-overhead when sessionStore or eventBus is nil)
@@ -2241,44 +2203,17 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
 
                 // Session lifecycle wiring (Story 17-7)
                 // Resolve the active session ID based on continueRecentSession / forkSession options.
-                // Execution order: continueRecentSession → forkSession → session restore → resumeSessionAt
-                var resolvedSessionId = capturedSessionId
-                if let sessionStore = capturedSessionStore {
-                    // continueRecentSession: if no explicit sessionId, resolve most recent session
-                    if capturedContinueRecentSession,
-                       resolvedSessionId == nil || resolvedSessionId?.isEmpty == true {
-                        if let sessions = try? await sessionStore.list(), let mostRecent = sessions.first {
-                            resolvedSessionId = mostRecent.id
-                        }
-                    }
-
-                    // forkSession: fork the resolved session into a new copy
-                    if capturedForkSession, let sourceId = resolvedSessionId {
-                        if let forkedId = try? await sessionStore.fork(sourceSessionId: sourceId) {
-                            resolvedSessionId = forkedId
-                        }
-                    }
-                }
-
-                // Session restore: load history if sessionStore and resolvedSessionId are configured
-                if let sessionStore = capturedSessionStore, let sessionId = resolvedSessionId {
-                    if let sessionData = try? await sessionStore.load(sessionId: sessionId) {
-                        messages = sessionData.messages
-                    } else {
-                        messages = []
-                    }
-
-                    // resumeSessionAt: truncate history to the message with matching UUID
-                    if let resumeAt = capturedResumeSessionAt, !messages.isEmpty {
-                        if let truncateIndex = messages.firstIndex(where: { msg in
-                            (msg["uuid"] as? String) == resumeAt || (msg["id"] as? String) == resumeAt
-                        }) {
-                            messages = Array(messages[0...truncateIndex])
-                        }
-                    }
-
-                    // Append new user message to restored (or empty) history
-                    messages.append(["role": "user", "content": text])
+                // Session lifecycle wiring (Story 17-7)
+                let (resolvedSessionId, resolvedSessionMessages) = await Self.resolveSessionMessages(
+                    sessionStore: capturedSessionStore,
+                    sessionId: capturedSessionId,
+                    continueRecentSession: capturedContinueRecentSession,
+                    forkSession: capturedForkSession,
+                    resumeSessionAt: capturedResumeSessionAt,
+                    text: text
+                )
+                if let resolvedMsgs = resolvedSessionMessages {
+                    messages = resolvedMsgs
                 }
 
                 let currentInvocationMessageStartIndex = messages.count
@@ -2351,12 +2286,11 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                 var streamCostTracker = CostTracker(model: capturedModel, maxBudgetUsd: capturedMaxBudgetUsd, label: capturedAgentLabel)
 
                 // TraceRecorder: opt-in execution trace (JSONL)
-                var streamTraceRecorder: TraceRecorder? = nil
-                if capturedTraceEnabled {
-                    let traceBaseURL: URL? = capturedTraceBaseURL.map { URL(fileURLWithPath: $0) }
-                    let runIdForTrace = capturedRunId ?? UUID().uuidString
-                    streamTraceRecorder = try? TraceRecorder(runId: runIdForTrace, baseURL: traceBaseURL)
-                }
+                let streamTraceRecorder: TraceRecorder? = Self.createTraceRecorder(
+                    enabled: capturedTraceEnabled,
+                    baseURL: capturedTraceBaseURL,
+                    runId: capturedRunId
+                )
                 var traceStepIndex = 0
 
                 while turnCount < capturedMaxTurns {
@@ -3423,6 +3357,78 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
     private static func computeDurationMs(_ elapsed: Duration) -> Int {
         Int(elapsed.components.seconds * 1000)
             + Int(elapsed.components.attoseconds / 1_000_000_000_000)
+    }
+
+    /// Resolve session lifecycle: continueRecentSession → forkSession → session restore → resumeSessionAt.
+    ///
+    /// Returns `(resolvedSessionId, messages)` where `messages` is nil when no session is configured
+    /// (caller should fall back to `buildMessages()` or use pre-loaded messages).
+    private static func resolveSessionMessages(
+        sessionStore: SessionStore?,
+        sessionId: String?,
+        continueRecentSession: Bool,
+        forkSession: Bool,
+        resumeSessionAt: String?,
+        text: String
+    ) async -> (resolvedSessionId: String?, messages: [[String: Any]]?) {
+        var resolvedSessionId = sessionId
+
+        if let sessionStore = sessionStore {
+            // continueRecentSession: if no explicit sessionId, resolve most recent session
+            if continueRecentSession,
+               resolvedSessionId == nil || resolvedSessionId?.isEmpty == true {
+                if let sessions = try? await sessionStore.list(), let mostRecent = sessions.first {
+                    resolvedSessionId = mostRecent.id
+                }
+                // If no sessions exist, resolvedSessionId stays nil → new session behavior
+            }
+
+            // forkSession: fork the resolved session into a new copy
+            if forkSession, let sourceId = resolvedSessionId {
+                if let forkedId = try? await sessionStore.fork(sourceSessionId: sourceId) {
+                    resolvedSessionId = forkedId
+                }
+                // If fork returns nil (source doesn't exist), keep original sessionId
+            }
+        }
+
+        // Session restore: load history if sessionStore and resolvedSessionId are configured
+        if let sessionStore = sessionStore, let sessionId = resolvedSessionId {
+            var messages: [[String: Any]]
+            if let sessionData = try? await sessionStore.load(sessionId: sessionId) {
+                messages = sessionData.messages
+            } else {
+                messages = []
+            }
+
+            // resumeSessionAt: truncate history to the message with matching UUID
+            if let resumeAt = resumeSessionAt, !messages.isEmpty {
+                if let truncateIndex = messages.firstIndex(where: { msg in
+                    (msg["uuid"] as? String) == resumeAt || (msg["id"] as? String) == resumeAt
+                }) {
+                    messages = Array(messages[0...truncateIndex])
+                }
+                // If UUID not found, keep full history (no truncation, no error)
+            }
+
+            // Append new user message to restored (or empty) history
+            messages.append(["role": "user", "content": text])
+            return (resolvedSessionId, messages)
+        }
+
+        return (resolvedSessionId, nil)
+    }
+
+    /// Create a TraceRecorder if tracing is enabled.
+    private static func createTraceRecorder(
+        enabled: Bool,
+        baseURL: String?,
+        runId: String?
+    ) -> TraceRecorder? {
+        guard enabled else { return nil }
+        let traceBaseURL: URL? = baseURL.map { URL(fileURLWithPath: $0) }
+        let runIdForTrace = runId ?? UUID().uuidString
+        return try? TraceRecorder(runId: runIdForTrace, baseURL: traceBaseURL)
     }
 
     /// Extract assistant text generated during the current invocation.
