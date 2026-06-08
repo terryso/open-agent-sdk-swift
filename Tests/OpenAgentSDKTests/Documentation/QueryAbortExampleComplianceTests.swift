@@ -7,50 +7,16 @@ import Foundation
 
 final class QueryAbortExampleComplianceTests: XCTestCase {
 
-    // MARK: - Helper: Resolve project root
-
-    /// Walk upward from this test file to find the directory containing Package.swift.
-    private func projectRoot() -> String {
-        let fileManager = FileManager.default
-        let testFileDir = URL(fileURLWithPath: #file).deletingLastPathComponent().path
-        var dir = testFileDir
-        for _ in 0..<10 {
-            let packagePath = dir + "/Package.swift"
-            if fileManager.fileExists(atPath: packagePath) {
-                return dir
-            }
-            let parent = URL(fileURLWithPath: dir).deletingLastPathComponent().path
-            if parent == dir { break }
-            dir = parent
-        }
-        return testFileDir
-    }
-
-    private func examplesDir() -> String {
-        return projectRoot() + "/Examples"
-    }
+    // MARK: - Helpers
 
     private func examplePath() -> String {
-        return examplesDir() + "/QueryAbortExample/main.swift"
-    }
-
-    private func fileContent(_ path: String) -> String? {
-        return try? String(contentsOfFile: path, encoding: .utf8)
-    }
-
-    private func packageSwiftContent() -> String {
-        let path = projectRoot() + "/Package.swift"
-        guard let content = try? String(contentsOfFile: path, encoding: .utf8) else {
-            XCTFail("Package.swift should be readable")
-            return ""
-        }
-        return content
+        return DocumentationTestHelpers.examplesDir() + "/QueryAbortExample/main.swift"
     }
 
     // MARK: - AC6: Package.swift executableTarget Configured
 
     func testPackageSwiftContainsQueryAbortExampleTarget() {
-        let content = packageSwiftContent()
+        let content = DocumentationTestHelpers.packageSwiftContent()
         XCTAssertTrue(
             content.contains("QueryAbortExample"),
             "Package.swift should contain QueryAbortExample executable target"
@@ -58,7 +24,7 @@ final class QueryAbortExampleComplianceTests: XCTestCase {
     }
 
     func testQueryAbortExampleTargetDependsOnOpenAgentSDK() {
-        let content = packageSwiftContent()
+        let content = DocumentationTestHelpers.packageSwiftContent()
         XCTAssertTrue(
             content.contains("QueryAbortExample"),
             "Package.swift should contain QueryAbortExample target before checking dependencies"
@@ -78,7 +44,7 @@ final class QueryAbortExampleComplianceTests: XCTestCase {
     }
 
     func testQueryAbortExampleTargetSpecifiesCorrectPath() {
-        let content = packageSwiftContent()
+        let content = DocumentationTestHelpers.packageSwiftContent()
         XCTAssertTrue(
             content.contains("QueryAbortExample"),
             "Package.swift should contain QueryAbortExample target before checking path"
@@ -103,7 +69,7 @@ final class QueryAbortExampleComplianceTests: XCTestCase {
         let fileManager = FileManager.default
         var isDir: ObjCBool = false
         let exists = fileManager.fileExists(
-            atPath: examplesDir() + "/QueryAbortExample",
+            atPath: DocumentationTestHelpers.examplesDir() + "/QueryAbortExample",
             isDirectory: &isDir
         )
         XCTAssertTrue(exists, "Examples/QueryAbortExample/ directory should exist")
@@ -119,7 +85,7 @@ final class QueryAbortExampleComplianceTests: XCTestCase {
     }
 
     func testQueryAbortExampleImportsOpenAgentSDK() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/QueryAbortExample/main.swift should be readable")
             return
         }
@@ -130,7 +96,7 @@ final class QueryAbortExampleComplianceTests: XCTestCase {
     }
 
     func testQueryAbortExampleImportsFoundation() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/QueryAbortExample/main.swift should be readable")
             return
         }
@@ -143,7 +109,7 @@ final class QueryAbortExampleComplianceTests: XCTestCase {
     // MARK: - AC1: Code Quality
 
     func testQueryAbortExampleHasTopLevelDescriptionComment() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/QueryAbortExample/main.swift should be readable")
             return
         }
@@ -155,7 +121,7 @@ final class QueryAbortExampleComplianceTests: XCTestCase {
     }
 
     func testQueryAbortExampleHasMultipleInlineComments() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/QueryAbortExample/main.swift should be readable")
             return
         }
@@ -169,7 +135,7 @@ final class QueryAbortExampleComplianceTests: XCTestCase {
     }
 
     func testQueryAbortExampleHasMarkSections() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/QueryAbortExample/main.swift should be readable")
             return
         }
@@ -181,7 +147,7 @@ final class QueryAbortExampleComplianceTests: XCTestCase {
     }
 
     func testQueryAbortExampleDoesNotUseForceUnwrap() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/QueryAbortExample/main.swift should be readable")
             return
         }
@@ -198,7 +164,7 @@ final class QueryAbortExampleComplianceTests: XCTestCase {
     }
 
     func testQueryAbortExampleDoesNotExposeRealAPIKeys() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/QueryAbortExample/main.swift should be readable")
             return
         }
@@ -209,7 +175,7 @@ final class QueryAbortExampleComplianceTests: XCTestCase {
     }
 
     func testQueryAbortExampleUsesLoadDotEnvPattern() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/QueryAbortExample/main.swift should be readable")
             return
         }
@@ -220,7 +186,7 @@ final class QueryAbortExampleComplianceTests: XCTestCase {
     }
 
     func testQueryAbortExampleUsesGetEnvPattern() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/QueryAbortExample/main.swift should be readable")
             return
         }
@@ -231,7 +197,7 @@ final class QueryAbortExampleComplianceTests: XCTestCase {
     }
 
     func testQueryAbortExampleUsesBypassPermissions() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/QueryAbortExample/main.swift should be readable")
             return
         }
@@ -242,7 +208,7 @@ final class QueryAbortExampleComplianceTests: XCTestCase {
     }
 
     func testQueryAbortExampleUsesCreateAgent() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/QueryAbortExample/main.swift should be readable")
             return
         }
@@ -255,7 +221,7 @@ final class QueryAbortExampleComplianceTests: XCTestCase {
     // MARK: - AC2: Task.cancel() Cancellation
 
     func testQueryAbortExampleUsesTaskBlock() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/QueryAbortExample/main.swift should be readable")
             return
         }
@@ -269,7 +235,7 @@ final class QueryAbortExampleComplianceTests: XCTestCase {
     }
 
     func testQueryAbortExampleCallsTaskCancel() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/QueryAbortExample/main.swift should be readable")
             return
         }
@@ -280,7 +246,7 @@ final class QueryAbortExampleComplianceTests: XCTestCase {
     }
 
     func testQueryAbortExampleUsesTaskSleep() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/QueryAbortExample/main.swift should be readable")
             return
         }
@@ -292,7 +258,7 @@ final class QueryAbortExampleComplianceTests: XCTestCase {
     }
 
     func testQueryAbortExampleChecksIsCancelled() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/QueryAbortExample/main.swift should be readable")
             return
         }
@@ -303,7 +269,7 @@ final class QueryAbortExampleComplianceTests: XCTestCase {
     }
 
     func testQueryAbortExampleUsesPromptAPI() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/QueryAbortExample/main.swift should be readable")
             return
         }
@@ -314,7 +280,7 @@ final class QueryAbortExampleComplianceTests: XCTestCase {
     }
 
     func testQueryAbortExampleUsesAwait() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/QueryAbortExample/main.swift should be readable")
             return
         }
@@ -327,7 +293,7 @@ final class QueryAbortExampleComplianceTests: XCTestCase {
     // MARK: - AC3: Agent.interrupt() Cancellation
 
     func testQueryAbortExampleCallsAgentInterrupt() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/QueryAbortExample/main.swift should be readable")
             return
         }
@@ -338,7 +304,7 @@ final class QueryAbortExampleComplianceTests: XCTestCase {
     }
 
     func testQueryAbortExampleDemonstratesSecondCancellationMechanism() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/QueryAbortExample/main.swift should be readable")
             return
         }
@@ -354,7 +320,7 @@ final class QueryAbortExampleComplianceTests: XCTestCase {
     // MARK: - AC4: Partial Results Handling
 
     func testQueryAbortExampleInspectsPartialText() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/QueryAbortExample/main.swift should be readable")
             return
         }
@@ -366,7 +332,7 @@ final class QueryAbortExampleComplianceTests: XCTestCase {
     }
 
     func testQueryAbortExampleInspectsNumTurns() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/QueryAbortExample/main.swift should be readable")
             return
         }
@@ -377,7 +343,7 @@ final class QueryAbortExampleComplianceTests: XCTestCase {
     }
 
     func testQueryAbortExampleInspectsUsage() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/QueryAbortExample/main.swift should be readable")
             return
         }
@@ -391,7 +357,7 @@ final class QueryAbortExampleComplianceTests: XCTestCase {
     // MARK: - AC5: Stream Cancellation
 
     func testQueryAbortExampleUsesStreamAPI() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/QueryAbortExample/main.swift should be readable")
             return
         }
@@ -402,7 +368,7 @@ final class QueryAbortExampleComplianceTests: XCTestCase {
     }
 
     func testQueryAbortExampleIteratesAsyncStream() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/QueryAbortExample/main.swift should be readable")
             return
         }
@@ -413,7 +379,7 @@ final class QueryAbortExampleComplianceTests: XCTestCase {
     }
 
     func testQueryAbortExampleHandlesSDKMessageResult() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/QueryAbortExample/main.swift should be readable")
             return
         }
@@ -424,7 +390,7 @@ final class QueryAbortExampleComplianceTests: XCTestCase {
     }
 
     func testQueryAbortExampleChecksCancelledSubtype() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/QueryAbortExample/main.swift should be readable")
             return
         }
@@ -435,7 +401,7 @@ final class QueryAbortExampleComplianceTests: XCTestCase {
     }
 
     func testQueryAbortExampleHasThreeParts() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/QueryAbortExample/main.swift should be readable")
             return
         }
@@ -451,7 +417,7 @@ final class QueryAbortExampleComplianceTests: XCTestCase {
     // MARK: - AC1 / Build Verification: assert() usage for compliance testing
 
     func testQueryAbortExampleUsesAssertions() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/QueryAbortExample/main.swift should be readable")
             return
         }

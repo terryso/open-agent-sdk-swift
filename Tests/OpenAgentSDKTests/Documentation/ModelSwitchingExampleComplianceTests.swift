@@ -7,50 +7,16 @@ import Foundation
 
 final class ModelSwitchingExampleComplianceTests: XCTestCase {
 
-    // MARK: - Helper: Resolve project root
-
-    /// Walk upward from this test file to find the directory containing Package.swift.
-    private func projectRoot() -> String {
-        let fileManager = FileManager.default
-        let testFileDir = URL(fileURLWithPath: #file).deletingLastPathComponent().path
-        var dir = testFileDir
-        for _ in 0..<10 {
-            let packagePath = dir + "/Package.swift"
-            if fileManager.fileExists(atPath: packagePath) {
-                return dir
-            }
-            let parent = URL(fileURLWithPath: dir).deletingLastPathComponent().path
-            if parent == dir { break }
-            dir = parent
-        }
-        return testFileDir
-    }
-
-    private func examplesDir() -> String {
-        return projectRoot() + "/Examples"
-    }
+    // MARK: - Helpers
 
     private func examplePath() -> String {
-        return examplesDir() + "/ModelSwitchingExample/main.swift"
-    }
-
-    private func fileContent(_ path: String) -> String? {
-        return try? String(contentsOfFile: path, encoding: .utf8)
-    }
-
-    private func packageSwiftContent() -> String {
-        let path = projectRoot() + "/Package.swift"
-        guard let content = try? String(contentsOfFile: path, encoding: .utf8) else {
-            XCTFail("Package.swift should be readable")
-            return ""
-        }
-        return content
+        return DocumentationTestHelpers.examplesDir() + "/ModelSwitchingExample/main.swift"
     }
 
     // MARK: - AC6: Package.swift executableTarget Configured
 
     func testPackageSwiftContainsModelSwitchingExampleTarget() {
-        let content = packageSwiftContent()
+        let content = DocumentationTestHelpers.packageSwiftContent()
         XCTAssertTrue(
             content.contains("ModelSwitchingExample"),
             "Package.swift should contain ModelSwitchingExample executable target"
@@ -58,7 +24,7 @@ final class ModelSwitchingExampleComplianceTests: XCTestCase {
     }
 
     func testModelSwitchingExampleTargetDependsOnOpenAgentSDK() {
-        let content = packageSwiftContent()
+        let content = DocumentationTestHelpers.packageSwiftContent()
         XCTAssertTrue(
             content.contains("ModelSwitchingExample"),
             "Package.swift should contain ModelSwitchingExample target before checking dependencies"
@@ -78,7 +44,7 @@ final class ModelSwitchingExampleComplianceTests: XCTestCase {
     }
 
     func testModelSwitchingExampleTargetSpecifiesCorrectPath() {
-        let content = packageSwiftContent()
+        let content = DocumentationTestHelpers.packageSwiftContent()
         XCTAssertTrue(
             content.contains("ModelSwitchingExample"),
             "Package.swift should contain ModelSwitchingExample target before checking path"
@@ -103,7 +69,7 @@ final class ModelSwitchingExampleComplianceTests: XCTestCase {
         let fileManager = FileManager.default
         var isDir: ObjCBool = false
         let exists = fileManager.fileExists(
-            atPath: examplesDir() + "/ModelSwitchingExample",
+            atPath: DocumentationTestHelpers.examplesDir() + "/ModelSwitchingExample",
             isDirectory: &isDir
         )
         XCTAssertTrue(exists, "Examples/ModelSwitchingExample/ directory should exist")
@@ -119,7 +85,7 @@ final class ModelSwitchingExampleComplianceTests: XCTestCase {
     }
 
     func testModelSwitchingExampleImportsOpenAgentSDK() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/ModelSwitchingExample/main.swift should be readable")
             return
         }
@@ -130,7 +96,7 @@ final class ModelSwitchingExampleComplianceTests: XCTestCase {
     }
 
     func testModelSwitchingExampleImportsFoundation() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/ModelSwitchingExample/main.swift should be readable")
             return
         }
@@ -143,7 +109,7 @@ final class ModelSwitchingExampleComplianceTests: XCTestCase {
     // MARK: - AC1: Code Quality
 
     func testModelSwitchingExampleHasTopLevelDescriptionComment() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/ModelSwitchingExample/main.swift should be readable")
             return
         }
@@ -155,7 +121,7 @@ final class ModelSwitchingExampleComplianceTests: XCTestCase {
     }
 
     func testModelSwitchingExampleHasMultipleInlineComments() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/ModelSwitchingExample/main.swift should be readable")
             return
         }
@@ -169,7 +135,7 @@ final class ModelSwitchingExampleComplianceTests: XCTestCase {
     }
 
     func testModelSwitchingExampleHasMarkSections() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/ModelSwitchingExample/main.swift should be readable")
             return
         }
@@ -181,7 +147,7 @@ final class ModelSwitchingExampleComplianceTests: XCTestCase {
     }
 
     func testModelSwitchingExampleDoesNotUseForceUnwrap() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/ModelSwitchingExample/main.swift should be readable")
             return
         }
@@ -198,7 +164,7 @@ final class ModelSwitchingExampleComplianceTests: XCTestCase {
     }
 
     func testModelSwitchingExampleDoesNotExposeRealAPIKeys() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/ModelSwitchingExample/main.swift should be readable")
             return
         }
@@ -209,7 +175,7 @@ final class ModelSwitchingExampleComplianceTests: XCTestCase {
     }
 
     func testModelSwitchingExampleUsesLoadDotEnvPattern() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/ModelSwitchingExample/main.swift should be readable")
             return
         }
@@ -220,7 +186,7 @@ final class ModelSwitchingExampleComplianceTests: XCTestCase {
     }
 
     func testModelSwitchingExampleUsesGetEnvPattern() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/ModelSwitchingExample/main.swift should be readable")
             return
         }
@@ -233,7 +199,7 @@ final class ModelSwitchingExampleComplianceTests: XCTestCase {
     // MARK: - AC2: Default Model Query
 
     func testModelSwitchingExampleCreatesAgentWithDefaultModel() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/ModelSwitchingExample/main.swift should be readable")
             return
         }
@@ -244,7 +210,7 @@ final class ModelSwitchingExampleComplianceTests: XCTestCase {
     }
 
     func testModelSwitchingExampleReferencesClaudeSonnet() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/ModelSwitchingExample/main.swift should be readable")
             return
         }
@@ -255,7 +221,7 @@ final class ModelSwitchingExampleComplianceTests: XCTestCase {
     }
 
     func testModelSwitchingExampleUsesPromptAPI() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/ModelSwitchingExample/main.swift should be readable")
             return
         }
@@ -266,7 +232,7 @@ final class ModelSwitchingExampleComplianceTests: XCTestCase {
     }
 
     func testModelSwitchingExampleExecutesFirstQuery() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/ModelSwitchingExample/main.swift should be readable")
             return
         }
@@ -283,7 +249,7 @@ final class ModelSwitchingExampleComplianceTests: XCTestCase {
     }
 
     func testModelSwitchingExampleUsesBypassPermissions() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/ModelSwitchingExample/main.swift should be readable")
             return
         }
@@ -296,7 +262,7 @@ final class ModelSwitchingExampleComplianceTests: XCTestCase {
     // MARK: - AC3: Model Switching
 
     func testModelSwitchingExampleCallsSwitchModel() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/ModelSwitchingExample/main.swift should be readable")
             return
         }
@@ -307,7 +273,7 @@ final class ModelSwitchingExampleComplianceTests: XCTestCase {
     }
 
     func testModelSwitchingExampleSwitchesToOpus() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/ModelSwitchingExample/main.swift should be readable")
             return
         }
@@ -318,7 +284,7 @@ final class ModelSwitchingExampleComplianceTests: XCTestCase {
     }
 
     func testModelSwitchingExampleExecutesSecondQuery() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/ModelSwitchingExample/main.swift should be readable")
             return
         }
@@ -331,7 +297,7 @@ final class ModelSwitchingExampleComplianceTests: XCTestCase {
     }
 
     func testModelSwitchingExampleVerifiesModelAfterSwitch() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/ModelSwitchingExample/main.swift should be readable")
             return
         }
@@ -345,7 +311,7 @@ final class ModelSwitchingExampleComplianceTests: XCTestCase {
     // MARK: - AC4: Cost Breakdown
 
     func testModelSwitchingExampleReferencesCostBreakdown() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/ModelSwitchingExample/main.swift should be readable")
             return
         }
@@ -356,7 +322,7 @@ final class ModelSwitchingExampleComplianceTests: XCTestCase {
     }
 
     func testModelSwitchingExampleDemonstratesPerModelCostEntries() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/ModelSwitchingExample/main.swift should be readable")
             return
         }
@@ -369,7 +335,7 @@ final class ModelSwitchingExampleComplianceTests: XCTestCase {
     }
 
     func testModelSwitchingExampleDisplaysTokenCounts() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/ModelSwitchingExample/main.swift should be readable")
             return
         }
@@ -381,7 +347,7 @@ final class ModelSwitchingExampleComplianceTests: XCTestCase {
     }
 
     func testModelSwitchingExampleDisplaysCostUsd() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/ModelSwitchingExample/main.swift should be readable")
             return
         }
@@ -392,7 +358,7 @@ final class ModelSwitchingExampleComplianceTests: XCTestCase {
     }
 
     func testModelSwitchingExamplePrintsUsageInfo() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/ModelSwitchingExample/main.swift should be readable")
             return
         }
@@ -406,7 +372,7 @@ final class ModelSwitchingExampleComplianceTests: XCTestCase {
     // MARK: - AC5: Error Handling for Empty Model
 
     func testModelSwitchingExampleDemonstratesEmptyModelError() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/ModelSwitchingExample/main.swift should be readable")
             return
         }
@@ -418,7 +384,7 @@ final class ModelSwitchingExampleComplianceTests: XCTestCase {
     }
 
     func testModelSwitchingExampleUsesTryCatch() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/ModelSwitchingExample/main.swift should be readable")
             return
         }
@@ -433,7 +399,7 @@ final class ModelSwitchingExampleComplianceTests: XCTestCase {
     }
 
     func testModelSwitchingExampleCatchesSDKError() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/ModelSwitchingExample/main.swift should be readable")
             return
         }
@@ -444,7 +410,7 @@ final class ModelSwitchingExampleComplianceTests: XCTestCase {
     }
 
     func testModelSwitchingExampleCatchesInvalidConfiguration() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/ModelSwitchingExample/main.swift should be readable")
             return
         }
@@ -455,7 +421,7 @@ final class ModelSwitchingExampleComplianceTests: XCTestCase {
     }
 
     func testModelSwitchingExampleVerifiesModelUnchangedAfterError() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/ModelSwitchingExample/main.swift should be readable")
             return
         }
@@ -471,7 +437,7 @@ final class ModelSwitchingExampleComplianceTests: XCTestCase {
     // MARK: - AC1 / Build Verification: assert() usage for compliance testing
 
     func testModelSwitchingExampleUsesAssertions() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/ModelSwitchingExample/main.swift should be readable")
             return
         }

@@ -7,50 +7,16 @@ import Foundation
 
 final class SkillsExampleComplianceTests: XCTestCase {
 
-    // MARK: - Helper: Resolve project root
-
-    /// Walk upward from this test file to find the directory containing Package.swift.
-    private func projectRoot() -> String {
-        let fileManager = FileManager.default
-        let testFileDir = URL(fileURLWithPath: #file).deletingLastPathComponent().path
-        var dir = testFileDir
-        for _ in 0..<10 {
-            let packagePath = dir + "/Package.swift"
-            if fileManager.fileExists(atPath: packagePath) {
-                return dir
-            }
-            let parent = URL(fileURLWithPath: dir).deletingLastPathComponent().path
-            if parent == dir { break }
-            dir = parent
-        }
-        return testFileDir
-    }
-
-    private func examplesDir() -> String {
-        return projectRoot() + "/Examples"
-    }
+    // MARK: - Helpers
 
     private func examplePath() -> String {
-        return examplesDir() + "/SkillsExample/main.swift"
-    }
-
-    private func fileContent(_ path: String) -> String? {
-        return try? String(contentsOfFile: path, encoding: .utf8)
-    }
-
-    private func packageSwiftContent() -> String {
-        let path = projectRoot() + "/Package.swift"
-        guard let content = try? String(contentsOfFile: path, encoding: .utf8) else {
-            XCTFail("Package.swift should be readable")
-            return ""
-        }
-        return content
+        return DocumentationTestHelpers.examplesDir() + "/SkillsExample/main.swift"
     }
 
     // MARK: - AC8: Package.swift executableTarget Configured
 
     func testPackageSwiftContainsSkillsExampleTarget() {
-        let content = packageSwiftContent()
+        let content = DocumentationTestHelpers.packageSwiftContent()
         XCTAssertTrue(
             content.contains("SkillsExample"),
             "Package.swift should contain SkillsExample executable target"
@@ -58,7 +24,7 @@ final class SkillsExampleComplianceTests: XCTestCase {
     }
 
     func testSkillsExampleTargetDependsOnOpenAgentSDK() {
-        let content = packageSwiftContent()
+        let content = DocumentationTestHelpers.packageSwiftContent()
         XCTAssertTrue(
             content.contains("SkillsExample"),
             "Package.swift should contain SkillsExample target before checking dependencies"
@@ -78,7 +44,7 @@ final class SkillsExampleComplianceTests: XCTestCase {
     }
 
     func testSkillsExampleTargetSpecifiesCorrectPath() {
-        let content = packageSwiftContent()
+        let content = DocumentationTestHelpers.packageSwiftContent()
         XCTAssertTrue(
             content.contains("SkillsExample"),
             "Package.swift should contain SkillsExample target before checking path"
@@ -103,7 +69,7 @@ final class SkillsExampleComplianceTests: XCTestCase {
         let fileManager = FileManager.default
         var isDir: ObjCBool = false
         let exists = fileManager.fileExists(
-            atPath: examplesDir() + "/SkillsExample",
+            atPath: DocumentationTestHelpers.examplesDir() + "/SkillsExample",
             isDirectory: &isDir
         )
         XCTAssertTrue(exists, "Examples/SkillsExample/ directory should exist")
@@ -119,7 +85,7 @@ final class SkillsExampleComplianceTests: XCTestCase {
     }
 
     func testSkillsExampleImportsOpenAgentSDK() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/SkillsExample/main.swift should be readable")
             return
         }
@@ -130,7 +96,7 @@ final class SkillsExampleComplianceTests: XCTestCase {
     }
 
     func testSkillsExampleImportsFoundation() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/SkillsExample/main.swift should be readable")
             return
         }
@@ -143,7 +109,7 @@ final class SkillsExampleComplianceTests: XCTestCase {
     // MARK: - AC2: Built-in Skills Initialization
 
     func testSkillsExampleCreatesSkillRegistry() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/SkillsExample/main.swift should be readable")
             return
         }
@@ -154,7 +120,7 @@ final class SkillsExampleComplianceTests: XCTestCase {
     }
 
     func testSkillsExampleRegistersAllBuiltInSkills() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/SkillsExample/main.swift should be readable")
             return
         }
@@ -169,7 +135,7 @@ final class SkillsExampleComplianceTests: XCTestCase {
     }
 
     func testSkillsExampleRegistersBuiltInSkillsIntoRegistry() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/SkillsExample/main.swift should be readable")
             return
         }
@@ -182,7 +148,7 @@ final class SkillsExampleComplianceTests: XCTestCase {
     // MARK: - AC3: List All Registered Skills
 
     func testSkillsExampleOutputsAllRegisteredSkills() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/SkillsExample/main.swift should be readable")
             return
         }
@@ -193,7 +159,7 @@ final class SkillsExampleComplianceTests: XCTestCase {
     }
 
     func testSkillsExamplePrintsSkillNameDescriptionAndAliases() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/SkillsExample/main.swift should be readable")
             return
         }
@@ -210,7 +176,7 @@ final class SkillsExampleComplianceTests: XCTestCase {
     // MARK: - AC4: List User-Invocable Skills
 
     func testSkillsExampleOutputsUserInvocableSkills() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/SkillsExample/main.swift should be readable")
             return
         }
@@ -221,7 +187,7 @@ final class SkillsExampleComplianceTests: XCTestCase {
     }
 
     func testSkillsExampleDemonstratesFilteringDifference() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/SkillsExample/main.swift should be readable")
             return
         }
@@ -235,7 +201,7 @@ final class SkillsExampleComplianceTests: XCTestCase {
     // MARK: - AC5: Register Custom Skill
 
     func testSkillsExampleRegistersCustomSkill() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/SkillsExample/main.swift should be readable")
             return
         }
@@ -248,7 +214,7 @@ final class SkillsExampleComplianceTests: XCTestCase {
     }
 
     func testSkillsExampleCustomSkillHasPromptTemplate() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/SkillsExample/main.swift should be readable")
             return
         }
@@ -259,7 +225,7 @@ final class SkillsExampleComplianceTests: XCTestCase {
     }
 
     func testSkillsExampleCustomSkillHasAliases() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/SkillsExample/main.swift should be readable")
             return
         }
@@ -272,7 +238,7 @@ final class SkillsExampleComplianceTests: XCTestCase {
     }
 
     func testSkillsExampleCustomSkillAppearsInAllSkills() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/SkillsExample/main.swift should be readable")
             return
         }
@@ -288,7 +254,7 @@ final class SkillsExampleComplianceTests: XCTestCase {
     // MARK: - AC6: Find Skill by Name and Alias
 
     func testSkillsExampleDemonstratesFindByName() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/SkillsExample/main.swift should be readable")
             return
         }
@@ -299,7 +265,7 @@ final class SkillsExampleComplianceTests: XCTestCase {
     }
 
     func testSkillsExampleDemonstratesFindByAlias() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/SkillsExample/main.swift should be readable")
             return
         }
@@ -332,7 +298,7 @@ final class SkillsExampleComplianceTests: XCTestCase {
     // MARK: - AC7: Agent Invokes Skill via LLM
 
     func testSkillsExampleCreatesAgentWithSkillTool() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/SkillsExample/main.swift should be readable")
             return
         }
@@ -343,7 +309,7 @@ final class SkillsExampleComplianceTests: XCTestCase {
     }
 
     func testSkillsExampleAppendsSkillToolToTools() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/SkillsExample/main.swift should be readable")
             return
         }
@@ -358,7 +324,7 @@ final class SkillsExampleComplianceTests: XCTestCase {
     }
 
     func testSkillsExampleCreatesAgentWithOptions() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/SkillsExample/main.swift should be readable")
             return
         }
@@ -369,7 +335,7 @@ final class SkillsExampleComplianceTests: XCTestCase {
     }
 
     func testSkillsExamplePassesToolsIncludingSkillTool() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/SkillsExample/main.swift should be readable")
             return
         }
@@ -380,7 +346,7 @@ final class SkillsExampleComplianceTests: XCTestCase {
     }
 
     func testSkillsExampleUsesBypassPermissions() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/SkillsExample/main.swift should be readable")
             return
         }
@@ -391,7 +357,7 @@ final class SkillsExampleComplianceTests: XCTestCase {
     }
 
     func testSkillsExampleSendsQueryToAgent() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/SkillsExample/main.swift should be readable")
             return
         }
@@ -402,7 +368,7 @@ final class SkillsExampleComplianceTests: XCTestCase {
     }
 
     func testSkillsExamplePrintsAgentResponse() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/SkillsExample/main.swift should be readable")
             return
         }
@@ -414,7 +380,7 @@ final class SkillsExampleComplianceTests: XCTestCase {
     }
 
     func testSkillsExamplePrintsQueryStatistics() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/SkillsExample/main.swift should be readable")
             return
         }
@@ -431,7 +397,7 @@ final class SkillsExampleComplianceTests: XCTestCase {
     // MARK: - API Key Loading Pattern (follows existing example conventions)
 
     func testSkillsExampleUsesLoadDotEnvPattern() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/SkillsExample/main.swift should be readable")
             return
         }
@@ -442,7 +408,7 @@ final class SkillsExampleComplianceTests: XCTestCase {
     }
 
     func testSkillsExampleUsesGetEnvPattern() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/SkillsExample/main.swift should be readable")
             return
         }
@@ -453,7 +419,7 @@ final class SkillsExampleComplianceTests: XCTestCase {
     }
 
     func testSkillsExampleDoesNotExposeRealAPIKeys() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/SkillsExample/main.swift should be readable")
             return
         }
@@ -479,7 +445,7 @@ final class SkillsExampleComplianceTests: XCTestCase {
     // MARK: - Code Quality and Documentation
 
     func testSkillsExampleHasTopLevelDescriptionComment() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/SkillsExample/main.swift should be readable")
             return
         }
@@ -491,7 +457,7 @@ final class SkillsExampleComplianceTests: XCTestCase {
     }
 
     func testSkillsExampleHasMultipleInlineComments() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/SkillsExample/main.swift should be readable")
             return
         }
@@ -505,7 +471,7 @@ final class SkillsExampleComplianceTests: XCTestCase {
     }
 
     func testSkillsExampleHasMarkSections() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/SkillsExample/main.swift should be readable")
             return
         }
@@ -517,7 +483,7 @@ final class SkillsExampleComplianceTests: XCTestCase {
     }
 
     func testSkillsExampleDoesNotUseForceUnwrap() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/SkillsExample/main.swift should be readable")
             return
         }
@@ -537,7 +503,7 @@ final class SkillsExampleComplianceTests: XCTestCase {
     // MARK: - Uses Actual Public API Signatures
 
     func testSkillsExampleUsesRealSkillStructInit() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/SkillsExample/main.swift should be readable")
             return
         }
@@ -556,7 +522,7 @@ final class SkillsExampleComplianceTests: XCTestCase {
     }
 
     func testSkillsExampleUsesRealQueryResultProperties() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/SkillsExample/main.swift should be readable")
             return
         }
@@ -571,7 +537,7 @@ final class SkillsExampleComplianceTests: XCTestCase {
     }
 
     func testSkillsExampleUsesAwaitForPrompt() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/SkillsExample/main.swift should be readable")
             return
         }

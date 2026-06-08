@@ -6,27 +6,8 @@ import Foundation
 
 final class DocCComplianceTests: XCTestCase {
 
-    // MARK: - Helper: Resolve project root
-
-    /// Walk upward from this test file to find the directory containing Package.swift.
-    private func projectRoot() -> String {
-        let fileManager = FileManager.default
-        let testFileDir = URL(fileURLWithPath: #file).deletingLastPathComponent().path
-        var dir = testFileDir
-        for _ in 0..<10 {
-            let packagePath = dir + "/Package.swift"
-            if fileManager.fileExists(atPath: packagePath) {
-                return dir
-            }
-            let parent = URL(fileURLWithPath: dir).deletingLastPathComponent().path
-            if parent == dir { break }
-            dir = parent
-        }
-        return testFileDir
-    }
-
     private func sourcesDir() -> String {
-        return projectRoot() + "/Sources/OpenAgentSDK"
+        return DocumentationTestHelpers.projectRoot() + "/Sources/OpenAgentSDK"
     }
 
     private func doccDir() -> String {
@@ -81,7 +62,7 @@ final class DocCComplianceTests: XCTestCase {
     // MARK: - AC2: DocC Plugin Integration
 
     func testPackageSwiftContainsDocCPluginDependency() {
-        let packagePath = projectRoot() + "/Package.swift"
+        let packagePath = DocumentationTestHelpers.projectRoot() + "/Package.swift"
         let content = try? String(contentsOfFile: packagePath, encoding: .utf8)
 
         XCTAssertNotNil(content, "Package.swift should be readable")
