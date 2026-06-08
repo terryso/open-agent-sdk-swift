@@ -274,9 +274,7 @@ public struct FrozenSnapshot: Sendable, Codable, Equatable {
     }
 
     private static func computeSnapshotId(domain: String, frozenAt: Date) -> String {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        let input = domain + ":" + formatter.string(from: frozenAt)
+        let input = domain + ":" + makeISO8601DateFormatter().string(from: frozenAt)
         var hash: UInt64 = 5381
         for byte in input.utf8 {
             hash = ((hash &<< 5) &+ hash) &+ UInt64(byte)

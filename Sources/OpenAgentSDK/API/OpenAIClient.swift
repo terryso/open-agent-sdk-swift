@@ -376,7 +376,7 @@ public actor OpenAIClient: LLMClient {
                 let function = toolCall["function"] as? [String: Any] ?? [:]
                 let name = function["name"] as? String ?? ""
                 let argumentsStr = function["arguments"] as? String ?? "{}"
-                let input = parseInputJson(argumentsStr)
+                let input = parseJSONToDict(argumentsStr) ?? [:]
 
                 content.append([
                     "type": "tool_use",
@@ -577,16 +577,5 @@ public actor OpenAIClient: LLMClient {
         }
 
         return events
-    }
-
-    // MARK: - Helpers
-
-    private static func parseInputJson(_ jsonString: String) -> [String: Any] {
-        guard !jsonString.isEmpty,
-              let data = jsonString.data(using: .utf8),
-              let dict = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any] else {
-            return [:]
-        }
-        return dict
     }
 }
