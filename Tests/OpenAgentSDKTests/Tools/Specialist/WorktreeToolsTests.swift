@@ -20,66 +20,15 @@ final class WorktreeToolsTests: XCTestCase {
 
     override class func setUp() {
         super.setUp()
-        templateRepoPath = createTemplateGitRepo()
+        templateRepoPath = createTemplateGitRepo(prefix: "worktree-tool-test-template")
     }
 
     override class func tearDown() {
         if let path = templateRepoPath {
-            try? FileManager.default.removeItem(atPath: path)
+            cleanupTempDir(path)
             templateRepoPath = nil
         }
         super.tearDown()
-    }
-
-    /// Creates a template git repo once for all tests to copy from.
-    private static func createTemplateGitRepo() -> String? {
-        let tempDir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("worktree-tool-test-template-\(UUID().uuidString)")
-        do {
-            try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
-
-            let gitInit = Process()
-            gitInit.executableURL = URL(fileURLWithPath: "/usr/bin/git")
-            gitInit.arguments = ["init"]
-            gitInit.currentDirectoryURL = tempDir
-            try gitInit.run()
-            gitInit.waitUntilExit()
-
-            let gitConfig = Process()
-            gitConfig.executableURL = URL(fileURLWithPath: "/usr/bin/git")
-            gitConfig.arguments = ["config", "user.email", "test@example.com"]
-            gitConfig.currentDirectoryURL = tempDir
-            try gitConfig.run()
-            gitConfig.waitUntilExit()
-
-            let gitConfigName = Process()
-            gitConfigName.executableURL = URL(fileURLWithPath: "/usr/bin/git")
-            gitConfigName.arguments = ["config", "user.name", "Test User"]
-            gitConfigName.currentDirectoryURL = tempDir
-            try gitConfigName.run()
-            gitConfigName.waitUntilExit()
-
-            let dummyFile = tempDir.appendingPathComponent("README.md")
-            try "test".write(to: dummyFile, atomically: true, encoding: .utf8)
-
-            let gitAdd = Process()
-            gitAdd.executableURL = URL(fileURLWithPath: "/usr/bin/git")
-            gitAdd.arguments = ["add", "."]
-            gitAdd.currentDirectoryURL = tempDir
-            try gitAdd.run()
-            gitAdd.waitUntilExit()
-
-            let gitCommit = Process()
-            gitCommit.executableURL = URL(fileURLWithPath: "/usr/bin/git")
-            gitCommit.arguments = ["commit", "-m", "Initial commit"]
-            gitCommit.currentDirectoryURL = tempDir
-            try gitCommit.run()
-            gitCommit.waitUntilExit()
-
-            return tempDir.path
-        } catch {
-            return nil
-        }
     }
 
     // MARK: - Helpers
@@ -93,30 +42,10 @@ final class WorktreeToolsTests: XCTestCase {
         )
     }
 
-    /// Creates a ToolContext without any WorktreeStore (nil).
-    private func makeContextWithoutStore() -> ToolContext {
-        return ToolContext(
-            cwd: "/tmp",
-            toolUseId: "test-tool-use-id"
-        )
-    }
-
     /// Creates a temporary Git repository by copying the shared template.
     /// Returns the path to the temp directory. Caller is responsible for cleanup.
-    private func createTempGitRepo() throws -> String {
-        guard let templatePath = Self.templateRepoPath else {
-            throw NSError(domain: "WorktreeToolsTests", code: -1,
-                          userInfo: [NSLocalizedDescriptionKey: "Template repo not available"])
-        }
-        let newDir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("worktree-tool-test-\(UUID().uuidString)")
-        try FileManager.default.copyItem(at: URL(fileURLWithPath: templatePath), to: newDir)
-        return newDir.path
-    }
-
-    /// Removes a temporary directory.
-    private func cleanupTempDir(_ path: String) {
-        try? FileManager.default.removeItem(atPath: path)
+    private func cloneTemplateRepo() throws -> String {
+        try createTempGitRepo(fromTemplate: Self.templateRepoPath, prefix: "worktree-tool-test")
     }
 
     // MARK: - AC2: EnterWorktree Tool -- Factory
@@ -160,7 +89,7 @@ final class WorktreeToolsTests: XCTestCase {
     /// AC2 [P0]: Creating a worktree with a name returns success with path and branch.
     func testEnterWorktree_withName_returnsSuccess() async throws {
         let worktreeStore = WorktreeStore()
-        let tempDir = try createTempGitRepo()
+        let tempDir = try cloneTemplateRepo()
         defer { cleanupTempDir(tempDir) }
 
         let tool = createEnterWorktreeTool()
@@ -177,7 +106,7 @@ final class WorktreeToolsTests: XCTestCase {
     /// AC2 [P0]: After EnterWorktree, the worktree is tracked in the store.
     func testEnterWorktree_trackedInStore() async throws {
         let worktreeStore = WorktreeStore()
-        let tempDir = try createTempGitRepo()
+        let tempDir = try cloneTemplateRepo()
         defer { cleanupTempDir(tempDir) }
 
         let tool = createEnterWorktreeTool()
@@ -210,7 +139,7 @@ final class WorktreeToolsTests: XCTestCase {
     /// AC6 [P0]: EnterWorktree input Codable correctly decodes JSON fields.
     func testEnterWorktree_inputDecodable() async throws {
         let worktreeStore = WorktreeStore()
-        let tempDir = try createTempGitRepo()
+        let tempDir = try cloneTemplateRepo()
         defer { cleanupTempDir(tempDir) }
 
         let tool = createEnterWorktreeTool()
@@ -273,7 +202,7 @@ final class WorktreeToolsTests: XCTestCase {
     /// AC3 [P0]: Exiting a worktree with action="remove" removes it.
     func testExitWorktree_actionRemove_returnsSuccess() async throws {
         let worktreeStore = WorktreeStore()
-        let tempDir = try createTempGitRepo()
+        let tempDir = try cloneTemplateRepo()
         defer { cleanupTempDir(tempDir) }
 
         // First create a worktree
@@ -294,7 +223,7 @@ final class WorktreeToolsTests: XCTestCase {
     /// AC3 [P0]: Default action for ExitWorktree is "remove".
     func testExitWorktree_defaultActionIsRemove() async throws {
         let worktreeStore = WorktreeStore()
-        let tempDir = try createTempGitRepo()
+        let tempDir = try cloneTemplateRepo()
         defer { cleanupTempDir(tempDir) }
 
         let entry = try await worktreeStore.create(name: "default-remove", originalCwd: tempDir)
@@ -314,7 +243,7 @@ final class WorktreeToolsTests: XCTestCase {
     /// AC3 [P0]: Exiting a worktree with action="keep" preserves filesystem.
     func testExitWorktree_actionKeep_returnsSuccess() async throws {
         let worktreeStore = WorktreeStore()
-        let tempDir = try createTempGitRepo()
+        let tempDir = try cloneTemplateRepo()
         defer { cleanupTempDir(tempDir) }
 
         let entry = try await worktreeStore.create(name: "to-keep", originalCwd: tempDir)
@@ -354,7 +283,7 @@ final class WorktreeToolsTests: XCTestCase {
     /// AC9 [P0]: EnterWorktree returns error when worktreeStore is nil.
     func testEnterWorktree_nilWorktreeStore_returnsError() async throws {
         let tool = createEnterWorktreeTool()
-        let context = makeContextWithoutStore()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = ["name": "test"]
         let result = await tool.call(input: input, context: context)
@@ -367,7 +296,7 @@ final class WorktreeToolsTests: XCTestCase {
     /// AC9 [P0]: ExitWorktree returns error when worktreeStore is nil.
     func testExitWorktree_nilWorktreeStore_returnsError() async throws {
         let tool = createExitWorktreeTool()
-        let context = makeContextWithoutStore()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = ["id": "worktree_1"]
         let result = await tool.call(input: input, context: context)
@@ -382,7 +311,7 @@ final class WorktreeToolsTests: XCTestCase {
     /// AC9 [P0]: EnterWorktree never throws -- always returns ToolResult even with malformed input.
     func testEnterWorktree_neverThrows_malformedInput() async throws {
         let tool = createEnterWorktreeTool()
-        let context = makeContextWithoutStore()
+        let context = makeTestToolContext()
 
         let badInputs: [[String: Any]] = [
             [:],              // missing all fields
@@ -399,7 +328,7 @@ final class WorktreeToolsTests: XCTestCase {
     /// AC9 [P0]: ExitWorktree never throws -- always returns ToolResult even with malformed input.
     func testExitWorktree_neverThrows_malformedInput() async throws {
         let tool = createExitWorktreeTool()
-        let context = makeContextWithoutStore()
+        let context = makeTestToolContext()
 
         let badInputs: [[String: Any]] = [
             [:],              // missing all fields
@@ -490,7 +419,7 @@ final class WorktreeToolsTests: XCTestCase {
     /// Integration [P1]: Enter a worktree, then exit with remove.
     func testIntegration_enterThenExit() async throws {
         let worktreeStore = WorktreeStore()
-        let tempDir = try createTempGitRepo()
+        let tempDir = try cloneTemplateRepo()
         defer { cleanupTempDir(tempDir) }
 
         let enterTool = createEnterWorktreeTool()
@@ -523,7 +452,7 @@ final class WorktreeToolsTests: XCTestCase {
     /// Integration [P1]: Enter a worktree, then exit with keep.
     func testIntegration_enterThenKeep() async throws {
         let worktreeStore = WorktreeStore()
-        let tempDir = try createTempGitRepo()
+        let tempDir = try cloneTemplateRepo()
         defer { cleanupTempDir(tempDir) }
 
         let enterTool = createEnterWorktreeTool()
