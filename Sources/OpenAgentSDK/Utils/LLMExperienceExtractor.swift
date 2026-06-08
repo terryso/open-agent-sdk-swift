@@ -151,15 +151,7 @@ public struct LLMExperienceExtractor: ExperienceExtractor, Sendable {
     }
 
     private func parseExtractionResponse(_ text: String) -> ParsedExtraction {
-        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            return ParsedExtraction(signals: [], parseFailureCount: 0)
-        }
-
-        let jsonText = stripCodeFences(text)
-
-        guard let data = jsonText.data(using: .utf8),
-              let jsonArray = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]]
-        else {
+        guard let jsonArray = parseLLMResponseAsArray(text) else {
             Logger.shared.warn("LLMExperienceExtractor", "malformed_json_response", data: [
                 "responsePreview": String(text.prefix(200)),
             ])

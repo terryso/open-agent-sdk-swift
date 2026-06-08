@@ -67,3 +67,29 @@ func parseJSONToDict(_ jsonString: String) -> [String: Any]? {
           let data = jsonString.data(using: .utf8) else { return nil }
     return try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any]
 }
+
+/// Parse an LLM response (possibly wrapped in code fences) as a JSON object.
+///
+/// Handles the common 3-step pipeline used by skill evolver, prompt evolver, and
+/// experience extractor: trim whitespace → strip code fences → parse JSON object.
+///
+/// - Parameter text: The raw LLM response text.
+/// - Returns: The parsed `[String: Any]` dictionary, or `nil` on failure.
+func parseLLMResponseAsObject(_ text: String) -> [String: Any]? {
+    let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return nil }
+    return parseJSONToDict(stripCodeFences(trimmed))
+}
+
+/// Parse an LLM response (possibly wrapped in code fences) as a JSON array.
+///
+/// Handles the common 3-step pipeline: trim whitespace → strip code fences → parse JSON array.
+///
+/// - Parameter text: The raw LLM response text.
+/// - Returns: The parsed `[[String: Any]]` array, or `nil` on failure.
+func parseLLMResponseAsArray(_ text: String) -> [[String: Any]]? {
+    let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return nil }
+    guard let data = stripCodeFences(trimmed).data(using: .utf8) else { return nil }
+    return try? JSONSerialization.jsonObject(with: data, options: []) as? [[String: Any]]
+}
