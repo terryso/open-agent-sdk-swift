@@ -5,8 +5,8 @@ import Foundation
 /// Shared helpers for parsing LLM API responses.
 ///
 /// These are used by multiple LLM-calling components (skill evolver, experience
-/// extractor, prompt evolver) to extract text content and strip code fences from
-/// raw API response dictionaries.
+/// extractor, prompt evolver, streaming dispatchers) to extract text content,
+/// strip code fences, and parse JSON strings from raw API response dictionaries.
 
 /// Extract the first text block from an LLM response dictionary.
 ///
@@ -52,4 +52,18 @@ func stripCodeFences(_ text: String) -> String {
     }
 
     return trimmed.trimmingCharacters(in: .whitespacesAndNewlines)
+}
+
+/// Parse a JSON string into a `[String: Any]` dictionary.
+///
+/// Returns `nil` if the string is empty, cannot be converted to UTF-8 data,
+/// or is not valid JSON / not a JSON object. Used by SSE event dispatchers,
+/// tool input parsers, and OpenAI response converters.
+///
+/// - Parameter jsonString: The JSON string to parse.
+/// - Returns: The parsed dictionary, or `nil` on failure.
+func parseJSONToDict(_ jsonString: String) -> [String: Any]? {
+    guard !jsonString.isEmpty,
+          let data = jsonString.data(using: .utf8) else { return nil }
+    return try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any]
 }

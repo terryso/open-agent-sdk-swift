@@ -2505,7 +2505,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                                         "type": "tool_use",
                                         "id": accumulated.id,
                                         "name": accumulated.name,
-                                        "input": Self.parseInputJson(accumulated.inputJson)
+                                        "input": parseJSONToDict(accumulated.inputJson) ?? [:]
                                     ]
                                     contentBlocks.append(block)
 
@@ -2792,7 +2792,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                     if currentStopReason == "tool_use" && !toolUseAccumulator.isEmpty {
                         // Convert accumulated tool_use data to ToolUseBlock array
                         let toolUseBlocks = toolUseAccumulator.sorted(by: { $0.key < $1.key }).map { _, item in
-                            ToolUseBlock(id: item.id, name: item.name, input: Self.parseInputJson(item.inputJson))
+                            ToolUseBlock(id: item.id, name: item.name, input: parseJSONToDict(item.inputJson) ?? [:])
                         }
 
                         if !toolUseBlocks.isEmpty {
@@ -3175,20 +3175,6 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
             return content
         }
         return await microCompact(client: client, model: model, content: content)
-    }
-
-    /// Parse a JSON string into a dictionary, returning empty dict on failure.
-    ///
-    /// Used when converting accumulated tool_use input JSON from SSE deltas.
-    /// - Parameter jsonString: The JSON string to parse.
-    /// - Returns: The parsed dictionary, or an empty dictionary on failure.
-    private static func parseInputJson(_ jsonString: String) -> [String: Any] {
-        guard !jsonString.isEmpty,
-              let data = jsonString.data(using: .utf8),
-              let dict = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any] else {
-            return [:]
-        }
-        return dict
     }
 
     /// Yield an error result to the stream continuation and finish it.

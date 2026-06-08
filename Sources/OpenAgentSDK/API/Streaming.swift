@@ -54,14 +54,14 @@ struct SSEEventDispatcher {
     static func dispatch(event: String, data: String) -> SSEEvent? {
         switch event {
         case "message_start":
-            guard let dict = parseJSONDict(data),
+            guard let dict = parseJSONToDict(data),
                   let message = dict["message"] as? [String: Any] else {
                 return nil
             }
             return .messageStart(message: message)
 
         case "content_block_start":
-            guard let dict = parseJSONDict(data),
+            guard let dict = parseJSONToDict(data),
                   let index = dict["index"] as? Int,
                   let contentBlock = dict["content_block"] as? [String: Any] else {
                 return nil
@@ -69,7 +69,7 @@ struct SSEEventDispatcher {
             return .contentBlockStart(index: index, contentBlock: contentBlock)
 
         case "content_block_delta":
-            guard let dict = parseJSONDict(data),
+            guard let dict = parseJSONToDict(data),
                   let index = dict["index"] as? Int,
                   let delta = dict["delta"] as? [String: Any] else {
                 return nil
@@ -77,14 +77,14 @@ struct SSEEventDispatcher {
             return .contentBlockDelta(index: index, delta: delta)
 
         case "content_block_stop":
-            guard let dict = parseJSONDict(data),
+            guard let dict = parseJSONToDict(data),
                   let index = dict["index"] as? Int else {
                 return nil
             }
             return .contentBlockStop(index: index)
 
         case "message_delta":
-            guard let dict = parseJSONDict(data),
+            guard let dict = parseJSONToDict(data),
                   let delta = dict["delta"] as? [String: Any],
                   let usage = dict["usage"] as? [String: Any] else {
                 return nil
@@ -98,7 +98,7 @@ struct SSEEventDispatcher {
             return .ping
 
         case "error":
-            guard let dict = parseJSONDict(data) else {
+            guard let dict = parseJSONToDict(data) else {
                 return nil
             }
             return .error(data: dict)
@@ -106,11 +106,5 @@ struct SSEEventDispatcher {
         default:
             return nil
         }
-    }
-
-    /// Safely parses a JSON string into a dictionary.
-    private static func parseJSONDict(_ jsonString: String) -> [String: Any]? {
-        guard let data = jsonString.data(using: .utf8) else { return nil }
-        return try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any]
     }
 }
