@@ -13,30 +13,7 @@ import XCTest
 ///   - `AgentOptions.memoryStore` property is added
 ///   - `ToolContext.memoryStore` field is added
 /// TDD Phase: RED (feature not implemented yet)
-final class MemoryStoreTests: XCTestCase {
-
-    // MARK: - Properties
-
-    private var tempDir: String!
-
-    // MARK: - Setup / Teardown
-
-    override func setUp() {
-        super.setUp()
-        tempDir = (NSTemporaryDirectory() as NSString)
-            .appendingPathComponent("memory-store-tests-\(UUID().uuidString)")
-        try? FileManager.default.createDirectory(
-            atPath: tempDir,
-            withIntermediateDirectories: true
-        )
-    }
-
-    override func tearDown() {
-        if let tempDir {
-            try? FileManager.default.removeItem(atPath: tempDir)
-        }
-        super.tearDown()
-    }
+final class MemoryStoreTests: TempDirTestCase {
 
     // MARK: - Helper: Create KnowledgeEntry
 

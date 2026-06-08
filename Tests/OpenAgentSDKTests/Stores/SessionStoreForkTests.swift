@@ -7,30 +7,7 @@ import XCTest
 /// All tests assert EXPECTED behavior. They will FAIL until:
 ///   - `SessionStore.fork(sourceSessionId:newSessionId:upToMessageIndex:)` is implemented
 /// TDD Phase: RED (feature not implemented yet)
-final class SessionStoreForkTests: XCTestCase {
-
-    // MARK: - Properties
-
-    private var tempDir: String!
-
-    // MARK: - Setup / Teardown
-
-    override func setUp() {
-        super.setUp()
-        tempDir = (NSTemporaryDirectory() as NSString)
-            .appendingPathComponent("session-fork-tests-\(UUID().uuidString)")
-        try? FileManager.default.createDirectory(
-            atPath: tempDir,
-            withIntermediateDirectories: true
-        )
-    }
-
-    override func tearDown() {
-        if let tempDir {
-            try? FileManager.default.removeItem(atPath: tempDir)
-        }
-        super.tearDown()
-    }
+final class SessionStoreForkTests: TempDirTestCase {
 
     // MARK: - Helpers
 
