@@ -27,19 +27,8 @@ public actor OpenAIClient: LLMClient {
     ///   - urlSession: Optional custom URLSession (useful for testing).
     public init(apiKey: String, baseURL: String? = nil, urlSession: URLSession? = nil) {
         self.apiKey = apiKey
-
-        let urlString = baseURL ?? "https://api.openai.com/v1"
-        if let parsedURL = URL(string: urlString) {
-            self.baseURL = parsedURL
-        } else {
-            self.baseURL = URL(string: "https://api.openai.com/v1")!
-        }
-
-        if let urlSession {
-            self.urlSession = urlSession
-        } else {
-            self.urlSession = URLSession.shared
-        }
+        self.baseURL = resolveBaseURL(custom: baseURL, default: "https://api.openai.com/v1")
+        self.urlSession = urlSession ?? URLSession.shared
     }
 
     // MARK: - LLMClient Conformance
@@ -62,8 +51,8 @@ public actor OpenAIClient: LLMClient {
         )
 
         let request = try buildRequest(body: body)
-        let (data, response) = try await sendRequest(request, urlSession: urlSession)
-        try validateHTTPResponse(response, data: data, apiKey: apiKey)
+        let (data, response) = try await performLLMRequest(request, urlSession: urlSession, apiKey: apiKey)
+        try validateLLMHTTPResponse(response, data: data, apiKey: apiKey)
 
         return try Self.convertResponse(data: data)
     }
@@ -86,8 +75,8 @@ public actor OpenAIClient: LLMClient {
         )
 
         let request = try buildRequest(body: body)
-        let (data, response) = try await sendRequest(request, urlSession: urlSession)
-        try validateHTTPResponse(response, data: data, apiKey: apiKey)
+        let (data, response) = try await performLLMRequest(request, urlSession: urlSession, apiKey: apiKey)
+        try validateLLMHTTPResponse(response, data: data, apiKey: apiKey)
 
         guard let responseText = String(data: data, encoding: .utf8) else {
             throw SDKError.apiError(statusCode: 0, message: "Empty streaming response")
@@ -152,43 +141,6 @@ public actor OpenAIClient: LLMClient {
         }
 
         return request
-    }
-
-    // MARK: - Network
-
-    private nonisolated func sendRequest(
-        _ request: URLRequest,
-        urlSession: URLSession
-    ) async throws -> (Data, URLResponse) {
-        do {
-            return try await urlSession.data(for: request)
-        } catch let error as URLError {
-            let statusCode = error.code == .timedOut ? 408 : 0
-            let safeMessage = error.localizedDescription.replacingOccurrences(of: apiKey, with: "***")
-            throw SDKError.apiError(statusCode: statusCode, message: safeMessage)
-        }
-    }
-
-    private nonisolated func validateHTTPResponse(
-        _ response: URLResponse?,
-        data: Data?,
-        apiKey: String
-    ) throws {
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw SDKError.apiError(statusCode: 0, message: "Invalid response")
-        }
-
-        guard (200...299).contains(httpResponse.statusCode) else {
-            var errorMessage = "HTTP \(httpResponse.statusCode)"
-            if let data,
-               let json = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any],
-               let error = json["error"] as? [String: Any],
-               let message = error["message"] as? String {
-                errorMessage = message
-            }
-            let safeMessage = errorMessage.replacingOccurrences(of: apiKey, with: "***")
-            throw SDKError.apiError(statusCode: httpResponse.statusCode, message: safeMessage)
-        }
     }
 
     // MARK: - Message Conversion (Anthropic → OpenAI)
