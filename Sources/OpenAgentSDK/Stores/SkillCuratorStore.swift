@@ -12,17 +12,8 @@ public actor SkillCuratorStore {
 
     private let customSkillsDir: String?
     private var cachedState: CuratorState?
-    private let jsonEncoder: JSONEncoder = {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        encoder.dateEncodingStrategy = .iso8601
-        return encoder
-    }()
-    private let jsonDecoder: JSONDecoder = {
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return decoder
-    }()
+    private let jsonEncoder = makeSDKJSONEncoder()
+    private let jsonDecoder = makeSDKJSONDecoder()
 
     // MARK: - Initialization
 
@@ -31,11 +22,7 @@ public actor SkillCuratorStore {
     /// - Parameter skillsDir: Optional custom directory path. Defaults to `~/.open-agent-sdk/skills/`.
     public init(skillsDir: String? = nil) {
         self.customSkillsDir = skillsDir
-        self.cachedState = Self.loadSync(from: resolveSkillsDir(customDir: skillsDir), decoder: {
-            let d = JSONDecoder()
-            d.dateDecodingStrategy = .iso8601
-            return d
-        }())
+        self.cachedState = Self.loadSync(from: resolveSkillsDir(customDir: skillsDir), decoder: makeSDKJSONDecoder())
     }
 
     // MARK: - Public API

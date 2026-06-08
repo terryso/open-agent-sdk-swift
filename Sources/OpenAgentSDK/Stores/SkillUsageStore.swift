@@ -12,17 +12,8 @@ public actor SkillUsageStore {
 
     private let customSkillsDir: String?
     private var cache: [String: SkillUsageData] = [:]
-    private let jsonEncoder: JSONEncoder = {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        encoder.dateEncodingStrategy = .iso8601
-        return encoder
-    }()
-    private let jsonDecoder: JSONDecoder = {
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return decoder
-    }()
+    private let jsonEncoder = makeSDKJSONEncoder()
+    private let jsonDecoder = makeSDKJSONDecoder()
 
     // MARK: - Initialization
 
@@ -32,11 +23,7 @@ public actor SkillUsageStore {
     public init(skillsDir: String? = nil) {
         self.customSkillsDir = skillsDir
         let resolvedDir = resolveSkillsDir(customDir: skillsDir)
-        self.cache = Self.loadSync(from: resolvedDir, decoder: {
-            let d = JSONDecoder()
-            d.dateDecodingStrategy = .iso8601
-            return d
-        }())
+        self.cache = Self.loadSync(from: resolvedDir, decoder: makeSDKJSONDecoder())
     }
 
     // MARK: - Public API
