@@ -678,20 +678,14 @@ final class ResumeSessionAtWiringTests: TempDirTestCase {
 
 /// Tests for Story 17-7 AC4: persistSession wiring verification.
 /// Verifies that persistSession gates session save in all code paths.
-final class PersistSessionWiringTests: XCTestCase {
-
-    private var tempDir: String!
+final class PersistSessionWiringTests: TempDirTestCase {
 
     override func setUp() {
         super.setUp()
         SessionWiringMockURLProtocol.reset()
-        tempDir = (NSTemporaryDirectory() as NSString)
-            .appendingPathComponent("persist-wiring-\(UUID().uuidString)")
-        try? FileManager.default.createDirectory(atPath: tempDir, withIntermediateDirectories: true)
     }
 
     override func tearDown() {
-        if let tempDir { try? FileManager.default.removeItem(atPath: tempDir) }
         SessionWiringMockURLProtocol.reset()
         super.tearDown()
     }
@@ -818,20 +812,14 @@ final class PersistSessionWiringTests: XCTestCase {
 
 /// Tests for Story 17-7 AC5: Combined session option interactions.
 /// Verifies that session options work correctly when combined.
-final class CombinedSessionOptionsWiringTests: XCTestCase {
-
-    private var tempDir: String!
+final class CombinedSessionOptionsWiringTests: TempDirTestCase {
 
     override func setUp() {
         super.setUp()
         SessionWiringMockURLProtocol.reset()
-        tempDir = (NSTemporaryDirectory() as NSString)
-            .appendingPathComponent("combined-wiring-\(UUID().uuidString)")
-        try? FileManager.default.createDirectory(atPath: tempDir, withIntermediateDirectories: true)
     }
 
     override func tearDown() {
-        if let tempDir { try? FileManager.default.removeItem(atPath: tempDir) }
         SessionWiringMockURLProtocol.reset()
         super.tearDown()
     }
@@ -947,20 +935,14 @@ final class CombinedSessionOptionsWiringTests: XCTestCase {
 // MARK: - Stream() Path Verification Tests
 
 /// Tests verifying session wiring also works in the stream() code path.
-final class StreamSessionWiringTests: XCTestCase {
-
-    private var tempDir: String!
+final class StreamSessionWiringTests: TempDirTestCase {
 
     override func setUp() {
         super.setUp()
         SessionWiringMockURLProtocol.reset()
-        tempDir = (NSTemporaryDirectory() as NSString)
-            .appendingPathComponent("stream-wiring-\(UUID().uuidString)")
-        try? FileManager.default.createDirectory(atPath: tempDir, withIntermediateDirectories: true)
     }
 
     override func tearDown() {
-        if let tempDir { try? FileManager.default.removeItem(atPath: tempDir) }
         SessionWiringMockURLProtocol.reset()
         super.tearDown()
     }
