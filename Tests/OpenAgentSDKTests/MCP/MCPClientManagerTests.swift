@@ -16,14 +16,6 @@ final class MCPClientManagerTests: XCTestCase {
 
     // MARK: - Helpers
 
-    /// Creates a basic ToolContext with just cwd (no stores needed for MCP tests).
-    private func makeContext(toolUseId: String = "test-tool-use-id") -> ToolContext {
-        return ToolContext(
-            cwd: "/tmp",
-            toolUseId: toolUseId
-        )
-    }
-
     /// Creates a stdio server config for testing.
     private func makeStdioConfig(
         command: String = "echo",
@@ -213,7 +205,7 @@ final class MCPClientManagerTests: XCTestCase {
             mcpClient: nil
         )
 
-        let context = makeContext()
+        let context = makeTestToolContext()
         let result = await tool.call(input: [:], context: context)
 
         XCTAssertTrue(result.isError,
@@ -232,7 +224,7 @@ final class MCPClientManagerTests: XCTestCase {
             mcpClient: nil
         )
 
-        let context = makeContext()
+        let context = makeTestToolContext()
         // Various malformed inputs -- none should throw, all return ToolResult
         let result1 = await tool.call(input: [:], context: context)
         // With nil client, all calls should return error ToolResult (not throw)
@@ -792,7 +784,7 @@ final class MCPClientManagerTests: XCTestCase {
             mcpClient: mockClient
         )
 
-        let context = makeContext()
+        let context = makeTestToolContext()
         let result = await tool.call(input: ["name": "world"], context: context)
 
         XCTAssertFalse(result.isError, "Successful MCP call should not be error")
@@ -815,7 +807,7 @@ final class MCPClientManagerTests: XCTestCase {
             mcpClient: mockClient
         )
 
-        let context = makeContext()
+        let context = makeTestToolContext()
         let result = await tool.call(input: [:], context: context)
 
         XCTAssertTrue(result.isError,
@@ -835,7 +827,7 @@ final class MCPClientManagerTests: XCTestCase {
             mcpClient: mockClient
         )
 
-        let context = makeContext(toolUseId: "unique-id-123")
+        let context = makeTestToolContext(toolUseId: "unique-id-123")
         let result = await tool.call(input: [:], context: context)
 
         XCTAssertEqual(result.toolUseId, "unique-id-123")

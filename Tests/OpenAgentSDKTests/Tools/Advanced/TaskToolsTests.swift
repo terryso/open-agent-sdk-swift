@@ -28,14 +28,6 @@ final class TaskToolsTests: XCTestCase {
         )
     }
 
-    /// Creates a ToolContext without any TaskStore (nil).
-    private func makeTestToolContext() -> ToolContext {
-        return ToolContext(
-            cwd: "/tmp",
-            toolUseId: "test-tool-use-id"
-        )
-    }
-
     // MARK: - AC1: TaskCreate Tool
 
     // MARK: AC1 — Factory
