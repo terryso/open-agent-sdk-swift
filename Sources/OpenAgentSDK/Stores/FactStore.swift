@@ -330,14 +330,6 @@ public actor FactStore {
     }
 
     private func validateDomainName(_ domain: String) throws {
-        guard !domain.isEmpty else {
-            throw SDKError.sessionError(message: "Domain name must not be empty")
-        }
-        let forbidden = ["/", "\\", ".."]
-        for component in forbidden {
-            if domain.contains(component) {
-                throw SDKError.sessionError(message: "Domain name contains invalid character: '\(component)'")
-            }
-        }
+        try validatePathSafeIdentifier(domain, label: "Domain name")
     }
 }
