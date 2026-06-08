@@ -83,21 +83,7 @@ public func createReviewSkillUpdateTool(
                 let skillDir = try SkillWriter.write(skill: evolved, to: resolvedSkillsDir)
 
                 // Update registry with correct baseDir
-                let updatedSkill = Skill(
-                    name: evolved.name,
-                    description: evolved.description,
-                    aliases: evolved.aliases,
-                    userInvocable: evolved.userInvocable,
-                    toolRestrictions: evolved.toolRestrictions,
-                    modelOverride: evolved.modelOverride,
-                    promptTemplate: evolved.promptTemplate,
-                    whenToUse: evolved.whenToUse,
-                    argumentHint: evolved.argumentHint,
-                    baseDir: skillDir,
-                    supportingFiles: evolved.supportingFiles,
-                    lifecycleState: evolved.lifecycleState
-                )
-                skillRegistry.replace(updatedSkill)
+                skillRegistry.replace(evolved.withBaseDir(skillDir))
 
                 return reviewJSONResponse([
                     "success": true,

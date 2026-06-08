@@ -23,11 +23,7 @@ public struct ImportResult: Equatable, Sendable {
 /// Imports memory facts from a bundle, downgrading and merging with existing data.
 public struct MemoryBundleImportService {
 
-    private let jsonDecoder: JSONDecoder = {
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return decoder
-    }()
+    private let jsonDecoder: JSONDecoder = makeSDKJSONDecoder()
 
     public init() {}
 

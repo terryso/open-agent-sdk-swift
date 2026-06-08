@@ -3,12 +3,7 @@ import Foundation
 /// Exports memory facts as a portable JSON bundle.
 public struct MemoryBundleExportService {
 
-    private let jsonEncoder: JSONEncoder = {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        encoder.dateEncodingStrategy = .iso8601
-        return encoder
-    }()
+    private let jsonEncoder: JSONEncoder = makeSDKJSONEncoder()
 
     public init() {}
 
