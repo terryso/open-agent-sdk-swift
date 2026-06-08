@@ -1597,18 +1597,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                 }
 
                 // Structured log for API error
-                let statusCode: String
-                let errorMessage: String
-                if let sdkError = error as? SDKError, let code = sdkError.statusCode {
-                    statusCode = String(code)
-                    errorMessage = sdkError.message
-                } else if let urlError = error as? URLError {
-                    statusCode = String(urlError.errorCode)
-                    errorMessage = urlError.localizedDescription
-                } else {
-                    statusCode = "0"
-                    errorMessage = error.localizedDescription
-                }
+                let (statusCode, errorMessage) = Self.classifyError(error)
                 Logger.shared.error("QueryEngine", "api_error", data: [
                     "statusCode": statusCode,
                     "message": errorMessage
@@ -1728,16 +1717,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
             }
 
             // Check budget via CostTracker (structured check) with inline fallback for backward compat
-            let budgetResult = costTracker.checkBudget()
-            let budgetExceeded: Bool
-            if case .budgetExceeded = budgetResult {
-                budgetExceeded = true
-            } else if let budget = options.maxBudgetUsd, totalCostUsd > budget {
-                budgetExceeded = true
-            } else {
-                budgetExceeded = false
-            }
-            if budgetExceeded {
+            if Self.isBudgetExceeded(checkResult: costTracker.checkBudget(), maxBudgetUsd: options.maxBudgetUsd, totalCostUsd: totalCostUsd) {
                 status = .errorMaxBudgetUsd
                 // Structured log for budget exceeded
                 Logger.shared.warn("QueryEngine", "budget_exceeded", data: [
@@ -2316,18 +2296,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                         }, retryConfig: retryCfg)
                     } catch {
                         // Structured log for API error in stream
-                        let statusCode: String
-                        let errorMessage: String
-                        if let sdkError = error as? SDKError, let code = sdkError.statusCode {
-                            statusCode = String(code)
-                            errorMessage = sdkError.message
-                        } else if let urlError = error as? URLError {
-                            statusCode = String(urlError.errorCode)
-                            errorMessage = urlError.localizedDescription
-                        } else {
-                            statusCode = "0"
-                            errorMessage = error.localizedDescription
-                        }
+                        let (statusCode, errorMessage) = Self.classifyError(error)
                         Logger.shared.error("QueryEngine", "api_error", data: [
                             "statusCode": statusCode,
                             "message": errorMessage
@@ -2398,49 +2367,22 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                                 }
 
                                 // Check budget after input token cost accumulation
-                                let streamBudgetResult = streamCostTracker.checkBudget()
-                                let streamBudgetExceeded: Bool
-                                if case .budgetExceeded = streamBudgetResult {
-                                    streamBudgetExceeded = true
-                                } else if let budget = capturedMaxBudgetUsd, totalCostUsd > budget {
-                                    streamBudgetExceeded = true
-                                } else {
-                                    streamBudgetExceeded = false
-                                }
-                                if streamBudgetExceeded {
-                                    let elapsed = ContinuousClock.now - startTime
-                                    let durationMs = Self.computeDurationMs(elapsed)
-                                    let previousText = Self.extractCollectedText(
+                                if Self.isBudgetExceeded(checkResult: streamCostTracker.checkBudget(), maxBudgetUsd: capturedMaxBudgetUsd, totalCostUsd: totalCostUsd) {
+                                    await Self.handleBudgetExceededInStream(
+                                        continuation: continuation,
                                         messages: messages,
                                         startingAt: currentInvocationMessageStartIndex,
-                                        separator: " "
-                                    )
-
-                                    // Structured log for budget exceeded
-                                    Logger.shared.warn("QueryEngine", "budget_exceeded", data: [
-                                        "costUsd": String(format: "%.4f", totalCostUsd),
-                                        "budgetUsd": String(format: "%.4f", capturedMaxBudgetUsd ?? 0),
-                                        "turnsUsed": String(turnCount)
-                                    ])
-
-                                    // Fire hooks before yielding budget error
-                                    await Self.fireStopAndEndHooks(hookRegistry: capturedHookRegistry, cwd: capturedCwd)
-
-                                    let budgetStartResultMsg = SDKMessage.result(SDKMessage.ResultData(
-                                        subtype: .errorMaxBudgetUsd,
-                                        text: previousText,
+                                        accumulatedText: "",
                                         usage: totalUsage,
-                                        numTurns: turnCount,
-                                        durationMs: durationMs,
+                                        turnsUsed: turnCount,
+                                        startTime: startTime,
                                         totalCostUsd: totalCostUsd,
-                                        costBreakdown: Array(costByModel.values)
-                                    ))
-                                    continuation.yield(budgetStartResultMsg)
-                                    if let trace = streamTraceRecorder, let mapped = TraceEventMapping.traceEvent(from: budgetStartResultMsg) {
-                                        await trace.record(event: mapped.event, payload: mapped.payload)
-                                    }
-                                    await streamTraceRecorder?.close()
-                                    continuation.finish()
+                                        maxBudgetUsd: capturedMaxBudgetUsd,
+                                        costByModel: costByModel,
+                                        hookRegistry: capturedHookRegistry,
+                                        cwd: capturedCwd,
+                                        traceRecorder: streamTraceRecorder
+                                    )
                                     return
                                 }
 
@@ -2530,50 +2472,22 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                                 )
 
                                 // Check budget after cost accumulation via CostTracker + inline fallback
-                                let deltaBudgetResult = streamCostTracker.checkBudget()
-                                let deltaBudgetExceeded: Bool
-                                if case .budgetExceeded = deltaBudgetResult {
-                                    deltaBudgetExceeded = true
-                                } else if let budget = capturedMaxBudgetUsd, totalCostUsd > budget {
-                                    deltaBudgetExceeded = true
-                                } else {
-                                    deltaBudgetExceeded = false
-                                }
-                                if deltaBudgetExceeded {
-                                    let elapsed = ContinuousClock.now - startTime
-                                    let durationMs = Self.computeDurationMs(elapsed)
-                                    let previousText = Self.extractCollectedText(
+                                if Self.isBudgetExceeded(checkResult: streamCostTracker.checkBudget(), maxBudgetUsd: capturedMaxBudgetUsd, totalCostUsd: totalCostUsd) {
+                                    await Self.handleBudgetExceededInStream(
+                                        continuation: continuation,
                                         messages: messages,
                                         startingAt: currentInvocationMessageStartIndex,
-                                        separator: " "
-                                    )
-                                    let finalText = previousText.isEmpty ? accumulatedText : "\(previousText) \(accumulatedText)"
-
-                                    // Structured log for budget exceeded
-                                    Logger.shared.warn("QueryEngine", "budget_exceeded", data: [
-                                        "costUsd": String(format: "%.4f", totalCostUsd),
-                                        "budgetUsd": String(format: "%.4f", capturedMaxBudgetUsd ?? 0),
-                                        "turnsUsed": String(turnCount + 1)
-                                    ])
-
-                                    // Fire hooks before yielding budget error
-                                    await Self.fireStopAndEndHooks(hookRegistry: capturedHookRegistry, cwd: capturedCwd)
-
-                                    let budgetResultMsg = SDKMessage.result(SDKMessage.ResultData(
-                                        subtype: .errorMaxBudgetUsd,
-                                        text: finalText,
+                                        accumulatedText: accumulatedText,
                                         usage: totalUsage,
-                                        numTurns: turnCount + 1,
-                                        durationMs: durationMs,
+                                        turnsUsed: turnCount + 1,
+                                        startTime: startTime,
                                         totalCostUsd: totalCostUsd,
-                                        costBreakdown: Array(costByModel.values)
-                                    ))
-                                    continuation.yield(budgetResultMsg)
-                                    if let trace = streamTraceRecorder, let mapped = TraceEventMapping.traceEvent(from: budgetResultMsg) {
-                                        await trace.record(event: mapped.event, payload: mapped.payload)
-                                    }
-                                    await streamTraceRecorder?.close()
-                                    continuation.finish()
+                                        maxBudgetUsd: capturedMaxBudgetUsd,
+                                        costByModel: costByModel,
+                                        hookRegistry: capturedHookRegistry,
+                                        cwd: capturedCwd,
+                                        traceRecorder: streamTraceRecorder
+                                    )
                                     return
                                 }
 
@@ -3437,6 +3351,89 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
             messageCount: messages.count,
             messages: summaries
         ))
+    }
+
+    /// Classify an error into a (statusCode, message) tuple for logging and event emission.
+    ///
+    /// Handles three error types: SDKError (API errors with status codes), URLError (network
+    /// errors with integer codes), and generic errors (code "0").
+    private static func classifyError(_ error: Error) -> (statusCode: String, message: String) {
+        if let sdkError = error as? SDKError, let code = sdkError.statusCode {
+            return (String(code), sdkError.message)
+        } else if let urlError = error as? URLError {
+            return (String(urlError.errorCode), urlError.localizedDescription)
+        } else {
+            return ("0", error.localizedDescription)
+        }
+    }
+
+    /// Check whether the budget has been exceeded via either CostTracker or inline fallback.
+    ///
+    /// Unifies the 3 identical budget-check patterns across promptImpl and stream.
+    private static func isBudgetExceeded(
+        checkResult: BudgetCheckResult,
+        maxBudgetUsd: Double?,
+        totalCostUsd: Double
+    ) -> Bool {
+        if case .budgetExceeded = checkResult {
+            return true
+        } else if let budget = maxBudgetUsd, totalCostUsd > budget {
+            return true
+        }
+        return false
+    }
+
+    /// Handle budget exceeded in the streaming path: log warning, fire hooks, yield result,
+    /// record trace, close recorder, and finish continuation.
+    ///
+    /// Used by the two budget-check sites in `stream()` (messageStart and messageDelta).
+    private static func handleBudgetExceededInStream(
+        continuation: AsyncStream<SDKMessage>.Continuation,
+        messages: [[String: Any]],
+        startingAt: Int,
+        accumulatedText: String,
+        usage: TokenUsage,
+        turnsUsed: Int,
+        startTime: ContinuousClock.Instant,
+        totalCostUsd: Double,
+        maxBudgetUsd: Double?,
+        costByModel: [String: CostBreakdownEntry],
+        hookRegistry: HookRegistry?,
+        cwd: String?,
+        traceRecorder: TraceRecorder?
+    ) async {
+        let elapsed = ContinuousClock.now - startTime
+        let durationMs = computeDurationMs(elapsed)
+        let previousText = extractCollectedText(
+            messages: messages,
+            startingAt: startingAt,
+            separator: " "
+        )
+        let text = previousText.isEmpty ? accumulatedText : "\(previousText) \(accumulatedText)"
+
+        Logger.shared.warn("QueryEngine", "budget_exceeded", data: [
+            "costUsd": String(format: "%.4f", totalCostUsd),
+            "budgetUsd": String(format: "%.4f", maxBudgetUsd ?? 0),
+            "turnsUsed": String(turnsUsed)
+        ])
+
+        await fireStopAndEndHooks(hookRegistry: hookRegistry, cwd: cwd)
+
+        let resultMsg = SDKMessage.result(SDKMessage.ResultData(
+            subtype: .errorMaxBudgetUsd,
+            text: text,
+            usage: usage,
+            numTurns: turnsUsed,
+            durationMs: durationMs,
+            totalCostUsd: totalCostUsd,
+            costBreakdown: Array(costByModel.values)
+        ))
+        continuation.yield(resultMsg)
+        if let trace = traceRecorder, let mapped = TraceEventMapping.traceEvent(from: resultMsg) {
+            await trace.record(event: mapped.event, payload: mapped.payload)
+        }
+        await traceRecorder?.close()
+        continuation.finish()
     }
 
     /// Extract plain text from Anthropic API response content blocks.
