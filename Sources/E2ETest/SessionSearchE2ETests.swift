@@ -23,17 +23,6 @@ struct SessionSearchE2ETests {
 
     // MARK: - Helpers
 
-    private static func makeTempDir() -> String {
-        let dir = (NSTemporaryDirectory() as NSString)
-            .appendingPathComponent("e2e-session-search-\(UUID().uuidString)")
-        try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
-        return dir
-    }
-
-    private static func cleanup(_ dir: String) {
-        try? FileManager.default.removeItem(atPath: dir)
-    }
-
     private static func msgs(_ pairs: (String, String)...) -> [[String: Any]] {
         pairs.map { ["type": $0.0, "message": $0.1] }
     }
@@ -41,7 +30,7 @@ struct SessionSearchE2ETests {
     // MARK: - Test 76: Multi-Session Discover E2E
 
     private static func testDiscoverE2E() async {
-        let tempDir = makeTempDir()
+        let tempDir = makeTempDir(prefix: "e2e-session-search")
         defer { cleanup(tempDir) }
 
         do {
@@ -140,7 +129,7 @@ struct SessionSearchE2ETests {
     // MARK: - Test 77: Scroll Context Window E2E
 
     private static func testScrollE2E() async {
-        let tempDir = makeTempDir()
+        let tempDir = makeTempDir(prefix: "e2e-session-search")
         defer { cleanup(tempDir) }
 
         do {
@@ -224,7 +213,7 @@ struct SessionSearchE2ETests {
     // MARK: - Test 78: Browse Session Listing E2E
 
     private static func testBrowseE2E() async {
-        let tempDir = makeTempDir()
+        let tempDir = makeTempDir(prefix: "e2e-session-search")
         defer { cleanup(tempDir) }
 
         do {
@@ -274,7 +263,7 @@ struct SessionSearchE2ETests {
             }
 
             // Browse empty directory
-            let emptyDir = makeTempDir()
+            let emptyDir = makeTempDir(prefix: "e2e-session-search")
             defer { cleanup(emptyDir) }
             let emptyStore = SessionStore(sessionsDir: emptyDir)
             let emptyQuery = SessionSearchQuery(mode: .browse, limit: 10)
