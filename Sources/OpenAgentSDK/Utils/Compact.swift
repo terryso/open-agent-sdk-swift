@@ -119,13 +119,7 @@ func compactConversation(
         }, retryConfig: retryConfig)
 
         // Extract summary text from response
-        var summary = ""
-        if let content = response["content"] as? [[String: Any]] {
-            summary = content
-                .filter { $0["type"] as? String == "text" }
-                .compactMap { $0["text"] as? String }
-                .joined(separator: "\n")
-        }
+        let summary = extractTextFromResponse(response)
 
         // Extract session memory entries from the summary
         if !summary.isEmpty, let sessionMemory = sessionMemory {
@@ -208,13 +202,7 @@ func extractSessionMemory(
 ) async {
     // Short summary: store directly without LLM extraction call
     if summary.count < 200 {
-        let entry = SessionMemoryEntry(
-            category: "decision",
-            summary: summary,
-            context: "",
-            timestamp: Date()
-        )
-        sessionMemory.append(entry)
+        appendFallbackEntry(summary: summary, to: sessionMemory)
         return
     }
 
@@ -239,26 +227,14 @@ func extractSessionMemory(
         }, retryConfig: retryConfig)
 
         // Extract text from response
-        var responseText = ""
-        if let content = response["content"] as? [[String: Any]] {
-            responseText = content
-                .filter { $0["type"] as? String == "text" }
-                .compactMap { $0["text"] as? String }
-                .joined(separator: "\n")
-        }
+        let responseText = extractTextFromResponse(response)
 
         // Strip markdown code fences if present
         let cleanedJSON = stripMarkdownFences(responseText)
         guard let data = cleanedJSON.data(using: .utf8),
               let jsonArray = try? JSONSerialization.jsonObject(with: data, options: []) as? [[String: String]] else {
             // If parsing fails, store the summary directly as fallback
-            let entry = SessionMemoryEntry(
-                category: "decision",
-                summary: summary,
-                context: "",
-                timestamp: Date()
-            )
-            sessionMemory.append(entry)
+            appendFallbackEntry(summary: summary, to: sessionMemory)
             return
         }
 
@@ -281,14 +257,36 @@ func extractSessionMemory(
         }
     } catch {
         // On extraction failure, store summary directly as fallback
-        let entry = SessionMemoryEntry(
-            category: "decision",
-            summary: summary,
-            context: "",
-            timestamp: Date()
-        )
-        sessionMemory.append(entry)
+        appendFallbackEntry(summary: summary, to: sessionMemory)
     }
+}
+
+// MARK: - Shared Helpers
+
+/// Extract concatenated text content from an LLM response dictionary.
+///
+/// Filters response content blocks for `type: "text"` and joins them with newlines.
+/// Returns an empty string if the response has no text content.
+private func extractTextFromResponse(_ response: [String: Any]) -> String {
+    guard let content = response["content"] as? [[String: Any]] else { return "" }
+    return content
+        .filter { $0["type"] as? String == "text" }
+        .compactMap { $0["text"] as? String }
+        .joined(separator: "\n")
+}
+
+/// Append a fallback "decision" entry to session memory.
+///
+/// Used when LLM extraction fails or the summary is too short to warrant
+/// a dedicated extraction call.
+private func appendFallbackEntry(summary: String, to sessionMemory: SessionMemory) {
+    let entry = SessionMemoryEntry(
+        category: "decision",
+        summary: summary,
+        context: "",
+        timestamp: Date()
+    )
+    sessionMemory.append(entry)
 }
 
 /// Build the extraction prompt for session memory.
@@ -390,13 +388,7 @@ func microCompact(
         }, retryConfig: retryConfig)
 
         // Extract summary text from response
-        var summary = ""
-        if let responseContent = response["content"] as? [[String: Any]] {
-            summary = responseContent
-                .filter { $0["type"] as? String == "text" }
-                .compactMap { $0["text"] as? String }
-                .joined(separator: "\n")
-        }
+        let summary = extractTextFromResponse(response)
 
         guard !summary.isEmpty else {
             return content
