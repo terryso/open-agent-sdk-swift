@@ -1,5 +1,57 @@
 import Foundation
 
+// MARK: - Shared Helpers
+
+/// Filter, sort, and limit knowledge entries based on query parameters and max age.
+///
+/// Shared by both `InMemoryStore` and `FileBasedMemoryStore` to eliminate
+/// duplicated filter/sort/limit logic in their `query` methods.
+///
+/// - Parameters:
+///   - entries: The candidate entries to filter.
+///   - filter: Optional filter criteria (tags, date range, limit).
+///   - maxAge: Maximum entry age in seconds; entries older than this are excluded.
+/// - Returns: Filtered, sorted, and limited entries.
+private func filterAndSortEntries(
+    _ entries: [KnowledgeEntry],
+    filter: KnowledgeQueryFilter?,
+    maxAge: TimeInterval
+) -> [KnowledgeEntry] {
+    let expiryCutoff = Date().addingTimeInterval(-maxAge)
+
+    var results = entries.filter { entry in
+        // Auto-expiry: skip entries exceeding maxAge
+        guard entry.createdAt > expiryCutoff else { return false }
+
+        // Tag filter: match entries with any of the specified tags
+        if let tags = filter?.tags, !tags.isEmpty {
+            guard entry.tags.contains(where: { tags.contains($0) }) else {
+                return false
+            }
+        }
+
+        // Date range filters
+        if let olderThan = filter?.olderThan {
+            guard entry.createdAt < olderThan else { return false }
+        }
+        if let newerThan = filter?.newerThan {
+            guard entry.createdAt > newerThan else { return false }
+        }
+
+        return true
+    }
+
+    // Sort by createdAt ascending (oldest first)
+    results.sort { $0.createdAt < $1.createdAt }
+
+    // Apply limit
+    if let limit = filter?.limit, limit > 0 {
+        results = Array(results.prefix(limit))
+    }
+
+    return results
+}
+
 // MARK: - InMemoryStore
 
 /// In-memory knowledge store using actor isolation.
@@ -38,40 +90,7 @@ public actor InMemoryStore: MemoryStoreProtocol {
         guard let entries = storage[domain] else {
             return []
         }
-
-        let expiryCutoff = Date().addingTimeInterval(-maxAge)
-
-        var results = entries.filter { entry in
-            // Auto-expiry: skip entries exceeding maxAge
-            guard entry.createdAt > expiryCutoff else { return false }
-
-            // Tag filter: match entries with any of the specified tags
-            if let tags = filter?.tags, !tags.isEmpty {
-                guard entry.tags.contains(where: { tags.contains($0) }) else {
-                    return false
-                }
-            }
-
-            // Date range filters
-            if let olderThan = filter?.olderThan {
-                guard entry.createdAt < olderThan else { return false }
-            }
-            if let newerThan = filter?.newerThan {
-                guard entry.createdAt > newerThan else { return false }
-            }
-
-            return true
-        }
-
-        // Sort by createdAt ascending (oldest first)
-        results.sort { $0.createdAt < $1.createdAt }
-
-        // Apply limit
-        if let limit = filter?.limit, limit > 0 {
-            results = Array(results.prefix(limit))
-        }
-
-        return results
+        return filterAndSortEntries(entries, filter: filter, maxAge: maxAge)
     }
 
     public func delete(domain: String, olderThan: Date) async throws -> Int {
@@ -159,40 +178,7 @@ public actor FileBasedMemoryStore: MemoryStoreProtocol {
         guard let entries = cache[domain] else {
             return []
         }
-
-        let expiryCutoff = Date().addingTimeInterval(-maxAge)
-
-        var results = entries.filter { entry in
-            // Auto-expiry: skip entries exceeding maxAge
-            guard entry.createdAt > expiryCutoff else { return false }
-
-            // Tag filter
-            if let tags = filter?.tags, !tags.isEmpty {
-                guard entry.tags.contains(where: { tags.contains($0) }) else {
-                    return false
-                }
-            }
-
-            // Date range filters
-            if let olderThan = filter?.olderThan {
-                guard entry.createdAt < olderThan else { return false }
-            }
-            if let newerThan = filter?.newerThan {
-                guard entry.createdAt > newerThan else { return false }
-            }
-
-            return true
-        }
-
-        // Sort by createdAt ascending
-        results.sort { $0.createdAt < $1.createdAt }
-
-        // Apply limit
-        if let limit = filter?.limit, limit > 0 {
-            results = Array(results.prefix(limit))
-        }
-
-        return results
+        return filterAndSortEntries(entries, filter: filter, maxAge: maxAge)
     }
 
     public func delete(domain: String, olderThan: Date) throws -> Int {
