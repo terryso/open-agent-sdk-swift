@@ -9,13 +9,6 @@ import XCTest
 /// TDD Phase: RED (feature not implemented yet)
 final class ToolSystemEnhancementATDDTests: XCTestCase {
 
-    // MARK: - Helpers
-
-    /// Standard ToolContext for testing.
-    private func makeContext(toolUseId: String = "enhancement-test-tu") -> ToolContext {
-        ToolContext(cwd: "/tmp", toolUseId: toolUseId)
-    }
-
     // MARK: - AC1+AC4: defineTool with annotations flows through toApiTool
 
     /// AC1+AC4 [P0]: Tool defined with annotations appears correctly in toApiTools output.
@@ -111,7 +104,7 @@ final class ToolSystemEnhancementATDDTests: XCTestCase {
         }
 
         // When: executing the tool
-        let result = await tool.call(input: ["query": "test"], context: makeContext())
+        let result = await tool.call(input: ["query": "test"], context: makeTestToolContext())
 
         // Then: ToolResult has typedContent preserved
         XCTAssertFalse(result.isError)
@@ -138,7 +131,7 @@ final class ToolSystemEnhancementATDDTests: XCTestCase {
         }
 
         // When: executing the tool
-        let result = await tool.call(input: ["name": "World"], context: makeContext())
+        let result = await tool.call(input: ["name": "World"], context: makeTestToolContext())
 
         // Then: content is the plain string
         XCTAssertFalse(result.isError)
@@ -162,7 +155,7 @@ final class ToolSystemEnhancementATDDTests: XCTestCase {
         }
 
         // When: executing
-        let result = await tool.call(input: [:], context: makeContext())
+        let result = await tool.call(input: [:], context: makeTestToolContext())
 
         // Then: typedContent is preserved through pipeline
         XCTAssertFalse(result.isError)
@@ -278,7 +271,7 @@ final class ToolSystemEnhancementATDDTests: XCTestCase {
         // When: executing and converting to API format
         let result = await tool.call(
             input: ["url": "https://example.com"],
-            context: makeContext(toolUseId: "tu_integration")
+            context: makeTestToolContext(toolUseId: "tu_integration")
         )
         let apiTool = toApiTool(tool)
 

@@ -21,14 +21,6 @@ final class TeamToolsTests: XCTestCase {
         )
     }
 
-    /// Creates a ToolContext without any TeamStore (nil).
-    private func makeTestToolContext() -> ToolContext {
-        return ToolContext(
-            cwd: "/tmp",
-            toolUseId: "test-tool-use-id"
-        )
-    }
-
     // MARK: - AC1: TeamCreate Tool
 
     // MARK: AC1 -- Factory

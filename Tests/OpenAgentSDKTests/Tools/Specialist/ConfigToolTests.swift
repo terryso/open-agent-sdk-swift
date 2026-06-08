@@ -12,16 +12,6 @@ import XCTest
 /// TDD Phase: RED (feature not implemented yet)
 final class ConfigToolTests: XCTestCase {
 
-    // MARK: - Helpers
-
-    /// Creates a basic ToolContext with just cwd (no stores needed for Config tool).
-    private func makeContext() -> ToolContext {
-        return ToolContext(
-            cwd: "/tmp",
-            toolUseId: "test-tool-use-id"
-        )
-    }
-
     // MARK: - AC1: ConfigTool Registration
 
     /// AC1 [P0]: createConfigTool() returns a ToolProtocol with name "Config".
@@ -118,7 +108,7 @@ final class ConfigToolTests: XCTestCase {
     /// AC3 [P0]: Config get with missing key returns is_error=true with "key required for get".
     func testConfigGet_missingKey_returnsError() async throws {
         let tool = createConfigTool()
-        let context = makeContext()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = [
             "action": "get"
@@ -137,7 +127,7 @@ final class ConfigToolTests: XCTestCase {
     /// AC2 [P0]: Config get with existing key returns the stored value.
     func testConfigGet_existingKey_returnsValue() async throws {
         let tool = createConfigTool()
-        let context = makeContext()
+        let context = makeTestToolContext()
 
         // First set a value
         let setInput: [String: Any] = [
@@ -161,7 +151,7 @@ final class ConfigToolTests: XCTestCase {
     /// AC2 [P0]: Config get with non-existent key returns "not found" message.
     func testConfigGet_nonExistentKey_returnsNotFound() async throws {
         let tool = createConfigTool()
-        let context = makeContext()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = [
             "action": "get",
@@ -181,7 +171,7 @@ final class ConfigToolTests: XCTestCase {
     /// AC5 [P0]: Config set with missing key returns is_error=true with "key required for set".
     func testConfigSet_missingKey_returnsError() async throws {
         let tool = createConfigTool()
-        let context = makeContext()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = [
             "action": "set",
@@ -201,7 +191,7 @@ final class ConfigToolTests: XCTestCase {
     /// AC4 [P0]: Config set stores value and returns confirmation message.
     func testConfigSet_withKeyAndValue_returnsConfirmation() async throws {
         let tool = createConfigTool()
-        let context = makeContext()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = [
             "action": "set",
@@ -220,7 +210,7 @@ final class ConfigToolTests: XCTestCase {
     /// AC4 [P0]: Config set with numeric value stores correctly.
     func testConfigSet_numericValue_storesCorrectly() async throws {
         let tool = createConfigTool()
-        let context = makeContext()
+        let context = makeTestToolContext()
 
         // Set a numeric value
         let setInput: [String: Any] = [
@@ -245,7 +235,7 @@ final class ConfigToolTests: XCTestCase {
     /// AC4 [P0]: Config set with boolean value stores correctly.
     func testConfigSet_booleanValue_storesCorrectly() async throws {
         let tool = createConfigTool()
-        let context = makeContext()
+        let context = makeTestToolContext()
 
         let setInput: [String: Any] = [
             "action": "set",
@@ -270,7 +260,7 @@ final class ConfigToolTests: XCTestCase {
     /// AC4 [P1]: Config set overwrites existing value.
     func testConfigSet_overwritesExistingValue() async throws {
         let tool = createConfigTool()
-        let context = makeContext()
+        let context = makeTestToolContext()
 
         // Set initial value
         let setInput1: [String: Any] = [
@@ -307,7 +297,7 @@ final class ConfigToolTests: XCTestCase {
     /// AC6 [P0]: Config list with no values returns "No config values set.".
     func testConfigList_empty_returnsNoValuesMessage() async throws {
         let tool = createConfigTool()
-        let context = makeContext()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = [
             "action": "list"
@@ -324,7 +314,7 @@ final class ConfigToolTests: XCTestCase {
     /// AC6 [P0]: Config list with values returns all entries.
     func testConfigList_withValues_returnsAllEntries() async throws {
         let tool = createConfigTool()
-        let context = makeContext()
+        let context = makeTestToolContext()
 
         // Set multiple values
         let set1: [String: Any] = ["action": "set", "key": "alpha", "value": "1"]
@@ -344,7 +334,7 @@ final class ConfigToolTests: XCTestCase {
     /// AC6 [P0]: Config list format is key = JSON(value) per line.
     func testConfigList_format_perLine() async throws {
         let tool = createConfigTool()
-        let context = makeContext()
+        let context = makeTestToolContext()
 
         let setInput: [String: Any] = ["action": "set", "key": "fmtTest", "value": "val"]
         _ = await tool.call(input: setInput, context: context)
@@ -364,7 +354,7 @@ final class ConfigToolTests: XCTestCase {
     /// AC7 [P0]: Config unknown action returns is_error=true with "Unknown action: {action}".
     func testConfig_unknownAction_returnsError() async throws {
         let tool = createConfigTool()
-        let context = makeContext()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = [
             "action": "delete"
@@ -383,7 +373,7 @@ final class ConfigToolTests: XCTestCase {
     /// AC15 [P0]: Config tool never throws -- always returns ToolResult even with malformed input.
     func testConfigTool_neverThrows_malformedInput() async throws {
         let tool = createConfigTool()
-        let context = makeContext()
+        let context = makeTestToolContext()
 
         let badInputs: [[String: Any]] = [
             [:],                              // empty dict (missing action)
@@ -437,7 +427,7 @@ final class ConfigToolTests: XCTestCase {
     /// Integration [P1]: set -> get -> list -> set (overwrite) -> get -> list lifecycle.
     func testIntegration_fullConfigLifecycle() async throws {
         let tool = createConfigTool()
-        let context = makeContext()
+        let context = makeTestToolContext()
 
         // Step 1: List initially empty
         let initialList = await tool.call(input: ["action": "list"], context: context)

@@ -25,14 +25,6 @@ final class CronToolsTests: XCTestCase {
         )
     }
 
-    /// Creates a ToolContext without any CronStore (nil).
-    private func makeTestToolContext() -> ToolContext {
-        return ToolContext(
-            cwd: "/tmp",
-            toolUseId: "test-tool-use-id"
-        )
-    }
-
     // MARK: - AC2: CronCreate Tool -- Factory
 
     /// AC2 [P0]: createCronCreateTool() returns a ToolProtocol with name "CronCreate".

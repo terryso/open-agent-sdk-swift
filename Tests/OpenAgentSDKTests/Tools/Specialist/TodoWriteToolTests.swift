@@ -23,14 +23,6 @@ final class TodoWriteToolTests: XCTestCase {
         )
     }
 
-    /// Creates a ToolContext without any TodoStore (nil).
-    private func makeTestToolContext() -> ToolContext {
-        return ToolContext(
-            cwd: "/tmp",
-            toolUseId: "test-tool-use-id"
-        )
-    }
-
     // MARK: - AC2: TodoWrite Tool -- add operation
 
     /// AC2 [P0]: Adding a todo item returns success with confirmation message containing id and text.

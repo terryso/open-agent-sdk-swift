@@ -97,10 +97,13 @@ func cleanupTempDir(_ path: String) {
 ///
 /// Useful for error-path tests that verify behavior when a store is nil.
 ///
-/// - Returns: A `ToolContext` with `cwd: "/tmp"` and `toolUseId: "test-tool-use-id"`.
-func makeTestToolContext() -> ToolContext {
+/// - Parameters:
+///   - cwd: The working directory (default: `"/tmp"`).
+///   - toolUseId: The tool use ID (default: `"test-tool-use-id"`).
+/// - Returns: A `ToolContext` with the given `cwd` and `toolUseId`.
+func makeTestToolContext(cwd: String = "/tmp", toolUseId: String = "test-tool-use-id") -> ToolContext {
     return ToolContext(
-        cwd: "/tmp",
-        toolUseId: "test-tool-use-id"
+        cwd: cwd,
+        toolUseId: toolUseId
     )
 }
