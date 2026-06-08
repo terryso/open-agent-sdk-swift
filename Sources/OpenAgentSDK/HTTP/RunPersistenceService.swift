@@ -43,7 +43,7 @@ public struct RunPersistenceService: Sendable {
     func persistRecord(_ run: TrackedRun) throws {
         let dir = runDirectory(runId: run.runId)
         let finalPath = (dir as NSString).appendingPathComponent("api-output.json")
-        let data = try JSONEncoder().encode(run)
+        let data = try makeSDKJSONEncoder().encode(run)
         try data.write(to: URL(fileURLWithPath: finalPath), options: .atomic)
     }
 
@@ -77,7 +77,7 @@ public struct RunPersistenceService: Sendable {
         guard FileManager.default.fileExists(atPath: path),
               let data = try? Data(contentsOf: URL(fileURLWithPath: path))
         else { return nil }
-        return try? JSONDecoder().decode(TrackedRun.self, from: data)
+        return try? makeSDKJSONDecoder().decode(TrackedRun.self, from: data)
     }
 
     /// Load all AgentSSEEvents from api-events.jsonl.
@@ -90,7 +90,7 @@ public struct RunPersistenceService: Sendable {
 
         return content.split(separator: "\n").compactMap { line -> AgentSSEEvent? in
             guard let data = line.data(using: .utf8),
-                  let wrapper = try? JSONDecoder().decode(PersistedSSEEvent.self, from: data)
+                  let wrapper = try? makeSDKJSONDecoder().decode(PersistedSSEEvent.self, from: data)
             else { return nil }
             return wrapper.toSSEEvent()
         }
