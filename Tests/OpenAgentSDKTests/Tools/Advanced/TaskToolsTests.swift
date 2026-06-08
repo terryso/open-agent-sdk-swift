@@ -29,7 +29,7 @@ final class TaskToolsTests: XCTestCase {
     }
 
     /// Creates a ToolContext without any TaskStore (nil).
-    private func makeContextWithoutStore() -> ToolContext {
+    private func makeTestToolContext() -> ToolContext {
         return ToolContext(
             cwd: "/tmp",
             toolUseId: "test-tool-use-id"
@@ -792,7 +792,7 @@ final class TaskToolsTests: XCTestCase {
     /// AC9 [P0]: TaskCreate returns error when taskStore is nil.
     func testTaskCreate_nilTaskStore_returnsError() async throws {
         let tool = createTaskCreateTool()
-        let context = makeContextWithoutStore()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = ["subject": "Test"]
         let result = await tool.call(input: input, context: context)
@@ -805,7 +805,7 @@ final class TaskToolsTests: XCTestCase {
     /// AC9 [P0]: TaskList returns error when taskStore is nil.
     func testTaskList_nilTaskStore_returnsError() async throws {
         let tool = createTaskListTool()
-        let context = makeContextWithoutStore()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = [:]
         let result = await tool.call(input: input, context: context)
@@ -816,7 +816,7 @@ final class TaskToolsTests: XCTestCase {
     /// AC9 [P0]: TaskUpdate returns error when taskStore is nil.
     func testTaskUpdate_nilTaskStore_returnsError() async throws {
         let tool = createTaskUpdateTool()
-        let context = makeContextWithoutStore()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = ["id": "task_1"]
         let result = await tool.call(input: input, context: context)
@@ -827,7 +827,7 @@ final class TaskToolsTests: XCTestCase {
     /// AC9 [P0]: TaskGet returns error when taskStore is nil.
     func testTaskGet_nilTaskStore_returnsError() async throws {
         let tool = createTaskGetTool()
-        let context = makeContextWithoutStore()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = ["id": "task_1"]
         let result = await tool.call(input: input, context: context)
@@ -838,7 +838,7 @@ final class TaskToolsTests: XCTestCase {
     /// AC9 [P0]: TaskStop returns error when taskStore is nil.
     func testTaskStop_nilTaskStore_returnsError() async throws {
         let tool = createTaskStopTool()
-        let context = makeContextWithoutStore()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = ["id": "task_1"]
         let result = await tool.call(input: input, context: context)
@@ -849,7 +849,7 @@ final class TaskToolsTests: XCTestCase {
     /// AC9 [P0]: TaskOutput returns error when taskStore is nil.
     func testTaskOutput_nilTaskStore_returnsError() async throws {
         let tool = createTaskOutputTool()
-        let context = makeContextWithoutStore()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = ["id": "task_1"]
         let result = await tool.call(input: input, context: context)
@@ -862,7 +862,7 @@ final class TaskToolsTests: XCTestCase {
     /// AC9 [P0]: TaskCreate never throws — always returns ToolResult even with malformed input.
     func testTaskCreate_neverThrows_malformedInput() async throws {
         let tool = createTaskCreateTool()
-        let context = makeContextWithoutStore()
+        let context = makeTestToolContext()
 
         let badInputs: [[String: Any]] = [
             [:],  // missing all fields
@@ -879,7 +879,7 @@ final class TaskToolsTests: XCTestCase {
     /// AC9 [P0]: TaskUpdate never throws — always returns ToolResult even with malformed input.
     func testTaskUpdate_neverThrows_malformedInput() async throws {
         let tool = createTaskUpdateTool()
-        let context = makeContextWithoutStore()
+        let context = makeTestToolContext()
 
         let badInputs: [[String: Any]] = [
             [:],  // missing all fields

@@ -22,7 +22,7 @@ final class TeamToolsTests: XCTestCase {
     }
 
     /// Creates a ToolContext without any TeamStore (nil).
-    private func makeContextWithoutStore() -> ToolContext {
+    private func makeTestToolContext() -> ToolContext {
         return ToolContext(
             cwd: "/tmp",
             toolUseId: "test-tool-use-id"
@@ -277,7 +277,7 @@ final class TeamToolsTests: XCTestCase {
     /// AC5 [P0]: TeamCreate returns error when teamStore is nil.
     func testTeamCreate_nilTeamStore_returnsError() async throws {
         let tool = createTeamCreateTool()
-        let context = makeContextWithoutStore()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = ["name": "Test"]
         let result = await tool.call(input: input, context: context)
@@ -290,7 +290,7 @@ final class TeamToolsTests: XCTestCase {
     /// AC5 [P0]: TeamDelete returns error when teamStore is nil.
     func testTeamDelete_nilTeamStore_returnsError() async throws {
         let tool = createTeamDeleteTool()
-        let context = makeContextWithoutStore()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = ["id": "team_1"]
         let result = await tool.call(input: input, context: context)
@@ -305,7 +305,7 @@ final class TeamToolsTests: XCTestCase {
     /// AC5 [P0]: TeamCreate never throws -- always returns ToolResult even with malformed input.
     func testTeamCreate_neverThrows_malformedInput() async throws {
         let tool = createTeamCreateTool()
-        let context = makeContextWithoutStore()
+        let context = makeTestToolContext()
 
         let badInputs: [[String: Any]] = [
             [:],  // missing all fields
@@ -322,7 +322,7 @@ final class TeamToolsTests: XCTestCase {
     /// AC5 [P0]: TeamDelete never throws -- always returns ToolResult even with malformed input.
     func testTeamDelete_neverThrows_malformedInput() async throws {
         let tool = createTeamDeleteTool()
-        let context = makeContextWithoutStore()
+        let context = makeTestToolContext()
 
         let badInputs: [[String: Any]] = [
             [:],  // missing all fields

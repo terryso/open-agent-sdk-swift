@@ -26,7 +26,7 @@ final class CronToolsTests: XCTestCase {
     }
 
     /// Creates a ToolContext without any CronStore (nil).
-    private func makeContextWithoutStore() -> ToolContext {
+    private func makeTestToolContext() -> ToolContext {
         return ToolContext(
             cwd: "/tmp",
             toolUseId: "test-tool-use-id"
@@ -118,7 +118,7 @@ final class CronToolsTests: XCTestCase {
     /// AC5 [P0]: CronCreate returns error when cronStore is nil.
     func testCronCreate_nilCronStore_returnsError() async throws {
         let tool = createCronCreateTool()
-        let context = makeContextWithoutStore()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = [
             "name": "test",
@@ -203,7 +203,7 @@ final class CronToolsTests: XCTestCase {
     /// AC5 [P0]: CronDelete returns error when cronStore is nil.
     func testCronDelete_nilCronStore_returnsError() async throws {
         let tool = createCronDeleteTool()
-        let context = makeContextWithoutStore()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = ["id": "cron_1"]
         let result = await tool.call(input: input, context: context)
@@ -284,7 +284,7 @@ final class CronToolsTests: XCTestCase {
     /// AC5 [P0]: CronList returns error when cronStore is nil.
     func testCronList_nilCronStore_returnsError() async throws {
         let tool = createCronListTool()
-        let context = makeContextWithoutStore()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = [:]
         let result = await tool.call(input: input, context: context)
@@ -299,7 +299,7 @@ final class CronToolsTests: XCTestCase {
     /// AC9 [P0]: CronCreate never throws -- always returns ToolResult even with malformed input.
     func testCronCreate_neverThrows_malformedInput() async throws {
         let tool = createCronCreateTool()
-        let context = makeContextWithoutStore()
+        let context = makeTestToolContext()
 
         let badInputs: [[String: Any]] = [
             [:],                          // empty dict (missing required fields)
@@ -317,7 +317,7 @@ final class CronToolsTests: XCTestCase {
     /// AC9 [P0]: CronDelete never throws -- always returns ToolResult even with malformed input.
     func testCronDelete_neverThrows_malformedInput() async throws {
         let tool = createCronDeleteTool()
-        let context = makeContextWithoutStore()
+        let context = makeTestToolContext()
 
         let badInputs: [[String: Any]] = [
             [:],                  // empty dict (missing required id)
@@ -333,7 +333,7 @@ final class CronToolsTests: XCTestCase {
     /// AC9 [P0]: CronList never throws -- always returns ToolResult.
     func testCronList_neverThrows_malformedInput() async throws {
         let tool = createCronListTool()
-        let context = makeContextWithoutStore()
+        let context = makeTestToolContext()
 
         let badInputs: [[String: Any]] = [
             [:],

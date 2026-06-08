@@ -25,7 +25,7 @@ final class PlanToolsTests: XCTestCase {
     }
 
     /// Creates a ToolContext without any PlanStore (nil).
-    private func makeContextWithoutStore() -> ToolContext {
+    private func makeTestToolContext() -> ToolContext {
         return ToolContext(
             cwd: "/tmp",
             toolUseId: "test-tool-use-id"
@@ -104,7 +104,7 @@ final class PlanToolsTests: XCTestCase {
     /// AC5 [P0]: EnterPlanMode returns error when planStore is nil.
     func testEnterPlanMode_nilPlanStore_returnsError() async throws {
         let tool = createEnterPlanModeTool()
-        let context = makeContextWithoutStore()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = [:]
         let result = await tool.call(input: input, context: context)
@@ -196,7 +196,7 @@ final class PlanToolsTests: XCTestCase {
     /// AC5 [P0]: ExitPlanMode returns error when planStore is nil.
     func testExitPlanMode_nilPlanStore_returnsError() async throws {
         let tool = createExitPlanModeTool()
-        let context = makeContextWithoutStore()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = ["plan": "test"]
         let result = await tool.call(input: input, context: context)
@@ -211,7 +211,7 @@ final class PlanToolsTests: XCTestCase {
     /// AC9 [P0]: EnterPlanMode never throws -- always returns ToolResult even with malformed input.
     func testEnterPlanMode_neverThrows_malformedInput() async throws {
         let tool = createEnterPlanModeTool()
-        let context = makeContextWithoutStore()
+        let context = makeTestToolContext()
 
         let badInputs: [[String: Any]] = [
             [:],                    // empty dict (valid for EnterPlanMode)
@@ -228,7 +228,7 @@ final class PlanToolsTests: XCTestCase {
     /// AC9 [P0]: ExitPlanMode never throws -- always returns ToolResult even with malformed input.
     func testExitPlanMode_neverThrows_malformedInput() async throws {
         let tool = createExitPlanModeTool()
-        let context = makeContextWithoutStore()
+        let context = makeTestToolContext()
 
         let badInputs: [[String: Any]] = [
             [:],                    // empty dict
