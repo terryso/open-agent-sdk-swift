@@ -35,6 +35,12 @@ struct DocumentationTestHelpers {
         return try? String(contentsOfFile: path, encoding: .utf8)
     }
 
+    /// Reads file content, failing the test if the file cannot be read.
+    /// - Throws: Triggers an XCTFail and throws if the file is unreadable.
+    static func requireFileContent(_ path: String, file: StaticString = #filePath, line: UInt = #line) throws -> String {
+        return try XCTUnwrap(fileContent(path), "Could not read file at \(path)", file: file, line: line)
+    }
+
     static func packageSwiftContent(file: String = #file) -> String {
         let path = projectRoot(file: file) + "/Package.swift"
         guard let content = try? String(contentsOfFile: path, encoding: .utf8) else {

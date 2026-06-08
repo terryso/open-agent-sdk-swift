@@ -31,33 +31,24 @@ final class ExamplesComplianceTests: XCTestCase {
         )
     }
 
-    func testBasicAgentUsesCreateAgent() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath("BasicAgent")) else {
-            XCTFail("Examples/BasicAgent/main.swift should be readable")
-            return
-        }
+    func testBasicAgentUsesCreateAgent() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath("BasicAgent"))
         XCTAssertTrue(
             content.contains("createAgent("),
             "BasicAgent example should use createAgent() factory function"
         )
     }
 
-    func testBasicAgentUsesBlockingPrompt() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath("BasicAgent")) else {
-            XCTFail("Examples/BasicAgent/main.swift should be readable")
-            return
-        }
+    func testBasicAgentUsesBlockingPrompt() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath("BasicAgent"))
         XCTAssertTrue(
             content.contains("agent.prompt("),
             "BasicAgent example should use agent.prompt() for blocking query"
         )
     }
 
-    func testBasicAgentShowsQueryResultProperties() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath("BasicAgent")) else {
-            XCTFail("Examples/BasicAgent/main.swift should be readable")
-            return
-        }
+    func testBasicAgentShowsQueryResultProperties() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath("BasicAgent"))
         // Should demonstrate at least text property on QueryResult
         let hasResultProperty = content.contains(".text") || content.contains("result.text")
         XCTAssertTrue(
@@ -66,11 +57,8 @@ final class ExamplesComplianceTests: XCTestCase {
         )
     }
 
-    func testBasicAgentImportsOpenAgentSDK() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath("BasicAgent")) else {
-            XCTFail("Examples/BasicAgent/main.swift should be readable")
-            return
-        }
+    func testBasicAgentImportsOpenAgentSDK() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath("BasicAgent"))
         XCTAssertTrue(
             content.contains("import OpenAgentSDK"),
             "BasicAgent example should import OpenAgentSDK"
@@ -95,22 +83,16 @@ final class ExamplesComplianceTests: XCTestCase {
         )
     }
 
-    func testStreamingAgentUsesAsyncStream() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath("StreamingAgent")) else {
-            XCTFail("Examples/StreamingAgent/main.swift should be readable")
-            return
-        }
+    func testStreamingAgentUsesAsyncStream() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath("StreamingAgent"))
         XCTAssertTrue(
             content.contains("for await") && content.contains("agent.stream("),
             "StreamingAgent example should use 'for await ... in agent.stream(...)' pattern"
         )
     }
 
-    func testStreamingAgentShowsSDKMessagePatternMatching() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath("StreamingAgent")) else {
-            XCTFail("Examples/StreamingAgent/main.swift should be readable")
-            return
-        }
+    func testStreamingAgentShowsSDKMessagePatternMatching() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath("StreamingAgent"))
         // Should demonstrate at least .partialMessage and .result pattern matching
         let hasPartialMessage = content.contains(".partialMessage")
         let hasResult = content.contains(".result(")
@@ -124,11 +106,8 @@ final class ExamplesComplianceTests: XCTestCase {
         )
     }
 
-    func testStreamingAgentShowsToolUseEvents() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath("StreamingAgent")) else {
-            XCTFail("Examples/StreamingAgent/main.swift should be readable")
-            return
-        }
+    func testStreamingAgentShowsToolUseEvents() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath("StreamingAgent"))
         // Should demonstrate .toolUse and .toolResult pattern matching
         let hasToolUse = content.contains(".toolUse")
         let hasToolResult = content.contains(".toolResult")
@@ -160,22 +139,16 @@ final class ExamplesComplianceTests: XCTestCase {
         )
     }
 
-    func testCustomToolsUsesDefineTool() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath("CustomTools")) else {
-            XCTFail("Examples/CustomTools/main.swift should be readable")
-            return
-        }
+    func testCustomToolsUsesDefineTool() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath("CustomTools"))
         XCTAssertTrue(
             content.contains("defineTool("),
             "CustomTools example should use defineTool() function"
         )
     }
 
-    func testCustomToolsDefinesCodableInputStruct() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath("CustomTools")) else {
-            XCTFail("Examples/CustomTools/main.swift should be readable")
-            return
-        }
+    func testCustomToolsDefinesCodableInputStruct() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath("CustomTools"))
         // Should define a Codable struct for tool input
         let hasCodableStruct = content.contains("Codable") && content.contains("struct")
         XCTAssertTrue(
@@ -184,22 +157,16 @@ final class ExamplesComplianceTests: XCTestCase {
         )
     }
 
-    func testCustomToolsDefinesJSONSchema() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath("CustomTools")) else {
-            XCTFail("Examples/CustomTools/main.swift should be readable")
-            return
-        }
+    func testCustomToolsDefinesJSONSchema() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath("CustomTools"))
         XCTAssertTrue(
             content.contains("inputSchema:"),
             "CustomTools example should define inputSchema for custom tools"
         )
     }
 
-    func testCustomToolsUsesToolExecuteResult() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath("CustomTools")) else {
-            XCTFail("Examples/CustomTools/main.swift should be readable")
-            return
-        }
+    func testCustomToolsUsesToolExecuteResult() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath("CustomTools"))
         // At least one tool should use ToolExecuteResult return type
         XCTAssertTrue(
             content.contains("ToolExecuteResult"),
@@ -225,11 +192,8 @@ final class ExamplesComplianceTests: XCTestCase {
         )
     }
 
-    func testMCPIntegrationUsesStdioConfig() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath("MCPIntegration")) else {
-            XCTFail("Examples/MCPIntegration/main.swift should be readable")
-            return
-        }
+    func testMCPIntegrationUsesStdioConfig() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath("MCPIntegration"))
         XCTAssertTrue(
             content.contains("McpServerConfig") && content.contains(".stdio("),
             "MCPIntegration example should demonstrate McpServerConfig.stdio() configuration"
@@ -240,11 +204,8 @@ final class ExamplesComplianceTests: XCTestCase {
         )
     }
 
-    func testMCPIntegrationUsesInProcessMCPServer() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath("MCPIntegration")) else {
-            XCTFail("Examples/MCPIntegration/main.swift should be readable")
-            return
-        }
+    func testMCPIntegrationUsesInProcessMCPServer() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath("MCPIntegration"))
         XCTAssertTrue(
             content.contains("InProcessMCPServer"),
             "MCPIntegration example should demonstrate InProcessMCPServer"
@@ -255,11 +216,8 @@ final class ExamplesComplianceTests: XCTestCase {
         )
     }
 
-    func testMCPIntegrationUsesMcpServersInOptions() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath("MCPIntegration")) else {
-            XCTFail("Examples/MCPIntegration/main.swift should be readable")
-            return
-        }
+    func testMCPIntegrationUsesMcpServersInOptions() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath("MCPIntegration"))
         XCTAssertTrue(
             content.contains("mcpServers:"),
             "MCPIntegration example should use mcpServers parameter in AgentOptions"
@@ -284,11 +242,8 @@ final class ExamplesComplianceTests: XCTestCase {
         )
     }
 
-    func testSessionsAndHooksUsesSessionStore() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath("SessionsAndHooks")) else {
-            XCTFail("Examples/SessionsAndHooks/main.swift should be readable")
-            return
-        }
+    func testSessionsAndHooksUsesSessionStore() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath("SessionsAndHooks"))
         XCTAssertTrue(
             content.contains("SessionStore"),
             "SessionsAndHooks example should use SessionStore"
@@ -304,11 +259,8 @@ final class ExamplesComplianceTests: XCTestCase {
         )
     }
 
-    func testSessionsAndHooksUsesHookRegistry() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath("SessionsAndHooks")) else {
-            XCTFail("Examples/SessionsAndHooks/main.swift should be readable")
-            return
-        }
+    func testSessionsAndHooksUsesHookRegistry() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath("SessionsAndHooks"))
         XCTAssertTrue(
             content.contains("HookRegistry"),
             "SessionsAndHooks example should use HookRegistry"
@@ -319,11 +271,8 @@ final class ExamplesComplianceTests: XCTestCase {
         )
     }
 
-    func testSessionsAndHooksShowsHookDefinition() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath("SessionsAndHooks")) else {
-            XCTFail("Examples/SessionsAndHooks/main.swift should be readable")
-            return
-        }
+    func testSessionsAndHooksShowsHookDefinition() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath("SessionsAndHooks"))
         XCTAssertTrue(
             content.contains("HookDefinition"),
             "SessionsAndHooks example should show HookDefinition usage"
@@ -390,11 +339,8 @@ final class ExamplesComplianceTests: XCTestCase {
         }
     }
 
-    func testDefineToolSignatureMatchesSource() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath("CustomTools")) else {
-            XCTFail("Examples/CustomTools/main.swift should be readable")
-            return
-        }
+    func testDefineToolSignatureMatchesSource() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath("CustomTools"))
         // defineTool should use the real parameter names: name:, description:, inputSchema:
         XCTAssertTrue(
             content.contains("name:") && content.contains("description:") && content.contains("inputSchema:"),
@@ -402,11 +348,8 @@ final class ExamplesComplianceTests: XCTestCase {
         )
     }
 
-    func testSDKMessageCasesMatchSource() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath("StreamingAgent")) else {
-            XCTFail("Examples/StreamingAgent/main.swift should be readable")
-            return
-        }
+    func testSDKMessageCasesMatchSource() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath("StreamingAgent"))
         // SDKMessage cases must match the actual enum cases from SDKMessage.swift
         let requiredCases = [".assistant", ".toolUse", ".toolResult", ".result", ".partialMessage"]
         for caseName in requiredCases {
@@ -417,11 +360,8 @@ final class ExamplesComplianceTests: XCTestCase {
         }
     }
 
-    func testMCPConfigTypesMatchSource() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath("MCPIntegration")) else {
-            XCTFail("Examples/MCPIntegration/main.swift should be readable")
-            return
-        }
+    func testMCPConfigTypesMatchSource() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath("MCPIntegration"))
         // McpStdioConfig init uses (command:, args:)
         XCTAssertTrue(
             content.contains("command:"),
@@ -434,11 +374,8 @@ final class ExamplesComplianceTests: XCTestCase {
         )
     }
 
-    func testHookTypesMatchSource() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath("SessionsAndHooks")) else {
-            XCTFail("Examples/SessionsAndHooks/main.swift should be readable")
-            return
-        }
+    func testHookTypesMatchSource() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath("SessionsAndHooks"))
         // HookDefinition init uses (command:, handler:, matcher:, timeout:)
         // At minimum should have handler
         XCTAssertTrue(

@@ -84,44 +84,32 @@ final class SubagentExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testSubagentExampleImportsOpenAgentSDK() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SubagentExample/main.swift should be readable")
-            return
-        }
+    func testSubagentExampleImportsOpenAgentSDK() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("import OpenAgentSDK"),
             "SubagentExample should import OpenAgentSDK"
         )
     }
 
-    func testSubagentExampleImportsFoundation() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SubagentExample/main.swift should be readable")
-            return
-        }
+    func testSubagentExampleImportsFoundation() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("import Foundation"),
             "SubagentExample should import Foundation for ProcessInfo"
         )
     }
 
-    func testSubagentExampleUsesCreateAgent() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SubagentExample/main.swift should be readable")
-            return
-        }
+    func testSubagentExampleUsesCreateAgent() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("createAgent("),
             "SubagentExample should use createAgent() factory function"
         )
     }
 
-    func testSubagentExampleUsesBypassPermissions() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SubagentExample/main.swift should be readable")
-            return
-        }
+    func testSubagentExampleUsesBypassPermissions() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains(".bypassPermissions"),
             "SubagentExample should set permissionMode to .bypassPermissions"
@@ -130,33 +118,24 @@ final class SubagentExampleComplianceTests: XCTestCase {
 
     // MARK: - AC2: Demonstrates Main Agent Using Agent Tool to Spawn Sub-Agent
 
-    func testSubagentExampleRegistersAgentTool() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SubagentExample/main.swift should be readable")
-            return
-        }
+    func testSubagentExampleRegistersAgentTool() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("createAgentTool()"),
             "SubagentExample should register the Agent tool via createAgentTool()"
         )
     }
 
-    func testSubagentExampleRegistersCoreToolsAlongsideAgentTool() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SubagentExample/main.swift should be readable")
-            return
-        }
+    func testSubagentExampleRegistersCoreToolsAlongsideAgentTool() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("getAllBaseTools(tier: .core)"),
             "SubagentExample should register core tools via getAllBaseTools(tier: .core)"
         )
     }
 
-    func testSubagentExampleCombinesCoreToolsAndAgentTool() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SubagentExample/main.swift should be readable")
-            return
-        }
+    func testSubagentExampleCombinesCoreToolsAndAgentTool() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // The tools array should combine core tools + agent tool (using + or similar)
         let hasBothTools = content.contains("getAllBaseTools(tier: .core)") &&
             content.contains("createAgentTool()")
@@ -166,22 +145,16 @@ final class SubagentExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testSubagentExamplePassesToolsToAgentOptions() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SubagentExample/main.swift should be readable")
-            return
-        }
+    func testSubagentExamplePassesToolsToAgentOptions() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("tools:"),
             "SubagentExample should pass tools: parameter in AgentOptions"
         )
     }
 
-    func testSubagentExampleDefinesCoordinatorSystemPrompt() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SubagentExample/main.swift should be readable")
-            return
-        }
+    func testSubagentExampleDefinesCoordinatorSystemPrompt() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("systemPrompt:"),
             "SubagentExample should define a systemPrompt in AgentOptions"
@@ -199,11 +172,8 @@ final class SubagentExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testSubagentExampleUsesCreateAgentWithOptions() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SubagentExample/main.swift should be readable")
-            return
-        }
+    func testSubagentExampleUsesCreateAgentWithOptions() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("createAgent(options:") || content.contains("createAgent(options: "),
             "SubagentExample should use createAgent(options: AgentOptions(...))"
@@ -212,11 +182,8 @@ final class SubagentExampleComplianceTests: XCTestCase {
 
     // MARK: - AC3: Sub-Agent Result Returns to Main Agent
 
-    func testSubagentExampleSendsDelegationPrompt() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SubagentExample/main.swift should be readable")
-            return
-        }
+    func testSubagentExampleSendsDelegationPrompt() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // The prompt sent to the agent should require delegation
         XCTAssertTrue(
             content.contains("agent.stream("),
@@ -224,22 +191,16 @@ final class SubagentExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testSubagentExampleHandlesToolResultForAgentTool() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SubagentExample/main.swift should be readable")
-            return
-        }
+    func testSubagentExampleHandlesToolResultForAgentTool() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains(".toolResult"),
             "SubagentExample should handle .toolResult case — sub-agent results return via this event"
         )
     }
 
-    func testSubagentExampleDisplaysToolResultContent() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SubagentExample/main.swift should be readable")
-            return
-        }
+    func testSubagentExampleDisplaysToolResultContent() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // Should display content from tool results (sub-agent output)
         let hasContentDisplay = content.contains("data.content") ||
             content.contains(".content") ||
@@ -250,11 +211,8 @@ final class SubagentExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testSubagentExampleHandlesResultEvent() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SubagentExample/main.swift should be readable")
-            return
-        }
+    func testSubagentExampleHandlesResultEvent() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains(".result("),
             "SubagentExample should handle .result case for final statistics (main agent completion)"
@@ -263,44 +221,32 @@ final class SubagentExampleComplianceTests: XCTestCase {
 
     // MARK: - AC4: Uses Streaming API for Real-Time Execution Display
 
-    func testSubagentExampleUsesStreamingAPI() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SubagentExample/main.swift should be readable")
-            return
-        }
+    func testSubagentExampleUsesStreamingAPI() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("for await") && content.contains("agent.stream("),
             "SubagentExample should use 'for await ... in agent.stream(...)' pattern"
         )
     }
 
-    func testSubagentExampleHandlesPartialMessage() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SubagentExample/main.swift should be readable")
-            return
-        }
+    func testSubagentExampleHandlesPartialMessage() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains(".partialMessage"),
             "SubagentExample should handle .partialMessage case for incremental text"
         )
     }
 
-    func testSubagentExampleHandlesToolUseEvent() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SubagentExample/main.swift should be readable")
-            return
-        }
+    func testSubagentExampleHandlesToolUseEvent() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains(".toolUse"),
             "SubagentExample should handle .toolUse case to display tool invocations (including Agent tool)"
         )
     }
 
-    func testSubagentExampleDisplaysToolNameFromToolUseData() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SubagentExample/main.swift should be readable")
-            return
-        }
+    func testSubagentExampleDisplaysToolNameFromToolUseData() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         let hasToolName = content.contains("toolName") || content.contains("data.toolName")
         XCTAssertTrue(
             hasToolName,
@@ -308,11 +254,8 @@ final class SubagentExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testSubagentExampleDisplaysToolInput() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SubagentExample/main.swift should be readable")
-            return
-        }
+    func testSubagentExampleDisplaysToolInput() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // Should display input parameters from tool use events
         let hasInput = content.contains("data.input") || content.contains(".input")
         XCTAssertTrue(
@@ -321,11 +264,8 @@ final class SubagentExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testSubagentExampleHandlesToolResultSummary() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SubagentExample/main.swift should be readable")
-            return
-        }
+    func testSubagentExampleHandlesToolResultSummary() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // Should display truncated tool result content
         let hasTruncation = content.contains("prefix(") || content.contains("data.content")
         XCTAssertTrue(
@@ -334,22 +274,16 @@ final class SubagentExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testSubagentExampleHandlesAssistantEvent() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SubagentExample/main.swift should be readable")
-            return
-        }
+    func testSubagentExampleHandlesAssistantEvent() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains(".assistant("),
             "SubagentExample should handle .assistant case for model info and stop reason"
         )
     }
 
-    func testSubagentExampleHandlesSystemEvent() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SubagentExample/main.swift should be readable")
-            return
-        }
+    func testSubagentExampleHandlesSystemEvent() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains(".system("),
             "SubagentExample should handle .system case for system-level events"
@@ -358,11 +292,8 @@ final class SubagentExampleComplianceTests: XCTestCase {
 
     // MARK: - AC6: Uses Actual Public API Signatures
 
-    func testSubagentExampleAgentOptionsUsesRealParameterNames() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SubagentExample/main.swift should be readable")
-            return
-        }
+    func testSubagentExampleAgentOptionsUsesRealParameterNames() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         if content.contains("AgentOptions(") {
             let validParams = [
                 "apiKey:", "model:", "systemPrompt:", "maxTurns:",
@@ -381,11 +312,8 @@ final class SubagentExampleComplianceTests: XCTestCase {
         }
     }
 
-    func testSubagentExampleSDKMessagePatternMatchesSource() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SubagentExample/main.swift should be readable")
-            return
-        }
+    func testSubagentExampleSDKMessagePatternMatchesSource() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // SDKMessage cases must match the actual enum cases from SDKMessage.swift
         let requiredCases = [".partialMessage", ".toolUse", ".toolResult", ".result", ".assistant", ".system"]
         for caseName in requiredCases {
@@ -396,11 +324,8 @@ final class SubagentExampleComplianceTests: XCTestCase {
         }
     }
 
-    func testSubagentExampleDoesNotUseHypotheticalAPIs() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SubagentExample/main.swift should be readable")
-            return
-        }
+    func testSubagentExampleDoesNotUseHypotheticalAPIs() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // Should use actual API function names, not hypothetical ones
         XCTAssertTrue(
             content.contains("createAgentTool()"),
@@ -412,11 +337,8 @@ final class SubagentExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testSubagentExampleSafelyUnwrapsOptionalUsage() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SubagentExample/main.swift should be readable")
-            return
-        }
+    func testSubagentExampleSafelyUnwrapsOptionalUsage() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // data.usage is Optional<TokenUsage> so should use if let or guard let
         let hasSafeUnwrap = content.contains("if let usage") || content.contains("guard let usage")
         XCTAssertTrue(
@@ -425,11 +347,8 @@ final class SubagentExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testSubagentExampleDisplaysUsageStatistics() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SubagentExample/main.swift should be readable")
-            return
-        }
+    func testSubagentExampleDisplaysUsageStatistics() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         let hasTurns = content.contains("numTurns") || content.contains("data.numTurns")
         XCTAssertTrue(
             hasTurns,
@@ -445,11 +364,8 @@ final class SubagentExampleComplianceTests: XCTestCase {
 
     // MARK: - AC7: Clear Comments and No Exposed Keys
 
-    func testSubagentExampleHasTopLevelDescriptionComment() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SubagentExample/main.swift should be readable")
-            return
-        }
+    func testSubagentExampleHasTopLevelDescriptionComment() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
         XCTAssertTrue(
             trimmed.hasPrefix("//"),
@@ -457,11 +373,8 @@ final class SubagentExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testSubagentExampleHasMultipleInlineComments() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SubagentExample/main.swift should be readable")
-            return
-        }
+    func testSubagentExampleHasMultipleInlineComments() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         let commentLines = content.components(separatedBy: "\n")
             .filter { $0.trimmingCharacters(in: .whitespaces).hasPrefix("//") }
             .count
@@ -471,11 +384,8 @@ final class SubagentExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testSubagentExampleDoesNotExposeRealAPIKeys() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SubagentExample/main.swift should be readable")
-            return
-        }
+    func testSubagentExampleDoesNotExposeRealAPIKeys() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         let lines = content.components(separatedBy: "\n")
         for line in lines {
             if line.contains("sk-") && !line.contains("sk-...") && !line.contains("sk-xxx") {
@@ -495,11 +405,8 @@ final class SubagentExampleComplianceTests: XCTestCase {
         }
     }
 
-    func testSubagentExampleUsesPlaceholderOrEnvVarForAPIKey() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SubagentExample/main.swift should be readable")
-            return
-        }
+    func testSubagentExampleUsesPlaceholderOrEnvVarForAPIKey() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         if content.contains("apiKey:") {
             let usesPlaceholder = content.contains("sk-...") || content.contains("sk-xxx")
             let usesEnvVar = content.contains("ProcessInfo.processInfo.environment") ||
@@ -511,11 +418,8 @@ final class SubagentExampleComplianceTests: XCTestCase {
         }
     }
 
-    func testSubagentExampleDoesNotUseForceUnwrap() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SubagentExample/main.swift should be readable")
-            return
-        }
+    func testSubagentExampleDoesNotUseForceUnwrap() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         let lines = content.components(separatedBy: "\n")
         for line in lines {
             let trimmed = line.trimmingCharacters(in: .whitespaces)

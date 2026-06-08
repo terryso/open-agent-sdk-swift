@@ -84,22 +84,16 @@ final class SandboxExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testSandboxExampleImportsOpenAgentSDK() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SandboxExample/main.swift should be readable")
-            return
-        }
+    func testSandboxExampleImportsOpenAgentSDK() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("import OpenAgentSDK"),
             "SandboxExample should import OpenAgentSDK"
         )
     }
 
-    func testSandboxExampleImportsFoundation() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SandboxExample/main.swift should be readable")
-            return
-        }
+    func testSandboxExampleImportsFoundation() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("import Foundation"),
             "SandboxExample should import Foundation"
@@ -108,11 +102,8 @@ final class SandboxExampleComplianceTests: XCTestCase {
 
     // MARK: - AC1: Code Quality
 
-    func testSandboxExampleHasTopLevelDescriptionComment() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SandboxExample/main.swift should be readable")
-            return
-        }
+    func testSandboxExampleHasTopLevelDescriptionComment() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
         XCTAssertTrue(
             trimmed.hasPrefix("//"),
@@ -120,11 +111,8 @@ final class SandboxExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testSandboxExampleHasMultipleInlineComments() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SandboxExample/main.swift should be readable")
-            return
-        }
+    func testSandboxExampleHasMultipleInlineComments() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         let commentLines = content.components(separatedBy: "\n")
             .filter { $0.trimmingCharacters(in: .whitespaces).hasPrefix("//") }
             .count
@@ -134,22 +122,16 @@ final class SandboxExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testSandboxExampleHasMarkSections() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SandboxExample/main.swift should be readable")
-            return
-        }
+    func testSandboxExampleHasMarkSections() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("MARK:"),
             "SandboxExample should use MARK section comments for organization"
         )
     }
 
-    func testSandboxExampleDoesNotUseForceUnwrap() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SandboxExample/main.swift should be readable")
-            return
-        }
+    func testSandboxExampleDoesNotUseForceUnwrap() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         let lines = content.components(separatedBy: "\n")
         for line in lines {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
@@ -164,55 +146,40 @@ final class SandboxExampleComplianceTests: XCTestCase {
 
     // MARK: - AC2: File System Path Restrictions
 
-    func testSandboxExampleCreatesSandboxSettingsWithPathRestrictions() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SandboxExample/main.swift should be readable")
-            return
-        }
+    func testSandboxExampleCreatesSandboxSettingsWithPathRestrictions() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("SandboxSettings("),
             "SandboxExample should create SandboxSettings instances for path restrictions"
         )
     }
 
-    func testSandboxExampleDemonstratesAllowedReadPaths() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SandboxExample/main.swift should be readable")
-            return
-        }
+    func testSandboxExampleDemonstratesAllowedReadPaths() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("allowedReadPaths:"),
             "SandboxExample should demonstrate allowedReadPaths configuration"
         )
     }
 
-    func testSandboxExampleDemonstratesAllowedWritePaths() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SandboxExample/main.swift should be readable")
-            return
-        }
+    func testSandboxExampleDemonstratesAllowedWritePaths() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("allowedWritePaths:"),
             "SandboxExample should demonstrate allowedWritePaths configuration"
         )
     }
 
-    func testSandboxExampleDemonstratesDeniedPaths() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SandboxExample/main.swift should be readable")
-            return
-        }
+    func testSandboxExampleDemonstratesDeniedPaths() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("deniedPaths:"),
             "SandboxExample should demonstrate deniedPaths configuration"
         )
     }
 
-    func testSandboxExampleUsesSandboxSettingsInit() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SandboxExample/main.swift should be readable")
-            return
-        }
+    func testSandboxExampleUsesSandboxSettingsInit() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // Should have at least 2 SandboxSettings instances (path + command configs)
         let settingsOccurrences = content.components(separatedBy: "SandboxSettings(").count - 1
         XCTAssertGreaterThanOrEqual(
@@ -223,22 +190,16 @@ final class SandboxExampleComplianceTests: XCTestCase {
 
     // MARK: - AC3: Command Blocklist (deniedCommands)
 
-    func testSandboxExampleCreatesBlocklistSandboxSettings() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SandboxExample/main.swift should be readable")
-            return
-        }
+    func testSandboxExampleCreatesBlocklistSandboxSettings() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("deniedCommands:"),
             "SandboxExample should create SandboxSettings with deniedCommands for blocklist mode"
         )
     }
 
-    func testSandboxExampleBlocklistContainsDangerousCommands() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SandboxExample/main.swift should be readable")
-            return
-        }
+    func testSandboxExampleBlocklistContainsDangerousCommands() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // Should include at least "rm" in the blocklist (standard dangerous command)
         XCTAssertTrue(
             content.contains("\"rm\""),
@@ -246,11 +207,8 @@ final class SandboxExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testSandboxExampleDemonstratesBlocklistRejection() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SandboxExample/main.swift should be readable")
-            return
-        }
+    func testSandboxExampleDemonstratesBlocklistRejection() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // Should show catching/handling of permissionDenied for blocklist
         XCTAssertTrue(
             content.contains("SandboxChecker"),
@@ -258,11 +216,8 @@ final class SandboxExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testSandboxExampleUsesDeniedCommandsParameter() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SandboxExample/main.swift should be readable")
-            return
-        }
+    func testSandboxExampleUsesDeniedCommandsParameter() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // The deniedCommands parameter should contain at least "rm" and "sudo"
         // (per story AC: "deniedCommands: ["rm", "sudo"]")
         XCTAssertTrue(
@@ -273,22 +228,16 @@ final class SandboxExampleComplianceTests: XCTestCase {
 
     // MARK: - AC4: Command Allowlist (allowedCommands)
 
-    func testSandboxExampleCreatesAllowlistSandboxSettings() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SandboxExample/main.swift should be readable")
-            return
-        }
+    func testSandboxExampleCreatesAllowlistSandboxSettings() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("allowedCommands:"),
             "SandboxExample should create SandboxSettings with allowedCommands for allowlist mode"
         )
     }
 
-    func testSandboxExampleAllowlistContainsSafeCommands() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SandboxExample/main.swift should be readable")
-            return
-        }
+    func testSandboxExampleAllowlistContainsSafeCommands() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // Per story AC: allowedCommands: ["git", "swift"]
         XCTAssertTrue(
             content.contains("\"git\""),
@@ -296,11 +245,8 @@ final class SandboxExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testSandboxExampleDemonstratesAllowlistAcceptance() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SandboxExample/main.swift should be readable")
-            return
-        }
+    func testSandboxExampleDemonstratesAllowlistAcceptance() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // Should show that allowlisted commands are permitted
         // Either via SandboxChecker.isCommandAllowed or checkCommand succeeding
         let usesCheck = content.contains("checkCommand(") || content.contains("isCommandAllowed(")
@@ -310,11 +256,8 @@ final class SandboxExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testSandboxExampleUsesAllowedCommandsParameter() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SandboxExample/main.swift should be readable")
-            return
-        }
+    func testSandboxExampleUsesAllowedCommandsParameter() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // allowedCommands should be set to a non-nil array (not nil which is blocklist mode)
         // Look for the pattern: allowedCommands: [ ... ] (non-nil array)
         XCTAssertTrue(
@@ -325,11 +268,8 @@ final class SandboxExampleComplianceTests: XCTestCase {
 
     // MARK: - AC5: Path Traversal and Symlink Resolution
 
-    func testSandboxExampleDemonstratesPathTraversalProtection() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SandboxExample/main.swift should be readable")
-            return
-        }
+    func testSandboxExampleDemonstratesPathTraversalProtection() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // Should show path traversal protection (e.g., /project/subdir/../../../etc/passwd)
         let hasTraversal = content.contains("../") || content.contains("..")
         XCTAssertTrue(
@@ -338,11 +278,8 @@ final class SandboxExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testSandboxExampleReferencesDotDotPathPattern() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SandboxExample/main.swift should be readable")
-            return
-        }
+    func testSandboxExampleReferencesDotDotPathPattern() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // Should explicitly reference a path containing ".." to show traversal
         XCTAssertTrue(
             content.contains("../"),
@@ -350,11 +287,8 @@ final class SandboxExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testSandboxExampleDemonstratesSymlinkResolution() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SandboxExample/main.swift should be readable")
-            return
-        }
+    func testSandboxExampleDemonstratesSymlinkResolution() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // Should mention symlinks or use SandboxPathNormalizer for symlink resolution
         let mentionsSymlink = content.contains("symlink") || content.contains("Symlink") ||
                               content.contains("symbolic link") || content.contains("resolvingSymlinksInPath")
@@ -364,11 +298,8 @@ final class SandboxExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testSandboxExampleUsesSandboxPathNormalizer() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SandboxExample/main.swift should be readable")
-            return
-        }
+    func testSandboxExampleUsesSandboxPathNormalizer() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("SandboxPathNormalizer"),
             "SandboxExample should use SandboxPathNormalizer for path normalization demo"
@@ -377,11 +308,8 @@ final class SandboxExampleComplianceTests: XCTestCase {
 
     // MARK: - AC6: Shell Metacharacter Detection
 
-    func testSandboxExampleDemonstratesSubshellDetection() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SandboxExample/main.swift should be readable")
-            return
-        }
+    func testSandboxExampleDemonstratesSubshellDetection() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // Should show bash -c detection
         XCTAssertTrue(
             content.contains("bash -c") || content.contains("sh -c") || content.contains("zsh -c"),
@@ -389,11 +317,8 @@ final class SandboxExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testSandboxExampleReferencesBashDashC() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SandboxExample/main.swift should be readable")
-            return
-        }
+    func testSandboxExampleReferencesBashDashC() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // Should reference "bash -c" explicitly (string literal in example)
         XCTAssertTrue(
             content.contains("bash -c"),
@@ -401,11 +326,8 @@ final class SandboxExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testSandboxExampleDemonstratesCommandSubstitution() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SandboxExample/main.swift should be readable")
-            return
-        }
+    func testSandboxExampleDemonstratesCommandSubstitution() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // Should show command substitution detection: $(...) or backtick
         let hasSubstitution = content.contains("$(") || content.contains("`rm")
         XCTAssertTrue(
@@ -414,11 +336,8 @@ final class SandboxExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testSandboxExampleDemonstratesEscapeBypassDetection() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SandboxExample/main.swift should be readable")
-            return
-        }
+    func testSandboxExampleDemonstratesEscapeBypassDetection() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // Should show escape bypass: \rm or "rm" patterns
         let hasEscape = content.contains("\\rm") || content.contains("\\\"rm\\\"") ||
                         content.contains("\"rm\"")
@@ -430,11 +349,8 @@ final class SandboxExampleComplianceTests: XCTestCase {
 
     // MARK: - AC7: Permission Denied Error Handling
 
-    func testSandboxExampleCatchesPermissionDeniedError() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SandboxExample/main.swift should be readable")
-            return
-        }
+    func testSandboxExampleCatchesPermissionDeniedError() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // Should use do/try/catch to catch permissionDenied errors
         XCTAssertTrue(
             content.contains("catch") && content.contains("try"),
@@ -442,22 +358,16 @@ final class SandboxExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testSandboxExampleUsesSandboxCheckerCheckPath() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SandboxExample/main.swift should be readable")
-            return
-        }
+    func testSandboxExampleUsesSandboxCheckerCheckPath() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("SandboxChecker") && content.contains("checkPath("),
             "SandboxExample should use SandboxChecker.checkPath() for path validation"
         )
     }
 
-    func testSandboxExampleUsesSandboxCheckerCheckCommand() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SandboxExample/main.swift should be readable")
-            return
-        }
+    func testSandboxExampleUsesSandboxCheckerCheckCommand() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("SandboxChecker") && content.contains("checkCommand("),
             "SandboxExample should use SandboxChecker.checkCommand() for command validation"
@@ -466,11 +376,8 @@ final class SandboxExampleComplianceTests: XCTestCase {
 
     // MARK: - AC8: Allowlist vs Blocklist Comparison
 
-    func testSandboxExampleDemonstratesAllowlistVsBlocklist() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SandboxExample/main.swift should be readable")
-            return
-        }
+    func testSandboxExampleDemonstratesAllowlistVsBlocklist() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // Should have both deniedCommands and allowedCommands to show comparison
         XCTAssertTrue(
             content.contains("deniedCommands:") && content.contains("allowedCommands:"),
@@ -478,11 +385,8 @@ final class SandboxExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testSandboxExampleShowsBehaviorDifference() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SandboxExample/main.swift should be readable")
-            return
-        }
+    func testSandboxExampleShowsBehaviorDifference() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // Should show that git is allowed in allowlist but rm is denied
         // Both "git" and "rm" should appear as test commands
         XCTAssertTrue(
@@ -493,11 +397,8 @@ final class SandboxExampleComplianceTests: XCTestCase {
 
     // MARK: - AC10: API Key Safety and Environment Patterns
 
-    func testSandboxExampleDoesNotExposeRealAPIKeys() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SandboxExample/main.swift should be readable")
-            return
-        }
+    func testSandboxExampleDoesNotExposeRealAPIKeys() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         let lines = content.components(separatedBy: "\n")
         for line in lines {
             if line.contains("sk-") && !line.contains("sk-...") && !line.contains("sk-xxx") {
@@ -517,22 +418,16 @@ final class SandboxExampleComplianceTests: XCTestCase {
         }
     }
 
-    func testSandboxExampleUsesLoadDotEnvPattern() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SandboxExample/main.swift should be readable")
-            return
-        }
+    func testSandboxExampleUsesLoadDotEnvPattern() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("loadDotEnv()"),
             "SandboxExample should use loadDotEnv() helper pattern"
         )
     }
 
-    func testSandboxExampleUsesGetEnvPattern() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/SandboxExample/main.swift should be readable")
-            return
-        }
+    func testSandboxExampleUsesGetEnvPattern() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("getEnv("),
             "SandboxExample should use getEnv() helper pattern for API key loading"
