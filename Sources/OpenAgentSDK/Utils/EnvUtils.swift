@@ -140,6 +140,45 @@ internal func atomicWriteJSON(data: Data, toDirectory directory: String, fileNam
     }
 }
 
+/// Create a pre-configured ISO8601 date formatter with internet datetime and fractional seconds.
+///
+/// Returns a new `ISO8601DateFormatter` configured with `.withInternetDateTime` and
+/// `.withFractionalSeconds` format options. Each call creates a fresh instance,
+/// making it safe to use from any isolation context (actors, nonisolated code, etc.).
+///
+/// - Returns: A configured `ISO8601DateFormatter`.
+internal func makeISO8601DateFormatter() -> ISO8601DateFormatter {
+    let f = ISO8601DateFormatter()
+    f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    return f
+}
+
+/// The default memory directory path (`~/.agent/memory`).
+internal let defaultMemoryDir: String = {
+    let home: String
+    #if os(Linux)
+    if let homeEnv = getenv("HOME") {
+        home = String(cString: homeEnv)
+    } else {
+        home = "/tmp"
+    }
+    #else
+    home = NSHomeDirectory()
+    #endif
+    return (home as NSString).appendingPathComponent(".agent/memory")
+}()
+
+/// Resolve the memory directory from a custom path or the default.
+///
+/// - Parameter customDir: Optional custom directory path. Falls back to ``defaultMemoryDir``.
+/// - Returns: The resolved memory directory path.
+internal func resolveMemoryDir(customDir: String?) -> String {
+    if let custom = customDir {
+        return custom
+    }
+    return defaultMemoryDir
+}
+
 /// Get the default OpenAI-compatible base URL.
 ///
 /// Priority: `CODEANY_BASE_URL` environment variable > built-in default.

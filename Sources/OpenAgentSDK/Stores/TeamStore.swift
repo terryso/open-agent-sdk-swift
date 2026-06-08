@@ -7,11 +7,7 @@ public actor TeamStore {
 
     private var teams: [String: Team] = [:]
     private var teamCounter: Int = 0
-    private let dateFormatter: ISO8601DateFormatter = {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return f
-    }()
+    private let dateFormatter = makeISO8601DateFormatter()
 
     // MARK: - Initialization
 

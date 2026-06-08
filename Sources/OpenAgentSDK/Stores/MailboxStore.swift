@@ -6,11 +6,7 @@ public actor MailboxStore {
     // MARK: - Properties
 
     private var mailboxes: [String: [AgentMessage]] = [:]
-    private let dateFormatter: ISO8601DateFormatter = {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return f
-    }()
+    private let dateFormatter = makeISO8601DateFormatter()
 
     // MARK: - Initialization
 

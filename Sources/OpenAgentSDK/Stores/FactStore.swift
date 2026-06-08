@@ -39,11 +39,7 @@ public actor FactStore {
         decoder.dateDecodingStrategy = .iso8601
         return decoder
     }()
-    private let legacyDateFormatter: ISO8601DateFormatter = {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return f
-    }()
+    private let legacyDateFormatter = makeISO8601DateFormatter()
 
     // MARK: - Initialization
 
@@ -52,16 +48,12 @@ public actor FactStore {
     /// - Parameter memoryDir: Optional custom directory path. Defaults to `~/.agent/memory/`.
     public init(memoryDir: String? = nil) {
         self.customMemoryDir = memoryDir
-        let resolvedDir = Self.resolveMemoryDir(customDir: memoryDir)
+        let resolvedDir = resolveMemoryDir(customDir: memoryDir)
         self.cache = Self.loadAllDomainsSync(from: resolvedDir, decoder: {
             let d = JSONDecoder()
             d.dateDecodingStrategy = .iso8601
             return d
-        }(), legacyDateFormatter: {
-            let f = ISO8601DateFormatter()
-            f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-            return f
-        }())
+        }(), legacyDateFormatter: makeISO8601DateFormatter())
     }
 
     // MARK: - Public API
@@ -235,25 +227,8 @@ public actor FactStore {
 
     // MARK: - Private: Disk I/O
 
-    nonisolated private static func resolveMemoryDir(customDir: String?) -> String {
-        if let custom = customDir {
-            return custom
-        }
-        let home: String
-        #if os(Linux)
-        if let homeEnv = getenv("HOME") {
-            home = String(cString: homeEnv)
-        } else {
-            home = "/tmp"
-        }
-        #else
-        home = NSHomeDirectory()
-        #endif
-        return (home as NSString).appendingPathComponent(".agent/memory")
-    }
-
     private func getMemoryDir() -> String {
-        Self.resolveMemoryDir(customDir: customMemoryDir)
+        resolveMemoryDir(customDir: customMemoryDir)
     }
 
     nonisolated private static func loadAllDomainsSync(
