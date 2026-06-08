@@ -230,7 +230,7 @@ func extractSessionMemory(
         let responseText = extractTextFromResponse(response)
 
         // Strip markdown code fences if present
-        let cleanedJSON = stripMarkdownFences(responseText)
+        let cleanedJSON = stripCodeFences(responseText)
         guard let data = cleanedJSON.data(using: .utf8),
               let jsonArray = try? JSONSerialization.jsonObject(with: data, options: []) as? [[String: String]] else {
             // If parsing fails, store the summary directly as fallback
@@ -311,21 +311,6 @@ private func buildSessionMemoryExtractionPrompt(_ summary: String) -> String {
     Conversation summary:
     \(summary)
     """
-}
-
-/// Strip markdown code fences from a string (e.g., ```json ... ```).
-private func stripMarkdownFences(_ text: String) -> String {
-    var result = text.trimmingCharacters(in: .whitespacesAndNewlines)
-    if result.hasPrefix("```") {
-        // Remove opening fence (and optional language tag)
-        if let firstNewline = result.firstIndex(of: "\n") {
-            result = String(result[result.index(after: firstNewline)...])
-        }
-    }
-    if result.hasSuffix("```") {
-        result = String(result.dropLast(3))
-    }
-    return result.trimmingCharacters(in: .whitespacesAndNewlines)
 }
 
 // MARK: - Micro Compaction (Story 2.6)
