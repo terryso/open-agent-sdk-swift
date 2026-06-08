@@ -95,15 +95,12 @@ public enum SandboxChecker {
     ) throws {
         guard isPathAllowed(path, for: operation, settings: settings) else {
             let toolName = operation == .read ? "Read" : "Write"
-            let reason = "path '\(path)' is outside allowed \(operation.rawValue) scope"
-
-            Logger.shared.info("SandboxChecker", "sandbox_denial", data: [
-                "type": "path_\(operation.rawValue)",
-                "value": path,
-                "reason": reason
-            ])
-
-            throw SDKError.permissionDenied(tool: toolName, reason: reason)
+            try denySandbox(
+                type: "path_\(operation.rawValue)",
+                value: path,
+                reason: "path '\(path)' is outside allowed \(operation.rawValue) scope",
+                tool: toolName
+            )
         }
     }
 
@@ -202,15 +199,11 @@ public enum SandboxChecker {
             let basename = extractCommandBasename(command)
 
             guard isCommandAllowed(command, settings: settings) else {
-                let reason = "command '\(basename)' is denied by sandbox policy"
-
-                Logger.shared.info("SandboxChecker", "sandbox_denial", data: [
-                    "type": "command",
-                    "value": basename,
-                    "reason": reason
-                ])
-
-                throw SDKError.permissionDenied(tool: "Bash", reason: reason)
+                try denySandbox(
+                    type: "command",
+                    value: basename,
+                    reason: "command '\(basename)' is denied by sandbox policy"
+                )
             }
         }
 
@@ -223,15 +216,11 @@ public enum SandboxChecker {
                 for deniedPath in settings.deniedPaths {
                     let normalizedDenied = SandboxPathNormalizer.normalize(deniedPath)
                     if isPrefixMatch(normalizedPath: normalizedPath, configuredPath: normalizedDenied) {
-                        let reason = "path '\(path)' in command is denied by sandbox policy"
-
-                        Logger.shared.info("SandboxChecker", "sandbox_denial", data: [
-                            "type": "command_path_denied",
-                            "value": normalizedPath,
-                            "reason": reason
-                        ])
-
-                        throw SDKError.permissionDenied(tool: "Bash", reason: reason)
+                        try denySandbox(
+                            type: "command_path_denied",
+                            value: normalizedPath,
+                            reason: "path '\(path)' in command is denied by sandbox policy"
+                        )
                     }
                 }
                 // Check allowedReadPaths (if configured, only listed paths are readable via bash)
@@ -241,15 +230,11 @@ public enum SandboxChecker {
                         return isPrefixMatch(normalizedPath: normalizedPath, configuredPath: normalizedAllowed)
                     }
                     if !allowed {
-                        let reason = "path '\(path)' in command is outside allowed read scope"
-
-                        Logger.shared.info("SandboxChecker", "sandbox_denial", data: [
-                            "type": "command_path_read",
-                            "value": normalizedPath,
-                            "reason": reason
-                        ])
-
-                        throw SDKError.permissionDenied(tool: "Bash", reason: reason)
+                        try denySandbox(
+                            type: "command_path_read",
+                            value: normalizedPath,
+                            reason: "path '\(path)' in command is outside allowed read scope"
+                        )
                     }
                 }
             }
@@ -299,13 +284,11 @@ public enum SandboxChecker {
             return
         case .unparseable:
             // Deny by default for unparseable subshell patterns
-            let reason = "command contains unparseable shell metacharacters"
-            Logger.shared.info("SandboxChecker", "sandbox_denial", data: [
-                "type": "unparseable_metachar",
-                "value": trimmed,
-                "reason": reason
-            ])
-            throw SDKError.permissionDenied(tool: "Bash", reason: reason)
+            try denySandbox(
+                type: "unparseable_metachar",
+                value: trimmed,
+                reason: "command contains unparseable shell metacharacters"
+            )
         case .notSubshell:
             break // Continue to other checks
         }
@@ -316,23 +299,19 @@ public enum SandboxChecker {
             let innerBasename = extractCommandBasename(innerCmd)
             if let allowed = settings.allowedCommands {
                 if !allowed.contains(innerBasename) {
-                    let reason = "command '\(innerBasename)' is denied by sandbox policy (detected in substitution)"
-                    Logger.shared.info("SandboxChecker", "sandbox_denial", data: [
-                        "type": "command_substitution",
-                        "value": innerBasename,
-                        "reason": reason
-                    ])
-                    throw SDKError.permissionDenied(tool: "Bash", reason: reason)
+                    try denySandbox(
+                        type: "command_substitution",
+                        value: innerBasename,
+                        reason: "command '\(innerBasename)' is denied by sandbox policy (detected in substitution)"
+                    )
                 }
             } else if !settings.deniedCommands.isEmpty {
                 if settings.deniedCommands.contains(innerBasename) {
-                    let reason = "command '\(innerBasename)' is denied by sandbox policy (detected in substitution)"
-                    Logger.shared.info("SandboxChecker", "sandbox_denial", data: [
-                        "type": "command_substitution",
-                        "value": innerBasename,
-                        "reason": reason
-                    ])
-                    throw SDKError.permissionDenied(tool: "Bash", reason: reason)
+                    try denySandbox(
+                        type: "command_substitution",
+                        value: innerBasename,
+                        reason: "command '\(innerBasename)' is denied by sandbox policy (detected in substitution)"
+                    )
                 }
             }
         }
@@ -481,6 +460,25 @@ public enum SandboxChecker {
     }
 
     // MARK: - Internal Helpers
+
+    /// Log a sandbox denial and throw ``SDKError/permissionDenied(tool:reason:)``.
+    ///
+    /// Centralizes the Logger.info + SDKError.permissionDenied pattern used at every
+    /// sandbox enforcement point. Marked `-> Never` so the compiler knows callers
+    /// never continue past this call.
+    private static func denySandbox(
+        type: String,
+        value: String,
+        reason: String,
+        tool: String = "Bash"
+    ) throws -> Never {
+        Logger.shared.info("SandboxChecker", "sandbox_denial", data: [
+            "type": type,
+            "value": value,
+            "reason": reason
+        ])
+        throw SDKError.permissionDenied(tool: tool, reason: reason)
+    }
 
     /// Check whether `normalizedPath` matches any entry in `allowedPaths`.
     /// Returns `true` when `allowedPaths` is empty (no restrictions configured).

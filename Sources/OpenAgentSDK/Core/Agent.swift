@@ -1633,12 +1633,10 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                     || _interrupted
                     || (error as? URLError)?.code == .cancelled
                 // Emit AgentFailedEvent or AgentInterruptedEvent in error path
-                if let eventBus = options.eventBus {
-                    if isCancelled {
-                        await eventBus.publish(AgentInterruptedEvent(sessionId: resolvedSessionId, stepsCompleted: turnCount))
-                    } else {
-                        await eventBus.publish(AgentFailedEvent(sessionId: resolvedSessionId, error: "[\(statusCode)] \(errorMessage)", stepsCompleted: turnCount))
-                    }
+                if isCancelled {
+                    await Self.emitAgentInterrupted(eventBus: options.eventBus, sessionId: resolvedSessionId, stepsCompleted: turnCount)
+                } else {
+                    await Self.emitAgentFailed(eventBus: options.eventBus, sessionId: resolvedSessionId, error: "[\(statusCode)] \(errorMessage)", stepsCompleted: turnCount)
                 }
                 let resultStatus: QueryStatus = isCancelled ? .cancelled : .errorDuringExecution
                 return QueryResult(
@@ -1899,17 +1897,15 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
         let isCancelled = (status == .cancelled)
 
         // Emit AgentCompletedEvent / AgentInterruptedEvent
-        if let eventBus = options.eventBus {
-            if isCancelled {
-                await eventBus.publish(AgentInterruptedEvent(sessionId: resolvedSessionId, stepsCompleted: turnCount))
-            } else {
-                await eventBus.publish(AgentCompletedEvent(
-                    sessionId: resolvedSessionId,
-                    totalSteps: turnCount,
-                    durationMs: Self.computeDurationMs(ContinuousClock.now - startTime),
-                    resultText: lastAssistantText.isEmpty ? nil : lastAssistantText
-                ))
-            }
+        if isCancelled {
+            await Self.emitAgentInterrupted(eventBus: options.eventBus, sessionId: resolvedSessionId, stepsCompleted: turnCount)
+        } else if let eventBus = options.eventBus {
+            await eventBus.publish(AgentCompletedEvent(
+                sessionId: resolvedSessionId,
+                totalSteps: turnCount,
+                durationMs: Self.computeDurationMs(ContinuousClock.now - startTime),
+                resultText: lastAssistantText.isEmpty ? nil : lastAssistantText
+            ))
         }
 
         // Close trace recorder if active (promptImpl path doesn't yield SDKMessages,
@@ -2202,9 +2198,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                     // Cancellation check (FR60): cooperative cancellation via Task.isCancelled
                     if _Concurrency.Task.isCancelled {
                         // Emit AgentInterruptedEvent before yielding cancelled
-                        if let eventBus = capturedEventBus {
-                            await eventBus.publish(AgentInterruptedEvent(sessionId: resolvedSessionId, stepsCompleted: turnCount))
-                        }
+                        await Self.emitAgentInterrupted(eventBus: capturedEventBus, sessionId: resolvedSessionId, stepsCompleted: turnCount)
                         let finalText = Self.extractCollectedText(
                             messages: messages,
                             startingAt: currentInvocationMessageStartIndex
@@ -2304,9 +2298,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                         // API connection error — fire hooks before yielding error
                         await Self.fireStopAndEndHooks(hookRegistry: capturedHookRegistry, cwd: capturedCwd)
                         // Emit AgentFailedEvent before yielding error
-                        if let eventBus = capturedEventBus {
-                            await eventBus.publish(AgentFailedEvent(sessionId: resolvedSessionId, error: "[\(statusCode)] \(errorMessage)", stepsCompleted: turnCount))
-                        }
+                        await Self.emitAgentFailed(eventBus: capturedEventBus, sessionId: resolvedSessionId, error: "[\(statusCode)] \(errorMessage)", stepsCompleted: turnCount)
                         Self.yieldStreamError(
                             continuation: continuation, text: "",
                             usage: totalUsage, turnCount: turnCount, startTime: startTime,
@@ -2576,9 +2568,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                                 // SSE error event — fire hooks before yielding error
                                 await Self.fireStopAndEndHooks(hookRegistry: capturedHookRegistry, cwd: capturedCwd)
                                 // Emit AgentFailedEvent before yielding error
-                                if let eventBus = capturedEventBus {
-                                    await eventBus.publish(AgentFailedEvent(sessionId: resolvedSessionId, error: "SSE error event", stepsCompleted: turnCount))
-                                }
+                                await Self.emitAgentFailed(eventBus: capturedEventBus, sessionId: resolvedSessionId, error: "SSE error event", stepsCompleted: turnCount)
                                 Self.yieldStreamError(
                                     continuation: continuation, text: accumulatedText,
                                     usage: totalUsage, turnCount: turnCount, startTime: startTime,
@@ -2595,9 +2585,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                         // Check if this is a cancellation (not a real error)
                         if error is CancellationError || _Concurrency.Task.isCancelled || (error as? URLError)?.code == .cancelled {
                             // Emit AgentInterruptedEvent before yielding cancelled
-                            if let eventBus = capturedEventBus {
-                                await eventBus.publish(AgentInterruptedEvent(sessionId: resolvedSessionId, stepsCompleted: turnCount))
-                            }
+                            await Self.emitAgentInterrupted(eventBus: capturedEventBus, sessionId: resolvedSessionId, stepsCompleted: turnCount)
                             let previousText = Self.extractCollectedText(
                                 messages: messages,
                                 startingAt: currentInvocationMessageStartIndex
@@ -2620,9 +2608,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                         // Stream iteration error — fire hooks before yielding error
                         await Self.fireStopAndEndHooks(hookRegistry: capturedHookRegistry, cwd: capturedCwd)
                         // Emit AgentFailedEvent before yielding error
-                        if let eventBus = capturedEventBus {
-                            await eventBus.publish(AgentFailedEvent(sessionId: resolvedSessionId, error: error.localizedDescription, stepsCompleted: turnCount))
-                        }
+                        await Self.emitAgentFailed(eventBus: capturedEventBus, sessionId: resolvedSessionId, error: error.localizedDescription, stepsCompleted: turnCount)
                         Self.yieldStreamError(
                             continuation: continuation, text: accumulatedText,
                             usage: totalUsage, turnCount: turnCount, startTime: startTime,
@@ -2636,9 +2622,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                     // Cancellation check after SSE event stream ends (FR60)
                     if _Concurrency.Task.isCancelled {
                         // Emit AgentInterruptedEvent before yielding cancelled
-                        if let eventBus = capturedEventBus {
-                            await eventBus.publish(AgentInterruptedEvent(sessionId: resolvedSessionId, stepsCompleted: turnCount))
-                        }
+                        await Self.emitAgentInterrupted(eventBus: capturedEventBus, sessionId: resolvedSessionId, stepsCompleted: turnCount)
                         let finalText = Self.extractCollectedText(
                             messages: messages,
                             startingAt: currentInvocationMessageStartIndex
@@ -3325,6 +3309,18 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
         guard let hookRegistry else { return }
         await hookRegistry.execute(.stop, input: HookInput(event: .stop, cwd: cwd))
         await hookRegistry.execute(.sessionEnd, input: HookInput(event: .sessionEnd, cwd: cwd))
+    }
+
+    /// Publish an `AgentInterruptedEvent` if the event bus is configured.
+    private static func emitAgentInterrupted(eventBus: EventBus?, sessionId: String?, stepsCompleted: Int) async {
+        guard let eventBus else { return }
+        await eventBus.publish(AgentInterruptedEvent(sessionId: sessionId, stepsCompleted: stepsCompleted))
+    }
+
+    /// Publish an `AgentFailedEvent` if the event bus is configured.
+    private static func emitAgentFailed(eventBus: EventBus?, sessionId: String?, error: String, stepsCompleted: Int) async {
+        guard let eventBus else { return }
+        await eventBus.publish(AgentFailedEvent(sessionId: sessionId, error: error, stepsCompleted: stepsCompleted))
     }
 
     /// Emit an `LLMRequestStartedEvent` with message summaries.
