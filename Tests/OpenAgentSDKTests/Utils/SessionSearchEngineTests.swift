@@ -5,27 +5,13 @@ private func msgs(_ pairs: (String, String)...) -> [[String: Any]] {
     pairs.map { ["type": $0.0, "message": $0.1] }
 }
 
-final class SessionSearchEngineTests: XCTestCase {
+final class SessionSearchEngineTests: TempDirTestCase {
 
-    private var tempDir: String!
     private var store: SessionStore!
 
     override func setUp() {
         super.setUp()
-        tempDir = (NSTemporaryDirectory() as NSString)
-            .appendingPathComponent("session-search-engine-tests-\(UUID().uuidString)")
-        try? FileManager.default.createDirectory(
-            atPath: tempDir,
-            withIntermediateDirectories: true
-        )
         store = SessionStore(sessionsDir: tempDir)
-    }
-
-    override func tearDown() {
-        if let tempDir {
-            try? FileManager.default.removeItem(atPath: tempDir)
-        }
-        super.tearDown()
     }
 
     // MARK: - Discover
