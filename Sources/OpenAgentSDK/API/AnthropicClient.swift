@@ -25,19 +25,8 @@ public actor AnthropicClient: LLMClient {
     ///   - urlSession: Optional custom URLSession (useful for testing).
     public init(apiKey: String, baseURL: String? = nil, urlSession: URLSession? = nil) {
         self.apiKey = apiKey
-
-        let urlString = baseURL ?? "https://api.anthropic.com"
-        if let parsedURL = URL(string: urlString) {
-            self.baseURL = parsedURL
-        } else {
-            self.baseURL = URL(string: "https://api.anthropic.com")!
-        }
-
-        if let urlSession {
-            self.urlSession = urlSession
-        } else {
-            self.urlSession = URLSession.shared
-        }
+        self.baseURL = resolveBaseURL(custom: baseURL, default: "https://api.anthropic.com")
+        self.urlSession = urlSession ?? URLSession.shared
     }
 
     // MARK: - Non-Streaming Message
@@ -78,9 +67,9 @@ public actor AnthropicClient: LLMClient {
 
         let request = try buildRequest(body: body)
 
-        let (data, response) = try await performNetworkRequest(request)
+        let (data, response) = try await performLLMRequest(request, urlSession: urlSession, apiKey: apiKey)
 
-        try validateHTTPResponse(response, data: data)
+        try validateLLMHTTPResponse(response, data: data, apiKey: apiKey)
 
         return try parseResponse(data: data)
     }
@@ -117,9 +106,9 @@ public actor AnthropicClient: LLMClient {
 
         let request = try buildRequest(body: body)
 
-        let (data, response) = try await performNetworkRequest(request)
+        let (data, response) = try await performLLMRequest(request, urlSession: urlSession, apiKey: apiKey)
 
-        try validateHTTPResponse(response, data: nil)
+        try validateLLMHTTPResponse(response, data: nil, apiKey: apiKey)
 
         guard let responseText = String(data: data, encoding: .utf8) else {
             throw SDKError.apiError(statusCode: 0, message: "Empty streaming response")
@@ -138,17 +127,6 @@ public actor AnthropicClient: LLMClient {
     }
 
     // MARK: - Private Helpers
-
-    /// Performs a URL request, mapping URLError to SDKError with API-key-safe messages.
-    private nonisolated func performNetworkRequest(_ request: URLRequest) async throws -> (Data, URLResponse) {
-        do {
-            return try await urlSession.data(for: request)
-        } catch let error as URLError {
-            let statusCode = error.code == .timedOut ? 408 : 0
-            let safeMessage = error.localizedDescription.replacingOccurrences(of: apiKey, with: "***")
-            throw SDKError.apiError(statusCode: statusCode, message: safeMessage)
-        }
-    }
 
     /// Builds a URLRequest for the Messages API endpoint.
     private nonisolated func buildRequest(body: [String: Any]) throws -> URLRequest {
@@ -170,27 +148,5 @@ public actor AnthropicClient: LLMClient {
         }
 
         return request
-    }
-
-    /// Validates an HTTP response, throwing SDKError for non-2xx status codes.
-    private nonisolated func validateHTTPResponse(_ response: URLResponse?, data: Data?) throws {
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw SDKError.apiError(statusCode: 0, message: "Invalid response")
-        }
-
-        guard (200...299).contains(httpResponse.statusCode) else {
-            var errorMessage = "HTTP \(httpResponse.statusCode)"
-
-            if let data,
-               let json = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any],
-               let error = json["error"] as? [String: Any],
-               let message = error["message"] as? String {
-                errorMessage = message
-            }
-
-            // Security: ensure API key is never included in error messages
-            let safeMessage = errorMessage.replacingOccurrences(of: apiKey, with: "***")
-            throw SDKError.apiError(statusCode: httpResponse.statusCode, message: safeMessage)
-        }
     }
 }
