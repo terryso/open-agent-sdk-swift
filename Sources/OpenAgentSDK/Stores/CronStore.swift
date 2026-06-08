@@ -10,11 +10,7 @@ public actor CronStore {
 
     private var jobs: [String: CronJob] = [:]
     private var jobCounter: Int = 0
-    private let dateFormatter: ISO8601DateFormatter = {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return f
-    }()
+    private let dateFormatter = makeISO8601DateFormatter()
 
     // MARK: - Initialization
 

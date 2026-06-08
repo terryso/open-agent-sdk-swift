@@ -7,11 +7,7 @@ public actor SessionStore {
     // MARK: - Properties
 
     private let customSessionsDir: String?
-    private let dateFormatter: ISO8601DateFormatter = {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return f
-    }()
+    private let dateFormatter = makeISO8601DateFormatter()
 
     // MARK: - Initialization
 

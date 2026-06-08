@@ -132,11 +132,7 @@ public actor FileBasedMemoryStore: MemoryStoreProtocol {
 
     private let customMemoryDir: String?
     private var cache: [String: [KnowledgeEntry]] = [:]
-    private let dateFormatter: ISO8601DateFormatter = {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return f
-    }()
+    private let dateFormatter = makeISO8601DateFormatter()
 
     /// Maximum age for entries in seconds. Entries older than this are
     /// automatically filtered out during query. Defaults to 30 days (2,592,000 seconds).
@@ -155,10 +151,8 @@ public actor FileBasedMemoryStore: MemoryStoreProtocol {
 
         // Load all domain files on init using a static helper
         // (actor init is nonisolated, so we cannot call actor-isolated methods)
-        let memoryDir = FileBasedMemoryStore.resolveMemoryDir(customDir: memoryDir)
-        let dateFormatter = ISO8601DateFormatter()
-        dateFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        self.cache = Self.loadAllDomainsSync(from: memoryDir, dateFormatter: dateFormatter)
+        let memoryDir = resolveMemoryDir(customDir: memoryDir)
+        self.cache = Self.loadAllDomainsSync(from: memoryDir, dateFormatter: makeISO8601DateFormatter())
     }
 
     // MARK: - MemoryStoreProtocol
@@ -208,29 +202,9 @@ public actor FileBasedMemoryStore: MemoryStoreProtocol {
 
     // MARK: - Private: Disk I/O
 
-    /// Resolve the memory directory path (static, callable from nonisolated init).
-    nonisolated private static func resolveMemoryDir(customDir: String?) -> String {
-        if let custom = customDir {
-            return custom
-        }
-
-        let home: String
-        #if os(Linux)
-        if let homeEnv = getenv("HOME") {
-            home = String(cString: homeEnv)
-        } else {
-            home = "/tmp"
-        }
-        #else
-        home = NSHomeDirectory()
-        #endif
-
-        return (home as NSString).appendingPathComponent(".agent/memory")
-    }
-
     /// Resolve the memory directory path (instance convenience).
     private func getMemoryDir() -> String {
-        Self.resolveMemoryDir(customDir: customMemoryDir)
+        resolveMemoryDir(customDir: customMemoryDir)
     }
 
     /// Load all domain JSON files from disk into a cache dictionary (static, for init).
