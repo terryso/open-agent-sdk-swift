@@ -58,30 +58,17 @@ public func createReviewSkillCreateTool(
         }
 
         do {
-            let skillDir = try SkillWriter.write(
-                skill: Skill(
-                    name: input.name,
-                    description: input.description,
-                    aliases: [],
-                    userInvocable: false,
-                    promptTemplate: input.promptTemplate,
-                    whenToUse: input.whenToUse,
-                    lifecycleState: .active
-                ),
-                to: skillsDir
-            )
-
-            let registeredSkill = Skill(
+            let newSkill = Skill(
                 name: input.name,
                 description: input.description,
                 aliases: [],
                 userInvocable: false,
                 promptTemplate: input.promptTemplate,
                 whenToUse: input.whenToUse,
-                baseDir: skillDir,
                 lifecycleState: .active
             )
-            skillRegistry.register(registeredSkill)
+            let skillDir = try SkillWriter.write(skill: newSkill, to: skillsDir)
+            skillRegistry.register(newSkill.withBaseDir(skillDir))
 
             try await usageStore.setProvenance(skillName: input.name, provenance: .agentCreated)
 

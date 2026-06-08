@@ -78,21 +78,7 @@ public func createReviewSkillFileTool(
                 let skillDir = try SkillWriter.write(skill: skill, to: skillsDir)
                 baseDir = skillDir
                 // Update registry with the new baseDir
-                let updatedSkill = Skill(
-                    name: skill.name,
-                    description: skill.description,
-                    aliases: skill.aliases,
-                    userInvocable: skill.userInvocable,
-                    toolRestrictions: skill.toolRestrictions,
-                    modelOverride: skill.modelOverride,
-                    promptTemplate: skill.promptTemplate,
-                    whenToUse: skill.whenToUse,
-                    argumentHint: skill.argumentHint,
-                    baseDir: skillDir,
-                    supportingFiles: skill.supportingFiles,
-                    lifecycleState: skill.lifecycleState
-                )
-                skillRegistry.replace(updatedSkill)
+                skillRegistry.replace(skill.withBaseDir(skillDir))
             } catch {
                 return reviewJSONResponse([
                     "success": false,
