@@ -1493,20 +1493,13 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                 let retryThinking = Self.computeThinkingConfig(from: self.options)
 
                 // Emit LLMRequestStartedEvent with message summaries
-                if let eventBus = options.eventBus {
-                    let summaries: [MessageSummary] = messages.flatMap { msg -> [MessageSummary] in
-                        guard let role = msg["role"] as? String else { return [] }
-                        let (length, preview) = Self.extractContentInfo(from: msg)
-                        return [MessageSummary(role: role, contentLength: length, preview: preview)]
-                    }
-                    await eventBus.publish(LLMRequestStartedEvent(
-                        sessionId: resolvedSessionId,
-                        model: retryModel,
-                        systemPromptLength: retrySystemPrompt?.count ?? 0,
-                        messageCount: messages.count,
-                        messages: summaries
-                    ))
-                }
+                await Self.emitLLMRequestStarted(
+                    eventBus: options.eventBus,
+                    sessionId: resolvedSessionId,
+                    model: retryModel,
+                    systemPrompt: retrySystemPrompt,
+                    messages: messages
+                )
 
                 response = try await withRetry({
                     try await retryClient.sendMessage(
@@ -2301,20 +2294,13 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                         let retryThinking = Self.computeThinkingConfig(from: self.options)
 
                         // Emit LLMRequestStartedEvent with message summaries
-                        if let eventBus = capturedEventBus {
-                            let summaries: [MessageSummary] = retryMessages.flatMap { msg -> [MessageSummary] in
-                                guard let role = msg["role"] as? String else { return [] }
-                                let (length, preview) = Self.extractContentInfo(from: msg)
-                                return [MessageSummary(role: role, contentLength: length, preview: preview)]
-                            }
-                            await eventBus.publish(LLMRequestStartedEvent(
-                                sessionId: capturedSessionId,
-                                model: retryModel,
-                                systemPromptLength: retrySystemPrompt?.count ?? 0,
-                                messageCount: retryMessages.count,
-                                messages: summaries
-                            ))
-                        }
+                        await Self.emitLLMRequestStarted(
+                            eventBus: capturedEventBus,
+                            sessionId: capturedSessionId,
+                            model: retryModel,
+                            systemPrompt: retrySystemPrompt,
+                            messages: retryMessages
+                        )
 
                         eventStream = try await withRetry({
                             try await retryClient.streamMessage(
@@ -2347,12 +2333,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                             "message": errorMessage
                         ])
                         // API connection error — fire hooks before yielding error
-                        if let hookRegistry = capturedHookRegistry {
-                            let stopInput = HookInput(event: .stop, cwd: capturedCwd)
-                            await hookRegistry.execute(.stop, input: stopInput)
-                            let endInput = HookInput(event: .sessionEnd, cwd: capturedCwd)
-                            await hookRegistry.execute(.sessionEnd, input: endInput)
-                        }
+                        await Self.fireStopAndEndHooks(hookRegistry: capturedHookRegistry, cwd: capturedCwd)
                         // Emit AgentFailedEvent before yielding error
                         if let eventBus = capturedEventBus {
                             await eventBus.publish(AgentFailedEvent(sessionId: resolvedSessionId, error: "[\(statusCode)] \(errorMessage)", stepsCompleted: turnCount))
@@ -2443,12 +2424,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                                     ])
 
                                     // Fire hooks before yielding budget error
-                                    if let hookRegistry = capturedHookRegistry {
-                                        let stopInput = HookInput(event: .stop, cwd: capturedCwd)
-                                        await hookRegistry.execute(.stop, input: stopInput)
-                                        let endInput = HookInput(event: .sessionEnd, cwd: capturedCwd)
-                                        await hookRegistry.execute(.sessionEnd, input: endInput)
-                                    }
+                                    await Self.fireStopAndEndHooks(hookRegistry: capturedHookRegistry, cwd: capturedCwd)
 
                                     let budgetStartResultMsg = SDKMessage.result(SDKMessage.ResultData(
                                         subtype: .errorMaxBudgetUsd,
@@ -2581,12 +2557,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                                     ])
 
                                     // Fire hooks before yielding budget error
-                                    if let hookRegistry = capturedHookRegistry {
-                                        let stopInput = HookInput(event: .stop, cwd: capturedCwd)
-                                        await hookRegistry.execute(.stop, input: stopInput)
-                                        let endInput = HookInput(event: .sessionEnd, cwd: capturedCwd)
-                                        await hookRegistry.execute(.sessionEnd, input: endInput)
-                                    }
+                                    await Self.fireStopAndEndHooks(hookRegistry: capturedHookRegistry, cwd: capturedCwd)
 
                                     let budgetResultMsg = SDKMessage.result(SDKMessage.ResultData(
                                         subtype: .errorMaxBudgetUsd,
@@ -2689,12 +2660,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
 
                             case .error:
                                 // SSE error event — fire hooks before yielding error
-                                if let hookRegistry = capturedHookRegistry {
-                                    let stopInput = HookInput(event: .stop, cwd: capturedCwd)
-                                    await hookRegistry.execute(.stop, input: stopInput)
-                                    let endInput = HookInput(event: .sessionEnd, cwd: capturedCwd)
-                                    await hookRegistry.execute(.sessionEnd, input: endInput)
-                                }
+                                await Self.fireStopAndEndHooks(hookRegistry: capturedHookRegistry, cwd: capturedCwd)
                                 // Emit AgentFailedEvent before yielding error
                                 if let eventBus = capturedEventBus {
                                     await eventBus.publish(AgentFailedEvent(sessionId: resolvedSessionId, error: "SSE error event", stepsCompleted: turnCount))
@@ -2738,12 +2704,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                         }
 
                         // Stream iteration error — fire hooks before yielding error
-                        if let hookRegistry = capturedHookRegistry {
-                            let stopInput = HookInput(event: .stop, cwd: capturedCwd)
-                            await hookRegistry.execute(.stop, input: stopInput)
-                            let endInput = HookInput(event: .sessionEnd, cwd: capturedCwd)
-                            await hookRegistry.execute(.sessionEnd, input: endInput)
-                        }
+                        await Self.fireStopAndEndHooks(hookRegistry: capturedHookRegistry, cwd: capturedCwd)
                         // Emit AgentFailedEvent before yielding error
                         if let eventBus = capturedEventBus {
                             await eventBus.publish(AgentFailedEvent(sessionId: resolvedSessionId, error: error.localizedDescription, stepsCompleted: turnCount))
@@ -3440,6 +3401,42 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
             parentTools: tools,
             provider: provider
         )
+    }
+
+    /// Fire `.stop` and `.sessionEnd` hooks in sequence.
+    ///
+    /// Centralizes the paired hook execution pattern used at every error / budget / max-turns
+    /// exit point in `promptImpl` and `stream`. Does nothing when `hookRegistry` is `nil`.
+    private static func fireStopAndEndHooks(hookRegistry: HookRegistry?, cwd: String?) async {
+        guard let hookRegistry else { return }
+        await hookRegistry.execute(.stop, input: HookInput(event: .stop, cwd: cwd))
+        await hookRegistry.execute(.sessionEnd, input: HookInput(event: .sessionEnd, cwd: cwd))
+    }
+
+    /// Emit an `LLMRequestStartedEvent` with message summaries.
+    ///
+    /// Centralizes the summary construction (flatMap → extractContentInfo) and event
+    /// publication duplicated between `promptImpl` and `stream` LLM call sites.
+    private static func emitLLMRequestStarted(
+        eventBus: EventBus?,
+        sessionId: String?,
+        model: String,
+        systemPrompt: String?,
+        messages: [[String: Any]]
+    ) async {
+        guard let eventBus else { return }
+        let summaries: [MessageSummary] = messages.flatMap { msg -> [MessageSummary] in
+            guard let role = msg["role"] as? String else { return [] }
+            let (length, preview) = Self.extractContentInfo(from: msg)
+            return [MessageSummary(role: role, contentLength: length, preview: preview)]
+        }
+        await eventBus.publish(LLMRequestStartedEvent(
+            sessionId: sessionId,
+            model: model,
+            systemPromptLength: systemPrompt?.count ?? 0,
+            messageCount: messages.count,
+            messages: summaries
+        ))
     }
 
     /// Extract plain text from Anthropic API response content blocks.
