@@ -4,6 +4,18 @@ import _Concurrency
 
 final class TokenStreamingEventTests: XCTestCase {
 
+    private static let testEncoder: JSONEncoder = {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        return encoder
+    }()
+
+    private static let testDecoder: JSONDecoder = {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return decoder
+    }()
+
     // MARK: - AC1: AgentOptions.emitTokenStream default is false
 
     func testAgentOptionsEmitTokenStreamDefaultIsFalse() {
@@ -71,13 +83,9 @@ final class TokenStreamingEventTests: XCTestCase {
             sessionId: "s1",
             chunk: "Hello, world!"
         )
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        let data = try encoder.encode(event)
+        let data = try Self.testEncoder.encode(event)
 
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        let decoded = try decoder.decode(LLMTokenStreamEvent.self, from: data)
+        let decoded = try Self.testDecoder.decode(LLMTokenStreamEvent.self, from: data)
 
         XCTAssertEqual(decoded.id, event.id)
         XCTAssertEqual(decoded.timestamp.timeIntervalSince(event.timestamp), 0, accuracy: 1.0)
@@ -91,13 +99,9 @@ final class TokenStreamingEventTests: XCTestCase {
             sessionId: nil,
             chunk: "data"
         )
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        let data = try encoder.encode(event)
+        let data = try Self.testEncoder.encode(event)
 
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        let decoded = try decoder.decode(LLMTokenStreamEvent.self, from: data)
+        let decoded = try Self.testDecoder.decode(LLMTokenStreamEvent.self, from: data)
 
         XCTAssertNil(decoded.sessionId)
         XCTAssertEqual(decoded.chunk, "data")

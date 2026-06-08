@@ -104,8 +104,7 @@ final class FactStoreTests: XCTestCase {
 
     func testLazyMigrationFromKnowledgeEntry() async throws {
         // Write a legacy KnowledgeEntry file
-        let dateFormatter = ISO8601DateFormatter()
-        dateFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let dateFormatter = makeISO8601DateFormatter()
         let now = dateFormatter.string(from: Date())
 
         let legacyJSON: [[String: Any]] = [
@@ -145,8 +144,7 @@ final class FactStoreTests: XCTestCase {
         try await store.save(domain: "newdomain", fact: fact)
 
         // Write legacy format
-        let dateFormatter = ISO8601DateFormatter()
-        dateFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let dateFormatter = makeISO8601DateFormatter()
         let now = dateFormatter.string(from: Date())
         let legacyJSON: [[String: Any]] = [["id": "l1", "content": "c", "tags": [], "createdAt": now]]
         let data = try JSONSerialization.data(withJSONObject: legacyJSON, options: .prettyPrinted)
