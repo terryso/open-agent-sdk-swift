@@ -33,17 +33,10 @@ public func createReviewMemoryTool(factStore: FactStore) -> ToolProtocol {
             "required": ["domain", "content", "kind"]
         ]
     ) { (input: ReviewMemoryInput, _: ToolContext) async -> String in
-        guard !input.domain.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            return reviewJSONResponse(["success": false, "error": "'domain' must not be empty"] as [String: Any])
-        }
-        guard !input.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            return reviewJSONResponse(["success": false, "error": "'content' must not be empty"] as [String: Any])
-        }
+        if let err = requireNonEmptyInput(input.domain, field: "domain") { return err }
+        if let err = requireNonEmptyInput(input.content, field: "content") { return err }
         guard let kind = MemoryKind(rawValue: input.kind) else {
-            return reviewJSONResponse([
-                "success": false,
-                "error": "Invalid kind '\(input.kind)'. Must be one of: affordance, avoid, observation"
-            ] as [String: Any])
+            return reviewErrorResponse("Invalid kind '\(input.kind)'. Must be one of: affordance, avoid, observation")
         }
 
         let confidence = input.confidence ?? 0.7
@@ -63,10 +56,7 @@ public func createReviewMemoryTool(factStore: FactStore) -> ToolProtocol {
                 "message": "Memory saved to domain '\(input.domain)'"
             ] as [String: Any])
         } catch {
-            return reviewJSONResponse([
-                "success": false,
-                "error": error.localizedDescription
-            ] as [String: Any])
+            return reviewErrorResponse(error.localizedDescription)
         }
     }
 }

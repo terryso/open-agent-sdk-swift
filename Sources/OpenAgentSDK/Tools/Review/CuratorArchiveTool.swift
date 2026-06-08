@@ -41,22 +41,20 @@ public func createCuratorArchiveTool(
         ]
     ) { (input: CuratorArchiveInput, _: ToolContext) async -> String in
         let skillName = input.skillName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !skillName.isEmpty else {
-            return reviewJSONResponse(["success": false, "error": "'skillName' must not be empty"] as [String: Any])
-        }
+        if let err = requireNonEmptyInput(skillName, field: "skillName") { return err }
 
         let usageData = await usageStore.getUsage(skillName: skillName)
 
         if usageData.provenance != .agentCreated {
-            return reviewJSONResponse(["success": false, "error": "Cannot archive non-agent-created skill"] as [String: Any])
+            return reviewErrorResponse("Cannot archive non-agent-created skill")
         }
 
         if usageData.pinned {
-            return reviewJSONResponse(["success": false, "error": "Cannot archive pinned skill"] as [String: Any])
+            return reviewErrorResponse("Cannot archive pinned skill")
         }
 
         guard let skill = skillRegistry.find(skillName) else {
-            return reviewJSONResponse(["success": false, "error": "Skill '\(skillName)' not found"] as [String: Any])
+            return reviewErrorResponse("Skill '\(skillName)' not found")
         }
 
         let absorbedValue = input.absorbedInto?.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -94,7 +92,7 @@ public func createCuratorArchiveTool(
         do {
             try await usageStore.setUsage(skillName: skillName, data: updatedData)
         } catch {
-            return reviewJSONResponse(["success": false, "error": "Failed to persist archive data: \(error.localizedDescription)"] as [String: Any])
+            return reviewErrorResponse("Failed to persist archive data: \(error.localizedDescription)")
         }
 
         return reviewJSONResponse([

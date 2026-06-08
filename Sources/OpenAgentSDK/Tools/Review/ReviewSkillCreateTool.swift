@@ -41,20 +41,11 @@ public func createReviewSkillCreateTool(
             "required": ["name", "description", "promptTemplate"]
         ]
     ) { (input: ReviewSkillCreateInput, _: ToolContext) async -> String in
-        guard !input.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            return reviewJSONResponse(["success": false, "error": "'name' must not be empty"] as [String: Any])
-        }
-        guard !input.description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            return reviewJSONResponse(["success": false, "error": "'description' must not be empty"] as [String: Any])
-        }
-        guard !input.promptTemplate.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            return reviewJSONResponse(["success": false, "error": "'promptTemplate' must not be empty"] as [String: Any])
-        }
+        if let err = requireNonEmptyInput(input.name, field: "name") { return err }
+        if let err = requireNonEmptyInput(input.description, field: "description") { return err }
+        if let err = requireNonEmptyInput(input.promptTemplate, field: "promptTemplate") { return err }
         if skillRegistry.has(input.name) {
-            return reviewJSONResponse([
-                "success": false,
-                "error": "Skill '\(input.name)' already exists"
-            ] as [String: Any])
+            return reviewErrorResponse("Skill '\(input.name)' already exists")
         }
 
         do {
@@ -78,10 +69,7 @@ public func createReviewSkillCreateTool(
                 "path": skillDir,
             ] as [String: Any])
         } catch {
-            return reviewJSONResponse([
-                "success": false,
-                "error": "Failed to persist skill: \(error.localizedDescription)",
-            ] as [String: Any])
+            return reviewErrorResponse("Failed to persist skill: \(error.localizedDescription)")
         }
     }
 }
