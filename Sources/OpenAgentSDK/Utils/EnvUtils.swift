@@ -171,6 +171,20 @@ internal func resolveMemoryDir(customDir: String?) -> String {
     return defaultMemoryDir
 }
 
+/// The default sessions directory path (`~/.open-agent-sdk/sessions`).
+internal let defaultSessionsDir: String = (defaultHomeDir as NSString).appendingPathComponent(".open-agent-sdk/sessions")
+
+/// Resolve the sessions directory from a custom path or the default.
+///
+/// - Parameter customDir: Optional custom directory path. Falls back to ``defaultSessionsDir``.
+/// - Returns: The resolved sessions directory path.
+internal func resolveSessionsDir(customDir: String?) -> String {
+    if let custom = customDir {
+        return custom
+    }
+    return defaultSessionsDir
+}
+
 /// djb2 hash algorithm for deterministic string hashing.
 ///
 /// Produces a hex string hash of the input using the djb2 algorithm.
@@ -209,6 +223,36 @@ internal func makeSDKJSONDecoder() -> JSONDecoder {
     let decoder = JSONDecoder()
     decoder.dateDecodingStrategy = .iso8601
     return decoder
+}
+
+/// Serialize an arbitrary value to a JSON-like string representation.
+///
+/// Handles String, Int, Double, Bool, Array, Dictionary, and nil.
+/// When `quoteStrings` is true (default), string values are wrapped in double quotes
+/// (suitable for config display). When false, strings are returned unwrapped
+/// (suitable for already-user-facing MCP content text).
+///
+/// - Parameters:
+///   - value: The value to serialize. Nil returns `"null"`.
+///   - quoteStrings: Whether to wrap string values in double quotes. Defaults to `true`.
+/// - Returns: A JSON-like string representation.
+internal func jsonStringify(_ value: Any?, quoteStrings: Bool = true) -> String {
+    guard let value = value else { return "null" }
+    if let str = value as? String { return quoteStrings ? "\"\(str)\"" : str }
+    if let bool = value as? Bool { return bool ? "true" : "false" }
+    if let num = value as? Double {
+        return num.truncatingRemainder(dividingBy: 1) == 0 ? "\(Int(num))" : "\(num)"
+    }
+    if let num = value as? Int { return "\(num)" }
+    if let arr = value as? [Any] {
+        let items = arr.map { jsonStringify($0, quoteStrings: quoteStrings) }
+        return "[\(items.joined(separator: ", "))]"
+    }
+    if let dict = value as? [String: Any] {
+        let pairs = dict.map { "\"\($0.key)\": \(jsonStringify($0.value, quoteStrings: quoteStrings))" }
+        return "{\(pairs.joined(separator: ", "))}"
+    }
+    return String(describing: value)
 }
 
 /// Get the default OpenAI-compatible base URL.

@@ -21,34 +21,6 @@ private nonisolated(unsafe) let configSchema: ToolInputSchema = [
     "required": ["action"]
 ]
 
-// MARK: - JSON Serialization Helper
-
-/// Serializes an arbitrary value to a JSON-like string representation.
-///
-/// Handles String, Int, Double, Bool, Array, Dictionary, and nil.
-/// Matches the TS SDK's JSON.stringify behavior for config values.
-///
-/// - Parameter value: The value to serialize.
-/// - Returns: A JSON-like string representation.
-private func jsonString(_ value: Any?) -> String {
-    guard let value = value else { return "null" }
-    if let str = value as? String { return "\"\(str)\"" }
-    if let bool = value as? Bool { return bool ? "true" : "false" }
-    if let num = value as? Double {
-        return num.truncatingRemainder(dividingBy: 1) == 0 ? "\(Int(num))" : "\(num)"
-    }
-    if let num = value as? Int { return "\(num)" }
-    if let arr = value as? [Any] {
-        let items = arr.map { jsonString($0) }
-        return "[\(items.joined(separator: ", "))]"
-    }
-    if let dict = value as? [String: Any] {
-        let pairs = dict.map { "\"\($0.key)\": \(jsonString($0.value))" }
-        return "{\(pairs.joined(separator: ", "))}"
-    }
-    return String(describing: value)
-}
-
 // MARK: - Factory Function
 
 /// Creates the Config tool for managing session-scoped configuration values.
@@ -86,7 +58,7 @@ public func createConfigTool() -> ToolProtocol {
                 return ToolExecuteResult(content: "key required for get", isError: true)
             }
             if let value = configStore[key] {
-                return ToolExecuteResult(content: jsonString(value), isError: false)
+                return ToolExecuteResult(content: jsonStringify(value), isError: false)
             }
             return ToolExecuteResult(
                 content: "Config key \"\(key)\" not found",
@@ -100,7 +72,7 @@ public func createConfigTool() -> ToolProtocol {
             let value = input["value"]
             configStore[key] = value
             return ToolExecuteResult(
-                content: "Config set: \(key) = \(jsonString(value))",
+                content: "Config set: \(key) = \(jsonStringify(value))",
                 isError: false
             )
 
@@ -108,7 +80,7 @@ public func createConfigTool() -> ToolProtocol {
             if configStore.isEmpty {
                 return ToolExecuteResult(content: "No config values set.", isError: false)
             }
-            let lines = configStore.map { "\($0.key) = \(jsonString($0.value))" }
+            let lines = configStore.map { "\($0.key) = \(jsonStringify($0.value))" }
             return ToolExecuteResult(content: lines.joined(separator: "\n"), isError: false)
 
         default:
