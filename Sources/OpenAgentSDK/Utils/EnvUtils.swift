@@ -73,20 +73,24 @@ internal func validatePathSafeIdentifier(_ value: String, label: String) throws 
     }
 }
 
-/// The default skills directory path (`~/.open-agent-sdk/skills`).
-internal let defaultSkillsDir: String = {
-    let home: String
+/// The user's home directory, resolved cross-platform.
+///
+/// On Linux, reads `HOME` from the C environment (falls back to `/tmp`).
+/// On Apple platforms, uses `NSHomeDirectory()` which is sandbox-aware.
+internal let defaultHomeDir: String = {
     #if os(Linux)
     if let homeEnv = getenv("HOME") {
-        home = String(cString: homeEnv)
+        return String(cString: homeEnv)
     } else {
-        home = "/tmp"
+        return "/tmp"
     }
     #else
-    home = NSHomeDirectory()
+    return NSHomeDirectory()
     #endif
-    return (home as NSString).appendingPathComponent(".open-agent-sdk/skills")
 }()
+
+/// The default skills directory path (`~/.open-agent-sdk/skills`).
+internal let defaultSkillsDir: String = (defaultHomeDir as NSString).appendingPathComponent(".open-agent-sdk/skills")
 
 /// Resolve the skills directory from a custom path or the default.
 ///
@@ -154,19 +158,7 @@ internal func makeISO8601DateFormatter() -> ISO8601DateFormatter {
 }
 
 /// The default memory directory path (`~/.agent/memory`).
-internal let defaultMemoryDir: String = {
-    let home: String
-    #if os(Linux)
-    if let homeEnv = getenv("HOME") {
-        home = String(cString: homeEnv)
-    } else {
-        home = "/tmp"
-    }
-    #else
-    home = NSHomeDirectory()
-    #endif
-    return (home as NSString).appendingPathComponent(".agent/memory")
-}()
+internal let defaultMemoryDir: String = (defaultHomeDir as NSString).appendingPathComponent(".agent/memory")
 
 /// Resolve the memory directory from a custom path or the default.
 ///
