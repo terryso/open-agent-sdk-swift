@@ -360,22 +360,7 @@ public actor SessionStore {
     /// Resolve the sessions directory path.
     /// Uses custom directory if provided, otherwise defaults to `~/.open-agent-sdk/sessions/`.
     private func getSessionsDir() -> String {
-        if let custom = customSessionsDir {
-            return custom
-        }
-
-        let home: String
-        #if os(Linux)
-        if let homeEnv = getenv("HOME") {
-            home = String(cString: homeEnv)
-        } else {
-            home = "/tmp"
-        }
-        #else
-        home = NSHomeDirectory()
-        #endif
-
-        return (home as NSString).appendingPathComponent(".open-agent-sdk/sessions")
+        resolveSessionsDir(customDir: customSessionsDir)
     }
 
     /// Validate that a sessionId does not contain path traversal sequences.
