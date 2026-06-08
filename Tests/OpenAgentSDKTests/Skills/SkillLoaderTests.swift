@@ -6,24 +6,7 @@ import XCTest
 /// SkillLoader 文件系统技能发现与加载的单元测试。
 /// 覆盖: SKILL.md 解析、frontmatter 提取、Markdown body 提取、引用路径解析、
 /// 辅助文件发现、多目录扫描、去重、skillNames 过滤、畸形文件处理。
-final class SkillLoaderTests: XCTestCase {
-
-    // MARK: - 测试临时目录
-
-    private var tempDir: String!
-
-    override func setUp() {
-        super.setUp()
-        tempDir = NSTemporaryDirectory() + "SkillLoaderTests_\(ProcessInfo.processInfo.globallyUniqueString)"
-        try? FileManager.default.createDirectory(atPath: tempDir, withIntermediateDirectories: true)
-    }
-
-    override func tearDown() {
-        if let tempDir {
-            try? FileManager.default.removeItem(atPath: tempDir)
-        }
-        super.tearDown()
-    }
+final class SkillLoaderTests: TempDirTestCase {
 
     // MARK: - 辅助方法
 
