@@ -208,29 +208,16 @@ extension XCTestCase {
 ///   - `Agent.stream()` implements session restore logic
 ///   - Auto-save after prompt/stream is implemented
 /// TDD Phase: RED (feature not implemented yet)
-final class AgentPromptSessionRestoreTests: XCTestCase {
-
-    // MARK: - Properties
-
-    private var tempDir: String!
+final class AgentPromptSessionRestoreTests: TempDirTestCase {
 
     // MARK: - Setup / Teardown
 
     override func setUp() {
         super.setUp()
         SessionRestoreMockURLProtocol.reset()
-        tempDir = (NSTemporaryDirectory() as NSString)
-            .appendingPathComponent("session-restore-tests-\(UUID().uuidString)")
-        try? FileManager.default.createDirectory(
-            atPath: tempDir,
-            withIntermediateDirectories: true
-        )
     }
 
     override func tearDown() {
-        if let tempDir {
-            try? FileManager.default.removeItem(atPath: tempDir)
-        }
         SessionRestoreMockURLProtocol.reset()
         super.tearDown()
     }
@@ -365,29 +352,16 @@ final class AgentPromptSessionRestoreTests: XCTestCase {
 
 // MARK: - AC2: Agent.stream() with sessionId Restores History
 
-final class AgentStreamSessionRestoreTests: XCTestCase {
-
-    // MARK: - Properties
-
-    private var tempDir: String!
+final class AgentStreamSessionRestoreTests: TempDirTestCase {
 
     // MARK: - Setup / Teardown
 
     override func setUp() {
         super.setUp()
         SessionRestoreMockURLProtocol.reset()
-        tempDir = (NSTemporaryDirectory() as NSString)
-            .appendingPathComponent("stream-restore-tests-\(UUID().uuidString)")
-        try? FileManager.default.createDirectory(
-            atPath: tempDir,
-            withIntermediateDirectories: true
-        )
     }
 
     override func tearDown() {
-        if let tempDir {
-            try? FileManager.default.removeItem(atPath: tempDir)
-        }
         SessionRestoreMockURLProtocol.reset()
         super.tearDown()
     }
