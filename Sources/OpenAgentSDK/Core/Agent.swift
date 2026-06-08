@@ -1242,32 +1242,17 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
     public func executeSkill(_ skillName: String, args: String? = nil) async -> QueryResult {
         guard !isClosed else { return Self.closedQueryResult() }
 
-        // Find skill in registry
-        guard let skill = options.skillRegistry?.find(skillName) else {
+        let (skill, prompt): (Skill, String)
+        switch resolveSkillForExecution(skillName, args: args) {
+        case .success(let resolved):
+            (skill, prompt) = resolved
+        case .failure(let error):
             return QueryResult(
                 text: "", usage: TokenUsage(inputTokens: 0, outputTokens: 0),
                 numTurns: 0, durationMs: 0, messages: [],
                 status: .errorDuringExecution,
-                errors: ["Skill \"\(skillName)\" not found or not registered"]
+                errors: [error.message]
             )
-        }
-
-        // Check availability
-        guard skill.isAvailable() else {
-            return QueryResult(
-                text: "", usage: TokenUsage(inputTokens: 0, outputTokens: 0),
-                numTurns: 0, durationMs: 0, messages: [],
-                status: .errorDuringExecution,
-                errors: ["Skill \"\(skillName)\" is not available in the current environment"]
-            )
-        }
-
-        // Build prompt from skill template + args
-        let prompt: String
-        if let args, !args.isEmpty {
-            prompt = "\(skill.promptTemplate)\n\n---\nUser request: \(args)"
-        } else {
-            prompt = skill.promptTemplate
         }
 
         // Save current state for restoration after execution
@@ -1319,7 +1304,11 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
             return AsyncStream<SDKMessage> { $0.finish() }
         }
 
-        guard let skill = options.skillRegistry?.find(skillName) else {
+        let (skill, prompt): (Skill, String)
+        switch resolveSkillForExecution(skillName, args: args) {
+        case .success(let resolved):
+            (skill, prompt) = resolved
+        case .failure(let error):
             return AsyncStream<SDKMessage> { continuation in
                 continuation.yield(.result(SDKMessage.ResultData(
                     subtype: .errorDuringExecution,
@@ -1328,32 +1317,10 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                     numTurns: 0,
                     durationMs: 0,
                     totalCostUsd: 0,
-                    errors: ["Skill \"\(skillName)\" not found or not registered"]
+                    errors: [error.message]
                 )))
                 continuation.finish()
             }
-        }
-
-        guard skill.isAvailable() else {
-            return AsyncStream<SDKMessage> { continuation in
-                continuation.yield(.result(SDKMessage.ResultData(
-                    subtype: .errorDuringExecution,
-                    text: "",
-                    usage: nil,
-                    numTurns: 0,
-                    durationMs: 0,
-                    totalCostUsd: 0,
-                    errors: ["Skill \"\(skillName)\" is not available in the current environment"]
-                )))
-                continuation.finish()
-            }
-        }
-
-        let prompt: String
-        if let args, !args.isEmpty {
-            prompt = "\(skill.promptTemplate)\n\n---\nUser request: \(args)"
-        } else {
-            prompt = skill.promptTemplate
         }
 
         let savedAllowedTools = options.allowedTools
@@ -1816,17 +1783,13 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                     // Use MCP-merged tool pool for execution
                     let registeredTools = mcpTools
                     // Create agent spawner if AgentTool is registered
-                    let spawner: SubAgentSpawner? = {
-                        let hasAgentTool = registeredTools.contains { $0.name == "Agent" }
-                        guard hasAgentTool else { return nil }
-                        return DefaultSubAgentSpawner(
-                            apiKey: options.apiKey ?? "",
-                            baseURL: options.baseURL,
-                            parentModel: model,
-                            parentTools: registeredTools,
-                            provider: options.provider
-                        )
-                    }()
+                    let spawner = Self.createSubAgentSpawner(
+                        tools: registeredTools,
+                        apiKey: options.apiKey ?? "",
+                        baseURL: options.baseURL,
+                        parentModel: model,
+                        provider: options.provider
+                    )
                     let toolResults = await ToolExecutor.executeTools(
                         toolUseBlocks: toolUseBlocks,
                         tools: registeredTools,
@@ -2842,17 +2805,13 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                             }
 
                             // Create agent spawner if AgentTool is registered
-                            let streamSpawner: SubAgentSpawner? = {
-                                let hasAgentTool = allToolProtocols.contains { $0.name == "Agent" }
-                                guard hasAgentTool else { return nil }
-                                return DefaultSubAgentSpawner(
-                                    apiKey: capturedApiKey,
-                                    baseURL: capturedBaseURL,
-                                    parentModel: capturedModel,
-                                    parentTools: allToolProtocols,
-                                    provider: capturedProvider
-                                )
-                            }()
+                            let streamSpawner = Self.createSubAgentSpawner(
+                                tools: allToolProtocols,
+                                apiKey: capturedApiKey,
+                                baseURL: capturedBaseURL,
+                                parentModel: capturedModel,
+                                provider: capturedProvider
+                            )
                             let (capturedPermissionMode, capturedCanUseTool) = _permissionLock.withLock {
                                 (self.options.permissionMode, self.options.canUseTool)
                             }
@@ -3445,6 +3404,56 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                 messageCount: savedMessageCount
             ))
         }
+    }
+
+    // MARK: - Skill Execution Helpers
+
+    /// Lightweight error for skill resolution failures.
+    private struct SkillResolutionError: Error {
+        let message: String
+    }
+
+    /// Resolves a skill by name, validates availability, and builds the execution prompt.
+    ///
+    /// Centralizes the skill lookup → availability check → prompt assembly sequence
+    /// duplicated between `executeSkill` and `executeSkillStream`.
+    /// Returns `.success((skill, prompt))` or `.failure(SkillResolutionError)`.
+    private func resolveSkillForExecution(_ skillName: String, args: String?) -> Result<(Skill, String), SkillResolutionError> {
+        guard let skill = options.skillRegistry?.find(skillName) else {
+            return .failure(SkillResolutionError(message: "Skill \"\(skillName)\" not found or not registered"))
+        }
+        guard skill.isAvailable() else {
+            return .failure(SkillResolutionError(message: "Skill \"\(skillName)\" is not available in the current environment"))
+        }
+        let prompt: String
+        if let args, !args.isEmpty {
+            prompt = "\(skill.promptTemplate)\n\n---\nUser request: \(args)"
+        } else {
+            prompt = skill.promptTemplate
+        }
+        return .success((skill, prompt))
+    }
+
+    /// Creates a sub-agent spawner if the tool pool contains the Agent tool.
+    ///
+    /// Centralizes the hasAgentTool check + DefaultSubAgentSpawner construction
+    /// duplicated between `promptImpl` and `stream` tool execution blocks.
+    private static func createSubAgentSpawner(
+        tools: [ToolProtocol],
+        apiKey: String,
+        baseURL: String?,
+        parentModel: String,
+        provider: LLMProvider
+    ) -> SubAgentSpawner? {
+        let hasAgentTool = tools.contains { $0.name == "Agent" }
+        guard hasAgentTool else { return nil }
+        return DefaultSubAgentSpawner(
+            apiKey: apiKey,
+            baseURL: baseURL,
+            parentModel: parentModel,
+            parentTools: tools,
+            provider: provider
+        )
     }
 
     /// Extract plain text from Anthropic API response content blocks.
