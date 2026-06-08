@@ -29,7 +29,7 @@ final class MockURLProtocol: URLProtocol {
         // so read from stream to preserve body data for test assertions.
         var capturedRequest = request
         if capturedRequest.httpBody == nil, let stream = capturedRequest.httpBodyStream {
-            capturedRequest.httpBody = Self.readBodyFromStream(stream)
+            capturedRequest.httpBody = readRequestBodyFromStream(stream)
         }
 
         MockURLProtocol.lastRequest = capturedRequest
@@ -56,24 +56,6 @@ final class MockURLProtocol: URLProtocol {
         client?.urlProtocolDidFinishLoading(self)
     }
 
-    private static func readBodyFromStream(_ stream: InputStream) -> Data? {
-        stream.open()
-        defer { stream.close() }
-
-        let bufferSize = 4096
-        var data = Data()
-        var buffer = [UInt8](repeating: 0, count: bufferSize)
-
-        while stream.hasBytesAvailable {
-            let bytesRead = stream.read(&buffer, maxLength: bufferSize)
-            if bytesRead < 0 { return nil }
-            if bytesRead == 0 { break }
-            data.append(buffer, count: bytesRead)
-        }
-
-        return data
-    }
-
     override func stopLoading() {}
 
     static func reset() {
@@ -89,9 +71,7 @@ extension XCTestCase {
 
     /// Creates an AnthropicClient configured with MockURLProtocol for testing.
     func makeSUT(apiKey: String = "sk-test-api-key-12345", baseURL: String? = nil) -> AnthropicClient {
-        let sessionConfig = URLSessionConfiguration.ephemeral
-        sessionConfig.protocolClasses = [MockURLProtocol.self]
-        let urlSession = URLSession(configuration: sessionConfig)
+        let urlSession = makeMockURLSession(protocolClass: MockURLProtocol.self)
         // AnthropicClient is an actor; use the initializer that accepts a custom URLSession
         return AnthropicClient(apiKey: apiKey, baseURL: baseURL, urlSession: urlSession)
     }

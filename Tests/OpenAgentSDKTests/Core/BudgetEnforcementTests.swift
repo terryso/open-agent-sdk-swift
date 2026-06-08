@@ -29,9 +29,7 @@ final class BudgetEnforcementPromptTests: XCTestCase {
         maxBudgetUsd: Double? = nil,
         maxTurns: Int = 10
     ) -> Agent {
-        let sessionConfig = URLSessionConfiguration.ephemeral
-        sessionConfig.protocolClasses = [AgentLoopMockURLProtocol.self]
-        let urlSession = URLSession(configuration: sessionConfig)
+        let urlSession = makeMockURLSession(protocolClass: AgentLoopMockURLProtocol.self)
         let client = AnthropicClient(apiKey: "sk-test-budget-key", baseURL: nil, urlSession: urlSession)
 
         let options = AgentOptions(
@@ -213,9 +211,7 @@ final class BudgetEnforcementStreamTests: XCTestCase {
         maxBudgetUsd: Double? = nil,
         maxTurns: Int = 10
     ) -> Agent {
-        let sessionConfig = URLSessionConfiguration.ephemeral
-        sessionConfig.protocolClasses = [StreamMockURLProtocol.self]
-        let urlSession = URLSession(configuration: sessionConfig)
+        let urlSession = makeMockURLSession(protocolClass: StreamMockURLProtocol.self)
         let client = AnthropicClient(apiKey: "sk-test-budget-stream", baseURL: nil, urlSession: urlSession)
 
         let options = AgentOptions(

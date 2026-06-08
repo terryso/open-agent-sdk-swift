@@ -16,11 +16,7 @@ final class ExecuteSkillStreamTests: XCTestCase {
 
     // MARK: - Helpers
 
-    private func makeMockSession() -> URLSession {
-        let config = URLSessionConfiguration.ephemeral
-        config.protocolClasses = [SkillStreamMockURLProtocol.self]
-        return URLSession(configuration: config)
-    }
+    private func makeMockSession() -> URLSession { makeMockURLSession(protocolClass: SkillStreamMockURLProtocol.self) }
 
     private func makeStreamingResponse(text: String = "ok") -> Data {
         let events = """

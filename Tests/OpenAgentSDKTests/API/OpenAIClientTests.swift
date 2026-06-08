@@ -9,9 +9,7 @@ final class OpenAIClientTests: XCTestCase {
         apiKey: String = "test-key-123",
         baseURL: String = "https://api.test.com/v1"
     ) -> OpenAIClient {
-        let sessionConfig = URLSessionConfiguration.ephemeral
-        sessionConfig.protocolClasses = [MockURLProtocol.self]
-        let urlSession = URLSession(configuration: sessionConfig)
+        let urlSession = makeMockURLSession(protocolClass: MockURLProtocol.self)
         return OpenAIClient(apiKey: apiKey, baseURL: baseURL, urlSession: urlSession)
     }
 
@@ -94,9 +92,7 @@ final class OpenAIClientTests: XCTestCase {
     }
 
     func testInit_invalidBaseURL_fallsBack() {
-        let sessionConfig = URLSessionConfiguration.ephemeral
-        sessionConfig.protocolClasses = [MockURLProtocol.self]
-        let urlSession = URLSession(configuration: sessionConfig)
+        let urlSession = makeMockURLSession(protocolClass: MockURLProtocol.self)
         // Invalid URL should fall back to default
         let client = OpenAIClient(apiKey: "key", baseURL: "not a valid url:// $%", urlSession: urlSession)
         let _ = client
