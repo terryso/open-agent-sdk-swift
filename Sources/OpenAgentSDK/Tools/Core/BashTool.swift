@@ -167,6 +167,31 @@ public func createBashTool() -> ToolProtocol {
     }
 }
 
+// MARK: - Process Configuration
+
+/// Creates and configures a bash `Process` with the given command, working directory, and
+/// optional environment variable overrides.
+///
+/// Environment variables are merged on top of `ProcessInfo.processInfo.environment`.
+private func configureBashProcess(
+    command: String,
+    cwd: String,
+    env: [String: String]? = nil
+) -> Process {
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/bin/bash")
+    process.arguments = ["-c", command]
+    process.currentDirectoryURL = URL(fileURLWithPath: cwd)
+
+    if let env, !env.isEmpty {
+        var merged = ProcessInfo.processInfo.environment
+        for (key, value) in env { merged[key] = value }
+        process.environment = merged
+    }
+
+    return process
+}
+
 // MARK: - Background Process Launch
 
 /// Launches a bash process in the background and returns immediately with a task ID.
@@ -184,16 +209,7 @@ private func launchBackgroundProcess(
     cwd: String,
     env: [String: String]? = nil
 ) -> ToolExecuteResult {
-    let process = Process()
-    process.executableURL = URL(fileURLWithPath: "/bin/bash")
-    process.arguments = ["-c", command]
-    process.currentDirectoryURL = URL(fileURLWithPath: cwd)
-
-    if let env, !env.isEmpty {
-        var merged = ProcessInfo.processInfo.environment
-        for (key, value) in env { merged[key] = value }
-        process.environment = merged
-    }
+    let process = configureBashProcess(command: command, cwd: cwd, env: env)
 
     // Discard output for background processes
     let devNull = FileHandle.nullDevice
@@ -243,21 +259,12 @@ private func executeBashProcess(
 ) async -> ToolExecuteResult {
     return await withCheckedContinuation { continuation in
         let accumulator = ProcessOutputAccumulator()
-        let process = Process()
+        let process = configureBashProcess(command: command, cwd: cwd, env: env)
         let stdoutPipe = Pipe()
         let stderrPipe = Pipe()
 
-        process.executableURL = URL(fileURLWithPath: "/bin/bash")
-        process.arguments = ["-c", command]
-        process.currentDirectoryURL = URL(fileURLWithPath: cwd)
         process.standardOutput = stdoutPipe
         process.standardError = stderrPipe
-
-        if let env, !env.isEmpty {
-            var merged = ProcessInfo.processInfo.environment
-            for (key, value) in env { merged[key] = value }
-            process.environment = merged
-        }
 
         stdoutPipe.fileHandleForReading.readabilityHandler = { handler in
             accumulator.stdoutData.append(handler.availableData)
