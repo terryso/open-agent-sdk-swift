@@ -25,8 +25,7 @@ public struct RunPersistenceService: Sendable {
         if let custom = customBaseDirectory {
             return custom
         }
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
-        return (home as NSString).appendingPathComponent(".open-agent-sdk/api-runs")
+        return defaultApiRunsDir
     }
 
     /// Returns the run directory, creating it if needed.

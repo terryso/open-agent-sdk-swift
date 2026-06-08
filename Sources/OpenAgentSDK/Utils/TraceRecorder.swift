@@ -123,7 +123,6 @@ public actor TraceRecorder {
 
     /// Default trace directory: `~/.open-agent-sdk/traces/`
     public static func defaultBaseURL() -> URL {
-        let home = FileManager.default.homeDirectoryForCurrentUser
-        return home.appendingPathComponent(".open-agent-sdk/traces", isDirectory: true)
+        return URL(fileURLWithPath: defaultTracesDir, isDirectory: true)
     }
 }
