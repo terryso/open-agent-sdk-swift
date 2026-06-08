@@ -67,10 +67,7 @@ public actor InProcessMCPServer {
     ///   client-side of a connected pair. Connect an MCP `Client` to this transport.
     public func createSession() async throws -> (Server, InMemoryTransport) {
         let mcpServer = await getOrCreateMCPServer()
-        let session = await mcpServer.createSession()
-        let (clientTransport, serverTransport) = await InMemoryTransport.createConnectedPair()
-        try await session.start(transport: serverTransport)
-        return (session, clientTransport)
+        return try await createMCPSession(mcpServer)
     }
 
     // MARK: - Tool Access (SDK Internal Mode)
@@ -105,64 +102,13 @@ public actor InProcessMCPServer {
         let server = MCPServer(name: name, version: version)
 
         // Register each tool as a closure-based MCP tool
-        for tool in tools {
-            let toolName = tool.name
-            let toolDescription = tool.description
-            let inputSchema = schemaToMCPValue(tool.inputSchema)
-            let capturedCwd = cwd
-
-            // Capture tool as a Sendable-safe reference for the closure
-            // Each tool is already Sendable (ToolProtocol: Sendable)
-            let sendableTool = tool
-
-            do {
-                try await server.register(
-                    name: toolName,
-                    description: toolDescription,
-                    inputSchema: inputSchema
-                ) { (args: [String: Value], context: HandlerContext) async throws -> String in
-                    // Convert MCP Value arguments to [String: Any]
-                    let inputArgs = args.mapValues { value in
-                        mcpValueToAny(value)
-                    }
-
-                    // Build ToolContext with cwd and a generated toolUseId for tracing
-                    let toolContext = ToolContext(
-                        cwd: capturedCwd,
-                        toolUseId: UUID().uuidString
-                    )
-
-                    // Call the tool (never throws per rule #38)
-                    let result = await sendableTool.call(
-                        input: inputArgs,
-                        context: toolContext
-                    )
-
-                    // If the tool returned an error, throw so MCP returns isError: true
-                    if result.isError {
-                        throw ToolExecutionError(message: result.content)
-                    }
-
-                    return result.content
-                }
-            } catch {
-                // Tool registration failed -- this indicates a bug (duplicate name, etc.)
-                assertionFailure("Failed to register tool '\(toolName)' on MCP server: \(error)")
-            }
+        await registerToolsOnMCPServer(tools, server: server, cwd: cwd) { toolName, error in
+            // Tool registration failed -- this indicates a bug (duplicate name, etc.)
+            assertionFailure("Failed to register tool '\(toolName)' on MCP server: \(error)")
         }
 
         mcpServer = server
         return server
     }
 
-}
-
-// MARK: - ToolExecutionError
-
-/// Error thrown when a tool execution returns `isError: true`.
-///
-/// This is caught by MCPServer's CallTool handler and converted to
-/// `isError: true` in the MCP response (rule #38).
-private struct ToolExecutionError: Error, Sendable {
-    let message: String
 }

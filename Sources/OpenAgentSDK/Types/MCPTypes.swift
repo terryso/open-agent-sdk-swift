@@ -183,3 +183,86 @@ internal func mcpValueToAny(_ value: Value) -> Any {
     case .data(_, let data): return data
     }
 }
+
+// MARK: - MCP Tool Registration
+
+/// Error thrown when a tool execution returns `isError: true`.
+///
+/// This is caught by MCPServer's CallTool handler and converted to
+/// `isError: true` in the MCP response (rule #38).
+struct ToolExecutionError: Error, Sendable {
+    let message: String
+}
+
+/// Registers an array of `ToolProtocol` tools as closure-based MCP tools on an `MCPServer`.
+///
+/// Centralizes the MCP tool registration pattern shared between `InProcessMCPServer` and
+/// `AgentMCPServer`: schema conversion → MCP Value argument conversion → ToolContext creation →
+/// tool invocation → error result handling.
+///
+/// - Parameters:
+///   - tools: The tools to register.
+///   - server: The `MCPServer` to register tools on.
+///   - cwd: Working directory passed to `ToolContext` for each tool invocation.
+///   - onRegistrationError: Called when a tool registration fails (e.g., duplicate name).
+internal func registerToolsOnMCPServer(
+    _ tools: [ToolProtocol],
+    server: MCPServer,
+    cwd: String,
+    onRegistrationError: @Sendable (String, Error) -> Void
+) async {
+    for tool in tools {
+        let toolName = tool.name
+        let toolDescription = tool.description
+        let inputSchema = schemaToMCPValue(tool.inputSchema)
+        let sendableTool = tool
+
+        do {
+            try await server.register(
+                name: toolName,
+                description: toolDescription,
+                inputSchema: inputSchema
+            ) { (args: [String: Value], context: HandlerContext) async throws -> String in
+                // Convert MCP Value arguments to [String: Any]
+                let inputArgs = args.mapValues { value in
+                    mcpValueToAny(value)
+                }
+
+                // Build ToolContext with cwd and a generated toolUseId for tracing
+                let toolContext = ToolContext(
+                    cwd: cwd,
+                    toolUseId: UUID().uuidString
+                )
+
+                // Call the tool (never throws per rule #38)
+                let result = await sendableTool.call(
+                    input: inputArgs,
+                    context: toolContext
+                )
+
+                // If the tool returned an error, throw so MCP returns isError: true
+                if result.isError {
+                    throw ToolExecutionError(message: result.content)
+                }
+
+                return result.content
+            }
+        } catch {
+            onRegistrationError(toolName, error)
+        }
+    }
+}
+
+/// Creates a new MCP session with a connected `InMemoryTransport` pair.
+///
+/// Centralizes the session creation pattern shared between `InProcessMCPServer` and
+/// `AgentMCPServer`: create session → create transport pair → start session.
+///
+/// - Parameter mcpServer: The `MCPServer` to create a session from.
+/// - Returns: A tuple of (Server, InMemoryTransport) for an MCP client to connect to.
+internal func createMCPSession(_ mcpServer: MCPServer) async throws -> (Server, InMemoryTransport) {
+    let session = await mcpServer.createSession()
+    let (clientTransport, serverTransport) = await InMemoryTransport.createConnectedPair()
+    try await session.start(transport: serverTransport)
+    return (session, clientTransport)
+}
