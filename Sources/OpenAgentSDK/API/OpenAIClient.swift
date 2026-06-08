@@ -56,22 +56,10 @@ public actor OpenAIClient: LLMClient {
     ) async throws -> [String: Any] {
         let openAIMessages = Self.convertMessages(messages: messages, system: system)
         let openAITools = tools.map { Self.convertTools($0) }
-
-        var body: [String: Any] = [
-            "model": model,
-            "messages": openAIMessages,
-            "max_tokens": maxTokens,
-            "stream": false,
-        ]
-        if let openAITools {
-            body["tools"] = openAITools
-        }
-        if let toolChoice {
-            body["tool_choice"] = Self.convertToolChoice(toolChoice)
-        }
-        if let temperature {
-            body["temperature"] = temperature
-        }
+        let body = Self.buildRequestBody(
+            model: model, messages: openAIMessages, maxTokens: maxTokens,
+            stream: false, tools: openAITools, toolChoice: toolChoice, temperature: temperature
+        )
 
         let request = try buildRequest(body: body)
         let (data, response) = try await sendRequest(request, urlSession: urlSession)
@@ -92,22 +80,10 @@ public actor OpenAIClient: LLMClient {
     ) async throws -> AsyncThrowingStream<SSEEvent, Error> {
         let openAIMessages = Self.convertMessages(messages: messages, system: system)
         let openAITools = tools.map { Self.convertTools($0) }
-
-        var body: [String: Any] = [
-            "model": model,
-            "messages": openAIMessages,
-            "max_tokens": maxTokens,
-            "stream": true,
-        ]
-        if let openAITools {
-            body["tools"] = openAITools
-        }
-        if let toolChoice {
-            body["tool_choice"] = Self.convertToolChoice(toolChoice)
-        }
-        if let temperature {
-            body["temperature"] = temperature
-        }
+        let body = Self.buildRequestBody(
+            model: model, messages: openAIMessages, maxTokens: maxTokens,
+            stream: true, tools: openAITools, toolChoice: toolChoice, temperature: temperature
+        )
 
         let request = try buildRequest(body: body)
         let (data, response) = try await sendRequest(request, urlSession: urlSession)
@@ -129,6 +105,34 @@ public actor OpenAIClient: LLMClient {
     }
 
     // MARK: - Request Building
+
+    /// Builds the common request body dictionary shared by both send and stream calls.
+    private static func buildRequestBody(
+        model: String,
+        messages: [[String: Any]],
+        maxTokens: Int,
+        stream: Bool,
+        tools: [[String: Any]]?,
+        toolChoice: [String: Any]?,
+        temperature: Double?
+    ) -> [String: Any] {
+        var body: [String: Any] = [
+            "model": model,
+            "messages": messages,
+            "max_tokens": maxTokens,
+            "stream": stream,
+        ]
+        if let tools {
+            body["tools"] = tools
+        }
+        if let toolChoice {
+            body["tool_choice"] = convertToolChoice(toolChoice)
+        }
+        if let temperature {
+            body["temperature"] = temperature
+        }
+        return body
+    }
 
     private nonisolated func buildRequest(body: [String: Any]) throws -> URLRequest {
         guard let url = URL(string: baseURL.absoluteString + "/chat/completions") else {

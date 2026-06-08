@@ -666,6 +666,16 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
         _closedLock.withLock { _closed }
     }
 
+    /// Convenience factory for the error result returned when the agent is closed.
+    private static func closedQueryResult() -> QueryResult {
+        QueryResult(
+            text: "", usage: TokenUsage(inputTokens: 0, outputTokens: 0),
+            numTurns: 0, durationMs: 0, messages: [],
+            status: .errorDuringExecution,
+            errors: ["Agent is already closed"]
+        )
+    }
+
     /// Thread-safe write to ``_closed``.
     private func setClosed(_ value: Bool) {
         _closedLock.withLock { _closed = value }
@@ -1212,14 +1222,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
     ///   turn count, duration, collected messages, and a ``QueryStatus`` indicating
     ///   how the query terminated.
     public func prompt(_ text: String) async -> QueryResult {
-        guard !isClosed else {
-            return QueryResult(
-                text: "", usage: TokenUsage(inputTokens: 0, outputTokens: 0),
-                numTurns: 0, durationMs: 0, messages: [],
-                status: .errorDuringExecution,
-                errors: ["Agent is already closed"]
-            )
-        }
+        guard !isClosed else { return Self.closedQueryResult() }
         _interrupted = false
         return await promptImpl(text)
     }
@@ -1237,14 +1240,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
     ///   - args: Optional user arguments appended to the skill's prompt template.
     /// - Returns: A ``QueryResult`` with the agent's response.
     public func executeSkill(_ skillName: String, args: String? = nil) async -> QueryResult {
-        guard !isClosed else {
-            return QueryResult(
-                text: "", usage: TokenUsage(inputTokens: 0, outputTokens: 0),
-                numTurns: 0, durationMs: 0, messages: [],
-                status: .errorDuringExecution,
-                errors: ["Agent is already closed"]
-            )
-        }
+        guard !isClosed else { return Self.closedQueryResult() }
 
         // Find skill in registry
         guard let skill = options.skillRegistry?.find(skillName) else {

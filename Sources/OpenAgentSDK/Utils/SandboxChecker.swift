@@ -73,25 +73,12 @@ public enum SandboxChecker {
         }
 
         // Check allowed paths based on operation
+        let allowedPaths: [String]
         switch operation {
-        case .read:
-            if settings.allowedReadPaths.isEmpty {
-                return true // No read restrictions, all reads allowed
-            }
-            return settings.allowedReadPaths.contains { allowedPath in
-                let normalizedAllowed = SandboxPathNormalizer.normalize(allowedPath)
-                return isPrefixMatch(normalizedPath: normalizedPath, configuredPath: normalizedAllowed)
-            }
-
-        case .write:
-            if settings.allowedWritePaths.isEmpty {
-                return true // No write restrictions, all writes allowed
-            }
-            return settings.allowedWritePaths.contains { allowedPath in
-                let normalizedAllowed = SandboxPathNormalizer.normalize(allowedPath)
-                return isPrefixMatch(normalizedPath: normalizedPath, configuredPath: normalizedAllowed)
-            }
+        case .read:  allowedPaths = settings.allowedReadPaths
+        case .write: allowedPaths = settings.allowedWritePaths
         }
+        return matchesAllowedPathList(normalizedPath: normalizedPath, allowedPaths: allowedPaths)
     }
 
     /// Verify a path is allowed and throw if denied.
@@ -494,6 +481,16 @@ public enum SandboxChecker {
     }
 
     // MARK: - Internal Helpers
+
+    /// Check whether `normalizedPath` matches any entry in `allowedPaths`.
+    /// Returns `true` when `allowedPaths` is empty (no restrictions configured).
+    private static func matchesAllowedPathList(normalizedPath: String, allowedPaths: [String]) -> Bool {
+        if allowedPaths.isEmpty { return true }
+        return allowedPaths.contains { allowedPath in
+            let normalizedAllowed = SandboxPathNormalizer.normalize(allowedPath)
+            return isPrefixMatch(normalizedPath: normalizedPath, configuredPath: normalizedAllowed)
+        }
+    }
 
     /// Check prefix match with path-segment boundary enforcement.
     ///
