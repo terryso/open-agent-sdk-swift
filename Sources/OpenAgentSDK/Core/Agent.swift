@@ -1553,17 +1553,15 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                             let turnCost = estimateCost(model: fallbackModel, usage: turnUsage)
                             totalCostUsd += turnCost
                             costTracker.recordUsage(model: fallbackModel, usage: turnUsage)
-                            if let eventBus = options.eventBus {
-                                await eventBus.publish(LLMCostEvent(
-                                    sessionId: resolvedSessionId,
-                                    model: fallbackModel,
-                                    inputTokens: turnUsage.inputTokens,
-                                    outputTokens: turnUsage.outputTokens,
-                                    cacheCreationInputTokens: usage["cache_creation_input_tokens"] as? Int,
-                                    cacheReadInputTokens: usage["cache_read_input_tokens"] as? Int,
-                                    estimatedCostUsd: turnCost
-                                ))
-                            }
+                            await Self.emitLLMCostEvent(
+                                eventBus: options.eventBus,
+                                sessionId: resolvedSessionId,
+                                model: fallbackModel,
+                                inputTokens: turnUsage.inputTokens,
+                                outputTokens: turnUsage.outputTokens,
+                                cacheUsage: usage,
+                                estimatedCostUsd: turnCost
+                            )
                             Self.recordCostBreakdown(
                                 costByModel: &costByModel,
                                 model: fallbackModel,
@@ -1679,17 +1677,15 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                 let turnCost = estimateCost(model: model, usage: turnUsage)
                 totalCostUsd += turnCost
                 costTracker.recordUsage(model: model, usage: turnUsage)
-                if let eventBus = options.eventBus {
-                    await eventBus.publish(LLMCostEvent(
-                        sessionId: resolvedSessionId,
-                        model: model,
-                        inputTokens: turnUsage.inputTokens,
-                        outputTokens: turnUsage.outputTokens,
-                        cacheCreationInputTokens: usage["cache_creation_input_tokens"] as? Int,
-                        cacheReadInputTokens: usage["cache_read_input_tokens"] as? Int,
-                        estimatedCostUsd: turnCost
-                    ))
-                }
+                await Self.emitLLMCostEvent(
+                    eventBus: options.eventBus,
+                    sessionId: resolvedSessionId,
+                    model: model,
+                    inputTokens: turnUsage.inputTokens,
+                    outputTokens: turnUsage.outputTokens,
+                    cacheUsage: usage,
+                    estimatedCostUsd: turnCost
+                )
                 // Track per-model cost breakdown
                 Self.recordCostBreakdown(
                     costByModel: &costByModel,
@@ -1764,8 +1760,9 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                     let toolResults = await ToolExecutor.executeTools(
                         toolUseBlocks: toolUseBlocks,
                         tools: registeredTools,
-                        context: ToolContext(
+                        context: Self.buildToolContext(
                             cwd: options.cwd ?? FileManager.default.currentDirectoryPath,
+                            sessionId: resolvedSessionId,
                             agentSpawner: spawner,
                             mailboxStore: options.mailboxStore,
                             teamStore: options.teamStore,
@@ -1781,14 +1778,11 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                             canUseTool: options.canUseTool,
                             skillRegistry: options.skillRegistry,
                             restrictionStack: restrictionStack,
-                            skillNestingDepth: restrictionStack?.nestingDepth ?? 0,
                             maxSkillRecursionDepth: options.maxSkillRecursionDepth,
                             fileCache: fileCache,
                             sandbox: options.sandbox,
-                            mcpConnections: nil,
                             env: options.env,
-                            eventBus: options.eventBus,
-                            sessionId: resolvedSessionId
+                            eventBus: options.eventBus
                         )
                     )
 
@@ -2336,17 +2330,15 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                                     let turnCost = estimateCost(model: currentModel, usage: TokenUsage(inputTokens: inputTokens, outputTokens: 0))
                                     totalCostUsd += turnCost
                                     streamCostTracker.recordUsage(model: currentModel, usage: TokenUsage(inputTokens: inputTokens, outputTokens: 0))
-                                    if let eventBus = capturedEventBus {
-                                        await eventBus.publish(LLMCostEvent(
-                                            sessionId: resolvedSessionId,
-                                            model: currentModel,
-                                            inputTokens: inputTokens,
-                                            outputTokens: 0,
-                                            cacheCreationInputTokens: msgUsage["cache_creation_input_tokens"] as? Int,
-                                            cacheReadInputTokens: msgUsage["cache_read_input_tokens"] as? Int,
-                                            estimatedCostUsd: turnCost
-                                        ))
-                                    }
+                                    await Self.emitLLMCostEvent(
+                                        eventBus: capturedEventBus,
+                                        sessionId: resolvedSessionId,
+                                        model: currentModel,
+                                        inputTokens: inputTokens,
+                                        outputTokens: 0,
+                                        cacheUsage: msgUsage,
+                                        estimatedCostUsd: turnCost
+                                    )
                                     // Track per-model cost breakdown
                                     Self.recordCostBreakdown(
                                         costByModel: &costByModel,
@@ -2442,17 +2434,15 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                                 let turnCost = estimateCost(model: currentModel, usage: turnUsage)
                                 totalCostUsd += turnCost
                                 streamCostTracker.recordUsage(model: currentModel, usage: turnUsage)
-                                if let eventBus = capturedEventBus {
-                                    await eventBus.publish(LLMCostEvent(
-                                        sessionId: resolvedSessionId,
-                                        model: currentModel,
-                                        inputTokens: turnUsage.inputTokens,
-                                        outputTokens: turnUsage.outputTokens,
-                                        cacheCreationInputTokens: usage["cache_creation_input_tokens"] as? Int,
-                                        cacheReadInputTokens: usage["cache_read_input_tokens"] as? Int,
-                                        estimatedCostUsd: turnCost
-                                    ))
-                                }
+                                await Self.emitLLMCostEvent(
+                                    eventBus: capturedEventBus,
+                                    sessionId: resolvedSessionId,
+                                    model: currentModel,
+                                    inputTokens: turnUsage.inputTokens,
+                                    outputTokens: turnUsage.outputTokens,
+                                    cacheUsage: usage,
+                                    estimatedCostUsd: turnCost
+                                )
                                 // Track per-model cost breakdown
                                 Self.recordCostBreakdown(
                                     costByModel: &costByModel,
@@ -2677,8 +2667,9 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                             let toolResults = await ToolExecutor.executeTools(
                                 toolUseBlocks: toolUseBlocks,
                                 tools: allToolProtocols,
-                                context: ToolContext(
+                                context: Self.buildToolContext(
                                     cwd: capturedCwd,
+                                    sessionId: resolvedSessionId,
                                     agentSpawner: streamSpawner,
                                     mailboxStore: capturedMailboxStore,
                                     teamStore: capturedTeamStore,
@@ -2694,14 +2685,11 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                                     canUseTool: capturedCanUseTool,
                                     skillRegistry: capturedSkillRegistry,
                                     restrictionStack: capturedRestrictionStack,
-                                    skillNestingDepth: capturedRestrictionStack?.nestingDepth ?? 0,
                                     maxSkillRecursionDepth: capturedMaxSkillRecursionDepth,
                                     fileCache: capturedFileCache,
                                     sandbox: capturedSandbox,
-                                    mcpConnections: nil,
                                     env: capturedEnv,
-                                    eventBus: capturedEventBus,
-                                    sessionId: resolvedSessionId
+                                    eventBus: capturedEventBus
                                 )
                             )
 
@@ -3437,6 +3425,89 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
     /// The API returns content as an array of blocks, each with a `type` field.
     /// This helper filters for `type == "text"` blocks and joins their text content.
     /// - Parameter content: The raw content value from the API response.
+    /// Publish an `LLMCostEvent` to the event bus (no-op when bus is nil).
+    ///
+    /// Centralizes the 8-field LLMCostEvent construction that is duplicated at 4 cost-tracking
+    /// sites across promptImpl (fallback model path, main loop) and stream (messageStart, messageDelta).
+    private static func emitLLMCostEvent(
+        eventBus: EventBus?,
+        sessionId: String?,
+        model: String,
+        inputTokens: Int,
+        outputTokens: Int,
+        cacheUsage: [String: Any],
+        estimatedCostUsd: Double
+    ) async {
+        guard let eventBus else { return }
+        await eventBus.publish(LLMCostEvent(
+            sessionId: sessionId,
+            model: model,
+            inputTokens: inputTokens,
+            outputTokens: outputTokens,
+            cacheCreationInputTokens: cacheUsage["cache_creation_input_tokens"] as? Int,
+            cacheReadInputTokens: cacheUsage["cache_read_input_tokens"] as? Int,
+            estimatedCostUsd: estimatedCostUsd
+        ))
+    }
+
+    /// Build a `ToolContext` from the resolved execution parameters.
+    ///
+    /// Centralizes the 24-field ToolContext construction that is duplicated between promptImpl
+    /// (using `options.*` directly) and stream (using pre-captured `captured*` values).
+    /// The caller passes all varying fields; the helper only fills in the fixed defaults
+    /// (`mcpConnections: nil`, `toolUseId: ""`).
+    private static func buildToolContext(
+        cwd: String,
+        sessionId: String?,
+        agentSpawner: (any SubAgentSpawner)?,
+        mailboxStore: MailboxStore?,
+        teamStore: TeamStore?,
+        senderName: String?,
+        taskStore: TaskStore?,
+        worktreeStore: WorktreeStore?,
+        planStore: PlanStore?,
+        cronStore: CronStore?,
+        todoStore: TodoStore?,
+        memoryStore: (any MemoryStoreProtocol)?,
+        hookRegistry: HookRegistry?,
+        permissionMode: PermissionMode?,
+        canUseTool: CanUseToolFn?,
+        skillRegistry: SkillRegistry?,
+        restrictionStack: ToolRestrictionStack?,
+        maxSkillRecursionDepth: Int,
+        fileCache: FileCache?,
+        sandbox: SandboxSettings?,
+        env: [String: String]?,
+        eventBus: EventBus?
+    ) -> ToolContext {
+        ToolContext(
+            cwd: cwd,
+            agentSpawner: agentSpawner,
+            mailboxStore: mailboxStore,
+            teamStore: teamStore,
+            senderName: senderName,
+            taskStore: taskStore,
+            worktreeStore: worktreeStore,
+            planStore: planStore,
+            cronStore: cronStore,
+            todoStore: todoStore,
+            memoryStore: memoryStore,
+            hookRegistry: hookRegistry,
+            permissionMode: permissionMode,
+            canUseTool: canUseTool,
+            skillRegistry: skillRegistry,
+            restrictionStack: restrictionStack,
+            skillNestingDepth: restrictionStack?.nestingDepth ?? 0,
+            maxSkillRecursionDepth: maxSkillRecursionDepth,
+            fileCache: fileCache,
+            sandbox: sandbox,
+            mcpConnections: nil,
+            env: env,
+            eventBus: eventBus,
+            sessionId: sessionId
+        )
+    }
+
     /// - Returns: The concatenated text from all text blocks, or a string representation
     ///   of the content if it cannot be parsed.
     private func extractText(from content: Any) -> String {
