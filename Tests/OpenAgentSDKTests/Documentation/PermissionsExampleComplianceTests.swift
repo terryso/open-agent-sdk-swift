@@ -7,50 +7,16 @@ import Foundation
 
 final class PermissionsExampleComplianceTests: XCTestCase {
 
-    // MARK: - Helper: Resolve project root
-
-    /// Walk upward from this test file to find the directory containing Package.swift.
-    private func projectRoot() -> String {
-        let fileManager = FileManager.default
-        let testFileDir = URL(fileURLWithPath: #file).deletingLastPathComponent().path
-        var dir = testFileDir
-        for _ in 0..<10 {
-            let packagePath = dir + "/Package.swift"
-            if fileManager.fileExists(atPath: packagePath) {
-                return dir
-            }
-            let parent = URL(fileURLWithPath: dir).deletingLastPathComponent().path
-            if parent == dir { break }
-            dir = parent
-        }
-        return testFileDir
-    }
-
-    private func examplesDir() -> String {
-        return projectRoot() + "/Examples"
-    }
+    // MARK: - Helpers
 
     private func examplePath() -> String {
-        return examplesDir() + "/PermissionsExample/main.swift"
-    }
-
-    private func fileContent(_ path: String) -> String? {
-        return try? String(contentsOfFile: path, encoding: .utf8)
-    }
-
-    private func packageSwiftContent() -> String {
-        let path = projectRoot() + "/Package.swift"
-        guard let content = try? String(contentsOfFile: path, encoding: .utf8) else {
-            XCTFail("Package.swift should be readable")
-            return ""
-        }
-        return content
+        return DocumentationTestHelpers.examplesDir() + "/PermissionsExample/main.swift"
     }
 
     // MARK: - AC5: Package.swift executableTarget Configured
 
     func testPackageSwiftContainsPermissionsExampleTarget() {
-        let content = packageSwiftContent()
+        let content = DocumentationTestHelpers.packageSwiftContent()
         XCTAssertTrue(
             content.contains("PermissionsExample"),
             "Package.swift should contain PermissionsExample executable target"
@@ -58,7 +24,7 @@ final class PermissionsExampleComplianceTests: XCTestCase {
     }
 
     func testPermissionsExampleTargetDependsOnOpenAgentSDK() {
-        let content = packageSwiftContent()
+        let content = DocumentationTestHelpers.packageSwiftContent()
         XCTAssertTrue(
             content.contains("PermissionsExample"),
             "Package.swift should contain PermissionsExample target before checking dependencies"
@@ -78,7 +44,7 @@ final class PermissionsExampleComplianceTests: XCTestCase {
     }
 
     func testPermissionsExampleTargetSpecifiesCorrectPath() {
-        let content = packageSwiftContent()
+        let content = DocumentationTestHelpers.packageSwiftContent()
         XCTAssertTrue(
             content.contains("PermissionsExample"),
             "Package.swift should contain PermissionsExample target before checking path"
@@ -103,7 +69,7 @@ final class PermissionsExampleComplianceTests: XCTestCase {
         let fileManager = FileManager.default
         var isDir: ObjCBool = false
         let exists = fileManager.fileExists(
-            atPath: examplesDir() + "/PermissionsExample",
+            atPath: DocumentationTestHelpers.examplesDir() + "/PermissionsExample",
             isDirectory: &isDir
         )
         XCTAssertTrue(exists, "Examples/PermissionsExample/ directory should exist")
@@ -119,7 +85,7 @@ final class PermissionsExampleComplianceTests: XCTestCase {
     }
 
     func testPermissionsExampleImportsOpenAgentSDK() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/PermissionsExample/main.swift should be readable")
             return
         }
@@ -130,7 +96,7 @@ final class PermissionsExampleComplianceTests: XCTestCase {
     }
 
     func testPermissionsExampleImportsFoundation() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/PermissionsExample/main.swift should be readable")
             return
         }
@@ -141,7 +107,7 @@ final class PermissionsExampleComplianceTests: XCTestCase {
     }
 
     func testPermissionsExampleUsesCreateAgent() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/PermissionsExample/main.swift should be readable")
             return
         }
@@ -154,7 +120,7 @@ final class PermissionsExampleComplianceTests: XCTestCase {
     // MARK: - AC2: Demonstrates ToolNameAllowlistPolicy Restricting Tool Access
 
     func testPermissionsExampleUsesToolNameAllowlistPolicy() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/PermissionsExample/main.swift should be readable")
             return
         }
@@ -165,7 +131,7 @@ final class PermissionsExampleComplianceTests: XCTestCase {
     }
 
     func testPermissionsExampleAllowlistSpecifiesReadGlobGrep() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/PermissionsExample/main.swift should be readable")
             return
         }
@@ -180,7 +146,7 @@ final class PermissionsExampleComplianceTests: XCTestCase {
     }
 
     func testPermissionsExampleUsesCanUseToolPolicyBridge() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/PermissionsExample/main.swift should be readable")
             return
         }
@@ -191,7 +157,7 @@ final class PermissionsExampleComplianceTests: XCTestCase {
     }
 
     func testPermissionsExamplePassesCanUseToolToAgentOptions() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/PermissionsExample/main.swift should be readable")
             return
         }
@@ -206,7 +172,7 @@ final class PermissionsExampleComplianceTests: XCTestCase {
     // MARK: - AC3: Demonstrates ReadOnlyPolicy Restricting to Read-Only Operations
 
     func testPermissionsExampleUsesReadOnlyPolicy() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/PermissionsExample/main.swift should be readable")
             return
         }
@@ -217,7 +183,7 @@ final class PermissionsExampleComplianceTests: XCTestCase {
     }
 
     func testPermissionsExampleReadOnlyPolicyBridgedViaCanUseTool() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/PermissionsExample/main.swift should be readable")
             return
         }
@@ -230,7 +196,7 @@ final class PermissionsExampleComplianceTests: XCTestCase {
     }
 
     func testPermissionsExampleShowsMultipleAgentsWithDifferentPolicies() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/PermissionsExample/main.swift should be readable")
             return
         }
@@ -246,7 +212,7 @@ final class PermissionsExampleComplianceTests: XCTestCase {
     // MARK: - AC4: Demonstrates bypassPermissions Mode for Comparison
 
     func testPermissionsExampleUsesBypassPermissions() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/PermissionsExample/main.swift should be readable")
             return
         }
@@ -257,7 +223,7 @@ final class PermissionsExampleComplianceTests: XCTestCase {
     }
 
     func testPermissionsExampleBypassAgentDoesNotSetCanUseTool() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/PermissionsExample/main.swift should be readable")
             return
         }
@@ -308,7 +274,7 @@ final class PermissionsExampleComplianceTests: XCTestCase {
     }
 
     func testPermissionsExampleOutputsComparisonSummary() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/PermissionsExample/main.swift should be readable")
             return
         }
@@ -328,7 +294,7 @@ final class PermissionsExampleComplianceTests: XCTestCase {
     // MARK: - AC1 (continued): Uses Blocking Prompt API
 
     func testPermissionsExampleUsesBlockingPromptAPI() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/PermissionsExample/main.swift should be readable")
             return
         }
@@ -339,7 +305,7 @@ final class PermissionsExampleComplianceTests: XCTestCase {
     }
 
     func testPermissionsExampleDisplaysQueryResultProperties() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/PermissionsExample/main.swift should be readable")
             return
         }
@@ -351,7 +317,7 @@ final class PermissionsExampleComplianceTests: XCTestCase {
     }
 
     func testPermissionsExampleUsesCoreTools() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/PermissionsExample/main.swift should be readable")
             return
         }
@@ -362,7 +328,7 @@ final class PermissionsExampleComplianceTests: XCTestCase {
     }
 
     func testPermissionsExamplePassesToolsToAgentOptions() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/PermissionsExample/main.swift should be readable")
             return
         }
@@ -373,7 +339,7 @@ final class PermissionsExampleComplianceTests: XCTestCase {
     }
 
     func testPermissionsExampleUsesCreateAgentWithOptions() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/PermissionsExample/main.swift should be readable")
             return
         }
@@ -386,7 +352,7 @@ final class PermissionsExampleComplianceTests: XCTestCase {
     // MARK: - AC6: Uses Actual Public API Signatures
 
     func testPermissionsExampleAgentOptionsUsesRealParameterNames() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/PermissionsExample/main.swift should be readable")
             return
         }
@@ -409,7 +375,7 @@ final class PermissionsExampleComplianceTests: XCTestCase {
     }
 
     func testPermissionsExampleQueryResultMatchesSourceType() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/PermissionsExample/main.swift should be readable")
             return
         }
@@ -424,7 +390,7 @@ final class PermissionsExampleComplianceTests: XCTestCase {
     }
 
     func testPermissionsExampleUsesToolNameAllowlistPolicyRealAPI() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/PermissionsExample/main.swift should be readable")
             return
         }
@@ -436,7 +402,7 @@ final class PermissionsExampleComplianceTests: XCTestCase {
     }
 
     func testPermissionsExampleUsesCanUseToolPolicyBridgeFunction() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/PermissionsExample/main.swift should be readable")
             return
         }
@@ -448,7 +414,7 @@ final class PermissionsExampleComplianceTests: XCTestCase {
     }
 
     func testPermissionsExampleUsesAwaitForPrompt() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/PermissionsExample/main.swift should be readable")
             return
         }
@@ -461,7 +427,7 @@ final class PermissionsExampleComplianceTests: XCTestCase {
     // MARK: - AC7: Clear Comments and No Exposed Keys
 
     func testPermissionsExampleHasTopLevelDescriptionComment() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/PermissionsExample/main.swift should be readable")
             return
         }
@@ -473,7 +439,7 @@ final class PermissionsExampleComplianceTests: XCTestCase {
     }
 
     func testPermissionsExampleHasMultipleInlineComments() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/PermissionsExample/main.swift should be readable")
             return
         }
@@ -487,7 +453,7 @@ final class PermissionsExampleComplianceTests: XCTestCase {
     }
 
     func testPermissionsExampleDoesNotExposeRealAPIKeys() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/PermissionsExample/main.swift should be readable")
             return
         }
@@ -511,7 +477,7 @@ final class PermissionsExampleComplianceTests: XCTestCase {
     }
 
     func testPermissionsExampleUsesPlaceholderOrEnvVarForAPIKey() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/PermissionsExample/main.swift should be readable")
             return
         }
@@ -527,7 +493,7 @@ final class PermissionsExampleComplianceTests: XCTestCase {
     }
 
     func testPermissionsExampleDoesNotUseForceUnwrap() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/PermissionsExample/main.swift should be readable")
             return
         }
@@ -547,7 +513,7 @@ final class PermissionsExampleComplianceTests: XCTestCase {
     // MARK: - MARK Section Structure
 
     func testPermissionsExampleHasMarkSectionsForThreeParts() {
-        guard let content = fileContent(examplePath()) else {
+        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
             XCTFail("Examples/PermissionsExample/main.swift should be readable")
             return
         }
