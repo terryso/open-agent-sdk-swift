@@ -31,7 +31,7 @@ public actor SkillCuratorStore {
     /// - Parameter skillsDir: Optional custom directory path. Defaults to `~/.open-agent-sdk/skills/`.
     public init(skillsDir: String? = nil) {
         self.customSkillsDir = skillsDir
-        self.cachedState = Self.loadSync(from: Self.resolveSkillsDir(customDir: skillsDir), decoder: {
+        self.cachedState = Self.loadSync(from: resolveSkillsDir(customDir: skillsDir), decoder: {
             let d = JSONDecoder()
             d.dateDecodingStrategy = .iso8601
             return d
@@ -58,30 +58,7 @@ public actor SkillCuratorStore {
 
     /// Returns the resolved skills directory path.
     public func getSkillsDir() -> String {
-        Self.resolveSkillsDir(customDir: customSkillsDir)
-    }
-
-    // MARK: - Private: Path Resolution
-
-    nonisolated private static func resolveSkillsDir(customDir: String?) -> String {
-        if let custom = customDir {
-            return custom
-        }
-        let home: String
-        #if os(Linux)
-        if let homeEnv = getenv("HOME") {
-            home = String(cString: homeEnv)
-        } else {
-            home = "/tmp"
-        }
-        #else
-        home = NSHomeDirectory()
-        #endif
-        return (home as NSString).appendingPathComponent(".open-agent-sdk/skills")
-    }
-
-    private func getStateFilePath() -> String {
-        (getSkillsDir() as NSString).appendingPathComponent(".curator-state.json")
+        resolveSkillsDir(customDir: customSkillsDir)
     }
 
     // MARK: - Private: Loading
@@ -110,7 +87,6 @@ public actor SkillCuratorStore {
 
     private func flushToDisk(_ state: CuratorState) throws {
         let skillsDir = getSkillsDir()
-        let filePath = getStateFilePath()
 
         let jsonData: Data
         do {
@@ -121,33 +97,6 @@ public actor SkillCuratorStore {
             )
         }
 
-        do {
-            try FileManager.default.createDirectory(
-                atPath: skillsDir,
-                withIntermediateDirectories: true,
-                attributes: [.posixPermissions: 0o700]
-            )
-        } catch {
-            throw SDKError.sessionError(
-                message: "Failed to create skills directory: \(error.localizedDescription)"
-            )
-        }
-
-        // Atomic write: write to temp file, remove existing, then move
-        let tempFileName = ".curator-state.json.tmp.\(UUID().uuidString)"
-        let tempFilePath = (skillsDir as NSString).appendingPathComponent(tempFileName)
-
-        do {
-            try jsonData.write(to: URL(fileURLWithPath: tempFilePath), options: .atomic)
-            if FileManager.default.fileExists(atPath: filePath) {
-                try FileManager.default.removeItem(atPath: filePath)
-            }
-            try FileManager.default.moveItem(atPath: tempFilePath, toPath: filePath)
-        } catch {
-            try? FileManager.default.removeItem(atPath: tempFilePath)
-            throw SDKError.sessionError(
-                message: "Failed to write curator state at \(filePath): \(error.localizedDescription)"
-            )
-        }
+        try atomicWriteJSON(data: jsonData, toDirectory: skillsDir, fileName: ".curator-state.json", contentType: "curator state")
     }
 }
