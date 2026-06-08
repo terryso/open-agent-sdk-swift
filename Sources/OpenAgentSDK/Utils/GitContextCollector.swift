@@ -292,13 +292,5 @@ public final class GitContextCollector: @unchecked Sendable {
         return lines.joined(separator: "\n")
     }
 
-    /// Normalize a file path for cache key comparison.
-    ///
-    /// Resolves `.`, `..`, redundant slashes, and symlinks.
-    private func normalizePath(_ path: String) -> String {
-        let standardized = (path as NSString).standardizingPath
-        let url = URL(fileURLWithPath: standardized)
-        let resolved = url.resolvingSymlinksInPath().path
-        return resolved.isEmpty ? standardized : resolved
-    }
 }
+

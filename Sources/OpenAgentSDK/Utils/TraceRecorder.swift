@@ -24,7 +24,7 @@ public actor TraceRecorder {
     private static let sensitivePatterns: [String] = ["sk-", "key-"]
 
     /// Reusable date formatter for trace timestamps (protected by actor isolation).
-    private let timestampFormatter = ISO8601DateFormatter()
+    private let timestampFormatter = makeISO8601DateFormatter()
 
     /// Create a trace recorder that writes to `{baseURL}/{runId}/trace.jsonl`.
     ///
