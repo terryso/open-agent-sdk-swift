@@ -85,55 +85,40 @@ final class MultiToolExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testMultiToolExampleImportsOpenAgentSDK() {
-        guard let content = DocumentationTestHelpers.fileContent(multiToolExamplePath()) else {
-            XCTFail("Examples/MultiToolExample/main.swift should be readable")
-            return
-        }
+    func testMultiToolExampleImportsOpenAgentSDK() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(multiToolExamplePath())
         XCTAssertTrue(
             content.contains("import OpenAgentSDK"),
             "MultiToolExample should import OpenAgentSDK"
         )
     }
 
-    func testMultiToolExampleImportsFoundation() {
-        guard let content = DocumentationTestHelpers.fileContent(multiToolExamplePath()) else {
-            XCTFail("Examples/MultiToolExample/main.swift should be readable")
-            return
-        }
+    func testMultiToolExampleImportsFoundation() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(multiToolExamplePath())
         XCTAssertTrue(
             content.contains("import Foundation"),
             "MultiToolExample should import Foundation for ProcessInfo"
         )
     }
 
-    func testMultiToolExampleUsesCreateAgent() {
-        guard let content = DocumentationTestHelpers.fileContent(multiToolExamplePath()) else {
-            XCTFail("Examples/MultiToolExample/main.swift should be readable")
-            return
-        }
+    func testMultiToolExampleUsesCreateAgent() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(multiToolExamplePath())
         XCTAssertTrue(
             content.contains("createAgent("),
             "MultiToolExample should use createAgent() factory function"
         )
     }
 
-    func testMultiToolExampleRegistersCoreTools() {
-        guard let content = DocumentationTestHelpers.fileContent(multiToolExamplePath()) else {
-            XCTFail("Examples/MultiToolExample/main.swift should be readable")
-            return
-        }
+    func testMultiToolExampleRegistersCoreTools() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(multiToolExamplePath())
         XCTAssertTrue(
             content.contains("getAllBaseTools(tier: .core)"),
             "MultiToolExample should register all core tools via getAllBaseTools(tier: .core)"
         )
     }
 
-    func testMultiToolExampleUsesBypassPermissions() {
-        guard let content = DocumentationTestHelpers.fileContent(multiToolExamplePath()) else {
-            XCTFail("Examples/MultiToolExample/main.swift should be readable")
-            return
-        }
+    func testMultiToolExampleUsesBypassPermissions() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(multiToolExamplePath())
         XCTAssertTrue(
             content.contains(".bypassPermissions"),
             "MultiToolExample should set permissionMode to .bypassPermissions"
@@ -142,44 +127,32 @@ final class MultiToolExampleComplianceTests: XCTestCase {
 
     // MARK: - AC2: Uses Streaming API for Real-Time Events
 
-    func testMultiToolExampleUsesStreamingAPI() {
-        guard let content = DocumentationTestHelpers.fileContent(multiToolExamplePath()) else {
-            XCTFail("Examples/MultiToolExample/main.swift should be readable")
-            return
-        }
+    func testMultiToolExampleUsesStreamingAPI() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(multiToolExamplePath())
         XCTAssertTrue(
             content.contains("for await") && content.contains("agent.stream("),
             "MultiToolExample should use 'for await ... in agent.stream(...)' pattern"
         )
     }
 
-    func testMultiToolExampleHandlesPartialMessage() {
-        guard let content = DocumentationTestHelpers.fileContent(multiToolExamplePath()) else {
-            XCTFail("Examples/MultiToolExample/main.swift should be readable")
-            return
-        }
+    func testMultiToolExampleHandlesPartialMessage() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(multiToolExamplePath())
         XCTAssertTrue(
             content.contains(".partialMessage"),
             "MultiToolExample should handle .partialMessage case for incremental text"
         )
     }
 
-    func testMultiToolExampleHandlesToolUseEvent() {
-        guard let content = DocumentationTestHelpers.fileContent(multiToolExamplePath()) else {
-            XCTFail("Examples/MultiToolExample/main.swift should be readable")
-            return
-        }
+    func testMultiToolExampleHandlesToolUseEvent() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(multiToolExamplePath())
         XCTAssertTrue(
             content.contains(".toolUse"),
             "MultiToolExample should handle .toolUse case to display tool invocations"
         )
     }
 
-    func testMultiToolExampleHandlesToolResultEvent() {
-        guard let content = DocumentationTestHelpers.fileContent(multiToolExamplePath()) else {
-            XCTFail("Examples/MultiToolExample/main.swift should be readable")
-            return
-        }
+    func testMultiToolExampleHandlesToolResultEvent() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(multiToolExamplePath())
         XCTAssertTrue(
             content.contains(".toolResult"),
             "MultiToolExample should handle .toolResult case to display tool results"
@@ -188,11 +161,8 @@ final class MultiToolExampleComplianceTests: XCTestCase {
 
     // MARK: - AC3: Demonstrates Multi-Tool Orchestration
 
-    func testMultiToolExampleHasMultiStepSystemPrompt() {
-        guard let content = DocumentationTestHelpers.fileContent(multiToolExamplePath()) else {
-            XCTFail("Examples/MultiToolExample/main.swift should be readable")
-            return
-        }
+    func testMultiToolExampleHasMultiStepSystemPrompt() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(multiToolExamplePath())
         // System prompt should guide the agent to use multiple tools
         XCTAssertTrue(
             content.contains("systemPrompt:"),
@@ -205,11 +175,8 @@ final class MultiToolExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testMultiToolExampleDisplaysToolNameAndInput() {
-        guard let content = DocumentationTestHelpers.fileContent(multiToolExamplePath()) else {
-            XCTFail("Examples/MultiToolExample/main.swift should be readable")
-            return
-        }
+    func testMultiToolExampleDisplaysToolNameAndInput() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(multiToolExamplePath())
         // Should display tool name and input from ToolUseData
         let hasToolName = content.contains("toolName") || content.contains("data.toolName")
         XCTAssertTrue(
@@ -220,22 +187,16 @@ final class MultiToolExampleComplianceTests: XCTestCase {
 
     // MARK: - AC4: Final Output Includes Task Summary and Statistics
 
-    func testMultiToolExampleHandlesResultEvent() {
-        guard let content = DocumentationTestHelpers.fileContent(multiToolExamplePath()) else {
-            XCTFail("Examples/MultiToolExample/main.swift should be readable")
-            return
-        }
+    func testMultiToolExampleHandlesResultEvent() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(multiToolExamplePath())
         XCTAssertTrue(
             content.contains(".result("),
             "MultiToolExample should handle .result case for final statistics"
         )
     }
 
-    func testMultiToolExampleDisplaysUsageStatistics() {
-        guard let content = DocumentationTestHelpers.fileContent(multiToolExamplePath()) else {
-            XCTFail("Examples/MultiToolExample/main.swift should be readable")
-            return
-        }
+    func testMultiToolExampleDisplaysUsageStatistics() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(multiToolExamplePath())
         // Should display numTurns and usage from result data
         let hasTurns = content.contains("numTurns") || content.contains("data.numTurns")
         XCTAssertTrue(
@@ -251,11 +212,8 @@ final class MultiToolExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testMultiToolExampleSafelyUnwrapsOptionalUsage() {
-        guard let content = DocumentationTestHelpers.fileContent(multiToolExamplePath()) else {
-            XCTFail("Examples/MultiToolExample/main.swift should be readable")
-            return
-        }
+    func testMultiToolExampleSafelyUnwrapsOptionalUsage() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(multiToolExamplePath())
         // data.usage is Optional<TokenUsage> so should use if let or guard let
         let hasSafeUnwrap = content.contains("if let usage") || content.contains("guard let usage")
         XCTAssertTrue(
@@ -266,11 +224,8 @@ final class MultiToolExampleComplianceTests: XCTestCase {
 
     // MARK: - AC7: Clear Comments and No Exposed Keys
 
-    func testMultiToolExampleHasTopLevelDescriptionComment() {
-        guard let content = DocumentationTestHelpers.fileContent(multiToolExamplePath()) else {
-            XCTFail("Examples/MultiToolExample/main.swift should be readable")
-            return
-        }
+    func testMultiToolExampleHasTopLevelDescriptionComment() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(multiToolExamplePath())
         let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
         XCTAssertTrue(
             trimmed.hasPrefix("//"),
@@ -278,11 +233,8 @@ final class MultiToolExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testMultiToolExampleHasMultipleInlineComments() {
-        guard let content = DocumentationTestHelpers.fileContent(multiToolExamplePath()) else {
-            XCTFail("Examples/MultiToolExample/main.swift should be readable")
-            return
-        }
+    func testMultiToolExampleHasMultipleInlineComments() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(multiToolExamplePath())
         let commentLines = content.components(separatedBy: "\n")
             .filter { $0.trimmingCharacters(in: .whitespaces).hasPrefix("//") }
             .count
@@ -292,11 +244,8 @@ final class MultiToolExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testMultiToolExampleDoesNotExposeRealAPIKeys() {
-        guard let content = DocumentationTestHelpers.fileContent(multiToolExamplePath()) else {
-            XCTFail("Examples/MultiToolExample/main.swift should be readable")
-            return
-        }
+    func testMultiToolExampleDoesNotExposeRealAPIKeys() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(multiToolExamplePath())
         let lines = content.components(separatedBy: "\n")
         for line in lines {
             if line.contains("sk-") && !line.contains("sk-...") && !line.contains("sk-xxx") {
@@ -316,11 +265,8 @@ final class MultiToolExampleComplianceTests: XCTestCase {
         }
     }
 
-    func testMultiToolExampleUsesPlaceholderOrEnvVarForAPIKey() {
-        guard let content = DocumentationTestHelpers.fileContent(multiToolExamplePath()) else {
-            XCTFail("Examples/MultiToolExample/main.swift should be readable")
-            return
-        }
+    func testMultiToolExampleUsesPlaceholderOrEnvVarForAPIKey() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(multiToolExamplePath())
         if content.contains("apiKey:") {
             let usesPlaceholder = content.contains("sk-...") || content.contains("sk-xxx")
             let usesEnvVar = content.contains("ProcessInfo.processInfo.environment") ||
@@ -333,11 +279,8 @@ final class MultiToolExampleComplianceTests: XCTestCase {
         }
     }
 
-    func testMultiToolExampleDoesNotUseForceUnwrap() {
-        guard let content = DocumentationTestHelpers.fileContent(multiToolExamplePath()) else {
-            XCTFail("Examples/MultiToolExample/main.swift should be readable")
-            return
-        }
+    func testMultiToolExampleDoesNotUseForceUnwrap() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(multiToolExamplePath())
         // Check for try! and force unwrap patterns (but allow string interpolation with !)
         let lines = content.components(separatedBy: "\n")
         for line in lines {

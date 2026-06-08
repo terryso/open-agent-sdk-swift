@@ -84,22 +84,16 @@ final class QueryAbortExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testQueryAbortExampleImportsOpenAgentSDK() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/QueryAbortExample/main.swift should be readable")
-            return
-        }
+    func testQueryAbortExampleImportsOpenAgentSDK() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("import OpenAgentSDK"),
             "QueryAbortExample should import OpenAgentSDK"
         )
     }
 
-    func testQueryAbortExampleImportsFoundation() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/QueryAbortExample/main.swift should be readable")
-            return
-        }
+    func testQueryAbortExampleImportsFoundation() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("import Foundation"),
             "QueryAbortExample should import Foundation"
@@ -108,11 +102,8 @@ final class QueryAbortExampleComplianceTests: XCTestCase {
 
     // MARK: - AC1: Code Quality
 
-    func testQueryAbortExampleHasTopLevelDescriptionComment() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/QueryAbortExample/main.swift should be readable")
-            return
-        }
+    func testQueryAbortExampleHasTopLevelDescriptionComment() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
         XCTAssertTrue(
             trimmed.hasPrefix("//"),
@@ -120,11 +111,8 @@ final class QueryAbortExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testQueryAbortExampleHasMultipleInlineComments() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/QueryAbortExample/main.swift should be readable")
-            return
-        }
+    func testQueryAbortExampleHasMultipleInlineComments() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         let commentLines = content.components(separatedBy: "\n")
             .filter { $0.trimmingCharacters(in: .whitespaces).hasPrefix("//") }
             .count
@@ -134,11 +122,8 @@ final class QueryAbortExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testQueryAbortExampleHasMarkSections() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/QueryAbortExample/main.swift should be readable")
-            return
-        }
+    func testQueryAbortExampleHasMarkSections() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         let markCount = content.components(separatedBy: "MARK:").count - 1
         XCTAssertGreaterThanOrEqual(
             markCount, 3,
@@ -146,11 +131,8 @@ final class QueryAbortExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testQueryAbortExampleDoesNotUseForceUnwrap() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/QueryAbortExample/main.swift should be readable")
-            return
-        }
+    func testQueryAbortExampleDoesNotUseForceUnwrap() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         let lines = content.components(separatedBy: "\n")
         for line in lines {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
@@ -163,55 +145,40 @@ final class QueryAbortExampleComplianceTests: XCTestCase {
         }
     }
 
-    func testQueryAbortExampleDoesNotExposeRealAPIKeys() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/QueryAbortExample/main.swift should be readable")
-            return
-        }
+    func testQueryAbortExampleDoesNotExposeRealAPIKeys() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertFalse(
             content.contains("sk-ant-api03") || content.contains("sk-proj-"),
             "QueryAbortExample should not contain real API keys"
         )
     }
 
-    func testQueryAbortExampleUsesLoadDotEnvPattern() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/QueryAbortExample/main.swift should be readable")
-            return
-        }
+    func testQueryAbortExampleUsesLoadDotEnvPattern() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("loadDotEnv()"),
             "QueryAbortExample should use loadDotEnv() helper pattern"
         )
     }
 
-    func testQueryAbortExampleUsesGetEnvPattern() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/QueryAbortExample/main.swift should be readable")
-            return
-        }
+    func testQueryAbortExampleUsesGetEnvPattern() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("getEnv("),
             "QueryAbortExample should use getEnv() helper pattern for API key loading"
         )
     }
 
-    func testQueryAbortExampleUsesBypassPermissions() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/QueryAbortExample/main.swift should be readable")
-            return
-        }
+    func testQueryAbortExampleUsesBypassPermissions() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("bypassPermissions") || content.contains(".bypassPermissions"),
             "QueryAbortExample should use permissionMode: .bypassPermissions"
         )
     }
 
-    func testQueryAbortExampleUsesCreateAgent() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/QueryAbortExample/main.swift should be readable")
-            return
-        }
+    func testQueryAbortExampleUsesCreateAgent() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("createAgent("),
             "QueryAbortExample should create an Agent using createAgent()"
@@ -220,11 +187,8 @@ final class QueryAbortExampleComplianceTests: XCTestCase {
 
     // MARK: - AC2: Task.cancel() Cancellation
 
-    func testQueryAbortExampleUsesTaskBlock() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/QueryAbortExample/main.swift should be readable")
-            return
-        }
+    func testQueryAbortExampleUsesTaskBlock() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // Should use Task { } to wrap agent queries for cancellation
         let taskBlockCount = content.components(separatedBy: "Task {").count - 1
             + content.components(separatedBy: "Task{").count - 1
@@ -234,22 +198,16 @@ final class QueryAbortExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testQueryAbortExampleCallsTaskCancel() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/QueryAbortExample/main.swift should be readable")
-            return
-        }
+    func testQueryAbortExampleCallsTaskCancel() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains(".cancel()"),
             "QueryAbortExample should call task.cancel() to cancel the running query"
         )
     }
 
-    func testQueryAbortExampleUsesTaskSleep() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/QueryAbortExample/main.swift should be readable")
-            return
-        }
+    func testQueryAbortExampleUsesTaskSleep() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // Should use Task.sleep for delay before cancellation
         XCTAssertTrue(
             content.contains("Task.sleep") || content.contains("sleep(for:"),
@@ -257,33 +215,24 @@ final class QueryAbortExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testQueryAbortExampleChecksIsCancelled() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/QueryAbortExample/main.swift should be readable")
-            return
-        }
+    func testQueryAbortExampleChecksIsCancelled() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("isCancelled"),
             "QueryAbortExample should check result.isCancelled after cancellation"
         )
     }
 
-    func testQueryAbortExampleUsesPromptAPI() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/QueryAbortExample/main.swift should be readable")
-            return
-        }
+    func testQueryAbortExampleUsesPromptAPI() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("agent.prompt(") || content.contains(".prompt("),
             "QueryAbortExample should use agent.prompt() to execute queries"
         )
     }
 
-    func testQueryAbortExampleUsesAwait() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/QueryAbortExample/main.swift should be readable")
-            return
-        }
+    func testQueryAbortExampleUsesAwait() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("await"),
             "QueryAbortExample should use await for async prompt calls"
@@ -292,22 +241,16 @@ final class QueryAbortExampleComplianceTests: XCTestCase {
 
     // MARK: - AC3: Agent.interrupt() Cancellation
 
-    func testQueryAbortExampleCallsAgentInterrupt() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/QueryAbortExample/main.swift should be readable")
-            return
-        }
+    func testQueryAbortExampleCallsAgentInterrupt() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("agent.interrupt()") || content.contains(".interrupt()"),
             "QueryAbortExample should call agent.interrupt() to cancel the running query"
         )
     }
 
-    func testQueryAbortExampleDemonstratesSecondCancellationMechanism() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/QueryAbortExample/main.swift should be readable")
-            return
-        }
+    func testQueryAbortExampleDemonstratesSecondCancellationMechanism() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // Should demonstrate both Task.cancel() and agent.interrupt()
         let hasTaskCancel = content.contains(".cancel()")
         let hasInterrupt = content.contains("interrupt()")
@@ -319,11 +262,8 @@ final class QueryAbortExampleComplianceTests: XCTestCase {
 
     // MARK: - AC4: Partial Results Handling
 
-    func testQueryAbortExampleInspectsPartialText() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/QueryAbortExample/main.swift should be readable")
-            return
-        }
+    func testQueryAbortExampleInspectsPartialText() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // Should inspect result.text for partial output
         XCTAssertTrue(
             content.contains("result.text") || content.contains(".text"),
@@ -331,22 +271,16 @@ final class QueryAbortExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testQueryAbortExampleInspectsNumTurns() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/QueryAbortExample/main.swift should be readable")
-            return
-        }
+    func testQueryAbortExampleInspectsNumTurns() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("numTurns"),
             "QueryAbortExample should inspect result.numTurns for completed turns after cancellation"
         )
     }
 
-    func testQueryAbortExampleInspectsUsage() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/QueryAbortExample/main.swift should be readable")
-            return
-        }
+    func testQueryAbortExampleInspectsUsage() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // Should reference usage for token counts after cancellation
         XCTAssertTrue(
             content.contains("usage") || content.contains("Tokens"),
@@ -356,55 +290,40 @@ final class QueryAbortExampleComplianceTests: XCTestCase {
 
     // MARK: - AC5: Stream Cancellation
 
-    func testQueryAbortExampleUsesStreamAPI() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/QueryAbortExample/main.swift should be readable")
-            return
-        }
+    func testQueryAbortExampleUsesStreamAPI() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("agent.stream(") || content.contains(".stream("),
             "QueryAbortExample should use agent.stream() API for streaming cancellation demo"
         )
     }
 
-    func testQueryAbortExampleIteratesAsyncStream() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/QueryAbortExample/main.swift should be readable")
-            return
-        }
+    func testQueryAbortExampleIteratesAsyncStream() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("for await"),
             "QueryAbortExample should iterate over AsyncStream with 'for await' pattern"
         )
     }
 
-    func testQueryAbortExampleHandlesSDKMessageResult() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/QueryAbortExample/main.swift should be readable")
-            return
-        }
+    func testQueryAbortExampleHandlesSDKMessageResult() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains(".result(") || content.contains("case .result"),
             "QueryAbortExample should handle .result case in SDKMessage stream events"
         )
     }
 
-    func testQueryAbortExampleChecksCancelledSubtype() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/QueryAbortExample/main.swift should be readable")
-            return
-        }
+    func testQueryAbortExampleChecksCancelledSubtype() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains(".cancelled") || content.contains("cancelled"),
             "QueryAbortExample should check for .cancelled subtype in stream result events"
         )
     }
 
-    func testQueryAbortExampleHasThreeParts() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/QueryAbortExample/main.swift should be readable")
-            return
-        }
+    func testQueryAbortExampleHasThreeParts() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // Should have three distinct parts: Task.cancel(), Agent.interrupt(), Stream
         let partCount = content.components(separatedBy: "Part ").count - 1
             + content.components(separatedBy: "PART ").count - 1
@@ -416,11 +335,8 @@ final class QueryAbortExampleComplianceTests: XCTestCase {
 
     // MARK: - AC1 / Build Verification: assert() usage for compliance testing
 
-    func testQueryAbortExampleUsesAssertions() {
-        guard let content = DocumentationTestHelpers.fileContent(examplePath()) else {
-            XCTFail("Examples/QueryAbortExample/main.swift should be readable")
-            return
-        }
+    func testQueryAbortExampleUsesAssertions() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // The example should use assert() for key validations so compliance tests can verify behavior
         XCTAssertTrue(
             content.contains("assert("),
