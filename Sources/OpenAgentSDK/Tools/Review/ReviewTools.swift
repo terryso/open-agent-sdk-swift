@@ -1,5 +1,32 @@
 import Foundation
 
+/// Builds a JSON error response string for review tools.
+///
+/// Convenience wrapper around ``reviewJSONResponse(_:)`` for the common error pattern
+/// used by all review tool guard clauses and error paths.
+///
+/// - Parameter message: The error description.
+/// - Returns: A JSON string like `{"success":false,"error":"message"}`.
+func reviewErrorResponse(_ message: String) -> String {
+    reviewJSONResponse(["success": false, "error": message] as [String: Any])
+}
+
+/// Validates that a string input is non-empty after trimming whitespace.
+///
+/// Used by all review tools for the common "field must not be empty" guard pattern.
+/// Returns the error response string if the value is empty, or nil if valid.
+///
+/// - Parameters:
+///   - value: The input string to validate.
+///   - field: The field name for the error message (e.g., "name", "skillName").
+/// - Returns: An error response string if empty, or nil if valid.
+func requireNonEmptyInput(_ value: String, field: String) -> String? {
+    if value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        return reviewErrorResponse("'\(field)' must not be empty")
+    }
+    return nil
+}
+
 /// Builds a JSON response string using JSONSerialization for safe encoding of user-provided values.
 func reviewJSONResponse(_ fields: [String: Any]) -> String {
     guard let data = try? JSONSerialization.data(withJSONObject: fields),

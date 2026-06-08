@@ -268,15 +268,7 @@ public actor FactStore {
             throw SDKError.sessionError(message: "Failed to serialize facts for domain '\(domain)': \(error.localizedDescription)")
         }
 
-        do {
-            try FileManager.default.createDirectory(
-                atPath: memoryDir,
-                withIntermediateDirectories: true,
-                attributes: [.posixPermissions: 0o700]
-            )
-        } catch {
-            throw SDKError.sessionError(message: "Failed to create memory directory: \(error.localizedDescription)")
-        }
+        try ensureDirectoryExists(atPath: memoryDir, label: "memory directory")
 
         do {
             try jsonData.write(to: URL(fileURLWithPath: filePath), options: .atomic)

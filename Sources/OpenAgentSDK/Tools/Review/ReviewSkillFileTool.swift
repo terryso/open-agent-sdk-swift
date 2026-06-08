@@ -41,32 +41,19 @@ public func createReviewSkillFileTool(
             "required": ["skillName", "filePath", "content"]
         ]
     ) { (input: ReviewSkillFileInput, _: ToolContext) -> String in
-        guard !input.skillName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            return reviewJSONResponse(["success": false, "error": "'skillName' must not be empty"] as [String: Any])
-        }
-        guard !input.filePath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            return reviewJSONResponse(["success": false, "error": "'filePath' must not be empty"] as [String: Any])
-        }
+        if let err = requireNonEmptyInput(input.skillName, field: "skillName") { return err }
+        if let err = requireNonEmptyInput(input.filePath, field: "filePath") { return err }
         guard let skill = skillRegistry.find(input.skillName) else {
-            return reviewJSONResponse([
-                "success": false,
-                "error": "Skill '\(input.skillName)' not found"
-            ] as [String: Any])
+            return reviewErrorResponse("Skill '\(input.skillName)' not found")
         }
 
         guard allowedFilePathPrefixes.contains(where: { input.filePath.hasPrefix($0) }) else {
-            return reviewJSONResponse([
-                "success": false,
-                "error": "Invalid file path '\(input.filePath)'. Must start with one of: \(allowedFilePathPrefixes.joined(separator: ", "))"
-            ] as [String: Any])
+            return reviewErrorResponse("Invalid file path '\(input.filePath)'. Must start with one of: \(allowedFilePathPrefixes.joined(separator: ", "))")
         }
 
         let pathComponents = input.filePath.split(separator: "/", omittingEmptySubsequences: false)
         if pathComponents.contains("..") {
-            return reviewJSONResponse([
-                "success": false,
-                "error": "Invalid file path '\(input.filePath)'. Path traversal ('..') is not allowed"
-            ] as [String: Any])
+            return reviewErrorResponse("Invalid file path '\(input.filePath)'. Path traversal ('..') is not allowed")
         }
 
         let baseDir: String
@@ -80,10 +67,7 @@ public func createReviewSkillFileTool(
                 // Update registry with the new baseDir
                 skillRegistry.replace(skill.withBaseDir(skillDir))
             } catch {
-                return reviewJSONResponse([
-                    "success": false,
-                    "error": "Failed to create skill directory: \(error.localizedDescription)"
-                ] as [String: Any])
+                return reviewErrorResponse("Failed to create skill directory: \(error.localizedDescription)")
             }
         }
 
@@ -98,10 +82,7 @@ public func createReviewSkillFileTool(
                 "message": "File added to skill '\(input.skillName)'"
             ] as [String: Any])
         } catch {
-            return reviewJSONResponse([
-                "success": false,
-                "error": error.localizedDescription
-            ] as [String: Any])
+            return reviewErrorResponse(error.localizedDescription)
         }
     }
 }

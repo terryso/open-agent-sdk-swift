@@ -307,15 +307,7 @@ public actor FileBasedMemoryStore: MemoryStoreProtocol {
         }
 
         // Ensure directory exists
-        do {
-            try FileManager.default.createDirectory(
-                atPath: memoryDir,
-                withIntermediateDirectories: true,
-                attributes: [.posixPermissions: 0o700]
-            )
-        } catch {
-            throw SDKError.sessionError(message: "Failed to create memory directory: \(error.localizedDescription)")
-        }
+        try ensureDirectoryExists(atPath: memoryDir, label: "memory directory")
 
         // Write file with 0600 permissions
         let permissions: [FileAttributeKey: Any] = [.posixPermissions: 0o600]

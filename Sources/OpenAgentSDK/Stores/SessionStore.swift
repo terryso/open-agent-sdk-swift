@@ -66,15 +66,7 @@ public actor SessionStore {
         ]
 
         // Create session directory (mkdir -p equivalent)
-        do {
-            try FileManager.default.createDirectory(
-                atPath: sessionPath,
-                withIntermediateDirectories: true,
-                attributes: [.posixPermissions: 0o700]
-            )
-        } catch {
-            throw SDKError.sessionError(message: "Failed to create session directory: \(error.localizedDescription)")
-        }
+        try ensureDirectoryExists(atPath: sessionPath, label: "session directory")
 
         // Serialize to JSON
         let jsonData: Data

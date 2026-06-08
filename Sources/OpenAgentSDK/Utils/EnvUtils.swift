@@ -103,6 +103,27 @@ internal func resolveSkillsDir(customDir: String?) -> String {
     return defaultSkillsDir
 }
 
+/// Ensure a directory exists, creating it with 0o700 permissions if needed.
+///
+/// A shared helper for store classes that need to create directories before writing files.
+/// Wraps `FileManager.createDirectory` with the standard SDKError mapping.
+///
+/// - Parameters:
+///   - path: The directory path to create.
+///   - label: Human-readable description for error messages (e.g., "memory directory", "session directory").
+/// - Throws: ``SDKError/sessionError(message:)`` if directory creation fails.
+internal func ensureDirectoryExists(atPath path: String, label: String = "directory") throws {
+    do {
+        try FileManager.default.createDirectory(
+            atPath: path,
+            withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o700]
+        )
+    } catch {
+        throw SDKError.sessionError(message: "Failed to create \(label): \(error.localizedDescription)")
+    }
+}
+
 /// Atomically write data to a file in the given directory.
 ///
 /// Creates the directory if needed (with 0o700 permissions), writes to a temporary file,
@@ -114,17 +135,7 @@ internal func resolveSkillsDir(customDir: String?) -> String {
 ///   - fileName: The final file name (e.g., ".usage.json").
 ///   - contentType: Human-readable description for error messages (e.g., "skill usage data").
 internal func atomicWriteJSON(data: Data, toDirectory directory: String, fileName: String, contentType: String) throws {
-    do {
-        try FileManager.default.createDirectory(
-            atPath: directory,
-            withIntermediateDirectories: true,
-            attributes: [.posixPermissions: 0o700]
-        )
-    } catch {
-        throw SDKError.sessionError(
-            message: "Failed to create directory: \(error.localizedDescription)"
-        )
-    }
+    try ensureDirectoryExists(atPath: directory)
 
     let tempFileName = "\(fileName).tmp.\(UUID().uuidString)"
     let tempFilePath = (directory as NSString).appendingPathComponent(tempFileName)
