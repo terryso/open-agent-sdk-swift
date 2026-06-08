@@ -10,30 +10,7 @@ import XCTest
 ///   - `SessionStore` actor is defined with save, load, delete methods
 ///   - `getSessionsDir()` resolves home directory correctly
 /// TDD Phase: RED (feature not implemented yet)
-final class SessionStoreTests: XCTestCase {
-
-    // MARK: - Properties
-
-    private var tempDir: String!
-
-    // MARK: - Setup / Teardown
-
-    override func setUp() {
-        super.setUp()
-        tempDir = (NSTemporaryDirectory() as NSString)
-            .appendingPathComponent("session-store-tests-\(UUID().uuidString)")
-        try? FileManager.default.createDirectory(
-            atPath: tempDir,
-            withIntermediateDirectories: true
-        )
-    }
-
-    override func tearDown() {
-        if let tempDir {
-            try? FileManager.default.removeItem(atPath: tempDir)
-        }
-        super.tearDown()
-    }
+final class SessionStoreTests: TempDirTestCase {
 
     // MARK: - AC1: SessionStore Actor Basic Structure
 

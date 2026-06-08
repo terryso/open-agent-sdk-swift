@@ -1,7 +1,7 @@
 import XCTest
 @testable import OpenAgentSDK
 
-final class IntelligentCuratorTests: XCTestCase {
+final class IntelligentCuratorTests: TempDirTestCase {
 
     // MARK: - Mock LLM Client
 
@@ -51,25 +51,6 @@ final class IntelligentCuratorTests: XCTestCase {
     }
 
     // MARK: - Helpers
-
-    private var tempDir: String!
-
-    override func setUp() {
-        super.setUp()
-        tempDir = (NSTemporaryDirectory() as NSString)
-            .appendingPathComponent("intelligent-curator-tests-\(UUID().uuidString)")
-        try? FileManager.default.createDirectory(
-            atPath: tempDir,
-            withIntermediateDirectories: true
-        )
-    }
-
-    override func tearDown() {
-        if let tempDir {
-            try? FileManager.default.removeItem(atPath: tempDir)
-        }
-        super.tearDown()
-    }
 
     private func makeUsageStore() -> SkillUsageStore {
         SkillUsageStore(skillsDir: tempDir)
