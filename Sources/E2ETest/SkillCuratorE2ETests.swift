@@ -21,27 +21,10 @@ struct SkillCuratorE2ETests {
         await testPauseResumeE2E()
     }
 
-    // MARK: - Helpers
-
-    private static func makeTempDir() -> String {
-        let dir = (NSTemporaryDirectory() as NSString)
-            .appendingPathComponent("e2e-skill-curator-\(UUID().uuidString)")
-        try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
-        return dir
-    }
-
-    private static func cleanup(_ dir: String) {
-        try? FileManager.default.removeItem(atPath: dir)
-    }
-
-    private static func date(daysAgo: Int) -> Date {
-        Calendar.current.date(byAdding: .day, value: -daysAgo, to: Date())!
-    }
-
     // MARK: - Test 71: Store Real Persistence
 
     private static func testStoreRealPersistenceE2E() async {
-        let tempDir = makeTempDir()
+        let tempDir = makeTempDir(prefix: "e2e-skill-curator")
         defer { cleanup(tempDir) }
 
         do {
@@ -119,7 +102,7 @@ struct SkillCuratorE2ETests {
             }
 
             // Default state when no file exists
-            let emptyDir = makeTempDir()
+            let emptyDir = makeTempDir(prefix: "e2e-skill-curator")
             defer { cleanup(emptyDir) }
             let store3 = SkillCuratorStore(skillsDir: emptyDir)
             let defaultState = await store3.loadState()
@@ -137,7 +120,7 @@ struct SkillCuratorE2ETests {
     // MARK: - Test 72: Full Curation Pass
 
     private static func testFullCurationPassE2E() async {
-        let tempDir = makeTempDir()
+        let tempDir = makeTempDir(prefix: "e2e-skill-curator")
         defer { cleanup(tempDir) }
 
         do {
@@ -238,7 +221,7 @@ struct SkillCuratorE2ETests {
             }
 
             // Empty store produces no transitions
-            let emptyDir = makeTempDir()
+            let emptyDir = makeTempDir(prefix: "e2e-skill-curator")
             defer { cleanup(emptyDir) }
             let emptyUsageStore = SkillUsageStore(skillsDir: emptyDir)
             let emptyCuratorStore = SkillCuratorStore(skillsDir: emptyDir)
@@ -262,7 +245,7 @@ struct SkillCuratorE2ETests {
     // MARK: - Test 73: Skip Rules
 
     private static func testSkipRulesE2E() async {
-        let tempDir = makeTempDir()
+        let tempDir = makeTempDir(prefix: "e2e-skill-curator")
         defer { cleanup(tempDir) }
 
         do {
@@ -330,7 +313,7 @@ struct SkillCuratorE2ETests {
             }
 
             // Mixed: some eligible, some skipped
-            let mixedDir = makeTempDir()
+            let mixedDir = makeTempDir(prefix: "e2e-skill-curator")
             defer { cleanup(mixedDir) }
             let mixedUsage = SkillUsageStore(skillsDir: mixedDir)
             let mixedCuratorStore = SkillCuratorStore(skillsDir: mixedDir)
@@ -388,7 +371,7 @@ struct SkillCuratorE2ETests {
     // MARK: - Test 74: dryRun Mode
 
     private static func testDryRunModeE2E() async {
-        let tempDir = makeTempDir()
+        let tempDir = makeTempDir(prefix: "e2e-skill-curator")
         defer { cleanup(tempDir) }
 
         do {
@@ -479,7 +462,7 @@ struct SkillCuratorE2ETests {
     // MARK: - Test 75: pause/resume
 
     private static func testPauseResumeE2E() async {
-        let tempDir = makeTempDir()
+        let tempDir = makeTempDir(prefix: "e2e-skill-curator")
         defer { cleanup(tempDir) }
 
         do {
