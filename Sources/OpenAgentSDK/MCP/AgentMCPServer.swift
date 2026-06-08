@@ -136,7 +136,7 @@ public actor AgentMCPServer {
         for tool in tools {
             let toolName = tool.name
             let toolDescription = tool.description
-            let inputSchema = schemaToValue(tool.inputSchema)
+            let inputSchema = schemaToMCPValue(tool.inputSchema)
             let capturedCwd = cwd
 
             // Each tool is already Sendable (ToolProtocol: Sendable)
@@ -150,7 +150,7 @@ public actor AgentMCPServer {
                 ) { (args: [String: Value], context: HandlerContext) async throws -> String in
                     // Convert MCP Value arguments to [String: Any]
                     let inputArgs = args.mapValues { value in
-                        Self.mcpValueToAny(value)
+                        mcpValueToAny(value)
                     }
 
                     // Build ToolContext with cwd and a generated toolUseId for tracing
@@ -223,40 +223,6 @@ public actor AgentMCPServer {
 
     // MARK: - Schema Conversion
 
-    /// Converts a `ToolInputSchema` (`[String: Any]`) to MCP `Value`.
-    ///
-    /// Recursively converts dictionary structures to MCP-compatible `Value` types.
-    private func schemaToValue(_ schema: ToolInputSchema) -> Value {
-        .object(schema.mapValues { Self.anyToMCPValue($0) })
-    }
-
-    /// Recursively converts a plain Swift value to an MCP `Value`.
-    private static func anyToMCPValue(_ value: Any) -> Value {
-        switch value {
-        case is NSNull: return .null
-        case let b as Bool: return .bool(b)
-        case let i as Int: return .int(i)
-        case let d as Double: return .double(d)
-        case let s as String: return .string(s)
-        case let arr as [Any]: return .array(arr.map { anyToMCPValue($0) })
-        case let dict as [String: Any]: return .object(dict.mapValues { anyToMCPValue($0) })
-        default: return .string("\(value)")
-        }
-    }
-
-    /// Recursively converts an MCP `Value` to a plain Swift value.
-    private static func mcpValueToAny(_ value: Value) -> Any {
-        switch value {
-        case .null: return NSNull()
-        case .bool(let b): return b
-        case .int(let i): return i
-        case .double(let d): return d
-        case .string(let s): return s
-        case .array(let arr): return arr.map { mcpValueToAny($0) }
-        case .object(let dict): return dict.mapValues { mcpValueToAny($0) }
-        case .data(_, let data): return data
-        }
-    }
 }
 
 // MARK: - ToolExecutionError

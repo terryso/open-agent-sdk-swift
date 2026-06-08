@@ -536,20 +536,6 @@ public actor MCPClientManager {
             return ["type": "object", "properties": [:] as [String: Any]]
         }
     }
-
-    /// Recursively converts an MCP `Value` to a plain Swift value.
-    private func mcpValueToAny(_ value: MCP.Value) -> Any {
-        switch value {
-        case .null: return NSNull()
-        case .bool(let b): return b
-        case .int(let i): return i
-        case .double(let d): return d
-        case .string(let s): return s
-        case .array(let arr): return arr.map { mcpValueToAny($0) }
-        case .object(let dict): return dict.mapValues { mcpValueToAny($0) }
-        case .data(_, let data): return data
-        }
-    }
 }
 
 // MARK: - MCPClientWrapper
@@ -584,20 +570,6 @@ private struct MCPClientWrapper: MCPClientProtocol, Sendable {
         }
 
         return textParts.joined(separator: "\n")
-    }
-
-    /// Converts a plain Swift value to an MCP `Value`.
-    private func anyToMCPValue(_ value: Any) -> MCP.Value {
-        switch value {
-        case is NSNull: return .null
-        case let b as Bool: return .bool(b)
-        case let i as Int: return .int(i)
-        case let d as Double: return .double(d)
-        case let s as String: return .string(s)
-        case let arr as [Any]: return .array(arr.map { anyToMCPValue($0) })
-        case let dict as [String: Any]: return .object(dict.mapValues { anyToMCPValue($0) })
-        default: return .string("\(value)")
-        }
     }
 }
 
