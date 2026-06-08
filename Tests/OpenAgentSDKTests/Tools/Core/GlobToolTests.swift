@@ -10,24 +10,7 @@ import XCTest
 ///   - The tool matches files by glob pattern and returns sorted paths
 ///   - Custom search directory, empty results, POSIX path resolution work
 /// TDD Phase: RED (feature not implemented yet)
-final class GlobToolTests: XCTestCase {
-
-    var tempDir: String!
-
-    override func setUp() {
-        super.setUp()
-        tempDir = NSTemporaryDirectory()
-            .appending("OpenAgentSDKTests-Glob-\(UUID().uuidString)")
-        try! FileManager.default.createDirectory(
-            atPath: tempDir,
-            withIntermediateDirectories: true
-        )
-    }
-
-    override func tearDown() {
-        try? FileManager.default.removeItem(atPath: tempDir)
-        super.tearDown()
-    }
+final class GlobToolTests: TempDirTestCase {
 
     // MARK: - Helpers
 
