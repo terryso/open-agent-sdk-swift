@@ -1545,30 +1545,12 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                         // by assigning to `response` and continuing below
                         turnCount += 1
                         if let usage = fallbackResponse["usage"] as? [String: Any] {
-                            let turnUsage = TokenUsage(
-                                inputTokens: usage["input_tokens"] as? Int ?? 0,
-                                outputTokens: usage["output_tokens"] as? Int ?? 0
-                            )
-                            totalUsage = totalUsage + turnUsage
-                            let turnCost = estimateCost(model: fallbackModel, usage: turnUsage)
-                            totalCostUsd += turnCost
-                            costTracker.recordUsage(model: fallbackModel, usage: turnUsage)
-                            await Self.emitLLMCostEvent(
-                                eventBus: options.eventBus,
-                                sessionId: resolvedSessionId,
-                                model: fallbackModel,
-                                inputTokens: turnUsage.inputTokens,
-                                outputTokens: turnUsage.outputTokens,
-                                cacheUsage: usage,
-                                estimatedCostUsd: turnCost
-                            )
-                            Self.recordCostBreakdown(
-                                costByModel: &costByModel,
-                                model: fallbackModel,
-                                label: options.agentLabel,
-                                inputTokens: turnUsage.inputTokens,
-                                outputTokens: turnUsage.outputTokens,
-                                cost: turnCost
+                            await Self.trackTurnCost(
+                                usage: usage, model: fallbackModel,
+                                totalUsage: &totalUsage, totalCostUsd: &totalCostUsd,
+                                costByModel: &costByModel, costTracker: &costTracker,
+                                eventBus: options.eventBus, sessionId: resolvedSessionId,
+                                agentLabel: options.agentLabel
                             )
                         }
                         let content = fallbackResponse["content"]
@@ -1669,31 +1651,12 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
 
             // Parse usage from response
             if let usage = response["usage"] as? [String: Any] {
-                let turnUsage = TokenUsage(
-                    inputTokens: usage["input_tokens"] as? Int ?? 0,
-                    outputTokens: usage["output_tokens"] as? Int ?? 0
-                )
-                totalUsage = totalUsage + turnUsage
-                let turnCost = estimateCost(model: model, usage: turnUsage)
-                totalCostUsd += turnCost
-                costTracker.recordUsage(model: model, usage: turnUsage)
-                await Self.emitLLMCostEvent(
-                    eventBus: options.eventBus,
-                    sessionId: resolvedSessionId,
-                    model: model,
-                    inputTokens: turnUsage.inputTokens,
-                    outputTokens: turnUsage.outputTokens,
-                    cacheUsage: usage,
-                    estimatedCostUsd: turnCost
-                )
-                // Track per-model cost breakdown
-                Self.recordCostBreakdown(
-                    costByModel: &costByModel,
-                    model: model,
-                    label: options.agentLabel,
-                    inputTokens: turnUsage.inputTokens,
-                    outputTokens: turnUsage.outputTokens,
-                    cost: turnCost
+                await Self.trackTurnCost(
+                    usage: usage, model: model,
+                    totalUsage: &totalUsage, totalCostUsd: &totalCostUsd,
+                    costByModel: &costByModel, costTracker: &costTracker,
+                    eventBus: options.eventBus, sessionId: resolvedSessionId,
+                    agentLabel: options.agentLabel
                 )
             }
 
@@ -2319,34 +2282,16 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                             switch event {
                             case .messageStart(let message):
                                 currentModel = message["model"] as? String ?? capturedModel
-                                // Extract input_tokens from the nested message.usage object
-                                if let msgUsage = message["usage"] as? [String: Any] {
-                                    let inputTokens = msgUsage["input_tokens"] as? Int ?? 0
-                                    totalUsage = totalUsage + TokenUsage(
-                                        inputTokens: inputTokens,
-                                        outputTokens: 0
-                                    )
-                                    // Calculate cost for input tokens at message start
-                                    let turnCost = estimateCost(model: currentModel, usage: TokenUsage(inputTokens: inputTokens, outputTokens: 0))
-                                    totalCostUsd += turnCost
-                                    streamCostTracker.recordUsage(model: currentModel, usage: TokenUsage(inputTokens: inputTokens, outputTokens: 0))
-                                    await Self.emitLLMCostEvent(
-                                        eventBus: capturedEventBus,
-                                        sessionId: resolvedSessionId,
-                                        model: currentModel,
-                                        inputTokens: inputTokens,
-                                        outputTokens: 0,
-                                        cacheUsage: msgUsage,
-                                        estimatedCostUsd: turnCost
-                                    )
-                                    // Track per-model cost breakdown
-                                    Self.recordCostBreakdown(
-                                        costByModel: &costByModel,
-                                        model: currentModel,
-                                        label: capturedAgentLabel,
-                                        inputTokens: inputTokens,
-                                        outputTokens: 0,
-                                        cost: turnCost
+                                // Extract input_tokens from the nested message.usage object.
+                                // messageStart only tracks input tokens; output tokens arrive in messageDelta.
+                                if var msgUsage = message["usage"] as? [String: Any] {
+                                    msgUsage["output_tokens"] = 0
+                                    await Self.trackTurnCost(
+                                        usage: msgUsage, model: currentModel,
+                                        totalUsage: &totalUsage, totalCostUsd: &totalCostUsd,
+                                        costByModel: &costByModel, costTracker: &streamCostTracker,
+                                        eventBus: capturedEventBus, sessionId: resolvedSessionId,
+                                        agentLabel: capturedAgentLabel
                                     )
                                 }
 
@@ -2426,31 +2371,12 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
 
                             case .messageDelta(let delta, let usage):
                                 currentStopReason = delta["stop_reason"] as? String ?? ""
-                                let turnUsage = TokenUsage(
-                                    inputTokens: usage["input_tokens"] as? Int ?? 0,
-                                    outputTokens: usage["output_tokens"] as? Int ?? 0
-                                )
-                                totalUsage = totalUsage + turnUsage
-                                let turnCost = estimateCost(model: currentModel, usage: turnUsage)
-                                totalCostUsd += turnCost
-                                streamCostTracker.recordUsage(model: currentModel, usage: turnUsage)
-                                await Self.emitLLMCostEvent(
-                                    eventBus: capturedEventBus,
-                                    sessionId: resolvedSessionId,
-                                    model: currentModel,
-                                    inputTokens: turnUsage.inputTokens,
-                                    outputTokens: turnUsage.outputTokens,
-                                    cacheUsage: usage,
-                                    estimatedCostUsd: turnCost
-                                )
-                                // Track per-model cost breakdown
-                                Self.recordCostBreakdown(
-                                    costByModel: &costByModel,
-                                    model: currentModel,
-                                    label: capturedAgentLabel,
-                                    inputTokens: turnUsage.inputTokens,
-                                    outputTokens: turnUsage.outputTokens,
-                                    cost: turnCost
+                                await Self.trackTurnCost(
+                                    usage: usage, model: currentModel,
+                                    totalUsage: &totalUsage, totalCostUsd: &totalCostUsd,
+                                    costByModel: &costByModel, costTracker: &streamCostTracker,
+                                    eventBus: capturedEventBus, sessionId: resolvedSessionId,
+                                    agentLabel: capturedAgentLabel
                                 )
 
                                 // Check budget after cost accumulation via CostTracker + inline fallback
@@ -3425,10 +3351,51 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
     /// The API returns content as an array of blocks, each with a `type` field.
     /// This helper filters for `type == "text"` blocks and joins their text content.
     /// - Parameter content: The raw content value from the API response.
+    /// Track turn-level cost: parse usage → accumulate totals → emit events → record breakdown.
+    ///
+    /// Centralizes the cost-tracking pipeline duplicated at 4 sites: promptImpl fallback model,
+    /// promptImpl main loop, stream messageStart, and stream messageDelta.
+    private static func trackTurnCost(
+        usage: [String: Any],
+        model: String,
+        totalUsage: inout TokenUsage,
+        totalCostUsd: inout Double,
+        costByModel: inout [String: CostBreakdownEntry],
+        costTracker: inout CostTracker,
+        eventBus: EventBus?,
+        sessionId: String?,
+        agentLabel: String?
+    ) async {
+        let turnUsage = TokenUsage(
+            inputTokens: usage["input_tokens"] as? Int ?? 0,
+            outputTokens: usage["output_tokens"] as? Int ?? 0
+        )
+        totalUsage = totalUsage + turnUsage
+        let turnCost = estimateCost(model: model, usage: turnUsage)
+        totalCostUsd += turnCost
+        costTracker.recordUsage(model: model, usage: turnUsage)
+        await Self.emitLLMCostEvent(
+            eventBus: eventBus,
+            sessionId: sessionId,
+            model: model,
+            inputTokens: turnUsage.inputTokens,
+            outputTokens: turnUsage.outputTokens,
+            cacheUsage: usage,
+            estimatedCostUsd: turnCost
+        )
+        Self.recordCostBreakdown(
+            costByModel: &costByModel,
+            model: model,
+            label: agentLabel,
+            inputTokens: turnUsage.inputTokens,
+            outputTokens: turnUsage.outputTokens,
+            cost: turnCost
+        )
+    }
+
     /// Publish an `LLMCostEvent` to the event bus (no-op when bus is nil).
     ///
-    /// Centralizes the 8-field LLMCostEvent construction that is duplicated at 4 cost-tracking
-    /// sites across promptImpl (fallback model path, main loop) and stream (messageStart, messageDelta).
+    /// Centralizes the 8-field LLMCostEvent construction used by ``trackTurnCost``.
     private static func emitLLMCostEvent(
         eventBus: EventBus?,
         sessionId: String?,
