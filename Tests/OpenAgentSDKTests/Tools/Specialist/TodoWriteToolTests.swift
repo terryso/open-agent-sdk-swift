@@ -24,7 +24,7 @@ final class TodoWriteToolTests: XCTestCase {
     }
 
     /// Creates a ToolContext without any TodoStore (nil).
-    private func makeContextWithoutStore() -> ToolContext {
+    private func makeTestToolContext() -> ToolContext {
         return ToolContext(
             cwd: "/tmp",
             toolUseId: "test-tool-use-id"
@@ -356,7 +356,7 @@ final class TodoWriteToolTests: XCTestCase {
     /// AC7 [P0]: All actions return error when todoStore is nil -- add.
     func testTodoWrite_add_nilTodoStore_returnsError() async throws {
         let tool = createTodoWriteTool()
-        let context = makeContextWithoutStore()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = [
             "action": "add",
@@ -372,7 +372,7 @@ final class TodoWriteToolTests: XCTestCase {
     /// AC7 [P0]: All actions return error when todoStore is nil -- toggle.
     func testTodoWrite_toggle_nilTodoStore_returnsError() async throws {
         let tool = createTodoWriteTool()
-        let context = makeContextWithoutStore()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = [
             "action": "toggle",
@@ -388,7 +388,7 @@ final class TodoWriteToolTests: XCTestCase {
     /// AC7 [P0]: All actions return error when todoStore is nil -- remove.
     func testTodoWrite_remove_nilTodoStore_returnsError() async throws {
         let tool = createTodoWriteTool()
-        let context = makeContextWithoutStore()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = [
             "action": "remove",
@@ -404,7 +404,7 @@ final class TodoWriteToolTests: XCTestCase {
     /// AC7 [P0]: All actions return error when todoStore is nil -- list.
     func testTodoWrite_list_nilTodoStore_returnsError() async throws {
         let tool = createTodoWriteTool()
-        let context = makeContextWithoutStore()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = [
             "action": "list"
@@ -419,7 +419,7 @@ final class TodoWriteToolTests: XCTestCase {
     /// AC7 [P0]: All actions return error when todoStore is nil -- clear.
     func testTodoWrite_clear_nilTodoStore_returnsError() async throws {
         let tool = createTodoWriteTool()
-        let context = makeContextWithoutStore()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = [
             "action": "clear"
@@ -511,7 +511,7 @@ final class TodoWriteToolTests: XCTestCase {
     /// AC11 [P0]: TodoWrite never throws -- always returns ToolResult even with malformed input.
     func testTodoWrite_neverThrows_malformedInput() async throws {
         let tool = createTodoWriteTool()
-        let context = makeContextWithoutStore()
+        let context = makeTestToolContext()
 
         let badInputs: [[String: Any]] = [
             [:],                          // empty dict (missing required action)
