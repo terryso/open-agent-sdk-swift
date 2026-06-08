@@ -434,7 +434,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
 
         // 4. Persist compacted messages back to session store
         let metadata = PartialSessionMetadata(
-            cwd: options.cwd ?? FileManager.default.currentDirectoryPath,
+            cwd: options.resolvedCwd,
             model: model,
             summary: nil
         )
@@ -855,7 +855,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
             let existing = try? await sessionStore.load(sessionId: sessionId)
             if existing == nil {
                 let metadata = PartialSessionMetadata(
-                    cwd: options.cwd ?? FileManager.default.currentDirectoryPath,
+                    cwd: options.resolvedCwd,
                     model: model,
                     summary: nil
                 )
@@ -1160,7 +1160,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
         } else {
             basePrompt = options.systemPrompt
         }
-        let cwd = options.cwd ?? FileManager.default.currentDirectoryPath
+        let cwd = options.resolvedCwd
         let gitContext = gitContextCollector.collectGitContext(
             cwd: cwd,
             ttl: options.gitCacheTTL
@@ -1593,7 +1593,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                         messages: messages,
                         sessionId: sessionId,
                         sessionStore: sessionStore,
-                        cwd: options.cwd ?? FileManager.default.currentDirectoryPath,
+                        cwd: options.resolvedCwd,
                         model: model,
                         eventBus: options.eventBus
                     )
@@ -1724,7 +1724,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                         toolUseBlocks: toolUseBlocks,
                         tools: registeredTools,
                         context: Self.buildToolContext(
-                            cwd: options.cwd ?? FileManager.default.currentDirectoryPath,
+                            cwd: options.resolvedCwd,
                             sessionId: resolvedSessionId,
                             agentSpawner: spawner,
                             mailboxStore: options.mailboxStore,
@@ -1924,7 +1924,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
         let capturedClient = client
         let capturedMaxBudgetUsd = options.maxBudgetUsd
         let capturedToolProtocols: [ToolProtocol] = options.tools ?? []
-        let capturedCwd = options.cwd ?? FileManager.default.currentDirectoryPath
+        let capturedCwd = options.resolvedCwd
         let capturedRetryConfig = options.retryConfig ?? RetryConfig.default
         let capturedApiKey = options.apiKey ?? ""
         let capturedBaseURL = options.baseURL

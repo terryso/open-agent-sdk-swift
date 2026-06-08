@@ -494,6 +494,14 @@ public struct AgentOptions: Sendable {
     /// Defaults to `false` — high-frequency events, enable only for TUI scenarios.
     public var emitTokenStream: Bool
 
+    /// Resolved working directory, falling back to the process current directory.
+    ///
+    /// Eliminates the need to repeat `cwd ?? FileManager.default.currentDirectoryPath`
+    /// at every call site that needs a concrete working directory path.
+    public var resolvedCwd: String {
+        cwd ?? FileManager.default.currentDirectoryPath
+    }
+
     // MARK: - Memberwise Init
 
     public init(
