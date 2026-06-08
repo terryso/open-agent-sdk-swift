@@ -3,6 +3,18 @@ import XCTest
 
 final class MemoryFactTests: XCTestCase {
 
+    private static let testEncoder: JSONEncoder = {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        return encoder
+    }()
+
+    private static let testDecoder: JSONDecoder = {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return decoder
+    }()
+
     // MARK: - Deterministic ID Generation
 
     func testSameInputProducesSameId() {
@@ -94,13 +106,9 @@ final class MemoryFactTests: XCTestCase {
             source: .observation, kind: .avoid,
             createdAt: now, lastVerifiedAt: now
         )
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        let data = try encoder.encode(fact)
+        let data = try Self.testEncoder.encode(fact)
 
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        let decoded = try decoder.decode(MemoryFact.self, from: data)
+        let decoded = try Self.testDecoder.decode(MemoryFact.self, from: data)
 
         XCTAssertEqual(decoded.id, fact.id)
         XCTAssertEqual(decoded.domain, fact.domain)
