@@ -185,6 +185,12 @@ internal func resolveMemoryDir(customDir: String?) -> String {
 /// The default sessions directory path (`~/.open-agent-sdk/sessions`).
 internal let defaultSessionsDir: String = (defaultHomeDir as NSString).appendingPathComponent(".open-agent-sdk/sessions")
 
+/// The default traces directory path (`~/.open-agent-sdk/traces`).
+internal let defaultTracesDir: String = (defaultHomeDir as NSString).appendingPathComponent(".open-agent-sdk/traces")
+
+/// The default API runs directory path (`~/.open-agent-sdk/api-runs`).
+internal let defaultApiRunsDir: String = (defaultHomeDir as NSString).appendingPathComponent(".open-agent-sdk/api-runs")
+
 /// Resolve the sessions directory from a custom path or the default.
 ///
 /// - Parameter customDir: Optional custom directory path. Falls back to ``defaultSessionsDir``.
@@ -278,4 +284,38 @@ internal func jsonStringify(_ value: Any?, quoteStrings: Bool = true) -> String 
 public func getDefaultOpenAIBaseURL(from dotEnv: [String: String] = [:]) -> String {
     getEnv("CODEANY_BASE_URL", from: dotEnv)
         ?? "https://open.bigmodel.cn/api/coding/paas/v4"
+}
+
+// MARK: - YAML Helpers
+
+/// Escape special characters in a string for safe inclusion in a YAML double-quoted value.
+///
+/// Escapes backslashes, double quotes, and newlines.
+///
+/// - Parameter value: The string to escape.
+/// - Returns: The escaped string (without surrounding quotes).
+internal func yamlEscape(_ value: String) -> String {
+    value
+        .replacingOccurrences(of: "\\", with: "\\\\")
+        .replacingOccurrences(of: "\"", with: "\\\"")
+        .replacingOccurrences(of: "\n", with: "\\n")
+}
+
+/// Quote a YAML value, wrapping in double quotes if it contains special characters.
+///
+/// Wraps the value in double quotes (with escaping) when it contains characters that
+/// would be ambiguous in unquoted YAML context (`:`, `#`, quotes, leading/trailing spaces)
+/// or is a YAML reserved word (`true`, `false`, `null`, `yes`, `no`, `on`, `off`, `y`, `n`)
+/// or is empty. Otherwise returns the value unquoted.
+///
+/// - Parameter value: The string to quote.
+/// - Returns: The safely quoted or unquoted YAML value string.
+internal func yamlQuote(_ value: String) -> String {
+    let yamlReserved: Set<String> = ["true", "false", "null", "yes", "no", "on", "off", "y", "n"]
+    if value.contains(":") || value.contains("#") || value.contains("'") || value.contains("\"")
+        || value.contains("\n") || yamlReserved.contains(value.lowercased()) || value.isEmpty
+        || value.hasPrefix(" ") || value.hasSuffix(" ") {
+        return "\"\(yamlEscape(value))\""
+    }
+    return value
 }
