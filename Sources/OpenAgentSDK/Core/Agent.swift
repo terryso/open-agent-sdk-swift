@@ -1604,12 +1604,13 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                                     estimatedCostUsd: turnCost
                                 ))
                             }
-                            costByModel[fallbackModel] = CostBreakdownEntry(
-                                label: options.agentLabel,
+                            Self.recordCostBreakdown(
+                                costByModel: &costByModel,
                                 model: fallbackModel,
+                                label: options.agentLabel,
                                 inputTokens: turnUsage.inputTokens,
                                 outputTokens: turnUsage.outputTokens,
-                                costUsd: turnCost
+                                cost: turnCost
                             )
                         }
                         let content = fallbackResponse["content"]
@@ -1659,23 +1660,14 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                 }
                 // Session auto-save on error: persist whatever messages we have so far
                 if let sessionStore = options.sessionStore, let sessionId = resolvedSessionId, options.persistSession {
-                    let metadata = PartialSessionMetadata(
+                    await Self.saveSessionMessages(
+                        messages: messages,
+                        sessionId: sessionId,
+                        sessionStore: sessionStore,
                         cwd: options.cwd ?? FileManager.default.currentDirectoryPath,
                         model: model,
-                        summary: nil
+                        eventBus: options.eventBus
                     )
-                    if let messagesData = try? JSONSerialization.data(withJSONObject: messages, options: []),
-                       let deserializedMessages = try? JSONSerialization.jsonObject(with: messagesData, options: []) as? [[String: Any]] {
-                        let savedMessageCount = deserializedMessages.count
-                        try? await sessionStore.save(sessionId: sessionId, messages: deserializedMessages, metadata: metadata)
-                        // Emit SessionAutoSavedEvent on error path (zero-overhead when eventBus is nil)
-                        if let eventBus = options.eventBus {
-                            await eventBus.publish(SessionAutoSavedEvent(
-                                sessionId: resolvedSessionId,
-                                messageCount: savedMessageCount
-                            ))
-                        }
-                    }
                 }
                 // Hook: stop — trigger on error path (loop terminated by exception)
                 if let hookRegistry = options.hookRegistry {
@@ -1752,27 +1744,14 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                     ))
                 }
                 // Track per-model cost breakdown
-                let currentModel = model
-                if var existing = costByModel[currentModel] {
-                    let newInput = existing.inputTokens + turnUsage.inputTokens
-                    let newOutput = existing.outputTokens + turnUsage.outputTokens
-                    let newCost = existing.costUsd + turnCost
-                    costByModel[currentModel] = CostBreakdownEntry(
-                        label: options.agentLabel,
-                        model: currentModel,
-                        inputTokens: newInput,
-                        outputTokens: newOutput,
-                        costUsd: newCost
-                    )
-                } else {
-                    costByModel[currentModel] = CostBreakdownEntry(
-                        label: options.agentLabel,
-                        model: currentModel,
-                        inputTokens: turnUsage.inputTokens,
-                        outputTokens: turnUsage.outputTokens,
-                        costUsd: turnCost
-                    )
-                }
+                Self.recordCostBreakdown(
+                    costByModel: &costByModel,
+                    model: model,
+                    label: options.agentLabel,
+                    inputTokens: turnUsage.inputTokens,
+                    outputTokens: turnUsage.outputTokens,
+                    cost: turnCost
+                )
             }
 
             // Structured log for LLM response
@@ -1965,24 +1944,14 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
 
         // Session auto-save: persist updated messages if sessionStore is configured and persistSession is true
         if let sessionStore = options.sessionStore, let sessionId = resolvedSessionId, options.persistSession {
-            let metadata = PartialSessionMetadata(
+            await Self.saveSessionMessages(
+                messages: messages,
+                sessionId: sessionId,
+                sessionStore: sessionStore,
                 cwd: options.cwd ?? "",
                 model: model,
-                summary: nil
+                eventBus: options.eventBus
             )
-            // Serialize messages to Data for Sendable compliance when crossing actor boundary
-            if let messagesData = try? JSONSerialization.data(withJSONObject: messages, options: []),
-               let deserializedMessages = try? JSONSerialization.jsonObject(with: messagesData, options: []) as? [[String: Any]] {
-                let savedMessageCount = deserializedMessages.count
-                try? await sessionStore.save(sessionId: sessionId, messages: deserializedMessages, metadata: metadata)
-                // Emit SessionAutoSavedEvent (zero-overhead when eventBus is nil)
-                if let eventBus = options.eventBus {
-                    await eventBus.publish(SessionAutoSavedEvent(
-                        sessionId: resolvedSessionId,
-                        messageCount: savedMessageCount
-                    ))
-                }
-            }
         }
 
         // Hook: sessionEnd — trigger before returning the result
@@ -2474,24 +2443,14 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                                         ))
                                     }
                                     // Track per-model cost breakdown
-                                    let modelKey = currentModel
-                                    if var existing = costByModel[modelKey] {
-                                        costByModel[modelKey] = CostBreakdownEntry(
-                                            label: capturedAgentLabel,
-                                            model: modelKey,
-                                            inputTokens: existing.inputTokens + inputTokens,
-                                            outputTokens: existing.outputTokens,
-                                            costUsd: existing.costUsd + turnCost
-                                        )
-                                    } else {
-                                        costByModel[modelKey] = CostBreakdownEntry(
-                                            label: capturedAgentLabel,
-                                            model: modelKey,
-                                            inputTokens: inputTokens,
-                                            outputTokens: 0,
-                                            costUsd: turnCost
-                                        )
-                                    }
+                                    Self.recordCostBreakdown(
+                                        costByModel: &costByModel,
+                                        model: currentModel,
+                                        label: capturedAgentLabel,
+                                        inputTokens: inputTokens,
+                                        outputTokens: 0,
+                                        cost: turnCost
+                                    )
                                 }
 
                                 // Check budget after input token cost accumulation
@@ -2622,24 +2581,14 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                                     ))
                                 }
                                 // Track per-model cost breakdown
-                                let modelKey = currentModel
-                                if var existing = costByModel[modelKey] {
-                                    costByModel[modelKey] = CostBreakdownEntry(
-                                        label: capturedAgentLabel,
-                                        model: modelKey,
-                                        inputTokens: existing.inputTokens + turnUsage.inputTokens,
-                                        outputTokens: existing.outputTokens + turnUsage.outputTokens,
-                                        costUsd: existing.costUsd + turnCost
-                                    )
-                                } else {
-                                    costByModel[modelKey] = CostBreakdownEntry(
-                                        label: capturedAgentLabel,
-                                        model: modelKey,
-                                        inputTokens: turnUsage.inputTokens,
-                                        outputTokens: turnUsage.outputTokens,
-                                        costUsd: turnCost
-                                    )
-                                }
+                                Self.recordCostBreakdown(
+                                    costByModel: &costByModel,
+                                    model: currentModel,
+                                    label: capturedAgentLabel,
+                                    inputTokens: turnUsage.inputTokens,
+                                    outputTokens: turnUsage.outputTokens,
+                                    cost: turnCost
+                                )
 
                                 // Check budget after cost accumulation via CostTracker + inline fallback
                                 let deltaBudgetResult = streamCostTracker.checkBudget()
@@ -3098,24 +3047,14 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                 // reused across stream() calls. Cleanup happens in agent.close().
                 // Session auto-save: persist updated messages if sessionStore is configured and persistSession is true
                 if let sessionStore = capturedSessionStore, let sessionId = resolvedSessionId, capturedPersistSession {
-                    let metadata = PartialSessionMetadata(
+                    await Self.saveSessionMessages(
+                        messages: messages,
+                        sessionId: sessionId,
+                        sessionStore: sessionStore,
                         cwd: capturedCwd,
                         model: capturedModel,
-                        summary: nil
+                        eventBus: capturedEventBus
                     )
-                    // Serialize messages to Data for Sendable compliance when crossing actor boundary
-                    if let messagesData = try? JSONSerialization.data(withJSONObject: messages, options: []),
-                       let deserializedMessages = try? JSONSerialization.jsonObject(with: messagesData, options: []) as? [[String: Any]] {
-                        let savedMessageCount = deserializedMessages.count
-                        try? await sessionStore.save(sessionId: sessionId, messages: deserializedMessages, metadata: metadata)
-                        // Emit SessionAutoSavedEvent (zero-overhead when capturedEventBus is nil)
-                        if let eventBus = capturedEventBus {
-                            await eventBus.publish(SessionAutoSavedEvent(
-                                sessionId: resolvedSessionId,
-                                messageCount: savedMessageCount
-                            ))
-                        }
-                    }
                 }
                 // Hook: sessionEnd — trigger before finishing the stream
                 if let hookRegistry = capturedHookRegistry {
@@ -3449,6 +3388,63 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                 .compactMap { $0["text"] as? String }
                 .joined()
         }.joined(separator: separator)
+    }
+
+    /// Record cost breakdown for a model, accumulating into an existing entry if present.
+    ///
+    /// Centralizes the `costByModel` dictionary update pattern used in both `promptImpl`
+    /// and `stream` to avoid duplicated if-else branching at every cost tracking site.
+    private static func recordCostBreakdown(
+        costByModel: inout [String: CostBreakdownEntry],
+        model: String,
+        label: String?,
+        inputTokens: Int,
+        outputTokens: Int,
+        cost: Double
+    ) {
+        if var existing = costByModel[model] {
+            costByModel[model] = CostBreakdownEntry(
+                label: label,
+                model: model,
+                inputTokens: existing.inputTokens + inputTokens,
+                outputTokens: existing.outputTokens + outputTokens,
+                costUsd: existing.costUsd + cost
+            )
+        } else {
+            costByModel[model] = CostBreakdownEntry(
+                label: label,
+                model: model,
+                inputTokens: inputTokens,
+                outputTokens: outputTokens,
+                costUsd: cost
+            )
+        }
+    }
+
+    /// Persist conversation messages to session storage and emit a SessionAutoSavedEvent.
+    ///
+    /// Centralizes the serialize → save → emit pattern used at session auto-save points
+    /// in both `promptImpl` (error and success paths) and `stream`.
+    private static func saveSessionMessages(
+        messages: [[String: Any]],
+        sessionId: String,
+        sessionStore: SessionStore,
+        cwd: String,
+        model: String,
+        eventBus: EventBus?
+    ) async {
+        let metadata = PartialSessionMetadata(cwd: cwd, model: model, summary: nil)
+        // Serialize messages to Data for Sendable compliance when crossing actor boundary
+        guard let messagesData = try? JSONSerialization.data(withJSONObject: messages, options: []),
+              let deserializedMessages = try? JSONSerialization.jsonObject(with: messagesData, options: []) as? [[String: Any]] else { return }
+        let savedMessageCount = deserializedMessages.count
+        try? await sessionStore.save(sessionId: sessionId, messages: deserializedMessages, metadata: metadata)
+        if let eventBus {
+            await eventBus.publish(SessionAutoSavedEvent(
+                sessionId: sessionId,
+                messageCount: savedMessageCount
+            ))
+        }
     }
 
     /// Extract plain text from Anthropic API response content blocks.
