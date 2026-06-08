@@ -29,7 +29,7 @@ final class RetryMockURLProtocol: URLProtocol {
         // Capture request with body
         var capturedRequest = request
         if capturedRequest.httpBody == nil, let stream = capturedRequest.httpBodyStream {
-            capturedRequest.httpBody = Self.readBodyFromStream(stream)
+            capturedRequest.httpBody = readRequestBodyFromStream(stream)
         }
 
         RetryMockURLProtocol.allRequests.append(capturedRequest)
@@ -57,21 +57,6 @@ final class RetryMockURLProtocol: URLProtocol {
             )
             client?.urlProtocol(self, didFailWithError: error)
         }
-    }
-
-    private static func readBodyFromStream(_ stream: InputStream) -> Data? {
-        stream.open()
-        defer { stream.close() }
-        let bufferSize = 4096
-        var data = Data()
-        var buffer = [UInt8](repeating: 0, count: bufferSize)
-        while stream.hasBytesAvailable {
-            let bytesRead = stream.read(&buffer, maxLength: bufferSize)
-            if bytesRead < 0 { return nil }
-            if bytesRead == 0 { break }
-            data.append(buffer, count: bytesRead)
-        }
-        return data
     }
 
     override func stopLoading() {}
@@ -109,7 +94,7 @@ final class RetryStreamMockURLProtocol: URLProtocol {
     override func startLoading() {
         var capturedRequest = request
         if capturedRequest.httpBody == nil, let stream = capturedRequest.httpBodyStream {
-            capturedRequest.httpBody = Self.readBodyFromStream(stream)
+            capturedRequest.httpBody = readRequestBodyFromStream(stream)
         }
 
         RetryStreamMockURLProtocol.allRequests.append(capturedRequest)
@@ -139,21 +124,6 @@ final class RetryStreamMockURLProtocol: URLProtocol {
         }
     }
 
-    private static func readBodyFromStream(_ stream: InputStream) -> Data? {
-        stream.open()
-        defer { stream.close() }
-        let bufferSize = 4096
-        var data = Data()
-        var buffer = [UInt8](repeating: 0, count: bufferSize)
-        while stream.hasBytesAvailable {
-            let bytesRead = stream.read(&buffer, maxLength: bufferSize)
-            if bytesRead < 0 { return nil }
-            if bytesRead == 0 { break }
-            data.append(buffer, count: bytesRead)
-        }
-        return data
-    }
-
     override func stopLoading() {}
 
     static func reset() {
@@ -173,9 +143,7 @@ extension XCTestCase {
         model: String = "claude-sonnet-4-6",
         maxTurns: Int = 10
     ) -> Agent {
-        let sessionConfig = URLSessionConfiguration.ephemeral
-        sessionConfig.protocolClasses = [RetryMockURLProtocol.self]
-        let urlSession = URLSession(configuration: sessionConfig)
+        let urlSession = makeMockURLSession(protocolClass: RetryMockURLProtocol.self)
         let client = AnthropicClient(apiKey: apiKey, baseURL: nil, urlSession: urlSession)
 
         let options = AgentOptions(
@@ -195,9 +163,7 @@ extension XCTestCase {
         model: String = "claude-sonnet-4-6",
         maxTurns: Int = 10
     ) -> Agent {
-        let sessionConfig = URLSessionConfiguration.ephemeral
-        sessionConfig.protocolClasses = [RetryStreamMockURLProtocol.self]
-        let urlSession = URLSession(configuration: sessionConfig)
+        let urlSession = makeMockURLSession(protocolClass: RetryStreamMockURLProtocol.self)
         let client = AnthropicClient(apiKey: apiKey, baseURL: nil, urlSession: urlSession)
 
         let options = AgentOptions(

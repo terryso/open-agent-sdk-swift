@@ -189,9 +189,7 @@ private extension XCTestCase {
         logLevel: LogLevel = .debug,
         capture: LogCapture
     ) -> Agent {
-        let sessionConfig = URLSessionConfiguration.ephemeral
-        sessionConfig.protocolClasses = [StructuredLogMockURLProtocol.self]
-        let urlSession = URLSession(configuration: sessionConfig)
+        let urlSession = makeMockURLSession(protocolClass: StructuredLogMockURLProtocol.self)
 
         let client = AnthropicClient(apiKey: "sk-test-structured-log", baseURL: nil, urlSession: urlSession)
 
@@ -514,9 +512,7 @@ final class CompactLogTests: XCTestCase {
     func testCompactLogging_ContainsRequiredDataFields() async throws {
         configureLogCapture(capture)
 
-        let sessionConfig = URLSessionConfiguration.ephemeral
-        sessionConfig.protocolClasses = [CompactMockURLProtocol.self]
-        let urlSession = URLSession(configuration: sessionConfig)
+        let urlSession = makeMockURLSession(protocolClass: CompactMockURLProtocol.self)
 
         let client = AnthropicClient(apiKey: "sk-test", baseURL: nil, urlSession: urlSession)
 
@@ -569,9 +565,7 @@ final class CompactLogTests: XCTestCase {
     func testCompactLogging_LevelIsInfo() async throws {
         configureLogCapture(capture)
 
-        let sessionConfig = URLSessionConfiguration.ephemeral
-        sessionConfig.protocolClasses = [CompactMockURLProtocol.self]
-        let urlSession = URLSession(configuration: sessionConfig)
+        let urlSession = makeMockURLSession(protocolClass: CompactMockURLProtocol.self)
 
         let client = AnthropicClient(apiKey: "sk-test", baseURL: nil, urlSession: urlSession)
 
@@ -617,9 +611,7 @@ final class CompactLogTests: XCTestCase {
     func testCompactLogging_TriggerIsAuto() async throws {
         configureLogCapture(capture)
 
-        let sessionConfig = URLSessionConfiguration.ephemeral
-        sessionConfig.protocolClasses = [CompactMockURLProtocol.self]
-        let urlSession = URLSession(configuration: sessionConfig)
+        let urlSession = makeMockURLSession(protocolClass: CompactMockURLProtocol.self)
 
         let client = AnthropicClient(apiKey: "sk-test", baseURL: nil, urlSession: urlSession)
 

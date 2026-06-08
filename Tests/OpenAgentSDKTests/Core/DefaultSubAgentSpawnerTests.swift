@@ -44,9 +44,7 @@ final class DefaultSubAgentSpawnerTests: XCTestCase {
 
     /// Creates a mock AnthropicClient that returns 401 without real network I/O.
     private func makeMockClient() -> AnthropicClient {
-        let sessionConfig = URLSessionConfiguration.ephemeral
-        sessionConfig.protocolClasses = [SpawnerMockURLProtocol.self]
-        let urlSession = URLSession(configuration: sessionConfig)
+        let urlSession = makeMockURLSession(protocolClass: SpawnerMockURLProtocol.self)
         return AnthropicClient(apiKey: "test-key", baseURL: nil, urlSession: urlSession)
     }
 

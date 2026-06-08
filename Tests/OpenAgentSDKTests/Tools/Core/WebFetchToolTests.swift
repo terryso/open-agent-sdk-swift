@@ -11,11 +11,7 @@ final class WebFetchToolTests: XCTestCase {
     // MARK: - Helpers
 
     /// Creates a URLSession backed by the shared MockURLProtocol.
-    private func makeMockSession() -> URLSession {
-        let config = URLSessionConfiguration.ephemeral
-        config.protocolClasses = [MockURLProtocol.self]
-        return URLSession(configuration: config)
-    }
+    private func makeMockSession() -> URLSession { makeMockURLSession(protocolClass: MockURLProtocol.self) }
 
     /// Creates the WebFetch tool with a mock URLSession.
     private func makeWebFetchTool() -> ToolProtocol {

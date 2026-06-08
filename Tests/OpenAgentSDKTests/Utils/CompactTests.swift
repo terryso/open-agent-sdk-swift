@@ -252,7 +252,7 @@ final class CompactMockURLProtocol: URLProtocol {
     override func startLoading() {
         var capturedRequest = request
         if capturedRequest.httpBody == nil, let stream = capturedRequest.httpBodyStream {
-            capturedRequest.httpBody = Self.readBodyFromStream(stream)
+            capturedRequest.httpBody = readRequestBodyFromStream(stream)
         }
 
         CompactMockURLProtocol.allRequests.append(capturedRequest)
@@ -282,21 +282,6 @@ final class CompactMockURLProtocol: URLProtocol {
         }
     }
 
-    private static func readBodyFromStream(_ stream: InputStream) -> Data? {
-        stream.open()
-        defer { stream.close() }
-        let bufferSize = 4096
-        var data = Data()
-        var buffer = [UInt8](repeating: 0, count: bufferSize)
-        while stream.hasBytesAvailable {
-            let bytesRead = stream.read(&buffer, maxLength: bufferSize)
-            if bytesRead < 0 { return nil }
-            if bytesRead == 0 { break }
-            data.append(buffer, count: bytesRead)
-        }
-        return data
-    }
-
     override func stopLoading() {}
 
     static func reset() {
@@ -319,9 +304,7 @@ extension XCTestCase {
     func makeCompactTestClient(
         apiKey: String = "sk-test-compact-key-12345"
     ) -> AnthropicClient {
-        let sessionConfig = URLSessionConfiguration.ephemeral
-        sessionConfig.protocolClasses = [CompactMockURLProtocol.self]
-        let urlSession = URLSession(configuration: sessionConfig)
+        let urlSession = makeMockURLSession(protocolClass: CompactMockURLProtocol.self)
         return AnthropicClient(apiKey: apiKey, baseURL: nil, urlSession: urlSession)
     }
 

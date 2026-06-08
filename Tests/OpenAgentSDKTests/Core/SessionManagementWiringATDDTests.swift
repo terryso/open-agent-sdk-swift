@@ -27,7 +27,7 @@ final class SessionWiringMockURLProtocol: URLProtocol {
     override func startLoading() {
         var capturedRequest = request
         if capturedRequest.httpBody == nil, let stream = capturedRequest.httpBodyStream {
-            capturedRequest.httpBody = Self.readBodyFromStream(stream)
+            capturedRequest.httpBody = readRequestBodyFromStream(stream)
         }
 
         SessionWiringMockURLProtocol.lastRequest = capturedRequest
@@ -72,21 +72,6 @@ final class SessionWiringMockURLProtocol: URLProtocol {
         client?.urlProtocolDidFinishLoading(self)
     }
 
-    private static func readBodyFromStream(_ stream: InputStream) -> Data? {
-        stream.open()
-        defer { stream.close() }
-        let bufferSize = 4096
-        var data = Data()
-        var buffer = [UInt8](repeating: 0, count: bufferSize)
-        while stream.hasBytesAvailable {
-            let bytesRead = stream.read(&buffer, maxLength: bufferSize)
-            if bytesRead < 0 { return nil }
-            if bytesRead == 0 { break }
-            data.append(buffer, count: bytesRead)
-        }
-        return data
-    }
-
     override func stopLoading() {}
 
     static func reset() {
@@ -115,9 +100,7 @@ extension XCTestCase {
         resumeSessionAt: String? = nil,
         persistSession: Bool = true
     ) -> Agent {
-        let sessionConfig = URLSessionConfiguration.ephemeral
-        sessionConfig.protocolClasses = [SessionWiringMockURLProtocol.self]
-        let urlSession = URLSession(configuration: sessionConfig)
+        let urlSession = makeMockURLSession(protocolClass: SessionWiringMockURLProtocol.self)
         let client = AnthropicClient(apiKey: apiKey, baseURL: nil, urlSession: urlSession)
 
         let options = AgentOptions(
