@@ -52,6 +52,27 @@ public func getEnv(_ key: String, from dotEnv: [String: String]) -> String? {
     return dotEnv[key]
 }
 
+/// Validate that a string identifier does not contain path traversal sequences.
+///
+/// Checks that the value is non-empty and does not contain `/`, `\`, or `..`
+/// which could be used for directory traversal attacks.
+///
+/// - Parameters:
+///   - value: The identifier to validate (session ID, domain name, etc.).
+///   - label: Human-readable label for error messages (e.g., "Session ID", "Domain name").
+/// - Throws: ``SDKError/sessionError(message:)`` if validation fails.
+internal func validatePathSafeIdentifier(_ value: String, label: String) throws {
+    guard !value.isEmpty else {
+        throw SDKError.sessionError(message: "\(label) must not be empty")
+    }
+    let forbidden = ["/", "\\", ".."]
+    for component in forbidden {
+        if value.contains(component) {
+            throw SDKError.sessionError(message: "\(label) contains invalid character: '\(component)'")
+        }
+    }
+}
+
 /// Get the default OpenAI-compatible base URL.
 ///
 /// Priority: `CODEANY_BASE_URL` environment variable > built-in default.

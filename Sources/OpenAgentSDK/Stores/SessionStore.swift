@@ -384,15 +384,7 @@ public actor SessionStore {
 
     /// Validate that a sessionId does not contain path traversal sequences.
     private func validateSessionId(_ sessionId: String) throws {
-        guard !sessionId.isEmpty else {
-            throw SDKError.sessionError(message: "Session ID must not be empty")
-        }
-        let forbidden = ["/", "\\", ".."]
-        for component in forbidden {
-            if sessionId.contains(component) {
-                throw SDKError.sessionError(message: "Session ID contains invalid character: '\(component)'")
-            }
-        }
+        try validatePathSafeIdentifier(sessionId, label: "Session ID")
     }
 
     /// Get the full path for a specific session directory.

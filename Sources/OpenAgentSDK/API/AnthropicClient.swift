@@ -78,20 +78,7 @@ public actor AnthropicClient: LLMClient {
 
         let request = try buildRequest(body: body)
 
-        let data: Data
-        let response: URLResponse
-        do {
-            (data, response) = try await urlSession.data(for: request)
-        } catch let error as URLError {
-            let statusCode: Int
-            if error.code == .timedOut {
-                statusCode = 408
-            } else {
-                statusCode = 0
-            }
-            let safeMessage = error.localizedDescription.replacingOccurrences(of: apiKey, with: "***")
-            throw SDKError.apiError(statusCode: statusCode, message: safeMessage)
-        }
+        let (data, response) = try await performNetworkRequest(request)
 
         try validateHTTPResponse(response, data: data)
 
@@ -130,20 +117,7 @@ public actor AnthropicClient: LLMClient {
 
         let request = try buildRequest(body: body)
 
-        let data: Data
-        let response: URLResponse
-        do {
-            (data, response) = try await urlSession.data(for: request)
-        } catch let error as URLError {
-            let statusCode: Int
-            if error.code == .timedOut {
-                statusCode = 408
-            } else {
-                statusCode = 0
-            }
-            let safeMessage = error.localizedDescription.replacingOccurrences(of: apiKey, with: "***")
-            throw SDKError.apiError(statusCode: statusCode, message: safeMessage)
-        }
+        let (data, response) = try await performNetworkRequest(request)
 
         try validateHTTPResponse(response, data: nil)
 
@@ -164,6 +138,17 @@ public actor AnthropicClient: LLMClient {
     }
 
     // MARK: - Private Helpers
+
+    /// Performs a URL request, mapping URLError to SDKError with API-key-safe messages.
+    private nonisolated func performNetworkRequest(_ request: URLRequest) async throws -> (Data, URLResponse) {
+        do {
+            return try await urlSession.data(for: request)
+        } catch let error as URLError {
+            let statusCode = error.code == .timedOut ? 408 : 0
+            let safeMessage = error.localizedDescription.replacingOccurrences(of: apiKey, with: "***")
+            throw SDKError.apiError(statusCode: statusCode, message: safeMessage)
+        }
+    }
 
     /// Builds a URLRequest for the Messages API endpoint.
     private nonisolated func buildRequest(body: [String: Any]) throws -> URLRequest {
