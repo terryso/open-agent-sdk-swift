@@ -48,27 +48,19 @@ public func createSaveSkillTool(
         let name = input.name.trimmingCharacters(in: .whitespacesAndNewlines)
 
         // 1. Validate name
-        guard !name.isEmpty else {
-            return reviewJSONResponse(["success": false, "error": "'name' must not be empty"] as [String: Any])
-        }
+        if let err = requireNonEmptyInput(name, field: "name") { return err }
         let validNamePattern = "^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$"
         guard let regex = try? NSRegularExpression(pattern: validNamePattern),
               regex.firstMatch(in: name, range: NSRange(name.startIndex..., in: name)) != nil
         else {
-            return reviewJSONResponse([
-                "success": false,
-                "error": "Skill name must be lowercase alphanumeric with hyphens (pattern: [a-z0-9-], 2+ chars, no leading/trailing hyphens)",
-            ] as [String: Any])
+            return reviewErrorResponse("Skill name must be lowercase alphanumeric with hyphens (pattern: [a-z0-9-], 2+ chars, no leading/trailing hyphens)")
         }
 
         // 2. Check for conflicts with non-agentCreated skills
         if let existing = skillRegistry.find(name) {
             let usageData = await usageStore.getUsage(skillName: name)
             if usageData.provenance != .agentCreated {
-                return reviewJSONResponse([
-                    "success": false,
-                    "error": "Skill '\(name)' already exists with provenance '\(usageData.provenance.rawValue)'. Only agent-created skills can be overwritten.",
-                ] as [String: Any])
+                return reviewErrorResponse("Skill '\(name)' already exists with provenance '\(usageData.provenance.rawValue)'. Only agent-created skills can be overwritten.")
             }
             _ = existing  // suppress unused warning
         }
@@ -96,16 +88,7 @@ public func createSaveSkillTool(
             let skillDir = try SkillWriter.write(skill: skill, to: skillsDir)
 
             // 5. Register in memory
-            let registeredSkill = Skill(
-                name: skill.name,
-                description: skill.description,
-                aliases: skill.aliases,
-                userInvocable: skill.userInvocable,
-                promptTemplate: skill.promptTemplate,
-                whenToUse: skill.whenToUse,
-                baseDir: skillDir
-            )
-            skillRegistry.register(registeredSkill)
+            skillRegistry.register(skill.withBaseDir(skillDir))
 
             // 6. Mark provenance
             try await usageStore.setProvenance(skillName: name, provenance: .agentCreated)
@@ -116,10 +99,7 @@ public func createSaveSkillTool(
                 "path": skillDir,
             ] as [String: Any])
         } catch {
-            return reviewJSONResponse([
-                "success": false,
-                "error": "Failed to save skill: \(error.localizedDescription)",
-            ] as [String: Any])
+            return reviewErrorResponse("Failed to save skill: \(error.localizedDescription)")
         }
     }
 }
