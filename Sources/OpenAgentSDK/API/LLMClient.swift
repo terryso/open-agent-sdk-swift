@@ -84,6 +84,38 @@ func validateLLMHTTPResponse(
     }
 }
 
+/// Builds a JSON POST `URLRequest` with the given URL, body, and headers.
+///
+/// Centralizes the URLRequest creation, header application, and JSON body serialization
+/// that is shared between `AnthropicClient` and `OpenAIClient`.
+///
+/// - Parameters:
+///   - url: The target URL for the request.
+///   - body: The request body as a JSON-serializable dictionary.
+///   - headers: HTTP headers to set on the request.
+///   - timeout: Request timeout interval in seconds. Defaults to 300.
+/// - Returns: A configured `URLRequest` ready to send.
+/// - Throws: ``SDKError/apiError(statusCode:message:)`` if JSON serialization fails.
+func buildJSONPostRequest(
+    url: URL,
+    body: [String: Any],
+    headers: [String: String],
+    timeout: TimeInterval = 300
+) throws -> URLRequest {
+    var request = URLRequest(url: url)
+    request.httpMethod = "POST"
+    request.timeoutInterval = timeout
+    for (key, value) in headers {
+        request.setValue(value, forHTTPHeaderField: key)
+    }
+    do {
+        request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
+    } catch {
+        throw SDKError.apiError(statusCode: 0, message: "Failed to serialize request body")
+    }
+    return request
+}
+
 /// Resolves a base URL from an optional custom string, falling back to a default.
 ///
 /// If the custom string is nil or produces an invalid URL, the default is used.

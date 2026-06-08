@@ -128,19 +128,14 @@ public actor OpenAIClient: LLMClient {
             throw SDKError.apiError(statusCode: 0, message: "Invalid URL")
         }
 
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.timeoutInterval = 300
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "content-type")
-
-        do {
-            request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
-        } catch {
-            throw SDKError.apiError(statusCode: 0, message: "Failed to serialize request body")
-        }
-
-        return request
+        return try buildJSONPostRequest(
+            url: url,
+            body: body,
+            headers: [
+                "Authorization": "Bearer \(apiKey)",
+                "content-type": "application/json",
+            ]
+        )
     }
 
     // MARK: - Message Conversion (Anthropic → OpenAI)

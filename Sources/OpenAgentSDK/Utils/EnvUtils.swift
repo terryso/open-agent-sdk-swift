@@ -103,6 +103,20 @@ internal func resolveSkillsDir(customDir: String?) -> String {
     return defaultSkillsDir
 }
 
+/// Normalize a file path for comparison by resolving `.`, `..`, redundant slashes, and symlinks.
+///
+/// Standardizes the path using `NSString.standardizingPath`, then resolves symlinks.
+/// Falls back to the standardized path if symlink resolution fails (e.g., broken symlink).
+///
+/// - Parameter path: The file path to normalize.
+/// - Returns: The normalized path string.
+internal func normalizePath(_ path: String) -> String {
+    let standardized = (path as NSString).standardizingPath
+    let url = URL(fileURLWithPath: standardized)
+    let resolved = url.resolvingSymlinksInPath().path
+    return resolved.isEmpty ? standardized : resolved
+}
+
 /// Ensure a directory exists, creating it with 0o700 permissions if needed.
 ///
 /// A shared helper for store classes that need to create directories before writing files.
