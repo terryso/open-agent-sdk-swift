@@ -13,17 +13,6 @@ import XCTest
 /// TDD Phase: RED (feature not implemented yet)
 final class McpResourceToolTests: XCTestCase {
 
-    // MARK: - Helpers
-
-    /// Creates a basic ToolContext with just cwd (no stores needed for MCP resource tools).
-    private func makeContext(mcpConnections: [MCPConnectionInfo]? = nil) -> ToolContext {
-        return ToolContext(
-            cwd: "/tmp",
-            toolUseId: "test-tool-use-id",
-            mcpConnections: mcpConnections
-        )
-    }
-
     // ================================================================
     // MARK: - ListMcpResources Tool
     // ================================================================
@@ -105,7 +94,7 @@ final class McpResourceToolTests: XCTestCase {
     /// AC4 [P0]: ListMcpResources with no connections returns "No MCP servers connected.".
     func testListMcpResources_noConnections_returnsNoServersMessage() async throws {
         let tool = createListMcpResourcesTool()
-        let context = makeContext()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = [:]
         let result = await tool.call(input: input, context: context)
@@ -120,7 +109,7 @@ final class McpResourceToolTests: XCTestCase {
     /// AC4 [P0]: ListMcpResources with server filter matching nothing returns "No MCP servers connected.".
     func testListMcpResources_serverFilterNoMatch_returnsNoServersMessage() async throws {
         let tool = createListMcpResourcesTool()
-        let context = makeContext()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = ["server": "nonexistent"]
         let result = await tool.call(input: input, context: context)
@@ -149,7 +138,7 @@ final class McpResourceToolTests: XCTestCase {
         )
 
         let tool = createListMcpResourcesTool()
-        let context = makeContext(mcpConnections: [connection])
+        let context = makeTestToolContext(mcpConnections: [connection])
 
         let input: [String: Any] = [:]
         let result = await tool.call(input: input, context: context)
@@ -179,7 +168,7 @@ final class McpResourceToolTests: XCTestCase {
         )
 
         let tool = createListMcpResourcesTool()
-        let context = makeContext(mcpConnections: [connection])
+        let context = makeTestToolContext(mcpConnections: [connection])
 
         let input: [String: Any] = [:]
         let result = await tool.call(input: input, context: context)
@@ -206,7 +195,7 @@ final class McpResourceToolTests: XCTestCase {
         )
 
         let tool = createListMcpResourcesTool()
-        let context = makeContext(mcpConnections: [connection])
+        let context = makeTestToolContext(mcpConnections: [connection])
 
         let input: [String: Any] = [:]
         let result = await tool.call(input: input, context: context)
@@ -228,7 +217,7 @@ final class McpResourceToolTests: XCTestCase {
         )
 
         let tool = createListMcpResourcesTool()
-        let context = makeContext(mcpConnections: [connection])
+        let context = makeTestToolContext(mcpConnections: [connection])
 
         let input: [String: Any] = [:]
         let result = await tool.call(input: input, context: context)
@@ -254,7 +243,7 @@ final class McpResourceToolTests: XCTestCase {
         let conn2 = MCPConnectionInfo(name: "server-beta", status: "connected", resourceProvider: provider2)
 
         let tool = createListMcpResourcesTool()
-        let context = makeContext(mcpConnections: [conn1, conn2])
+        let context = makeTestToolContext(mcpConnections: [conn1, conn2])
 
         let input: [String: Any] = ["server": "server-alpha"]
         let result = await tool.call(input: input, context: context)
@@ -282,7 +271,7 @@ final class McpResourceToolTests: XCTestCase {
         let conn2 = MCPConnectionInfo(name: "server-beta", status: "connected", resourceProvider: provider2)
 
         let tool = createListMcpResourcesTool()
-        let context = makeContext(mcpConnections: [conn1, conn2])
+        let context = makeTestToolContext(mcpConnections: [conn1, conn2])
 
         let input: [String: Any] = [:]
         let result = await tool.call(input: input, context: context)
@@ -307,7 +296,7 @@ final class McpResourceToolTests: XCTestCase {
         let conn2 = MCPConnectionInfo(name: "disconnected-server", status: "disconnected", resourceProvider: nil)
 
         let tool = createListMcpResourcesTool()
-        let context = makeContext(mcpConnections: [conn1, conn2])
+        let context = makeTestToolContext(mcpConnections: [conn1, conn2])
 
         let input: [String: Any] = [:]
         let result = await tool.call(input: input, context: context)
@@ -408,7 +397,7 @@ final class McpResourceToolTests: XCTestCase {
     /// AC10 [P0]: ReadMcpResource with nonexistent server returns is_error=true with "MCP server not found: {server}".
     func testReadMcpResource_serverNotFound_returnsError() async throws {
         let tool = createReadMcpResourceTool()
-        let context = makeContext()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = [
             "server": "missing-server",
@@ -433,7 +422,7 @@ final class McpResourceToolTests: XCTestCase {
         let connection = MCPConnectionInfo(name: "real-server", status: "connected", resourceProvider: provider)
 
         let tool = createReadMcpResourceTool()
-        let context = makeContext(mcpConnections: [connection])
+        let context = makeTestToolContext(mcpConnections: [connection])
 
         let input: [String: Any] = [
             "server": "fake-server",
@@ -460,7 +449,7 @@ final class McpResourceToolTests: XCTestCase {
         let connection = MCPConnectionInfo(name: "data-server", status: "connected", resourceProvider: provider)
 
         let tool = createReadMcpResourceTool()
-        let context = makeContext(mcpConnections: [connection])
+        let context = makeTestToolContext(mcpConnections: [connection])
 
         let input: [String: Any] = [
             "server": "data-server",
@@ -486,7 +475,7 @@ final class McpResourceToolTests: XCTestCase {
         let connection = MCPConnectionInfo(name: "multi-server", status: "connected", resourceProvider: provider)
 
         let tool = createReadMcpResourceTool()
-        let context = makeContext(mcpConnections: [connection])
+        let context = makeTestToolContext(mcpConnections: [connection])
 
         let input: [String: Any] = [
             "server": "multi-server",
@@ -515,7 +504,7 @@ final class McpResourceToolTests: XCTestCase {
         let connection = MCPConnectionInfo(name: "json-server", status: "connected", resourceProvider: provider)
 
         let tool = createReadMcpResourceTool()
-        let context = makeContext(mcpConnections: [connection])
+        let context = makeTestToolContext(mcpConnections: [connection])
 
         let input: [String: Any] = [
             "server": "json-server",
@@ -537,7 +526,7 @@ final class McpResourceToolTests: XCTestCase {
         let connection = MCPConnectionInfo(name: "empty-server", status: "connected", resourceProvider: provider)
 
         let tool = createReadMcpResourceTool()
-        let context = makeContext(mcpConnections: [connection])
+        let context = makeTestToolContext(mcpConnections: [connection])
 
         let input: [String: Any] = [
             "server": "empty-server",
@@ -560,7 +549,7 @@ final class McpResourceToolTests: XCTestCase {
         let connection = MCPConnectionInfo(name: "nil-server", status: "connected", resourceProvider: provider)
 
         let tool = createReadMcpResourceTool()
-        let context = makeContext(mcpConnections: [connection])
+        let context = makeTestToolContext(mcpConnections: [connection])
 
         let input: [String: Any] = [
             "server": "nil-server",
@@ -583,7 +572,7 @@ final class McpResourceToolTests: XCTestCase {
         let connection = MCPConnectionInfo(name: "error-server", status: "connected", resourceProvider: provider)
 
         let tool = createReadMcpResourceTool()
-        let context = makeContext(mcpConnections: [connection])
+        let context = makeTestToolContext(mcpConnections: [connection])
 
         let input: [String: Any] = [
             "server": "error-server",
@@ -604,7 +593,7 @@ final class McpResourceToolTests: XCTestCase {
         let connection = MCPConnectionInfo(name: "throw-server", status: "connected", resourceProvider: provider)
 
         let tool = createReadMcpResourceTool()
-        let context = makeContext(mcpConnections: [connection])
+        let context = makeTestToolContext(mcpConnections: [connection])
 
         let input: [String: Any] = [
             "server": "throw-server",
@@ -656,7 +645,7 @@ final class McpResourceToolTests: XCTestCase {
     /// AC15 [P0]: ListMcpResources never throws -- always returns ToolResult even with malformed input.
     func testListMcpResourcesTool_neverThrows_malformedInput() async throws {
         let tool = createListMcpResourcesTool()
-        let context = makeContext()
+        let context = makeTestToolContext()
 
         let badInputs: [[String: Any]] = [
             [:],                              // empty dict
@@ -674,7 +663,7 @@ final class McpResourceToolTests: XCTestCase {
     /// AC15 [P0]: ReadMcpResource never throws -- always returns ToolResult even with malformed input.
     func testReadMcpResourceTool_neverThrows_malformedInput() async throws {
         let tool = createReadMcpResourceTool()
-        let context = makeContext()
+        let context = makeTestToolContext()
 
         let badInputs: [[String: Any]] = [
             [:],                              // empty dict (missing server and uri)
@@ -722,7 +711,7 @@ final class McpResourceToolTests: XCTestCase {
     /// AC18 [P0]: ToolContext with nil mcpConnections reports "No MCP servers connected".
     func testToolContext_nilMcpConnections_reportsNoServers() async throws {
         let tool = createListMcpResourcesTool()
-        let context = makeContext()  // nil mcpConnections by default
+        let context = makeTestToolContext()  // nil mcpConnections by default
         let result = await tool.call(input: [:], context: context)
 
         XCTAssertTrue(
@@ -795,7 +784,7 @@ final class McpResourceToolTests: XCTestCase {
 
         // Step 1: List resources
         let listTool = createListMcpResourcesTool()
-        let context = makeContext(mcpConnections: [connection])
+        let context = makeTestToolContext(mcpConnections: [connection])
         let listResult = await listTool.call(input: [:], context: context)
         XCTAssertFalse(listResult.isError)
         XCTAssertTrue(listResult.content.contains("lifecycle-server"))
