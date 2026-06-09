@@ -13,38 +13,13 @@ import XCTest
 /// TDD Phase: RED (feature not implemented yet)
 final class SkillToolTests: XCTestCase {
 
-    // MARK: - Helper: Create a test skill
-
-    /// Creates a simple skill for testing.
-    private func makeSkill(
-        name: String = "test_skill",
-        description: String = "A test skill",
-        aliases: [String] = [],
-        userInvocable: Bool = true,
-        toolRestrictions: [ToolRestriction]? = nil,
-        modelOverride: String? = nil,
-        isAvailable: @escaping @Sendable () -> Bool = { true },
-        promptTemplate: String = "Test prompt template"
-    ) -> Skill {
-        Skill(
-            name: name,
-            description: description,
-            aliases: aliases,
-            userInvocable: userInvocable,
-            toolRestrictions: toolRestrictions,
-            modelOverride: modelOverride,
-            isAvailable: isAvailable,
-            promptTemplate: promptTemplate
-        )
-    }
-
     // MARK: - AC1: SkillTool Registration and LLM Discovery
 
     /// AC1 [P0]: createSkillTool returns a valid ToolProtocol with name "Skill".
     func testCreateSkillTool_returnsToolProtocol() async throws {
         // Given: a registry with a registered skill
         let registry = SkillRegistry()
-        registry.register(makeSkill(name: "commit"))
+        registry.register(makeTestSkill(name: "commit"))
 
         // When: creating the Skill tool
         let tool = createSkillTool(registry: registry)
@@ -80,7 +55,7 @@ final class SkillToolTests: XCTestCase {
     func testSkillTool_findsSkillAndReturnsJSON() async throws {
         // Given: a registry with a skill
         let registry = SkillRegistry()
-        registry.register(makeSkill(
+        registry.register(makeTestSkill(
             name: "commit",
             promptTemplate: "Create a git commit"
         ))
@@ -124,7 +99,7 @@ final class SkillToolTests: XCTestCase {
     func testSkillTool_unavailableSkill_returnsError() async throws {
         // Given: a registry with an unavailable skill
         let registry = SkillRegistry()
-        registry.register(makeSkill(
+        registry.register(makeTestSkill(
             name: "unavailable",
             isAvailable: { false }
         ))
@@ -145,7 +120,7 @@ final class SkillToolTests: XCTestCase {
     func testSkillTool_resolvesByAlias() async throws {
         // Given: a registry with a skill with alias "ci"
         let registry = SkillRegistry()
-        registry.register(makeSkill(
+        registry.register(makeTestSkill(
             name: "commit",
             aliases: ["ci"],
             promptTemplate: "Create a commit"
@@ -171,7 +146,7 @@ final class SkillToolTests: XCTestCase {
     func testSkillTool_modelOverride_includedInJSON() async throws {
         // Given: a registry with a skill that has modelOverride
         let registry = SkillRegistry()
-        registry.register(makeSkill(
+        registry.register(makeTestSkill(
             name: "opus-review",
             modelOverride: "claude-opus-4-6",
             promptTemplate: "Review code with opus"
@@ -195,7 +170,7 @@ final class SkillToolTests: XCTestCase {
     func testSkillTool_noModelOverride_noModelField() async throws {
         // Given: a registry with a skill without modelOverride
         let registry = SkillRegistry()
-        registry.register(makeSkill(
+        registry.register(makeTestSkill(
             name: "basic-skill",
             modelOverride: nil,
             promptTemplate: "Do something basic"
@@ -224,7 +199,7 @@ final class SkillToolTests: XCTestCase {
     func testSkillTool_selfReferenceRestriction_returnsError() async throws {
         // Given: a registry with a skill that restricts .skill (itself)
         let registry = SkillRegistry()
-        registry.register(makeSkill(
+        registry.register(makeTestSkill(
             name: "cyclic-skill",
             toolRestrictions: [.bash, .read, .skill],
             promptTemplate: "Do something cyclic"
@@ -246,7 +221,7 @@ final class SkillToolTests: XCTestCase {
     func testSkillTool_nonSelfRestriction_succeeds() async throws {
         // Given: a registry with a skill that restricts tools but not .skill
         let registry = SkillRegistry()
-        registry.register(makeSkill(
+        registry.register(makeTestSkill(
             name: "safe-skill",
             toolRestrictions: [.bash, .read, .glob],
             promptTemplate: "Do something safe"
@@ -268,7 +243,7 @@ final class SkillToolTests: XCTestCase {
     func testSkillTool_recursionDepthExceeded_returnsError() async throws {
         // Given: a registry with a skill and context at max depth
         let registry = SkillRegistry()
-        registry.register(makeSkill(
+        registry.register(makeTestSkill(
             name: "nested-skill",
             promptTemplate: "Nested"
         ))
@@ -294,7 +269,7 @@ final class SkillToolTests: XCTestCase {
     func testSkillTool_withinDepthLimit_succeeds() async throws {
         // Given: a registry with a skill and context below max depth
         let registry = SkillRegistry()
-        registry.register(makeSkill(
+        registry.register(makeTestSkill(
             name: "ok-skill",
             promptTemplate: "OK"
         ))
@@ -318,7 +293,7 @@ final class SkillToolTests: XCTestCase {
     func testSkillTool_defaultMaxDepth_is4() async throws {
         // Given: a registry with a skill
         let registry = SkillRegistry()
-        registry.register(makeSkill(
+        registry.register(makeTestSkill(
             name: "skill-at-depth3",
             promptTemplate: "Template"
         ))
@@ -340,7 +315,7 @@ final class SkillToolTests: XCTestCase {
     func testSkillTool_toolRestrictions_includedInJSON() async throws {
         // Given: a registry with a skill with tool restrictions
         let registry = SkillRegistry()
-        registry.register(makeSkill(
+        registry.register(makeTestSkill(
             name: "restricted-skill",
             toolRestrictions: [.bash, .read],
             promptTemplate: "Do restricted things"
@@ -366,7 +341,7 @@ final class SkillToolTests: XCTestCase {
     func testSkillTool_noRestrictions_noAllowedToolsField() async throws {
         // Given: a registry with a skill without restrictions
         let registry = SkillRegistry()
-        registry.register(makeSkill(
+        registry.register(makeTestSkill(
             name: "unrestricted-skill",
             toolRestrictions: nil,
             promptTemplate: "Do anything"
@@ -395,7 +370,7 @@ final class SkillToolTests: XCTestCase {
     func testSkillTool_noIndependentTurnBudget() async throws {
         // Given: a registry with a skill
         let registry = SkillRegistry()
-        registry.register(makeSkill(
+        registry.register(makeTestSkill(
             name: "budget-skill",
             promptTemplate: "Do budget things"
         ))
@@ -421,7 +396,7 @@ final class SkillToolTests: XCTestCase {
     func testSkillTool_optionalArgs_acceptedInInput() async throws {
         // Given: a registry with a skill
         let registry = SkillRegistry()
-        registry.register(makeSkill(
+        registry.register(makeTestSkill(
             name: "args-skill",
             promptTemplate: "Process with args"
         ))

@@ -8,36 +8,13 @@ import XCTest
 ///         userInvocableSkills, formatSkillsForPrompt, clear, thread safety.
 final class SkillRegistryTests: XCTestCase {
 
-    // MARK: - Helper: Create a test skill
-
-    /// Creates a simple skill for testing.
-    private func makeSkill(
-        name: String = "test_skill",
-        description: String = "A test skill",
-        aliases: [String] = [],
-        userInvocable: Bool = true,
-        toolRestrictions: [ToolRestriction]? = nil,
-        isAvailable: @escaping @Sendable () -> Bool = { true },
-        promptTemplate: String = "Test prompt template"
-    ) -> Skill {
-        Skill(
-            name: name,
-            description: description,
-            aliases: aliases,
-            userInvocable: userInvocable,
-            toolRestrictions: toolRestrictions,
-            isAvailable: isAvailable,
-            promptTemplate: promptTemplate
-        )
-    }
-
     // MARK: - AC2: SkillRegistry register and find
 
     /// AC2 [P0]: Registering a skill and finding it by name.
     func testRegisterAndFind_ByName() {
         // Given: a registry and a skill
         let registry = SkillRegistry()
-        let skill = makeSkill(name: "commit", description: "Create a commit")
+        let skill = makeTestSkill(name: "commit", description: "Create a commit")
 
         // When: registering the skill
         registry.register(skill)
@@ -53,7 +30,7 @@ final class SkillRegistryTests: XCTestCase {
     func testFind_ByAlias() {
         // Given: a registry with a skill that has aliases
         let registry = SkillRegistry()
-        let skill = makeSkill(name: "commit", aliases: ["ci"])
+        let skill = makeTestSkill(name: "commit", aliases: ["ci"])
 
         // When: registering the skill
         registry.register(skill)
@@ -80,7 +57,7 @@ final class SkillRegistryTests: XCTestCase {
     func testHas_RegisteredSkill_ReturnsTrue() {
         // Given: a registry with a registered skill
         let registry = SkillRegistry()
-        registry.register(makeSkill(name: "commit"))
+        registry.register(makeTestSkill(name: "commit"))
 
         // Then: has returns true
         XCTAssertTrue(registry.has("commit"))
@@ -101,9 +78,9 @@ final class SkillRegistryTests: XCTestCase {
         let registry = SkillRegistry()
 
         // When: registering multiple skills
-        registry.register(makeSkill(name: "commit"))
-        registry.register(makeSkill(name: "review"))
-        registry.register(makeSkill(name: "simplify"))
+        registry.register(makeTestSkill(name: "commit"))
+        registry.register(makeTestSkill(name: "review"))
+        registry.register(makeTestSkill(name: "simplify"))
 
         // Then: all are findable
         XCTAssertNotNil(registry.find("commit"))
@@ -115,7 +92,7 @@ final class SkillRegistryTests: XCTestCase {
     func testRegister_MultipleAliases() {
         // Given: a skill with multiple aliases
         let registry = SkillRegistry()
-        let skill = makeSkill(name: "commit", aliases: ["ci", "gitcommit"])
+        let skill = makeTestSkill(name: "commit", aliases: ["ci", "gitcommit"])
 
         // When: registering
         registry.register(skill)
@@ -133,13 +110,13 @@ final class SkillRegistryTests: XCTestCase {
     func testReplace_UpdatesSkillDefinition() {
         // Given: a registry with a registered skill
         let registry = SkillRegistry()
-        registry.register(makeSkill(
+        registry.register(makeTestSkill(
             name: "commit",
             promptTemplate: "Original template"
         ))
 
         // When: replacing with a new prompt template
-        let updatedSkill = makeSkill(
+        let updatedSkill = makeTestSkill(
             name: "commit",
             promptTemplate: "Updated template"
         )
@@ -154,7 +131,7 @@ final class SkillRegistryTests: XCTestCase {
     func testReplace_ValueTypeIsolation() {
         // Given: a registry with a registered skill
         let registry = SkillRegistry()
-        registry.register(makeSkill(
+        registry.register(makeTestSkill(
             name: "commit",
             promptTemplate: "Original"
         ))
@@ -164,7 +141,7 @@ final class SkillRegistryTests: XCTestCase {
         XCTAssertEqual(originalSkill.promptTemplate, "Original")
 
         // And: replacing the skill
-        registry.replace(makeSkill(
+        registry.replace(makeTestSkill(
             name: "commit",
             promptTemplate: "Replaced"
         ))
@@ -180,10 +157,10 @@ final class SkillRegistryTests: XCTestCase {
     func testReplace_WithAliases() {
         // Given: a registry with a skill with aliases
         let registry = SkillRegistry()
-        registry.register(makeSkill(name: "commit", aliases: ["ci"]))
+        registry.register(makeTestSkill(name: "commit", aliases: ["ci"]))
 
         // When: replacing with a new skill that has different aliases
-        registry.replace(makeSkill(name: "commit", aliases: ["ci", "c"]))
+        registry.replace(makeTestSkill(name: "commit", aliases: ["ci", "c"]))
 
         // Then: new aliases work
         XCTAssertNotNil(registry.find("ci"))
@@ -197,9 +174,9 @@ final class SkillRegistryTests: XCTestCase {
     func testUserInvocableSkills_FiltersNonInvocable() {
         // Given: a registry with 3 skills, 2 user-invocable
         let registry = SkillRegistry()
-        registry.register(makeSkill(name: "commit", userInvocable: true))
-        registry.register(makeSkill(name: "review", userInvocable: true))
-        registry.register(makeSkill(name: "internal_tool", userInvocable: false))
+        registry.register(makeTestSkill(name: "commit", userInvocable: true))
+        registry.register(makeTestSkill(name: "review", userInvocable: true))
+        registry.register(makeTestSkill(name: "internal_tool", userInvocable: false))
 
         // When: getting user-invocable skills
         let invocable = registry.userInvocableSkills
@@ -225,8 +202,8 @@ final class SkillRegistryTests: XCTestCase {
     func testUserInvocableSkills_FiltersUnavailable() {
         // Given: a registry with 2 user-invocable skills, 1 unavailable
         let registry = SkillRegistry()
-        registry.register(makeSkill(name: "commit", userInvocable: true, isAvailable: { true }))
-        registry.register(makeSkill(name: "test_skill", userInvocable: true, isAvailable: { false }))
+        registry.register(makeTestSkill(name: "commit", userInvocable: true, isAvailable: { true }))
+        registry.register(makeTestSkill(name: "test_skill", userInvocable: true, isAvailable: { false }))
 
         // When: getting user-invocable skills
         let invocable = registry.userInvocableSkills
@@ -242,11 +219,11 @@ final class SkillRegistryTests: XCTestCase {
     func testFormatSkillsForPrompt_ContainsSkillInfo() {
         // Given: a registry with registered skills
         let registry = SkillRegistry()
-        registry.register(makeSkill(
+        registry.register(makeTestSkill(
             name: "commit",
             description: "Create a git commit"
         ))
-        registry.register(makeSkill(
+        registry.register(makeTestSkill(
             name: "review",
             description: "Review code changes"
         ))
@@ -266,7 +243,7 @@ final class SkillRegistryTests: XCTestCase {
         // Given: a registry with many skills that would exceed 500 tokens
         let registry = SkillRegistry()
         for i in 0..<50 {
-            registry.register(makeSkill(
+            registry.register(makeTestSkill(
                 name: "skill_\(i)",
                 description: String(repeating: "This is a very long description for skill \(i). ", count: 20),
                 promptTemplate: "Template \(i)"
@@ -286,19 +263,19 @@ final class SkillRegistryTests: XCTestCase {
     func testFormatSkillsForPrompt_OnlyIncludesInvocableAndAvailable() {
         // Given: a registry with a mix of invocable/non-invocable/available/unavailable
         let registry = SkillRegistry()
-        registry.register(makeSkill(
+        registry.register(makeTestSkill(
             name: "commit",
             description: "Commit tool",
             userInvocable: true,
             isAvailable: { true }
         ))
-        registry.register(makeSkill(
+        registry.register(makeTestSkill(
             name: "internal",
             description: "Internal tool",
             userInvocable: false,
             isAvailable: { true }
         ))
-        registry.register(makeSkill(
+        registry.register(makeTestSkill(
             name: "unavailable",
             description: "Unavailable tool",
             userInvocable: true,
@@ -332,7 +309,7 @@ final class SkillRegistryTests: XCTestCase {
         let registry = SkillRegistry()
         // Register enough skills to exceed budget
         for i in 0..<30 {
-            registry.register(makeSkill(
+            registry.register(makeTestSkill(
                 name: "skill_\(String(format: "%02d", i))",
                 description: String(repeating: "Description for skill \(i). ", count: 10)
             ))
@@ -353,7 +330,7 @@ final class SkillRegistryTests: XCTestCase {
     func testIsAvailable_ExcludedFromUserInvocableSkills() {
         // Given: a registry with an unavailable skill
         let registry = SkillRegistry()
-        registry.register(makeSkill(
+        registry.register(makeTestSkill(
             name: "test_skill",
             isAvailable: { false }
         ))
@@ -369,7 +346,7 @@ final class SkillRegistryTests: XCTestCase {
     func testIsAvailable_ExcludedFromFormatSkillsForPrompt() {
         // Given: a registry with an unavailable skill
         let registry = SkillRegistry()
-        registry.register(makeSkill(
+        registry.register(makeTestSkill(
             name: "unavailable_skill",
             description: "Should not appear",
             isAvailable: { false }
@@ -386,7 +363,7 @@ final class SkillRegistryTests: XCTestCase {
     func testIsAvailable_FindDoesNotFilter() {
         // Given: a registry with an unavailable skill
         let registry = SkillRegistry()
-        registry.register(makeSkill(
+        registry.register(makeTestSkill(
             name: "test",
             isAvailable: { false }
         ))
@@ -403,7 +380,7 @@ final class SkillRegistryTests: XCTestCase {
     func testIsAvailable_FindByAliasDoesNotFilter() {
         // Given: a registry with an unavailable skill with alias
         let registry = SkillRegistry()
-        registry.register(makeSkill(
+        registry.register(makeTestSkill(
             name: "test",
             aliases: ["t"],
             isAvailable: { false }
@@ -423,9 +400,9 @@ final class SkillRegistryTests: XCTestCase {
     func testAllSkills_ReturnsAllRegistered() {
         // Given: a registry with 3 skills
         let registry = SkillRegistry()
-        registry.register(makeSkill(name: "commit"))
-        registry.register(makeSkill(name: "review"))
-        registry.register(makeSkill(name: "internal", userInvocable: false))
+        registry.register(makeTestSkill(name: "commit"))
+        registry.register(makeTestSkill(name: "review"))
+        registry.register(makeTestSkill(name: "internal", userInvocable: false))
 
         // When: getting all skills
         let all = registry.allSkills
@@ -438,8 +415,8 @@ final class SkillRegistryTests: XCTestCase {
     func testClear_RemovesAllSkills() {
         // Given: a registry with skills
         let registry = SkillRegistry()
-        registry.register(makeSkill(name: "commit"))
-        registry.register(makeSkill(name: "review"))
+        registry.register(makeTestSkill(name: "commit"))
+        registry.register(makeTestSkill(name: "review"))
 
         // When: clearing
         registry.clear()
@@ -454,8 +431,8 @@ final class SkillRegistryTests: XCTestCase {
     func testUnregister_RemovesSpecificSkill() {
         // Given: a registry with skills
         let registry = SkillRegistry()
-        registry.register(makeSkill(name: "commit", aliases: ["ci"]))
-        registry.register(makeSkill(name: "review"))
+        registry.register(makeTestSkill(name: "commit", aliases: ["ci"]))
+        registry.register(makeTestSkill(name: "review"))
 
         // When: unregistering commit
         let removed = registry.unregister("commit")
@@ -488,7 +465,7 @@ final class SkillRegistryTests: XCTestCase {
 
         // When: registering skills concurrently
         DispatchQueue.concurrentPerform(iterations: 100) { i in
-            registry.register(makeSkill(name: "skill_\(i)"))
+            registry.register(makeTestSkill(name: "skill_\(i)"))
         }
 
         // Then: all skills are registered without crash
@@ -500,7 +477,7 @@ final class SkillRegistryTests: XCTestCase {
         // Given: a registry with skills
         let registry = SkillRegistry()
         for i in 0..<50 {
-            registry.register(makeSkill(name: "skill_\(i)"))
+            registry.register(makeTestSkill(name: "skill_\(i)"))
         }
 
         // When: reading concurrently
