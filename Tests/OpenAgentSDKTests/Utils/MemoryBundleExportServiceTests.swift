@@ -1,26 +1,7 @@
 import XCTest
 @testable import OpenAgentSDK
 
-final class MemoryBundleExportServiceTests: XCTestCase {
-
-    private var tempDir: String!
-
-    override func setUp() {
-        super.setUp()
-        tempDir = (NSTemporaryDirectory() as NSString)
-            .appendingPathComponent("export-tests-\(UUID().uuidString)")
-        try? FileManager.default.createDirectory(
-            atPath: tempDir,
-            withIntermediateDirectories: true
-        )
-    }
-
-    override func tearDown() {
-        if let tempDir {
-            try? FileManager.default.removeItem(atPath: tempDir)
-        }
-        super.tearDown()
-    }
+final class MemoryBundleExportServiceTests: TempDirTestCase {
 
     private func makeFact(domain: String = "test") -> MemoryFact {
         MemoryFact.create(domain: domain, kind: .affordance, description: "export test \(UUID().uuidString)")

@@ -7,50 +7,16 @@ import Foundation
 
 final class MultiTurnExampleComplianceTests: XCTestCase {
 
-    // MARK: - Helper: Resolve project root
-
-    /// Walk upward from this test file to find the directory containing Package.swift.
-    private func projectRoot() -> String {
-        let fileManager = FileManager.default
-        let testFileDir = URL(fileURLWithPath: #file).deletingLastPathComponent().path
-        var dir = testFileDir
-        for _ in 0..<10 {
-            let packagePath = dir + "/Package.swift"
-            if fileManager.fileExists(atPath: packagePath) {
-                return dir
-            }
-            let parent = URL(fileURLWithPath: dir).deletingLastPathComponent().path
-            if parent == dir { break }
-            dir = parent
-        }
-        return testFileDir
-    }
-
-    private func examplesDir() -> String {
-        return projectRoot() + "/Examples"
-    }
+    // MARK: - Helpers
 
     private func examplePath() -> String {
-        return examplesDir() + "/MultiTurnExample/main.swift"
-    }
-
-    private func fileContent(_ path: String) -> String? {
-        return try? String(contentsOfFile: path, encoding: .utf8)
-    }
-
-    private func packageSwiftContent() -> String {
-        let path = projectRoot() + "/Package.swift"
-        guard let content = try? String(contentsOfFile: path, encoding: .utf8) else {
-            XCTFail("Package.swift should be readable")
-            return ""
-        }
-        return content
+        return DocumentationTestHelpers.examplesDir() + "/MultiTurnExample/main.swift"
     }
 
     // MARK: - AC7: Package.swift executableTarget Configured
 
     func testPackageSwiftContainsMultiTurnExampleTarget() {
-        let content = packageSwiftContent()
+        let content = DocumentationTestHelpers.packageSwiftContent()
         XCTAssertTrue(
             content.contains("MultiTurnExample"),
             "Package.swift should contain MultiTurnExample executable target"
@@ -58,7 +24,7 @@ final class MultiTurnExampleComplianceTests: XCTestCase {
     }
 
     func testMultiTurnExampleTargetDependsOnOpenAgentSDK() {
-        let content = packageSwiftContent()
+        let content = DocumentationTestHelpers.packageSwiftContent()
         XCTAssertTrue(
             content.contains("MultiTurnExample"),
             "Package.swift should contain MultiTurnExample target before checking dependencies"
@@ -78,7 +44,7 @@ final class MultiTurnExampleComplianceTests: XCTestCase {
     }
 
     func testMultiTurnExampleTargetSpecifiesCorrectPath() {
-        let content = packageSwiftContent()
+        let content = DocumentationTestHelpers.packageSwiftContent()
         XCTAssertTrue(
             content.contains("MultiTurnExample"),
             "Package.swift should contain MultiTurnExample target before checking path"
@@ -103,7 +69,7 @@ final class MultiTurnExampleComplianceTests: XCTestCase {
         let fileManager = FileManager.default
         var isDir: ObjCBool = false
         let exists = fileManager.fileExists(
-            atPath: examplesDir() + "/MultiTurnExample",
+            atPath: DocumentationTestHelpers.examplesDir() + "/MultiTurnExample",
             isDirectory: &isDir
         )
         XCTAssertTrue(exists, "Examples/MultiTurnExample/ directory should exist")
@@ -118,22 +84,16 @@ final class MultiTurnExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testMultiTurnExampleImportsOpenAgentSDK() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/MultiTurnExample/main.swift should be readable")
-            return
-        }
+    func testMultiTurnExampleImportsOpenAgentSDK() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("import OpenAgentSDK"),
             "MultiTurnExample should import OpenAgentSDK"
         )
     }
 
-    func testMultiTurnExampleImportsFoundation() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/MultiTurnExample/main.swift should be readable")
-            return
-        }
+    func testMultiTurnExampleImportsFoundation() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("import Foundation"),
             "MultiTurnExample should import Foundation"
@@ -142,11 +102,8 @@ final class MultiTurnExampleComplianceTests: XCTestCase {
 
     // MARK: - AC1: Code Quality
 
-    func testMultiTurnExampleHasTopLevelDescriptionComment() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/MultiTurnExample/main.swift should be readable")
-            return
-        }
+    func testMultiTurnExampleHasTopLevelDescriptionComment() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
         XCTAssertTrue(
             trimmed.hasPrefix("//"),
@@ -154,11 +111,8 @@ final class MultiTurnExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testMultiTurnExampleHasMultipleInlineComments() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/MultiTurnExample/main.swift should be readable")
-            return
-        }
+    func testMultiTurnExampleHasMultipleInlineComments() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         let commentLines = content.components(separatedBy: "\n")
             .filter { $0.trimmingCharacters(in: .whitespaces).hasPrefix("//") }
             .count
@@ -168,11 +122,8 @@ final class MultiTurnExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testMultiTurnExampleHasMarkSections() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/MultiTurnExample/main.swift should be readable")
-            return
-        }
+    func testMultiTurnExampleHasMarkSections() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         let markCount = content.components(separatedBy: "MARK:").count - 1
         XCTAssertGreaterThanOrEqual(
             markCount, 4,
@@ -180,11 +131,8 @@ final class MultiTurnExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testMultiTurnExampleDoesNotUseForceUnwrap() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/MultiTurnExample/main.swift should be readable")
-            return
-        }
+    func testMultiTurnExampleDoesNotUseForceUnwrap() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         let lines = content.components(separatedBy: "\n")
         for line in lines {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
@@ -197,44 +145,32 @@ final class MultiTurnExampleComplianceTests: XCTestCase {
         }
     }
 
-    func testMultiTurnExampleDoesNotExposeRealAPIKeys() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/MultiTurnExample/main.swift should be readable")
-            return
-        }
+    func testMultiTurnExampleDoesNotExposeRealAPIKeys() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertFalse(
             content.contains("sk-ant-api03") || content.contains("sk-proj-"),
             "MultiTurnExample should not contain real API keys"
         )
     }
 
-    func testMultiTurnExampleUsesLoadDotEnvPattern() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/MultiTurnExample/main.swift should be readable")
-            return
-        }
+    func testMultiTurnExampleUsesLoadDotEnvPattern() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("loadDotEnv()"),
             "MultiTurnExample should use loadDotEnv() helper pattern"
         )
     }
 
-    func testMultiTurnExampleUsesGetEnvPattern() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/MultiTurnExample/main.swift should be readable")
-            return
-        }
+    func testMultiTurnExampleUsesGetEnvPattern() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("getEnv("),
             "MultiTurnExample should use getEnv() helper pattern for API key loading"
         )
     }
 
-    func testMultiTurnExampleUsesAssertions() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/MultiTurnExample/main.swift should be readable")
-            return
-        }
+    func testMultiTurnExampleUsesAssertions() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("assert("),
             "MultiTurnExample should use assert() for key validations"
@@ -243,22 +179,16 @@ final class MultiTurnExampleComplianceTests: XCTestCase {
 
     // MARK: - AC2: Multi-turn with SessionStore
 
-    func testMultiTurnExampleCreatesSessionStore() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/MultiTurnExample/main.swift should be readable")
-            return
-        }
+    func testMultiTurnExampleCreatesSessionStore() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("SessionStore(") || content.contains("SessionStore()"),
             "MultiTurnExample should create a SessionStore instance"
         )
     }
 
-    func testMultiTurnExampleCreatesAgentWithSessionStoreAndSessionId() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/MultiTurnExample/main.swift should be readable")
-            return
-        }
+    func testMultiTurnExampleCreatesAgentWithSessionStoreAndSessionId() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("sessionStore"),
             "MultiTurnExample should pass sessionStore to AgentOptions"
@@ -269,11 +199,8 @@ final class MultiTurnExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testMultiTurnExampleExecutesMultiplePrompts() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/MultiTurnExample/main.swift should be readable")
-            return
-        }
+    func testMultiTurnExampleExecutesMultiplePrompts() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // Count occurrences of .prompt( or agent.prompt(
         let promptCount = content.components(separatedBy: ".prompt(").count - 1
             + content.components(separatedBy: "agent.prompt(").count - 1
@@ -285,11 +212,8 @@ final class MultiTurnExampleComplianceTests: XCTestCase {
 
     // MARK: - AC3: Cross-turn Context Retention
 
-    func testMultiTurnExampleDemonstratesCrossTurnContext() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/MultiTurnExample/main.swift should be readable")
-            return
-        }
+    func testMultiTurnExampleDemonstratesCrossTurnContext() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // Should tell the agent a fact in turn 1 and ask about it in turn 2
         let hasNameFact = content.contains("name is") || content.contains("my name")
             || content.contains("remember") || content.contains("Remember")
@@ -299,11 +223,8 @@ final class MultiTurnExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testMultiTurnExampleAssertsContextRetention() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/MultiTurnExample/main.swift should be readable")
-            return
-        }
+    func testMultiTurnExampleAssertsContextRetention() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // Should have an assert that verifies the second response contains the context
         // Look for assert with context check (e.g., assert(response.contains("Nick")))
         let hasAssertWithContext = content.contains("assert(") &&
@@ -314,33 +235,24 @@ final class MultiTurnExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testMultiTurnExampleUsesBypassPermissions() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/MultiTurnExample/main.swift should be readable")
-            return
-        }
+    func testMultiTurnExampleUsesBypassPermissions() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("bypassPermissions") || content.contains(".bypassPermissions"),
             "MultiTurnExample should use permissionMode: .bypassPermissions"
         )
     }
 
-    func testMultiTurnExampleUsesCreateAgent() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/MultiTurnExample/main.swift should be readable")
-            return
-        }
+    func testMultiTurnExampleUsesCreateAgent() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("createAgent("),
             "MultiTurnExample should create an Agent using createAgent()"
         )
     }
 
-    func testMultiTurnExampleUsesAwait() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/MultiTurnExample/main.swift should be readable")
-            return
-        }
+    func testMultiTurnExampleUsesAwait() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("await"),
             "MultiTurnExample should use await for async operations"
@@ -349,33 +261,24 @@ final class MultiTurnExampleComplianceTests: XCTestCase {
 
     // MARK: - AC4: Message History Inspection
 
-    func testMultiTurnExampleLoadsSessionData() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/MultiTurnExample/main.swift should be readable")
-            return
-        }
+    func testMultiTurnExampleLoadsSessionData() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("sessionStore.load(") || content.contains(".load(sessionId:"),
             "MultiTurnExample should load session via sessionStore.load(sessionId:)"
         )
     }
 
-    func testMultiTurnExampleAccessesMessageCount() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/MultiTurnExample/main.swift should be readable")
-            return
-        }
+    func testMultiTurnExampleAccessesMessageCount() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("messageCount"),
             "MultiTurnExample should access metadata.messageCount from SessionData"
         )
     }
 
-    func testMultiTurnExamplePrintsMetadata() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/MultiTurnExample/main.swift should be readable")
-            return
-        }
+    func testMultiTurnExamplePrintsMetadata() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // Should reference at least model and timestamps
         let hasModel = content.contains("model")
         let hasCreatedAt = content.contains("createdAt")
@@ -386,11 +289,8 @@ final class MultiTurnExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testMultiTurnExampleAssertsMessageCountGreaterThanZero() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/MultiTurnExample/main.swift should be readable")
-            return
-        }
+    func testMultiTurnExampleAssertsMessageCountGreaterThanZero() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // Should assert messageCount > 0 or messageCount >= N
         let hasMessageCountAssert = content.contains("messageCount") &&
             content.contains("assert(")
@@ -402,22 +302,16 @@ final class MultiTurnExampleComplianceTests: XCTestCase {
 
     // MARK: - AC5: Streaming Multi-turn
 
-    func testMultiTurnExampleUsesStream() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/MultiTurnExample/main.swift should be readable")
-            return
-        }
+    func testMultiTurnExampleUsesStream() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains(".stream(") || content.contains("agent.stream("),
             "MultiTurnExample should use agent.stream() for a streaming turn"
         )
     }
 
-    func testMultiTurnExampleCollectsSDKMessageEvents() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/MultiTurnExample/main.swift should be readable")
-            return
-        }
+    func testMultiTurnExampleCollectsSDKMessageEvents() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // Should collect SDKMessage events from stream
         let hasSDKMessage = content.contains("SDKMessage")
         XCTAssertTrue(
@@ -426,11 +320,8 @@ final class MultiTurnExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testMultiTurnExampleAssertsStreamingResponseNonEmpty() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/MultiTurnExample/main.swift should be readable")
-            return
-        }
+    func testMultiTurnExampleAssertsStreamingResponseNonEmpty() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // Should assert that the streaming response is non-empty
         // Look for assert near stream-related code
         let streamSectionRange = content.range(of: "stream(")
@@ -447,22 +338,16 @@ final class MultiTurnExampleComplianceTests: XCTestCase {
 
     // MARK: - AC6: Session Cleanup
 
-    func testMultiTurnExampleDeletesSession() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/MultiTurnExample/main.swift should be readable")
-            return
-        }
+    func testMultiTurnExampleDeletesSession() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("sessionStore.delete(") || content.contains(".delete(sessionId:"),
             "MultiTurnExample should delete the session via sessionStore.delete(sessionId:)"
         )
     }
 
-    func testMultiTurnExampleAssertsDeletionSucceeded() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/MultiTurnExample/main.swift should be readable")
-            return
-        }
+    func testMultiTurnExampleAssertsDeletionSucceeded() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // After delete, should assert it returned true
         let deleteSectionRange = content.range(of: "delete(")
         XCTAssertNotNil(deleteSectionRange, "Should find delete( in example code")
@@ -476,11 +361,8 @@ final class MultiTurnExampleComplianceTests: XCTestCase {
         }
     }
 
-    func testMultiTurnExampleVerifiesSessionNoLongerExists() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/MultiTurnExample/main.swift should be readable")
-            return
-        }
+    func testMultiTurnExampleVerifiesSessionNoLongerExists() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // After deletion, should verify session is gone (nil check)
         let deleteSectionRange = content.range(of: "delete(")
         XCTAssertNotNil(deleteSectionRange, "Should find delete( in example code")
@@ -497,11 +379,8 @@ final class MultiTurnExampleComplianceTests: XCTestCase {
 
     // MARK: - AC1: Structure Validation
 
-    func testMultiTurnExampleHasFourParts() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/MultiTurnExample/main.swift should be readable")
-            return
-        }
+    func testMultiTurnExampleHasFourParts() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // Should have four distinct parts
         let partCount = content.components(separatedBy: "Part ").count - 1
             + content.components(separatedBy: "PART ").count - 1
@@ -511,11 +390,8 @@ final class MultiTurnExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testMultiTurnExampleUsesSpecificSessionId() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/MultiTurnExample/main.swift should be readable")
-            return
-        }
+    func testMultiTurnExampleUsesSpecificSessionId() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("multi-turn-demo"),
             "MultiTurnExample should use 'multi-turn-demo' as the session ID"

@@ -3,6 +3,9 @@ import XCTest
 
 final class APITypesTests: XCTestCase {
 
+    private static let testEncoder = JSONEncoder()
+    private static let testDecoder = JSONDecoder()
+
     // MARK: - APIRunStatus
 
     func testAPIRunStatusAllCases() {
@@ -31,8 +34,8 @@ final class APITypesTests: XCTestCase {
 
     func testAPIRunStatusCodableRoundTrip() throws {
         for status in APIRunStatus.allCases {
-            let encoded = try JSONEncoder().encode(status)
-            let decoded = try JSONDecoder().decode(APIRunStatus.self, from: encoded)
+            let encoded = try Self.testEncoder.encode(status)
+            let decoded = try Self.testDecoder.decode(APIRunStatus.self, from: encoded)
             XCTAssertEqual(decoded, status)
         }
     }
@@ -41,7 +44,7 @@ final class APITypesTests: XCTestCase {
 
     func testCreateRunRequestCodableRoundTrip() throws {
         let request = CreateRunRequest(task: "analyze data", maxSteps: 10, maxBatches: 3)
-        let encoded = try JSONEncoder().encode(request)
+        let encoded = try Self.testEncoder.encode(request)
         let jsonString = String(data: encoded, encoding: .utf8)!
 
         // Verify snake_case keys
@@ -49,20 +52,20 @@ final class APITypesTests: XCTestCase {
         XCTAssertTrue(jsonString.contains("\"max_steps\""))
         XCTAssertTrue(jsonString.contains("\"max_batches\""))
 
-        let decoded = try JSONDecoder().decode(CreateRunRequest.self, from: encoded)
+        let decoded = try Self.testDecoder.decode(CreateRunRequest.self, from: encoded)
         XCTAssertEqual(decoded, request)
     }
 
     func testCreateRunRequestMinimal() throws {
         let request = CreateRunRequest(task: "simple task")
-        let encoded = try JSONEncoder().encode(request)
+        let encoded = try Self.testEncoder.encode(request)
         let jsonString = String(data: encoded, encoding: .utf8)!
 
         // Optional fields should be absent when nil
         XCTAssertFalse(jsonString.contains("max_steps"))
         XCTAssertFalse(jsonString.contains("max_batches"))
 
-        let decoded = try JSONDecoder().decode(CreateRunRequest.self, from: encoded)
+        let decoded = try Self.testDecoder.decode(CreateRunRequest.self, from: encoded)
         XCTAssertEqual(decoded.task, "simple task")
         XCTAssertNil(decoded.maxSteps)
         XCTAssertNil(decoded.maxBatches)
@@ -78,14 +81,14 @@ final class APITypesTests: XCTestCase {
             createdAt: "2026-01-01T00:00:00Z",
             updatedAt: "2026-01-01T00:01:00Z"
         )
-        let encoded = try JSONEncoder().encode(response)
+        let encoded = try Self.testEncoder.encode(response)
         let jsonString = String(data: encoded, encoding: .utf8)!
 
         XCTAssertTrue(jsonString.contains("\"run_id\""))
         XCTAssertTrue(jsonString.contains("\"created_at\""))
         XCTAssertTrue(jsonString.contains("\"updated_at\""))
 
-        let decoded = try JSONDecoder().decode(RunResponse.self, from: encoded)
+        let decoded = try Self.testDecoder.decode(RunResponse.self, from: encoded)
         XCTAssertEqual(decoded, response)
     }
 
@@ -99,8 +102,8 @@ final class APITypesTests: XCTestCase {
 
     func testHealthResponseCodableRoundTrip() throws {
         let response = HealthResponse(status: "degraded", version: "2.0.0")
-        let encoded = try JSONEncoder().encode(response)
-        let decoded = try JSONDecoder().decode(HealthResponse.self, from: encoded)
+        let encoded = try Self.testEncoder.encode(response)
+        let decoded = try Self.testDecoder.decode(HealthResponse.self, from: encoded)
         XCTAssertEqual(decoded, response)
     }
 
@@ -108,8 +111,8 @@ final class APITypesTests: XCTestCase {
 
     func testAPIErrorResponseCodableRoundTrip() throws {
         let error = APIErrorResponse(error: "not_found", message: "Run not found: xyz")
-        let encoded = try JSONEncoder().encode(error)
-        let decoded = try JSONDecoder().decode(APIErrorResponse.self, from: encoded)
+        let encoded = try Self.testEncoder.encode(error)
+        let decoded = try Self.testDecoder.decode(APIErrorResponse.self, from: encoded)
         XCTAssertEqual(decoded, error)
     }
 
@@ -117,7 +120,7 @@ final class APITypesTests: XCTestCase {
 
     func testStepStartedDataCodingKeys() throws {
         let data = StepStartedData(stepIndex: 2, tool: "Bash")
-        let encoded = try JSONEncoder().encode(data)
+        let encoded = try Self.testEncoder.encode(data)
         let jsonString = String(data: encoded, encoding: .utf8)!
 
         XCTAssertTrue(jsonString.contains("\"step_index\""))
@@ -128,7 +131,7 @@ final class APITypesTests: XCTestCase {
 
     func testStepCompletedDataCodingKeys() throws {
         let data = StepCompletedData(stepIndex: 1, tool: "Read", success: true, durationMs: 500)
-        let encoded = try JSONEncoder().encode(data)
+        let encoded = try Self.testEncoder.encode(data)
         let jsonString = String(data: encoded, encoding: .utf8)!
 
         XCTAssertTrue(jsonString.contains("\"step_index\""))
@@ -138,8 +141,8 @@ final class APITypesTests: XCTestCase {
 
     func testStepCompletedDataWithoutDuration() throws {
         let data = StepCompletedData(stepIndex: 0, tool: "Bash", success: false)
-        let encoded = try JSONEncoder().encode(data)
-        let decoded = try JSONDecoder().decode(StepCompletedData.self, from: encoded)
+        let encoded = try Self.testEncoder.encode(data)
+        let decoded = try Self.testDecoder.decode(StepCompletedData.self, from: encoded)
         XCTAssertEqual(decoded, data)
         XCTAssertNil(decoded.durationMs)
     }
@@ -153,7 +156,7 @@ final class APITypesTests: XCTestCase {
             totalSteps: 5,
             durationMs: 3000
         )
-        let encoded = try JSONEncoder().encode(data)
+        let encoded = try Self.testEncoder.encode(data)
         let jsonString = String(data: encoded, encoding: .utf8)!
 
         XCTAssertTrue(jsonString.contains("\"run_id\""))
@@ -250,7 +253,7 @@ final class APITypesTests: XCTestCase {
 
     func testRunStartedDataCodingKeys() throws {
         let data = RunStartedData(runId: "run-42", task: "do work")
-        let encoded = try JSONEncoder().encode(data)
+        let encoded = try Self.testEncoder.encode(data)
         let jsonString = String(data: encoded, encoding: .utf8)!
 
         XCTAssertTrue(jsonString.contains("\"run_id\""))
@@ -259,8 +262,8 @@ final class APITypesTests: XCTestCase {
 
     func testRunStartedDataCodableRoundTrip() throws {
         let data = RunStartedData(runId: "run-99", task: "hello world")
-        let encoded = try JSONEncoder().encode(data)
-        let decoded = try JSONDecoder().decode(RunStartedData.self, from: encoded)
+        let encoded = try Self.testEncoder.encode(data)
+        let decoded = try Self.testDecoder.decode(RunStartedData.self, from: encoded)
         XCTAssertEqual(decoded, data)
     }
 
@@ -271,7 +274,7 @@ final class APITypesTests: XCTestCase {
             model: "claude-sonnet-4-6", inputTokens: 100, outputTokens: 50,
             cacheCreationInputTokens: 10, cacheReadInputTokens: 20, estimatedCostUsd: 0.003
         )
-        let encoded = try JSONEncoder().encode(data)
+        let encoded = try Self.testEncoder.encode(data)
         let jsonString = String(data: encoded, encoding: .utf8)!
 
         XCTAssertTrue(jsonString.contains("\"model\""))
@@ -287,8 +290,8 @@ final class APITypesTests: XCTestCase {
             model: "m", inputTokens: 1, outputTokens: 2,
             cacheCreationInputTokens: nil, cacheReadInputTokens: nil, estimatedCostUsd: 0.01
         )
-        let encoded = try JSONEncoder().encode(data)
-        let decoded = try JSONDecoder().decode(CostUpdateData.self, from: encoded)
+        let encoded = try Self.testEncoder.encode(data)
+        let decoded = try Self.testDecoder.decode(CostUpdateData.self, from: encoded)
         XCTAssertEqual(decoded, data)
         XCTAssertNil(decoded.cacheCreationInputTokens)
         XCTAssertNil(decoded.cacheReadInputTokens)
@@ -323,8 +326,8 @@ final class APITypesTests: XCTestCase {
         let original = AgentSSEEvent.stepStarted(StepStartedData(stepIndex: 3, tool: "Bash"))
         let persisted = PersistedSSEEvent(from: original)
 
-        let encoded = try JSONEncoder().encode(persisted)
-        let decoded = try JSONDecoder().decode(PersistedSSEEvent.self, from: encoded)
+        let encoded = try Self.testEncoder.encode(persisted)
+        let decoded = try Self.testDecoder.decode(PersistedSSEEvent.self, from: encoded)
         let restored = decoded.toSSEEvent()
 
         XCTAssertEqual(restored, original)
@@ -336,8 +339,8 @@ final class APITypesTests: XCTestCase {
         )
         let persisted = PersistedSSEEvent(from: original)
 
-        let encoded = try JSONEncoder().encode(persisted)
-        let decoded = try JSONDecoder().decode(PersistedSSEEvent.self, from: encoded)
+        let encoded = try Self.testEncoder.encode(persisted)
+        let decoded = try Self.testDecoder.decode(PersistedSSEEvent.self, from: encoded)
         let restored = decoded.toSSEEvent()
 
         XCTAssertEqual(restored, original)
@@ -347,8 +350,8 @@ final class APITypesTests: XCTestCase {
         let original = AgentSSEEvent.runStarted(RunStartedData(runId: "r-2", task: "build feature"))
         let persisted = PersistedSSEEvent(from: original)
 
-        let encoded = try JSONEncoder().encode(persisted)
-        let decoded = try JSONDecoder().decode(PersistedSSEEvent.self, from: encoded)
+        let encoded = try Self.testEncoder.encode(persisted)
+        let decoded = try Self.testDecoder.decode(PersistedSSEEvent.self, from: encoded)
         let restored = decoded.toSSEEvent()
 
         XCTAssertEqual(restored, original)
@@ -360,8 +363,8 @@ final class APITypesTests: XCTestCase {
         )
         let persisted = PersistedSSEEvent(from: original)
 
-        let encoded = try JSONEncoder().encode(persisted)
-        let decoded = try JSONDecoder().decode(PersistedSSEEvent.self, from: encoded)
+        let encoded = try Self.testEncoder.encode(persisted)
+        let decoded = try Self.testDecoder.decode(PersistedSSEEvent.self, from: encoded)
         let restored = decoded.toSSEEvent()
 
         XCTAssertEqual(restored, original)
@@ -373,8 +376,8 @@ final class APITypesTests: XCTestCase {
         )
         let persisted = PersistedSSEEvent(from: original)
 
-        let encoded = try JSONEncoder().encode(persisted)
-        let decoded = try JSONDecoder().decode(PersistedSSEEvent.self, from: encoded)
+        let encoded = try Self.testEncoder.encode(persisted)
+        let decoded = try Self.testDecoder.decode(PersistedSSEEvent.self, from: encoded)
         let restored = decoded.toSSEEvent()
 
         XCTAssertEqual(restored, original)
@@ -385,7 +388,7 @@ final class APITypesTests: XCTestCase {
         {"eventType":"unknown_event","stepStarted":null,"stepCompleted":null,"runStarted":null,"runCompleted":null,"costUpdate":null}
         """
         let data = Data(json.utf8)
-        let persisted = try JSONDecoder().decode(PersistedSSEEvent.self, from: data)
+        let persisted = try Self.testDecoder.decode(PersistedSSEEvent.self, from: data)
         XCTAssertNil(persisted.toSSEEvent())
     }
 
@@ -432,8 +435,8 @@ final class APITypesTests: XCTestCase {
             resultText: "analysis complete",
             error: nil
         )
-        let encoded = try JSONEncoder().encode(run)
-        let decoded = try JSONDecoder().decode(TrackedRun.self, from: encoded)
+        let encoded = try Self.testEncoder.encode(run)
+        let decoded = try Self.testDecoder.decode(TrackedRun.self, from: encoded)
         XCTAssertEqual(decoded, run)
     }
 
@@ -444,8 +447,8 @@ final class APITypesTests: XCTestCase {
             task: "minimal",
             createdAt: "2026-01-01T00:00:00Z"
         )
-        let encoded = try JSONEncoder().encode(run)
-        let decoded = try JSONDecoder().decode(TrackedRun.self, from: encoded)
+        let encoded = try Self.testEncoder.encode(run)
+        let decoded = try Self.testDecoder.decode(TrackedRun.self, from: encoded)
         XCTAssertEqual(decoded, run)
         XCTAssertNil(decoded.updatedAt)
         XCTAssertEqual(decoded.totalSteps, 0)

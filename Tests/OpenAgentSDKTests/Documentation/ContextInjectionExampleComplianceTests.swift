@@ -7,50 +7,16 @@ import Foundation
 
 final class ContextInjectionExampleComplianceTests: XCTestCase {
 
-    // MARK: - Helper: Resolve project root
-
-    /// Walk upward from this test file to find the directory containing Package.swift.
-    private func projectRoot() -> String {
-        let fileManager = FileManager.default
-        let testFileDir = URL(fileURLWithPath: #file).deletingLastPathComponent().path
-        var dir = testFileDir
-        for _ in 0..<10 {
-            let packagePath = dir + "/Package.swift"
-            if fileManager.fileExists(atPath: packagePath) {
-                return dir
-            }
-            let parent = URL(fileURLWithPath: dir).deletingLastPathComponent().path
-            if parent == dir { break }
-            dir = parent
-        }
-        return testFileDir
-    }
-
-    private func examplesDir() -> String {
-        return projectRoot() + "/Examples"
-    }
+    // MARK: - Helpers
 
     private func examplePath() -> String {
-        return examplesDir() + "/ContextInjectionExample/main.swift"
-    }
-
-    private func fileContent(_ path: String) -> String? {
-        return try? String(contentsOfFile: path, encoding: .utf8)
-    }
-
-    private func packageSwiftContent() -> String {
-        let path = projectRoot() + "/Package.swift"
-        guard let content = try? String(contentsOfFile: path, encoding: .utf8) else {
-            XCTFail("Package.swift should be readable")
-            return ""
-        }
-        return content
+        return DocumentationTestHelpers.examplesDir() + "/ContextInjectionExample/main.swift"
     }
 
     // MARK: - AC8: Package.swift executableTarget Configured
 
     func testPackageSwiftContainsContextInjectionExampleTarget() {
-        let content = packageSwiftContent()
+        let content = DocumentationTestHelpers.packageSwiftContent()
         XCTAssertTrue(
             content.contains("ContextInjectionExample"),
             "Package.swift should contain ContextInjectionExample executable target"
@@ -58,7 +24,7 @@ final class ContextInjectionExampleComplianceTests: XCTestCase {
     }
 
     func testContextInjectionExampleTargetDependsOnOpenAgentSDK() {
-        let content = packageSwiftContent()
+        let content = DocumentationTestHelpers.packageSwiftContent()
         XCTAssertTrue(
             content.contains("ContextInjectionExample"),
             "Package.swift should contain ContextInjectionExample target before checking dependencies"
@@ -78,7 +44,7 @@ final class ContextInjectionExampleComplianceTests: XCTestCase {
     }
 
     func testContextInjectionExampleTargetSpecifiesCorrectPath() {
-        let content = packageSwiftContent()
+        let content = DocumentationTestHelpers.packageSwiftContent()
         XCTAssertTrue(
             content.contains("ContextInjectionExample"),
             "Package.swift should contain ContextInjectionExample target before checking path"
@@ -103,7 +69,7 @@ final class ContextInjectionExampleComplianceTests: XCTestCase {
         let fileManager = FileManager.default
         var isDir: ObjCBool = false
         let exists = fileManager.fileExists(
-            atPath: examplesDir() + "/ContextInjectionExample",
+            atPath: DocumentationTestHelpers.examplesDir() + "/ContextInjectionExample",
             isDirectory: &isDir
         )
         XCTAssertTrue(exists, "Examples/ContextInjectionExample/ directory should exist")
@@ -118,22 +84,16 @@ final class ContextInjectionExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testContextInjectionExampleImportsOpenAgentSDK() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/ContextInjectionExample/main.swift should be readable")
-            return
-        }
+    func testContextInjectionExampleImportsOpenAgentSDK() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("import OpenAgentSDK"),
             "ContextInjectionExample should import OpenAgentSDK"
         )
     }
 
-    func testContextInjectionExampleImportsFoundation() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/ContextInjectionExample/main.swift should be readable")
-            return
-        }
+    func testContextInjectionExampleImportsFoundation() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("import Foundation"),
             "ContextInjectionExample should import Foundation"
@@ -142,11 +102,8 @@ final class ContextInjectionExampleComplianceTests: XCTestCase {
 
     // MARK: - AC1: Code Quality
 
-    func testContextInjectionExampleHasTopLevelDescriptionComment() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/ContextInjectionExample/main.swift should be readable")
-            return
-        }
+    func testContextInjectionExampleHasTopLevelDescriptionComment() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
         XCTAssertTrue(
             trimmed.hasPrefix("//"),
@@ -154,11 +111,8 @@ final class ContextInjectionExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testContextInjectionExampleHasMultipleInlineComments() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/ContextInjectionExample/main.swift should be readable")
-            return
-        }
+    func testContextInjectionExampleHasMultipleInlineComments() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         let commentLines = content.components(separatedBy: "\n")
             .filter { $0.trimmingCharacters(in: .whitespaces).hasPrefix("//") }
             .count
@@ -168,11 +122,8 @@ final class ContextInjectionExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testContextInjectionExampleHasMarkSections() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/ContextInjectionExample/main.swift should be readable")
-            return
-        }
+    func testContextInjectionExampleHasMarkSections() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         let markCount = content.components(separatedBy: "MARK:").count - 1
         XCTAssertGreaterThanOrEqual(
             markCount, 5,
@@ -180,11 +131,8 @@ final class ContextInjectionExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testContextInjectionExampleDoesNotUseForceUnwrap() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/ContextInjectionExample/main.swift should be readable")
-            return
-        }
+    func testContextInjectionExampleDoesNotUseForceUnwrap() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         let lines = content.components(separatedBy: "\n")
         for line in lines {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
@@ -197,44 +145,32 @@ final class ContextInjectionExampleComplianceTests: XCTestCase {
         }
     }
 
-    func testContextInjectionExampleDoesNotExposeRealAPIKeys() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/ContextInjectionExample/main.swift should be readable")
-            return
-        }
+    func testContextInjectionExampleDoesNotExposeRealAPIKeys() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertFalse(
             content.contains("sk-ant-api03") || content.contains("sk-proj-"),
             "ContextInjectionExample should not contain real API keys"
         )
     }
 
-    func testContextInjectionExampleUsesLoadDotEnvPattern() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/ContextInjectionExample/main.swift should be readable")
-            return
-        }
+    func testContextInjectionExampleUsesLoadDotEnvPattern() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("loadDotEnv()"),
             "ContextInjectionExample should use loadDotEnv() helper pattern"
         )
     }
 
-    func testContextInjectionExampleUsesGetEnvPattern() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/ContextInjectionExample/main.swift should be readable")
-            return
-        }
+    func testContextInjectionExampleUsesGetEnvPattern() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("getEnv("),
             "ContextInjectionExample should use getEnv() helper pattern for API key loading"
         )
     }
 
-    func testContextInjectionExampleUsesAssertions() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/ContextInjectionExample/main.swift should be readable")
-            return
-        }
+    func testContextInjectionExampleUsesAssertions() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("assert("),
             "ContextInjectionExample should use assert() for key validations"
@@ -243,22 +179,16 @@ final class ContextInjectionExampleComplianceTests: XCTestCase {
 
     // MARK: - AC2: FileCache Configuration and Hit/Miss Stats
 
-    func testContextInjectionExampleCreatesFileCache() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/ContextInjectionExample/main.swift should be readable")
-            return
-        }
+    func testContextInjectionExampleCreatesFileCache() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("FileCache("),
             "ContextInjectionExample should create a FileCache instance with custom parameters"
         )
     }
 
-    func testContextInjectionExampleConfiguresFileCacheParams() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/ContextInjectionExample/main.swift should be readable")
-            return
-        }
+    func testContextInjectionExampleConfiguresFileCacheParams() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // Should configure at least maxEntries
         XCTAssertTrue(
             content.contains("maxEntries"),
@@ -266,33 +196,24 @@ final class ContextInjectionExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testContextInjectionExampleUsesCacheSet() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/ContextInjectionExample/main.swift should be readable")
-            return
-        }
+    func testContextInjectionExampleUsesCacheSet() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains(".set(") || content.contains("cache.set("),
             "ContextInjectionExample should use cache.set() to store entries"
         )
     }
 
-    func testContextInjectionExampleUsesCacheGet() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/ContextInjectionExample/main.swift should be readable")
-            return
-        }
+    func testContextInjectionExampleUsesCacheGet() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains(".get(") || content.contains("cache.get("),
             "ContextInjectionExample should use cache.get() to retrieve entries"
         )
     }
 
-    func testContextInjectionExamplePrintsCacheStats() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/ContextInjectionExample/main.swift should be readable")
-            return
-        }
+    func testContextInjectionExamplePrintsCacheStats() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // Should reference stats object and at least one stat field
         let hasStats = content.contains("stats") || content.contains(".stats")
         let hasStatField = content.contains("hitCount") || content.contains("missCount")
@@ -304,11 +225,8 @@ final class ContextInjectionExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testContextInjectionExampleDemonstratesHitAndMiss() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/ContextInjectionExample/main.swift should be readable")
-            return
-        }
+    func testContextInjectionExampleDemonstratesHitAndMiss() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // Should demonstrate both cache hits and misses
         let hasHitCount = content.contains("hitCount")
         let hasMissCount = content.contains("missCount")
@@ -320,22 +238,16 @@ final class ContextInjectionExampleComplianceTests: XCTestCase {
 
     // MARK: - AC3: FileCache Invalidation
 
-    func testContextInjectionExampleUsesCacheInvalidate() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/ContextInjectionExample/main.swift should be readable")
-            return
-        }
+    func testContextInjectionExampleUsesCacheInvalidate() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains(".invalidate(") || content.contains("cache.invalidate("),
             "ContextInjectionExample should use cache.invalidate() to remove entries"
         )
     }
 
-    func testContextInjectionExampleVerifiesNilAfterInvalidation() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/ContextInjectionExample/main.swift should be readable")
-            return
-        }
+    func testContextInjectionExampleVerifiesNilAfterInvalidation() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // After invalidation, should verify the entry is gone (nil check)
         let hasNilCheck = content.contains("== nil") || content.contains("!= nil")
             || content.contains("is nil") || content.contains("guard let")
@@ -345,11 +257,8 @@ final class ContextInjectionExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testContextInjectionExampleDemonstratesEviction() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/ContextInjectionExample/main.swift should be readable")
-            return
-        }
+    func testContextInjectionExampleDemonstratesEviction() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // Should demonstrate eviction by exceeding maxEntries
         let hasEvictionCount = content.contains("evictionCount")
         XCTAssertTrue(
@@ -360,33 +269,24 @@ final class ContextInjectionExampleComplianceTests: XCTestCase {
 
     // MARK: - AC4: Git Context Collection
 
-    func testContextInjectionExampleCreatesGitContextCollector() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/ContextInjectionExample/main.swift should be readable")
-            return
-        }
+    func testContextInjectionExampleCreatesGitContextCollector() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("GitContextCollector(") || content.contains("GitContextCollector()"),
             "ContextInjectionExample should create a GitContextCollector instance"
         )
     }
 
-    func testContextInjectionExampleCallsCollectGitContext() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/ContextInjectionExample/main.swift should be readable")
-            return
-        }
+    func testContextInjectionExampleCallsCollectGitContext() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("collectGitContext("),
             "ContextInjectionExample should call collectGitContext(cwd:ttl:)"
         )
     }
 
-    func testContextInjectionExamplePrintsGitContextBlock() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/ContextInjectionExample/main.swift should be readable")
-            return
-        }
+    func testContextInjectionExamplePrintsGitContextBlock() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // Should print or reference the git-context XML block
         let hasGitContext = content.contains("git-context") || content.contains("<git-context>")
             || content.contains("git context") || content.contains("Git context")
@@ -396,11 +296,8 @@ final class ContextInjectionExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testContextInjectionExampleUsesTTLParameter() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/ContextInjectionExample/main.swift should be readable")
-            return
-        }
+    func testContextInjectionExampleUsesTTLParameter() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // Should pass a ttl parameter to collectGitContext
         XCTAssertTrue(
             content.contains("ttl:"),
@@ -410,44 +307,32 @@ final class ContextInjectionExampleComplianceTests: XCTestCase {
 
     // MARK: - AC5: Project Document Discovery
 
-    func testContextInjectionExampleCreatesProjectDocumentDiscovery() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/ContextInjectionExample/main.swift should be readable")
-            return
-        }
+    func testContextInjectionExampleCreatesProjectDocumentDiscovery() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("ProjectDocumentDiscovery(") || content.contains("ProjectDocumentDiscovery()"),
             "ContextInjectionExample should create a ProjectDocumentDiscovery instance"
         )
     }
 
-    func testContextInjectionExampleCallsCollectProjectContext() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/ContextInjectionExample/main.swift should be readable")
-            return
-        }
+    func testContextInjectionExampleCallsCollectProjectContext() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("collectProjectContext("),
             "ContextInjectionExample should call collectProjectContext()"
         )
     }
 
-    func testContextInjectionExampleAccessesGlobalInstructions() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/ContextInjectionExample/main.swift should be readable")
-            return
-        }
+    func testContextInjectionExampleAccessesGlobalInstructions() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("globalInstructions"),
             "ContextInjectionExample should access globalInstructions from ProjectContextResult"
         )
     }
 
-    func testContextInjectionExampleAccessesProjectInstructions() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/ContextInjectionExample/main.swift should be readable")
-            return
-        }
+    func testContextInjectionExampleAccessesProjectInstructions() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("projectInstructions"),
             "ContextInjectionExample should access projectInstructions from ProjectContextResult"
@@ -456,11 +341,8 @@ final class ContextInjectionExampleComplianceTests: XCTestCase {
 
     // MARK: - AC6: Custom Project Root
 
-    func testContextInjectionExampleDemonstratesExplicitProjectRoot() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/ContextInjectionExample/main.swift should be readable")
-            return
-        }
+    func testContextInjectionExampleDemonstratesExplicitProjectRoot() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // Should pass explicitProjectRoot parameter
         XCTAssertTrue(
             content.contains("explicitProjectRoot"),
@@ -468,11 +350,8 @@ final class ContextInjectionExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testContextInjectionExampleDemonstratesAutoDiscovery() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/ContextInjectionExample/main.swift should be readable")
-            return
-        }
+    func testContextInjectionExampleDemonstratesAutoDiscovery() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // Should also demonstrate auto-discovery by passing nil for explicitProjectRoot
         let hasNilRoot = content.contains("explicitProjectRoot: nil")
         XCTAssertTrue(
@@ -483,33 +362,24 @@ final class ContextInjectionExampleComplianceTests: XCTestCase {
 
     // MARK: - AC7: Agent Query with Context Injection
 
-    func testContextInjectionExampleUsesBypassPermissions() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/ContextInjectionExample/main.swift should be readable")
-            return
-        }
+    func testContextInjectionExampleUsesBypassPermissions() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("bypassPermissions") || content.contains(".bypassPermissions"),
             "ContextInjectionExample should use permissionMode: .bypassPermissions"
         )
     }
 
-    func testContextInjectionExampleUsesCreateAgent() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/ContextInjectionExample/main.swift should be readable")
-            return
-        }
+    func testContextInjectionExampleUsesCreateAgent() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("createAgent("),
             "ContextInjectionExample should create an Agent using createAgent()"
         )
     }
 
-    func testContextInjectionExampleSetsProjectRoot() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/ContextInjectionExample/main.swift should be readable")
-            return
-        }
+    func testContextInjectionExampleSetsProjectRoot() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // Should set projectRoot in AgentOptions
         XCTAssertTrue(
             content.contains("projectRoot"),
@@ -517,33 +387,24 @@ final class ContextInjectionExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testContextInjectionExampleExecutesQuery() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/ContextInjectionExample/main.swift should be readable")
-            return
-        }
+    func testContextInjectionExampleExecutesQuery() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("agent.prompt(") || content.contains(".prompt("),
             "ContextInjectionExample should execute an agent query via prompt()"
         )
     }
 
-    func testContextInjectionExampleUsesAwait() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/ContextInjectionExample/main.swift should be readable")
-            return
-        }
+    func testContextInjectionExampleUsesAwait() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("await"),
             "ContextInjectionExample should use await for async operations"
         )
     }
 
-    func testContextInjectionExampleHasFiveParts() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/ContextInjectionExample/main.swift should be readable")
-            return
-        }
+    func testContextInjectionExampleHasFiveParts() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // Should have five distinct parts
         let partCount = content.components(separatedBy: "Part ").count - 1
             + content.components(separatedBy: "PART ").count - 1

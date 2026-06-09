@@ -14,25 +14,6 @@ import XCTest
 /// TDD Phase: RED (feature not implemented yet)
 final class CronToolsTests: XCTestCase {
 
-    // MARK: - Helpers
-
-    /// Creates a ToolContext with an injected CronStore.
-    private func makeContext(cronStore: CronStore? = nil) -> ToolContext {
-        return ToolContext(
-            cwd: "/tmp",
-            toolUseId: "test-tool-use-id",
-            cronStore: cronStore
-        )
-    }
-
-    /// Creates a ToolContext without any CronStore (nil).
-    private func makeContextWithoutStore() -> ToolContext {
-        return ToolContext(
-            cwd: "/tmp",
-            toolUseId: "test-tool-use-id"
-        )
-    }
-
     // MARK: - AC2: CronCreate Tool -- Factory
 
     /// AC2 [P0]: createCronCreateTool() returns a ToolProtocol with name "CronCreate".
@@ -85,7 +66,7 @@ final class CronToolsTests: XCTestCase {
     func testCronCreate_success_returnsConfirmation() async throws {
         let cronStore = CronStore()
         let tool = createCronCreateTool()
-        let context = makeContext(cronStore: cronStore)
+        let context = makeTestToolContext(cronStore: cronStore)
 
         let input: [String: Any] = [
             "name": "Daily Report",
@@ -102,7 +83,7 @@ final class CronToolsTests: XCTestCase {
     func testCronCreate_success_includesJobId() async throws {
         let cronStore = CronStore()
         let tool = createCronCreateTool()
-        let context = makeContext(cronStore: cronStore)
+        let context = makeTestToolContext(cronStore: cronStore)
 
         let input: [String: Any] = [
             "name": "Hourly Cleanup",
@@ -118,7 +99,7 @@ final class CronToolsTests: XCTestCase {
     /// AC5 [P0]: CronCreate returns error when cronStore is nil.
     func testCronCreate_nilCronStore_returnsError() async throws {
         let tool = createCronCreateTool()
-        let context = makeContextWithoutStore()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = [
             "name": "test",
@@ -176,7 +157,7 @@ final class CronToolsTests: XCTestCase {
         let job = await cronStore.create(name: "delete-me", schedule: "*/5 * * * *", command: "cmd")
 
         let tool = createCronDeleteTool()
-        let context = makeContext(cronStore: cronStore)
+        let context = makeTestToolContext(cronStore: cronStore)
 
         let input: [String: Any] = ["id": job.id]
         let result = await tool.call(input: input, context: context)
@@ -190,7 +171,7 @@ final class CronToolsTests: XCTestCase {
         let cronStore = CronStore()
 
         let tool = createCronDeleteTool()
-        let context = makeContext(cronStore: cronStore)
+        let context = makeTestToolContext(cronStore: cronStore)
 
         let input: [String: Any] = ["id": "cron_999"]
         let result = await tool.call(input: input, context: context)
@@ -203,7 +184,7 @@ final class CronToolsTests: XCTestCase {
     /// AC5 [P0]: CronDelete returns error when cronStore is nil.
     func testCronDelete_nilCronStore_returnsError() async throws {
         let tool = createCronDeleteTool()
-        let context = makeContextWithoutStore()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = ["id": "cron_1"]
         let result = await tool.call(input: input, context: context)
@@ -257,7 +238,7 @@ final class CronToolsTests: XCTestCase {
         _ = await cronStore.create(name: "Weekly Report", schedule: "0 17 * * 5", command: "generate-report")
 
         let tool = createCronListTool()
-        let context = makeContext(cronStore: cronStore)
+        let context = makeTestToolContext(cronStore: cronStore)
 
         let input: [String: Any] = [:]
         let result = await tool.call(input: input, context: context)
@@ -272,7 +253,7 @@ final class CronToolsTests: XCTestCase {
         let cronStore = CronStore()
 
         let tool = createCronListTool()
-        let context = makeContext(cronStore: cronStore)
+        let context = makeTestToolContext(cronStore: cronStore)
 
         let input: [String: Any] = [:]
         let result = await tool.call(input: input, context: context)
@@ -284,7 +265,7 @@ final class CronToolsTests: XCTestCase {
     /// AC5 [P0]: CronList returns error when cronStore is nil.
     func testCronList_nilCronStore_returnsError() async throws {
         let tool = createCronListTool()
-        let context = makeContextWithoutStore()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = [:]
         let result = await tool.call(input: input, context: context)
@@ -299,7 +280,7 @@ final class CronToolsTests: XCTestCase {
     /// AC9 [P0]: CronCreate never throws -- always returns ToolResult even with malformed input.
     func testCronCreate_neverThrows_malformedInput() async throws {
         let tool = createCronCreateTool()
-        let context = makeContextWithoutStore()
+        let context = makeTestToolContext()
 
         let badInputs: [[String: Any]] = [
             [:],                          // empty dict (missing required fields)
@@ -317,7 +298,7 @@ final class CronToolsTests: XCTestCase {
     /// AC9 [P0]: CronDelete never throws -- always returns ToolResult even with malformed input.
     func testCronDelete_neverThrows_malformedInput() async throws {
         let tool = createCronDeleteTool()
-        let context = makeContextWithoutStore()
+        let context = makeTestToolContext()
 
         let badInputs: [[String: Any]] = [
             [:],                  // empty dict (missing required id)
@@ -333,7 +314,7 @@ final class CronToolsTests: XCTestCase {
     /// AC9 [P0]: CronList never throws -- always returns ToolResult.
     func testCronList_neverThrows_malformedInput() async throws {
         let tool = createCronListTool()
-        let context = makeContextWithoutStore()
+        let context = makeTestToolContext()
 
         let badInputs: [[String: Any]] = [
             [:],
@@ -417,7 +398,7 @@ final class CronToolsTests: XCTestCase {
 
         // Verify they work through ToolContext injection
         let cronStore = CronStore()
-        let context = makeContext(cronStore: cronStore)
+        let context = makeTestToolContext(cronStore: cronStore)
 
         // CronCreate should succeed
         let createResult = await createTool.call(
@@ -443,7 +424,7 @@ final class CronToolsTests: XCTestCase {
         let createTool = createCronCreateTool()
         let deleteTool = createCronDeleteTool()
         let listTool = createCronListTool()
-        let context = makeContext(cronStore: cronStore)
+        let context = makeTestToolContext(cronStore: cronStore)
 
         // Step 1: List initially empty
         let initialList = await listTool.call(input: [:], context: context)
@@ -479,7 +460,7 @@ final class CronToolsTests: XCTestCase {
         let cronStore = CronStore()
         let createTool = createCronCreateTool()
         let listTool = createCronListTool()
-        let context = makeContext(cronStore: cronStore)
+        let context = makeTestToolContext(cronStore: cronStore)
 
         // Create 3 cron jobs
         _ = await createTool.call(

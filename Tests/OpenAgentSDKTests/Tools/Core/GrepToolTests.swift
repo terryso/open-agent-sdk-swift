@@ -11,24 +11,7 @@ import XCTest
 ///   - Output modes, file type filters, head_limit, context lines work
 ///   - POSIX path resolution against ToolContext.cwd works
 /// TDD Phase: RED (feature not implemented yet)
-final class GrepToolTests: XCTestCase {
-
-    var tempDir: String!
-
-    override func setUp() {
-        super.setUp()
-        tempDir = NSTemporaryDirectory()
-            .appending("OpenAgentSDKTests-Grep-\(UUID().uuidString)")
-        try! FileManager.default.createDirectory(
-            atPath: tempDir,
-            withIntermediateDirectories: true
-        )
-    }
-
-    override func tearDown() {
-        try? FileManager.default.removeItem(atPath: tempDir)
-        super.tearDown()
-    }
+final class GrepToolTests: TempDirTestCase {
 
     // MARK: - Helpers
 
@@ -65,11 +48,7 @@ final class GrepToolTests: XCTestCase {
         input: [String: Any],
         cwd: String? = nil
     ) async -> ToolResult {
-        let context = ToolContext(
-            cwd: cwd ?? tempDir,
-            toolUseId: "test-\(UUID().uuidString)"
-        )
-        return await tool.call(input: input, context: context)
+        await callToolForTest(tool, input: input, cwd: cwd ?? tempDir)
     }
 
     // MARK: - AC4: Grep searches file content

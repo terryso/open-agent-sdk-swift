@@ -12,32 +12,13 @@ import XCTest
 /// TDD Phase: RED (feature not implemented yet)
 final class TodoWriteToolTests: XCTestCase {
 
-    // MARK: - Helpers
-
-    /// Creates a ToolContext with an injected TodoStore.
-    private func makeContext(todoStore: TodoStore? = nil) -> ToolContext {
-        return ToolContext(
-            cwd: "/tmp",
-            toolUseId: "test-tool-use-id",
-            todoStore: todoStore
-        )
-    }
-
-    /// Creates a ToolContext without any TodoStore (nil).
-    private func makeContextWithoutStore() -> ToolContext {
-        return ToolContext(
-            cwd: "/tmp",
-            toolUseId: "test-tool-use-id"
-        )
-    }
-
     // MARK: - AC2: TodoWrite Tool -- add operation
 
     /// AC2 [P0]: Adding a todo item returns success with confirmation message containing id and text.
     func testTodoWrite_add_success_returnsConfirmation() async throws {
         let todoStore = TodoStore()
         let tool = createTodoWriteTool()
-        let context = makeContext(todoStore: todoStore)
+        let context = makeTestToolContext(todoStore: todoStore)
 
         let input: [String: Any] = [
             "action": "add",
@@ -53,7 +34,7 @@ final class TodoWriteToolTests: XCTestCase {
     func testTodoWrite_add_success_includesId() async throws {
         let todoStore = TodoStore()
         let tool = createTodoWriteTool()
-        let context = makeContext(todoStore: todoStore)
+        let context = makeTestToolContext(todoStore: todoStore)
 
         let input: [String: Any] = [
             "action": "add",
@@ -69,7 +50,7 @@ final class TodoWriteToolTests: XCTestCase {
     func testTodoWrite_add_withPriority_returnsConfirmation() async throws {
         let todoStore = TodoStore()
         let tool = createTodoWriteTool()
-        let context = makeContext(todoStore: todoStore)
+        let context = makeTestToolContext(todoStore: todoStore)
 
         let input: [String: Any] = [
             "action": "add",
@@ -86,7 +67,7 @@ final class TodoWriteToolTests: XCTestCase {
     func testTodoWrite_add_sequentialIds() async throws {
         let todoStore = TodoStore()
         let tool = createTodoWriteTool()
-        let context = makeContext(todoStore: todoStore)
+        let context = makeTestToolContext(todoStore: todoStore)
 
         let result1 = await tool.call(
             input: ["action": "add", "text": "first"] as [String: Any],
@@ -109,7 +90,7 @@ final class TodoWriteToolTests: XCTestCase {
     func testTodoWrite_add_missingText_returnsError() async throws {
         let todoStore = TodoStore()
         let tool = createTodoWriteTool()
-        let context = makeContext(todoStore: todoStore)
+        let context = makeTestToolContext(todoStore: todoStore)
 
         let input: [String: Any] = [
             "action": "add"
@@ -124,7 +105,7 @@ final class TodoWriteToolTests: XCTestCase {
     func testTodoWrite_add_emptyText_returnsError() async throws {
         let todoStore = TodoStore()
         let tool = createTodoWriteTool()
-        let context = makeContext(todoStore: todoStore)
+        let context = makeTestToolContext(todoStore: todoStore)
 
         let input: [String: Any] = [
             "action": "add",
@@ -143,7 +124,7 @@ final class TodoWriteToolTests: XCTestCase {
         let todoStore = TodoStore()
         _ = await todoStore.add(text: "toggle me")
         let tool = createTodoWriteTool()
-        let context = makeContext(todoStore: todoStore)
+        let context = makeTestToolContext(todoStore: todoStore)
 
         let input: [String: Any] = [
             "action": "toggle",
@@ -161,7 +142,7 @@ final class TodoWriteToolTests: XCTestCase {
         _ = await todoStore.add(text: "already done")
         _ = try await todoStore.toggle(id: 1) // complete it first
         let tool = createTodoWriteTool()
-        let context = makeContext(todoStore: todoStore)
+        let context = makeTestToolContext(todoStore: todoStore)
 
         let input: [String: Any] = [
             "action": "toggle",
@@ -177,7 +158,7 @@ final class TodoWriteToolTests: XCTestCase {
     func testTodoWrite_toggle_nonexistentItem_returnsError() async throws {
         let todoStore = TodoStore()
         let tool = createTodoWriteTool()
-        let context = makeContext(todoStore: todoStore)
+        let context = makeTestToolContext(todoStore: todoStore)
 
         let input: [String: Any] = [
             "action": "toggle",
@@ -194,7 +175,7 @@ final class TodoWriteToolTests: XCTestCase {
     func testTodoWrite_toggle_missingId_returnsError() async throws {
         let todoStore = TodoStore()
         let tool = createTodoWriteTool()
-        let context = makeContext(todoStore: todoStore)
+        let context = makeTestToolContext(todoStore: todoStore)
 
         let input: [String: Any] = [
             "action": "toggle"
@@ -212,7 +193,7 @@ final class TodoWriteToolTests: XCTestCase {
         let todoStore = TodoStore()
         _ = await todoStore.add(text: "remove me")
         let tool = createTodoWriteTool()
-        let context = makeContext(todoStore: todoStore)
+        let context = makeTestToolContext(todoStore: todoStore)
 
         let input: [String: Any] = [
             "action": "remove",
@@ -229,7 +210,7 @@ final class TodoWriteToolTests: XCTestCase {
     func testTodoWrite_remove_nonexistentItem_returnsError() async throws {
         let todoStore = TodoStore()
         let tool = createTodoWriteTool()
-        let context = makeContext(todoStore: todoStore)
+        let context = makeTestToolContext(todoStore: todoStore)
 
         let input: [String: Any] = [
             "action": "remove",
@@ -246,7 +227,7 @@ final class TodoWriteToolTests: XCTestCase {
     func testTodoWrite_remove_missingId_returnsError() async throws {
         let todoStore = TodoStore()
         let tool = createTodoWriteTool()
-        let context = makeContext(todoStore: todoStore)
+        let context = makeTestToolContext(todoStore: todoStore)
 
         let input: [String: Any] = [
             "action": "remove"
@@ -266,7 +247,7 @@ final class TodoWriteToolTests: XCTestCase {
         _ = await todoStore.add(text: "Write tests")
 
         let tool = createTodoWriteTool()
-        let context = makeContext(todoStore: todoStore)
+        let context = makeTestToolContext(todoStore: todoStore)
 
         let input: [String: Any] = [
             "action": "list"
@@ -287,7 +268,7 @@ final class TodoWriteToolTests: XCTestCase {
         _ = try await todoStore.toggle(id: 2) // mark item 2 as done
 
         let tool = createTodoWriteTool()
-        let context = makeContext(todoStore: todoStore)
+        let context = makeTestToolContext(todoStore: todoStore)
 
         let input: [String: Any] = [
             "action": "list"
@@ -303,7 +284,7 @@ final class TodoWriteToolTests: XCTestCase {
     func testTodoWrite_list_empty_returnsNoTodosMessage() async throws {
         let todoStore = TodoStore()
         let tool = createTodoWriteTool()
-        let context = makeContext(todoStore: todoStore)
+        let context = makeTestToolContext(todoStore: todoStore)
 
         let input: [String: Any] = [
             "action": "list"
@@ -323,7 +304,7 @@ final class TodoWriteToolTests: XCTestCase {
         _ = await todoStore.add(text: "item 2")
 
         let tool = createTodoWriteTool()
-        let context = makeContext(todoStore: todoStore)
+        let context = makeTestToolContext(todoStore: todoStore)
 
         let input: [String: Any] = [
             "action": "clear"
@@ -341,7 +322,7 @@ final class TodoWriteToolTests: XCTestCase {
         _ = await todoStore.add(text: "item 2")
 
         let tool = createTodoWriteTool()
-        let context = makeContext(todoStore: todoStore)
+        let context = makeTestToolContext(todoStore: todoStore)
 
         // Clear
         _ = await tool.call(input: ["action": "clear"] as [String: Any], context: context)
@@ -356,7 +337,7 @@ final class TodoWriteToolTests: XCTestCase {
     /// AC7 [P0]: All actions return error when todoStore is nil -- add.
     func testTodoWrite_add_nilTodoStore_returnsError() async throws {
         let tool = createTodoWriteTool()
-        let context = makeContextWithoutStore()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = [
             "action": "add",
@@ -372,7 +353,7 @@ final class TodoWriteToolTests: XCTestCase {
     /// AC7 [P0]: All actions return error when todoStore is nil -- toggle.
     func testTodoWrite_toggle_nilTodoStore_returnsError() async throws {
         let tool = createTodoWriteTool()
-        let context = makeContextWithoutStore()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = [
             "action": "toggle",
@@ -388,7 +369,7 @@ final class TodoWriteToolTests: XCTestCase {
     /// AC7 [P0]: All actions return error when todoStore is nil -- remove.
     func testTodoWrite_remove_nilTodoStore_returnsError() async throws {
         let tool = createTodoWriteTool()
-        let context = makeContextWithoutStore()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = [
             "action": "remove",
@@ -404,7 +385,7 @@ final class TodoWriteToolTests: XCTestCase {
     /// AC7 [P0]: All actions return error when todoStore is nil -- list.
     func testTodoWrite_list_nilTodoStore_returnsError() async throws {
         let tool = createTodoWriteTool()
-        let context = makeContextWithoutStore()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = [
             "action": "list"
@@ -419,7 +400,7 @@ final class TodoWriteToolTests: XCTestCase {
     /// AC7 [P0]: All actions return error when todoStore is nil -- clear.
     func testTodoWrite_clear_nilTodoStore_returnsError() async throws {
         let tool = createTodoWriteTool()
-        let context = makeContextWithoutStore()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = [
             "action": "clear"
@@ -494,7 +475,7 @@ final class TodoWriteToolTests: XCTestCase {
     func testTodoWrite_unknownAction_returnsError() async throws {
         let todoStore = TodoStore()
         let tool = createTodoWriteTool()
-        let context = makeContext(todoStore: todoStore)
+        let context = makeTestToolContext(todoStore: todoStore)
 
         let input: [String: Any] = [
             "action": "unknown_action"
@@ -511,7 +492,7 @@ final class TodoWriteToolTests: XCTestCase {
     /// AC11 [P0]: TodoWrite never throws -- always returns ToolResult even with malformed input.
     func testTodoWrite_neverThrows_malformedInput() async throws {
         let tool = createTodoWriteTool()
-        let context = makeContextWithoutStore()
+        let context = makeTestToolContext()
 
         let badInputs: [[String: Any]] = [
             [:],                          // empty dict (missing required action)
@@ -595,7 +576,7 @@ final class TodoWriteToolTests: XCTestCase {
 
         // Verify it works through ToolContext injection
         let todoStore = TodoStore()
-        let context = makeContext(todoStore: todoStore)
+        let context = makeTestToolContext(todoStore: todoStore)
 
         // add should succeed
         let addResult = await tool.call(
@@ -627,7 +608,7 @@ final class TodoWriteToolTests: XCTestCase {
     func testIntegration_addListToggleRemoveClear_fullLifecycle() async throws {
         let todoStore = TodoStore()
         let tool = createTodoWriteTool()
-        let context = makeContext(todoStore: todoStore)
+        let context = makeTestToolContext(todoStore: todoStore)
 
         // Step 1: List initially empty
         let initialList = await tool.call(input: ["action": "list"] as [String: Any], context: context)

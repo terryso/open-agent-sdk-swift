@@ -1,53 +1,10 @@
 import XCTest
 @testable import OpenAgentSDK
 
-final class SkillUsageTrackerTests: XCTestCase {
-
-    private var tempDir: String!
-
-    override func setUp() {
-        super.setUp()
-        tempDir = (NSTemporaryDirectory() as NSString)
-            .appendingPathComponent("skill-usage-tracker-tests-\(UUID().uuidString)")
-        try? FileManager.default.createDirectory(
-            atPath: tempDir,
-            withIntermediateDirectories: true
-        )
-    }
-
-    override func tearDown() {
-        if let tempDir {
-            try? FileManager.default.removeItem(atPath: tempDir)
-        }
-        super.tearDown()
-    }
-
-    // MARK: - Helpers
+final class SkillUsageTrackerTests: TempDirTestCase {
 
     private func makeStore() -> SkillUsageStore {
         SkillUsageStore(skillsDir: tempDir)
-    }
-
-    private func date(daysAgo: Int) -> Date {
-        Calendar.current.date(byAdding: .day, value: -daysAgo, to: Date())!
-    }
-
-    private func seedSkill(
-        store: SkillUsageStore,
-        name: String,
-        viewCount: Int = 10,
-        lastViewedAt: Date?,
-        pinned: Bool = false,
-        provenance: SkillProvenance = .userDefined
-    ) async throws {
-        let data = SkillUsageData(
-            skillName: name,
-            viewCount: viewCount,
-            lastViewedAt: lastViewedAt,
-            pinned: pinned,
-            provenance: provenance
-        )
-        try await store.setUsage(skillName: name, data: data)
     }
 
     // MARK: - Active → Deprecated after staleAfterDays

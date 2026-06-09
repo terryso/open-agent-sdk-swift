@@ -33,7 +33,7 @@ final class SessionRestoreMockURLProtocol: URLProtocol {
     override func startLoading() {
         var capturedRequest = request
         if capturedRequest.httpBody == nil, let stream = capturedRequest.httpBodyStream {
-            capturedRequest.httpBody = Self.readBodyFromStream(stream)
+            capturedRequest.httpBody = readRequestBodyFromStream(stream)
         }
 
         SessionRestoreMockURLProtocol.lastRequest = capturedRequest
@@ -85,24 +85,6 @@ final class SessionRestoreMockURLProtocol: URLProtocol {
         client?.urlProtocolDidFinishLoading(self)
     }
 
-    private static func readBodyFromStream(_ stream: InputStream) -> Data? {
-        stream.open()
-        defer { stream.close() }
-
-        let bufferSize = 4096
-        var data = Data()
-        var buffer = [UInt8](repeating: 0, count: bufferSize)
-
-        while stream.hasBytesAvailable {
-            let bytesRead = stream.read(&buffer, maxLength: bufferSize)
-            if bytesRead < 0 { return nil }
-            if bytesRead == 0 { break }
-            data.append(buffer, count: bytesRead)
-        }
-
-        return data
-    }
-
     override func stopLoading() {}
 
     static func reset() {
@@ -130,9 +112,7 @@ extension XCTestCase {
         sessionId: String? = nil,
         eventBus: EventBus? = nil
     ) -> Agent {
-        let sessionConfig = URLSessionConfiguration.ephemeral
-        sessionConfig.protocolClasses = [SessionRestoreMockURLProtocol.self]
-        let urlSession = URLSession(configuration: sessionConfig)
+        let urlSession = makeMockURLSession(protocolClass: SessionRestoreMockURLProtocol.self)
 
         let client = AnthropicClient(apiKey: apiKey, baseURL: nil, urlSession: urlSession)
 
@@ -208,29 +188,16 @@ extension XCTestCase {
 ///   - `Agent.stream()` implements session restore logic
 ///   - Auto-save after prompt/stream is implemented
 /// TDD Phase: RED (feature not implemented yet)
-final class AgentPromptSessionRestoreTests: XCTestCase {
-
-    // MARK: - Properties
-
-    private var tempDir: String!
+final class AgentPromptSessionRestoreTests: TempDirTestCase {
 
     // MARK: - Setup / Teardown
 
     override func setUp() {
         super.setUp()
         SessionRestoreMockURLProtocol.reset()
-        tempDir = (NSTemporaryDirectory() as NSString)
-            .appendingPathComponent("session-restore-tests-\(UUID().uuidString)")
-        try? FileManager.default.createDirectory(
-            atPath: tempDir,
-            withIntermediateDirectories: true
-        )
     }
 
     override func tearDown() {
-        if let tempDir {
-            try? FileManager.default.removeItem(atPath: tempDir)
-        }
         SessionRestoreMockURLProtocol.reset()
         super.tearDown()
     }
@@ -365,29 +332,16 @@ final class AgentPromptSessionRestoreTests: XCTestCase {
 
 // MARK: - AC2: Agent.stream() with sessionId Restores History
 
-final class AgentStreamSessionRestoreTests: XCTestCase {
-
-    // MARK: - Properties
-
-    private var tempDir: String!
+final class AgentStreamSessionRestoreTests: TempDirTestCase {
 
     // MARK: - Setup / Teardown
 
     override func setUp() {
         super.setUp()
         SessionRestoreMockURLProtocol.reset()
-        tempDir = (NSTemporaryDirectory() as NSString)
-            .appendingPathComponent("stream-restore-tests-\(UUID().uuidString)")
-        try? FileManager.default.createDirectory(
-            atPath: tempDir,
-            withIntermediateDirectories: true
-        )
     }
 
     override func tearDown() {
-        if let tempDir {
-            try? FileManager.default.removeItem(atPath: tempDir)
-        }
         SessionRestoreMockURLProtocol.reset()
         super.tearDown()
     }

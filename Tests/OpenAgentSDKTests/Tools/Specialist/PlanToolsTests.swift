@@ -13,25 +13,6 @@ import XCTest
 /// TDD Phase: RED (feature not implemented yet)
 final class PlanToolsTests: XCTestCase {
 
-    // MARK: - Helpers
-
-    /// Creates a ToolContext with an injected PlanStore.
-    private func makeContext(planStore: PlanStore? = nil) -> ToolContext {
-        return ToolContext(
-            cwd: "/tmp",
-            toolUseId: "test-tool-use-id",
-            planStore: planStore
-        )
-    }
-
-    /// Creates a ToolContext without any PlanStore (nil).
-    private func makeContextWithoutStore() -> ToolContext {
-        return ToolContext(
-            cwd: "/tmp",
-            toolUseId: "test-tool-use-id"
-        )
-    }
-
     // MARK: - AC2: EnterPlanMode Tool -- Factory
 
     /// AC2 [P0]: createEnterPlanModeTool() returns a ToolProtocol with name "EnterPlanMode".
@@ -73,7 +54,7 @@ final class PlanToolsTests: XCTestCase {
     func testEnterPlanMode_success_returnsConfirmation() async throws {
         let planStore = PlanStore()
         let tool = createEnterPlanModeTool()
-        let context = makeContext(planStore: planStore)
+        let context = makeTestToolContext(planStore: planStore)
 
         let input: [String: Any] = [:]
         let result = await tool.call(input: input, context: context)
@@ -90,7 +71,7 @@ final class PlanToolsTests: XCTestCase {
         _ = try await planStore.enterPlanMode()
 
         let tool = createEnterPlanModeTool()
-        let context = makeContext(planStore: planStore)
+        let context = makeTestToolContext(planStore: planStore)
 
         let input: [String: Any] = [:]
         let result = await tool.call(input: input, context: context)
@@ -104,7 +85,7 @@ final class PlanToolsTests: XCTestCase {
     /// AC5 [P0]: EnterPlanMode returns error when planStore is nil.
     func testEnterPlanMode_nilPlanStore_returnsError() async throws {
         let tool = createEnterPlanModeTool()
-        let context = makeContextWithoutStore()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = [:]
         let result = await tool.call(input: input, context: context)
@@ -163,7 +144,7 @@ final class PlanToolsTests: XCTestCase {
         _ = try await planStore.enterPlanMode()
 
         let tool = createExitPlanModeTool()
-        let context = makeContext(planStore: planStore)
+        let context = makeTestToolContext(planStore: planStore)
 
         let input: [String: Any] = [
             "plan": "Step 1: Design\nStep 2: Implement",
@@ -182,7 +163,7 @@ final class PlanToolsTests: XCTestCase {
         // No active plan
 
         let tool = createExitPlanModeTool()
-        let context = makeContext(planStore: planStore)
+        let context = makeTestToolContext(planStore: planStore)
 
         let input: [String: Any] = ["plan": "test"]
         let result = await tool.call(input: input, context: context)
@@ -196,7 +177,7 @@ final class PlanToolsTests: XCTestCase {
     /// AC5 [P0]: ExitPlanMode returns error when planStore is nil.
     func testExitPlanMode_nilPlanStore_returnsError() async throws {
         let tool = createExitPlanModeTool()
-        let context = makeContextWithoutStore()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = ["plan": "test"]
         let result = await tool.call(input: input, context: context)
@@ -211,7 +192,7 @@ final class PlanToolsTests: XCTestCase {
     /// AC9 [P0]: EnterPlanMode never throws -- always returns ToolResult even with malformed input.
     func testEnterPlanMode_neverThrows_malformedInput() async throws {
         let tool = createEnterPlanModeTool()
-        let context = makeContextWithoutStore()
+        let context = makeTestToolContext()
 
         let badInputs: [[String: Any]] = [
             [:],                    // empty dict (valid for EnterPlanMode)
@@ -228,7 +209,7 @@ final class PlanToolsTests: XCTestCase {
     /// AC9 [P0]: ExitPlanMode never throws -- always returns ToolResult even with malformed input.
     func testExitPlanMode_neverThrows_malformedInput() async throws {
         let tool = createExitPlanModeTool()
-        let context = makeContextWithoutStore()
+        let context = makeTestToolContext()
 
         let badInputs: [[String: Any]] = [
             [:],                    // empty dict
@@ -309,7 +290,7 @@ final class PlanToolsTests: XCTestCase {
 
         // Verify they work through ToolContext injection
         let planStore = PlanStore()
-        let context = makeContext(planStore: planStore)
+        let context = makeTestToolContext(planStore: planStore)
 
         // EnterPlanMode should succeed
         let enterResult = await enterTool.call(input: [:], context: context)
@@ -330,7 +311,7 @@ final class PlanToolsTests: XCTestCase {
         let planStore = PlanStore()
         let enterTool = createEnterPlanModeTool()
         let exitTool = createExitPlanModeTool()
-        let context = makeContext(planStore: planStore)
+        let context = makeTestToolContext(planStore: planStore)
 
         // Step 1: Enter plan mode
         let enterResult = await enterTool.call(input: [:], context: context)
@@ -362,7 +343,7 @@ final class PlanToolsTests: XCTestCase {
     func testIntegration_enterPlanModeTwice_returnsAlreadyInPlanMode() async throws {
         let planStore = PlanStore()
         let enterTool = createEnterPlanModeTool()
-        let context = makeContext(planStore: planStore)
+        let context = makeTestToolContext(planStore: planStore)
 
         // Step 1: Enter plan mode successfully
         let firstEnter = await enterTool.call(input: [:], context: context)

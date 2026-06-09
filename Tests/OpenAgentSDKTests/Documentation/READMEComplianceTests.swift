@@ -7,31 +7,12 @@ import Foundation
 
 final class READMEComplianceTests: XCTestCase {
 
-    // MARK: - Helper: Resolve project root
-
-    /// Walk upward from this test file to find the directory containing Package.swift.
-    private func projectRoot() -> String {
-        let fileManager = FileManager.default
-        let testFileDir = URL(fileURLWithPath: #file).deletingLastPathComponent().path
-        var dir = testFileDir
-        for _ in 0..<10 {
-            let packagePath = dir + "/Package.swift"
-            if fileManager.fileExists(atPath: packagePath) {
-                return dir
-            }
-            let parent = URL(fileURLWithPath: dir).deletingLastPathComponent().path
-            if parent == dir { break }
-            dir = parent
-        }
-        return testFileDir
-    }
-
     private func readmePath() -> String {
-        return projectRoot() + "/README.md"
+        return DocumentationTestHelpers.projectRoot() + "/README.md"
     }
 
     private func readmeCNPath() -> String {
-        return projectRoot() + "/README_CN.md"
+        return DocumentationTestHelpers.projectRoot() + "/README_CN.md"
     }
 
     private func readmeContent() -> String {

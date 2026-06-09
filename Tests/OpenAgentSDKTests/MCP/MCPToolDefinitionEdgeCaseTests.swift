@@ -5,10 +5,6 @@ import XCTest
 /// and mock client interactions.
 final class MCPToolDefinitionEdgeCaseTests: XCTestCase {
 
-    private func makeContext(toolUseId: String = "test-id") -> ToolContext {
-        return ToolContext(cwd: "/tmp", toolUseId: toolUseId)
-    }
-
     // MARK: - Precondition: serverName must not contain "__"
 
     func testInit_doubleUnderscoreInServerName_crashes() {
@@ -76,7 +72,7 @@ final class MCPToolDefinitionEdgeCaseTests: XCTestCase {
             mcpClient: mockClient
         )
 
-        let ctx = makeContext()
+        let ctx = makeTestToolContext()
         let result = await tool.call(input: ["key": "value"], context: ctx)
 
         XCTAssertFalse(result.isError)
@@ -93,7 +89,7 @@ final class MCPToolDefinitionEdgeCaseTests: XCTestCase {
             mcpClient: mockClient
         )
 
-        let ctx = makeContext()
+        let ctx = makeTestToolContext()
         // Non-dict input should be converted to empty dict
         let result = await tool.call(input: "string-input", context: ctx)
         XCTAssertFalse(result.isError)
@@ -115,7 +111,7 @@ final class MCPToolDefinitionEdgeCaseTests: XCTestCase {
             mcpClient: mockClient
         )
 
-        let ctx = makeContext()
+        let ctx = makeTestToolContext()
         let result = await tool.call(input: [:], context: ctx)
         XCTAssertFalse(result.isError)
     }
@@ -135,7 +131,7 @@ final class MCPToolDefinitionEdgeCaseTests: XCTestCase {
             mcpClient: mockClient
         )
 
-        let ctx = makeContext(toolUseId: "err-123")
+        let ctx = makeTestToolContext(toolUseId: "err-123")
         let result = await tool.call(input: [:], context: ctx)
 
         XCTAssertTrue(result.isError)
@@ -152,7 +148,7 @@ final class MCPToolDefinitionEdgeCaseTests: XCTestCase {
             mcpClient: nil
         )
 
-        let ctx = makeContext()
+        let ctx = makeTestToolContext()
         let result = await tool.call(input: [:], context: ctx)
 
         XCTAssertTrue(result.isError)

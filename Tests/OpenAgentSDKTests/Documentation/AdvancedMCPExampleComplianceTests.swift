@@ -7,50 +7,16 @@ import Foundation
 
 final class AdvancedMCPExampleComplianceTests: XCTestCase {
 
-    // MARK: - Helper: Resolve project root
-
-    /// Walk upward from this test file to find the directory containing Package.swift.
-    private func projectRoot() -> String {
-        let fileManager = FileManager.default
-        let testFileDir = URL(fileURLWithPath: #file).deletingLastPathComponent().path
-        var dir = testFileDir
-        for _ in 0..<10 {
-            let packagePath = dir + "/Package.swift"
-            if fileManager.fileExists(atPath: packagePath) {
-                return dir
-            }
-            let parent = URL(fileURLWithPath: dir).deletingLastPathComponent().path
-            if parent == dir { break }
-            dir = parent
-        }
-        return testFileDir
-    }
-
-    private func examplesDir() -> String {
-        return projectRoot() + "/Examples"
-    }
+    // MARK: - Helpers
 
     private func examplePath() -> String {
-        return examplesDir() + "/AdvancedMCPExample/main.swift"
-    }
-
-    private func fileContent(_ path: String) -> String? {
-        return try? String(contentsOfFile: path, encoding: .utf8)
-    }
-
-    private func packageSwiftContent() -> String {
-        let path = projectRoot() + "/Package.swift"
-        guard let content = try? String(contentsOfFile: path, encoding: .utf8) else {
-            XCTFail("Package.swift should be readable")
-            return ""
-        }
-        return content
+        return DocumentationTestHelpers.examplesDir() + "/AdvancedMCPExample/main.swift"
     }
 
     // MARK: - AC6: Package.swift executableTarget Configured
 
     func testPackageSwiftContainsAdvancedMCPExampleTarget() {
-        let content = packageSwiftContent()
+        let content = DocumentationTestHelpers.packageSwiftContent()
         XCTAssertTrue(
             content.contains("AdvancedMCPExample"),
             "Package.swift should contain AdvancedMCPExample executable target"
@@ -58,7 +24,7 @@ final class AdvancedMCPExampleComplianceTests: XCTestCase {
     }
 
     func testAdvancedMCPExampleTargetDependsOnOpenAgentSDK() {
-        let content = packageSwiftContent()
+        let content = DocumentationTestHelpers.packageSwiftContent()
         XCTAssertTrue(
             content.contains("AdvancedMCPExample"),
             "Package.swift should contain AdvancedMCPExample target before checking dependencies"
@@ -78,7 +44,7 @@ final class AdvancedMCPExampleComplianceTests: XCTestCase {
     }
 
     func testAdvancedMCPExampleTargetDependsOnMCPProduct() {
-        let content = packageSwiftContent()
+        let content = DocumentationTestHelpers.packageSwiftContent()
         XCTAssertTrue(
             content.contains("AdvancedMCPExample"),
             "Package.swift should contain AdvancedMCPExample target before checking MCP dependency"
@@ -98,7 +64,7 @@ final class AdvancedMCPExampleComplianceTests: XCTestCase {
     }
 
     func testAdvancedMCPExampleTargetSpecifiesCorrectPath() {
-        let content = packageSwiftContent()
+        let content = DocumentationTestHelpers.packageSwiftContent()
         XCTAssertTrue(
             content.contains("AdvancedMCPExample"),
             "Package.swift should contain AdvancedMCPExample target before checking path"
@@ -140,7 +106,7 @@ final class AdvancedMCPExampleComplianceTests: XCTestCase {
         let fileManager = FileManager.default
         var isDir: ObjCBool = false
         let exists = fileManager.fileExists(
-            atPath: examplesDir() + "/AdvancedMCPExample",
+            atPath: DocumentationTestHelpers.examplesDir() + "/AdvancedMCPExample",
             isDirectory: &isDir
         )
         XCTAssertTrue(exists, "Examples/AdvancedMCPExample/ directory should exist")
@@ -155,33 +121,24 @@ final class AdvancedMCPExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testAdvancedMCPExampleImportsOpenAgentSDK() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/AdvancedMCPExample/main.swift should be readable")
-            return
-        }
+    func testAdvancedMCPExampleImportsOpenAgentSDK() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("import OpenAgentSDK"),
             "AdvancedMCPExample should import OpenAgentSDK"
         )
     }
 
-    func testAdvancedMCPExampleImportsFoundation() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/AdvancedMCPExample/main.swift should be readable")
-            return
-        }
+    func testAdvancedMCPExampleImportsFoundation() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("import Foundation"),
             "AdvancedMCPExample should import Foundation for ProcessInfo"
         )
     }
 
-    func testAdvancedMCPExampleImportsMCP() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/AdvancedMCPExample/main.swift should be readable")
-            return
-        }
+    func testAdvancedMCPExampleImportsMCP() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("import MCP"),
             "AdvancedMCPExample should import MCP (required for InProcessMCPServer)"
@@ -190,22 +147,16 @@ final class AdvancedMCPExampleComplianceTests: XCTestCase {
 
     // MARK: - AC2: Demonstrates defineTool() Creating Custom Tools with Codable Input
 
-    func testAdvancedMCPExampleUsesDefineTool() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/AdvancedMCPExample/main.swift should be readable")
-            return
-        }
+    func testAdvancedMCPExampleUsesDefineTool() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("defineTool("),
             "AdvancedMCPExample should use defineTool() to create custom tools"
         )
     }
 
-    func testAdvancedMCPExampleDefinesAtLeastTwoCustomTools() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/AdvancedMCPExample/main.swift should be readable")
-            return
-        }
+    func testAdvancedMCPExampleDefinesAtLeastTwoCustomTools() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         let defineToolCount = content.components(separatedBy: "defineTool(").count - 1
         XCTAssertGreaterThanOrEqual(
             defineToolCount, 2,
@@ -213,11 +164,8 @@ final class AdvancedMCPExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testAdvancedMCPExampleUsesCodableInputStructs() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/AdvancedMCPExample/main.swift should be readable")
-            return
-        }
+    func testAdvancedMCPExampleUsesCodableInputStructs() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // Should define Codable input structs for tools
         XCTAssertTrue(
             content.contains("Codable"),
@@ -225,11 +173,8 @@ final class AdvancedMCPExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testAdvancedMCPExampleDefinesToolWithJSONSchema() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/AdvancedMCPExample/main.swift should be readable")
-            return
-        }
+    func testAdvancedMCPExampleDefinesToolWithJSONSchema() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // Tool definitions should include inputSchema with JSON Schema
         let hasSchema = content.contains("\"type\": \"object\"") ||
             content.contains("\"type\":\"object\"")
@@ -239,11 +184,8 @@ final class AdvancedMCPExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testAdvancedMCPExampleUsesToolExecuteResultVariant() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/AdvancedMCPExample/main.swift should be readable")
-            return
-        }
+    func testAdvancedMCPExampleUsesToolExecuteResultVariant() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // At least one tool should use the ToolExecuteResult variant (for error handling demo)
         XCTAssertTrue(
             content.contains("ToolExecuteResult"),
@@ -253,22 +195,16 @@ final class AdvancedMCPExampleComplianceTests: XCTestCase {
 
     // MARK: - AC3: Demonstrates InProcessMCPServer Wrapping Tools
 
-    func testAdvancedMCPExampleUsesInProcessMCPServer() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/AdvancedMCPExample/main.swift should be readable")
-            return
-        }
+    func testAdvancedMCPExampleUsesInProcessMCPServer() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("InProcessMCPServer("),
             "AdvancedMCPExample should use InProcessMCPServer to wrap custom tools"
         )
     }
 
-    func testAdvancedMCPExampleServerNameDoesNotContainDoubleUnderscore() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/AdvancedMCPExample/main.swift should be readable")
-            return
-        }
+    func testAdvancedMCPExampleServerNameDoesNotContainDoubleUnderscore() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // Extract InProcessMCPServer name parameter and verify no "__"
         let lines = content.components(separatedBy: "\n")
         for line in lines {
@@ -285,11 +221,8 @@ final class AdvancedMCPExampleComplianceTests: XCTestCase {
         }
     }
 
-    func testAdvancedMCPExamplePassesToolsToInProcessMCPServer() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/AdvancedMCPExample/main.swift should be readable")
-            return
-        }
+    func testAdvancedMCPExamplePassesToolsToInProcessMCPServer() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // InProcessMCPServer init takes tools: [ToolProtocol]
         let hasServerWithTools = content.contains("InProcessMCPServer(") &&
             content.contains("tools:")
@@ -299,22 +232,16 @@ final class AdvancedMCPExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testAdvancedMCPExampleUsesAsConfig() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/AdvancedMCPExample/main.swift should be readable")
-            return
-        }
+    func testAdvancedMCPExampleUsesAsConfig() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("asConfig()"),
             "AdvancedMCPExample should use asConfig() to generate SDK configuration from InProcessMCPServer"
         )
     }
 
-    func testAdvancedMCPExampleUsesAwaitForAsConfig() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/AdvancedMCPExample/main.swift should be readable")
-            return
-        }
+    func testAdvancedMCPExampleUsesAwaitForAsConfig() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // asConfig() is on an actor, so it requires await
         XCTAssertTrue(
             content.contains("await") && content.contains("asConfig()"),
@@ -324,22 +251,16 @@ final class AdvancedMCPExampleComplianceTests: XCTestCase {
 
     // MARK: - AC4: Agent Connects via mcpServers Configuration
 
-    func testAdvancedMCPExampleUsesAgentOptionsWithMcpServers() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/AdvancedMCPExample/main.swift should be readable")
-            return
-        }
+    func testAdvancedMCPExampleUsesAgentOptionsWithMcpServers() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("mcpServers:"),
             "AdvancedMCPExample should pass mcpServers: parameter in AgentOptions"
         )
     }
 
-    func testAdvancedMCPExampleMcpServersUsesSDKConfig() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/AdvancedMCPExample/main.swift should be readable")
-            return
-        }
+    func testAdvancedMCPExampleMcpServersUsesSDKConfig() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // The mcpServers value should be derived from asConfig() result
         XCTAssertTrue(
             content.contains("McpServerConfig") || content.contains("asConfig()"),
@@ -347,44 +268,32 @@ final class AdvancedMCPExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testAdvancedMCPExampleUsesBypassPermissions() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/AdvancedMCPExample/main.swift should be readable")
-            return
-        }
+    func testAdvancedMCPExampleUsesBypassPermissions() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains(".bypassPermissions"),
             "AdvancedMCPExample should use .bypassPermissions to avoid permission prompts"
         )
     }
 
-    func testAdvancedMCPExampleUsesCreateAgent() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/AdvancedMCPExample/main.swift should be readable")
-            return
-        }
+    func testAdvancedMCPExampleUsesCreateAgent() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("createAgent("),
             "AdvancedMCPExample should use createAgent() factory function"
         )
     }
 
-    func testAdvancedMCPExampleUsesAgentPrompt() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/AdvancedMCPExample/main.swift should be readable")
-            return
-        }
+    func testAdvancedMCPExampleUsesAgentPrompt() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("agent.prompt("),
             "AdvancedMCPExample should use agent.prompt() to send queries"
         )
     }
 
-    func testAdvancedMCPExampleUsesAwaitForPrompt() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/AdvancedMCPExample/main.swift should be readable")
-            return
-        }
+    func testAdvancedMCPExampleUsesAwaitForPrompt() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("await agent.prompt("),
             "AdvancedMCPExample should use 'await agent.prompt()' — the blocking async API"
@@ -393,11 +302,8 @@ final class AdvancedMCPExampleComplianceTests: XCTestCase {
 
     // MARK: - AC5: Demonstrates Tool Error Handling
 
-    func testAdvancedMCPExampleHasErrorHandlingTool() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/AdvancedMCPExample/main.swift should be readable")
-            return
-        }
+    func testAdvancedMCPExampleHasErrorHandlingTool() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // Should have at least one tool that can return an error (using ToolExecuteResult)
         // This tool should set isError: true under certain conditions
         XCTAssertTrue(
@@ -406,11 +312,8 @@ final class AdvancedMCPExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testAdvancedMCPExampleCreatesToolExecuteResultWithError() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/AdvancedMCPExample/main.swift should be readable")
-            return
-        }
+    func testAdvancedMCPExampleCreatesToolExecuteResultWithError() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // ToolExecuteResult(content: "...", isError: true) should appear
         XCTAssertTrue(
             content.contains("ToolExecuteResult(content:") && content.contains("isError:"),
@@ -418,11 +321,8 @@ final class AdvancedMCPExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testAdvancedMCPExampleDemonstratesErrorHandling() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/AdvancedMCPExample/main.swift should be readable")
-            return
-        }
+    func testAdvancedMCPExampleDemonstratesErrorHandling() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // Should have a section/part that demonstrates error handling
         let hasErrorSection = content.contains("Part 4") ||
             content.contains("error") ||
@@ -436,11 +336,8 @@ final class AdvancedMCPExampleComplianceTests: XCTestCase {
 
     // MARK: - AC7: Uses Actual Public API Signatures
 
-    func testAdvancedMCPExampleAgentOptionsUsesRealParameterNames() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/AdvancedMCPExample/main.swift should be readable")
-            return
-        }
+    func testAdvancedMCPExampleAgentOptionsUsesRealParameterNames() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         if content.contains("AgentOptions(") {
             let validParams = [
                 "apiKey:", "model:", "systemPrompt:", "maxTurns:",
@@ -459,22 +356,16 @@ final class AdvancedMCPExampleComplianceTests: XCTestCase {
         }
     }
 
-    func testAdvancedMCPExampleUsesCreateAgentWithOptions() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/AdvancedMCPExample/main.swift should be readable")
-            return
-        }
+    func testAdvancedMCPExampleUsesCreateAgentWithOptions() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("createAgent(options:") || content.contains("createAgent(options: "),
             "AdvancedMCPExample should use createAgent(options: AgentOptions(...))"
         )
     }
 
-    func testAdvancedMCPExampleQueryResultMatchesSourceType() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/AdvancedMCPExample/main.swift should be readable")
-            return
-        }
+    func testAdvancedMCPExampleQueryResultMatchesSourceType() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // QueryResult properties should match source: text, usage, numTurns, durationMs, status, totalCostUsd
         let requiredProperties = ["text", "numTurns", "durationMs", "totalCostUsd"]
         for prop in requiredProperties {
@@ -485,11 +376,8 @@ final class AdvancedMCPExampleComplianceTests: XCTestCase {
         }
     }
 
-    func testAdvancedMCPExampleDefineToolSignatureMatchesSource() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/AdvancedMCPExample/main.swift should be readable")
-            return
-        }
+    func testAdvancedMCPExampleDefineToolSignatureMatchesSource() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // defineTool should use: name:, description:, inputSchema:, and execute closure
         // The name parameter should be present
         let hasNameParam = content.contains("name:") && content.contains("description:")
@@ -499,11 +387,8 @@ final class AdvancedMCPExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testAdvancedMCPExampleInProcessMCPServerInitMatchesSource() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/AdvancedMCPExample/main.swift should be readable")
-            return
-        }
+    func testAdvancedMCPExampleInProcessMCPServerInitMatchesSource() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // InProcessMCPServer init: name:, version:, tools:, cwd:
         let hasInitParams = content.contains("InProcessMCPServer(") &&
             (content.contains("version:") || content.contains("tools:"))
@@ -515,11 +400,8 @@ final class AdvancedMCPExampleComplianceTests: XCTestCase {
 
     // MARK: - AC8: Clear Comments and No Exposed Keys
 
-    func testAdvancedMCPExampleHasTopLevelDescriptionComment() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/AdvancedMCPExample/main.swift should be readable")
-            return
-        }
+    func testAdvancedMCPExampleHasTopLevelDescriptionComment() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
         XCTAssertTrue(
             trimmed.hasPrefix("//"),
@@ -527,11 +409,8 @@ final class AdvancedMCPExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testAdvancedMCPExampleHasMultipleInlineComments() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/AdvancedMCPExample/main.swift should be readable")
-            return
-        }
+    func testAdvancedMCPExampleHasMultipleInlineComments() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         let commentLines = content.components(separatedBy: "\n")
             .filter { $0.trimmingCharacters(in: .whitespaces).hasPrefix("//") }
             .count
@@ -541,11 +420,8 @@ final class AdvancedMCPExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testAdvancedMCPExampleDoesNotExposeRealAPIKeys() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/AdvancedMCPExample/main.swift should be readable")
-            return
-        }
+    func testAdvancedMCPExampleDoesNotExposeRealAPIKeys() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         let lines = content.components(separatedBy: "\n")
         for line in lines {
             if line.contains("sk-") && !line.contains("sk-...") && !line.contains("sk-xxx") {
@@ -565,11 +441,8 @@ final class AdvancedMCPExampleComplianceTests: XCTestCase {
         }
     }
 
-    func testAdvancedMCPExampleUsesPlaceholderOrEnvVarForAPIKey() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/AdvancedMCPExample/main.swift should be readable")
-            return
-        }
+    func testAdvancedMCPExampleUsesPlaceholderOrEnvVarForAPIKey() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         if content.contains("apiKey:") {
             let usesPlaceholder = content.contains("sk-...") || content.contains("sk-xxx")
             let usesEnvVar = content.contains("ProcessInfo.processInfo.environment") ||
@@ -581,11 +454,8 @@ final class AdvancedMCPExampleComplianceTests: XCTestCase {
         }
     }
 
-    func testAdvancedMCPExampleDoesNotUseForceUnwrap() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/AdvancedMCPExample/main.swift should be readable")
-            return
-        }
+    func testAdvancedMCPExampleDoesNotUseForceUnwrap() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         let lines = content.components(separatedBy: "\n")
         for line in lines {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
@@ -601,11 +471,8 @@ final class AdvancedMCPExampleComplianceTests: XCTestCase {
 
     // MARK: - Code Structure (MARK Sections)
 
-    func testAdvancedMCPExampleHasMarkSectionsForParts() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/AdvancedMCPExample/main.swift should be readable")
-            return
-        }
+    func testAdvancedMCPExampleHasMarkSectionsForParts() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // Should have at least Part 1 (custom tools) and Part 2 (InProcessMCPServer) sections
         let hasPart1 = content.contains("Part 1") || content.contains("自定义工具") || content.contains("Custom")
         let hasPart2 = content.contains("Part 2") || content.contains("InProcessMCPServer") || content.contains("服务器")

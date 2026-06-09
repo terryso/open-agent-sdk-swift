@@ -1,26 +1,7 @@
 import XCTest
 @testable import OpenAgentSDK
 
-final class SkillCuratorTests: XCTestCase {
-
-    private var tempDir: String!
-
-    override func setUp() {
-        super.setUp()
-        tempDir = (NSTemporaryDirectory() as NSString)
-            .appendingPathComponent("skill-curator-tests-\(UUID().uuidString)")
-        try? FileManager.default.createDirectory(
-            atPath: tempDir,
-            withIntermediateDirectories: true
-        )
-    }
-
-    override func tearDown() {
-        if let tempDir {
-            try? FileManager.default.removeItem(atPath: tempDir)
-        }
-        super.tearDown()
-    }
+final class SkillCuratorTests: TempDirTestCase {
 
     // MARK: - Helpers
 
@@ -30,28 +11,6 @@ final class SkillCuratorTests: XCTestCase {
 
     private func makeCuratorStore() -> SkillCuratorStore {
         SkillCuratorStore(skillsDir: tempDir)
-    }
-
-    private func date(daysAgo: Int) -> Date {
-        Calendar.current.date(byAdding: .day, value: -daysAgo, to: Date())!
-    }
-
-    private func seedSkill(
-        store: SkillUsageStore,
-        name: String,
-        viewCount: Int = 10,
-        lastViewedAt: Date?,
-        pinned: Bool = false,
-        provenance: SkillProvenance = .agentCreated
-    ) async throws {
-        let data = SkillUsageData(
-            skillName: name,
-            viewCount: viewCount,
-            lastViewedAt: lastViewedAt,
-            pinned: pinned,
-            provenance: provenance
-        )
-        try await store.setUsage(skillName: name, data: data)
     }
 
     // MARK: - shouldRun
@@ -116,7 +75,8 @@ final class SkillCuratorTests: XCTestCase {
         // Seed an agent-created stale skill
         try await seedSkill(
             store: usageStore, name: "old-agent-skill",
-            viewCount: 5, lastViewedAt: date(daysAgo: 35)
+            viewCount: 5, lastViewedAt: date(daysAgo: 35),
+            provenance: .agentCreated
         )
 
         let curator = SkillCurator(
@@ -228,7 +188,8 @@ final class SkillCuratorTests: XCTestCase {
 
         try await seedSkill(
             store: usageStore, name: "stale-skill",
-            viewCount: 5, lastViewedAt: date(daysAgo: 35)
+            viewCount: 5, lastViewedAt: date(daysAgo: 35),
+            provenance: .agentCreated
         )
 
         let curator = SkillCurator(
@@ -349,13 +310,15 @@ final class SkillCuratorTests: XCTestCase {
         // Agent-created stale → should transition
         try await seedSkill(
             store: usageStore, name: "agent-stale",
-            viewCount: 5, lastViewedAt: date(daysAgo: 35)
+            viewCount: 5, lastViewedAt: date(daysAgo: 35),
+            provenance: .agentCreated
         )
 
         // Agent-created fresh → no transition
         try await seedSkill(
             store: usageStore, name: "agent-fresh",
-            viewCount: 5, lastViewedAt: date(daysAgo: 5)
+            viewCount: 5, lastViewedAt: date(daysAgo: 5),
+            provenance: .agentCreated
         )
 
         // Bundled stale → skipped
@@ -369,7 +332,8 @@ final class SkillCuratorTests: XCTestCase {
         try await seedSkill(
             store: usageStore, name: "pinned-agent",
             viewCount: 5, lastViewedAt: date(daysAgo: 100),
-            pinned: true
+            pinned: true,
+            provenance: .agentCreated
         )
 
         let curator = SkillCurator(
@@ -402,7 +366,8 @@ final class SkillCuratorTests: XCTestCase {
         let usageStore = makeUsageStore()
         try await seedSkill(
             store: usageStore, name: "valid-skill",
-            viewCount: 5, lastViewedAt: date(daysAgo: 5)
+            viewCount: 5, lastViewedAt: date(daysAgo: 5),
+            provenance: .agentCreated
         )
 
         let curator = SkillCurator(

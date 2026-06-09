@@ -14,14 +14,6 @@ final class NotebookEditToolTests: XCTestCase {
 
     // MARK: - Helpers
 
-    /// Creates a ToolContext with a temp directory as cwd.
-    private func makeContext(cwd: String = "/tmp") -> ToolContext {
-        return ToolContext(
-            cwd: cwd,
-            toolUseId: "test-tool-use-id"
-        )
-    }
-
     /// Creates a minimal valid .ipynb notebook at the given path.
     private func createTestNotebook(at path: String, cells: [[String: Any]] = []) throws {
         let notebook: [String: Any] = [
@@ -105,7 +97,7 @@ final class NotebookEditToolTests: XCTestCase {
         try createTestNotebook(at: notebookPath, cells: cells)
 
         let tool = createNotebookEditTool()
-        let context = makeContext(cwd: tempDir)
+        let context = makeTestToolContext(cwd: tempDir)
 
         let input: [String: Any] = [
             "file_path": notebookPath,
@@ -136,7 +128,7 @@ final class NotebookEditToolTests: XCTestCase {
         try createTestNotebook(at: notebookPath, cells: cells)
 
         let tool = createNotebookEditTool()
-        let context = makeContext(cwd: tempDir)
+        let context = makeTestToolContext(cwd: tempDir)
 
         let input: [String: Any] = [
             "file_path": notebookPath,
@@ -166,7 +158,7 @@ final class NotebookEditToolTests: XCTestCase {
         try createTestNotebook(at: notebookPath, cells: cells)
 
         let tool = createNotebookEditTool()
-        let context = makeContext(cwd: tempDir)
+        let context = makeTestToolContext(cwd: tempDir)
 
         let input: [String: Any] = [
             "file_path": notebookPath,
@@ -198,7 +190,7 @@ final class NotebookEditToolTests: XCTestCase {
         try createTestNotebook(at: notebookPath, cells: cells)
 
         let tool = createNotebookEditTool()
-        let context = makeContext(cwd: tempDir)
+        let context = makeTestToolContext(cwd: tempDir)
 
         let input: [String: Any] = [
             "file_path": notebookPath,
@@ -227,7 +219,7 @@ final class NotebookEditToolTests: XCTestCase {
         try createTestNotebook(at: notebookPath, cells: [])
 
         let tool = createNotebookEditTool()
-        let context = makeContext(cwd: tempDir)
+        let context = makeTestToolContext(cwd: tempDir)
 
         let input: [String: Any] = [
             "file_path": notebookPath,
@@ -257,7 +249,7 @@ final class NotebookEditToolTests: XCTestCase {
         try createTestNotebook(at: notebookPath, cells: [])
 
         let tool = createNotebookEditTool()
-        let context = makeContext(cwd: tempDir)
+        let context = makeTestToolContext(cwd: tempDir)
 
         let input: [String: Any] = [
             "file_path": notebookPath,
@@ -291,7 +283,7 @@ final class NotebookEditToolTests: XCTestCase {
         try createTestNotebook(at: notebookPath, cells: [])
 
         let tool = createNotebookEditTool()
-        let context = makeContext(cwd: tempDir)
+        let context = makeTestToolContext(cwd: tempDir)
 
         let input: [String: Any] = [
             "file_path": notebookPath,
@@ -326,7 +318,7 @@ final class NotebookEditToolTests: XCTestCase {
         try createTestNotebook(at: notebookPath, cells: cells)
 
         let tool = createNotebookEditTool()
-        let context = makeContext(cwd: tempDir)
+        let context = makeTestToolContext(cwd: tempDir)
 
         let input: [String: Any] = [
             "file_path": notebookPath,
@@ -354,7 +346,7 @@ final class NotebookEditToolTests: XCTestCase {
         try createTestNotebook(at: notebookPath, cells: [])
 
         let tool = createNotebookEditTool()
-        let context = makeContext(cwd: tempDir)
+        let context = makeTestToolContext(cwd: tempDir)
 
         let input: [String: Any] = [
             "file_path": notebookPath,
@@ -387,7 +379,7 @@ final class NotebookEditToolTests: XCTestCase {
         try createTestNotebook(at: notebookPath, cells: cells)
 
         let tool = createNotebookEditTool()
-        let context = makeContext(cwd: tempDir)
+        let context = makeTestToolContext(cwd: tempDir)
 
         let input: [String: Any] = [
             "file_path": notebookPath,
@@ -420,7 +412,7 @@ final class NotebookEditToolTests: XCTestCase {
         try createTestNotebook(at: notebookPath, cells: cells)
 
         let tool = createNotebookEditTool()
-        let context = makeContext(cwd: tempDir)
+        let context = makeTestToolContext(cwd: tempDir)
 
         let input: [String: Any] = [
             "file_path": notebookPath,
@@ -451,7 +443,7 @@ final class NotebookEditToolTests: XCTestCase {
         try createTestNotebook(at: notebookPath, cells: cells)
 
         let tool = createNotebookEditTool()
-        let context = makeContext(cwd: tempDir)
+        let context = makeTestToolContext(cwd: tempDir)
 
         let input: [String: Any] = [
             "file_path": notebookPath,
@@ -481,7 +473,7 @@ final class NotebookEditToolTests: XCTestCase {
         try createTestNotebook(at: notebookPath, cells: cells)
 
         let tool = createNotebookEditTool()
-        let context = makeContext(cwd: tempDir)
+        let context = makeTestToolContext(cwd: tempDir)
 
         let input: [String: Any] = [
             "file_path": notebookPath,
@@ -502,7 +494,7 @@ final class NotebookEditToolTests: XCTestCase {
     /// AC4 [P0]: Operating on a non-existent file returns isError=true.
     func testNotebookEdit_fileNotFound_returnsError() async throws {
         let tool = createNotebookEditTool()
-        let context = makeContext()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = [
             "file_path": "/tmp/nonexistent-\(UUID().uuidString).ipynb",
@@ -530,7 +522,7 @@ final class NotebookEditToolTests: XCTestCase {
         try "this is not json".write(toFile: notebookPath, atomically: true, encoding: .utf8)
 
         let tool = createNotebookEditTool()
-        let context = makeContext(cwd: tempDir)
+        let context = makeTestToolContext(cwd: tempDir)
 
         let input: [String: Any] = [
             "file_path": notebookPath,
@@ -556,7 +548,7 @@ final class NotebookEditToolTests: XCTestCase {
         try data.write(to: URL(fileURLWithPath: notebookPath))
 
         let tool = createNotebookEditTool()
-        let context = makeContext(cwd: tempDir)
+        let context = makeTestToolContext(cwd: tempDir)
 
         let input: [String: Any] = [
             "file_path": notebookPath,
@@ -586,7 +578,7 @@ final class NotebookEditToolTests: XCTestCase {
         try data.write(to: URL(fileURLWithPath: notebookPath))
 
         let tool = createNotebookEditTool()
-        let context = makeContext(cwd: tempDir)
+        let context = makeTestToolContext(cwd: tempDir)
 
         let input: [String: Any] = [
             "file_path": notebookPath,
@@ -613,7 +605,7 @@ final class NotebookEditToolTests: XCTestCase {
         try createTestNotebook(at: notebookPath, cells: cells)
 
         let tool = createNotebookEditTool()
-        let context = makeContext(cwd: tempDir)
+        let context = makeTestToolContext(cwd: tempDir)
 
         let input: [String: Any] = [
             "file_path": notebookPath,
@@ -644,7 +636,7 @@ final class NotebookEditToolTests: XCTestCase {
         try createTestNotebook(at: notebookPath, cells: cells)
 
         let tool = createNotebookEditTool()
-        let context = makeContext(cwd: tempDir)
+        let context = makeTestToolContext(cwd: tempDir)
 
         let input: [String: Any] = [
             "file_path": notebookPath,
@@ -665,7 +657,7 @@ final class NotebookEditToolTests: XCTestCase {
         try createTestNotebook(at: notebookPath, cells: [])
 
         let tool = createNotebookEditTool()
-        let context = makeContext(cwd: tempDir)
+        let context = makeTestToolContext(cwd: tempDir)
 
         let input: [String: Any] = [
             "file_path": notebookPath,
@@ -690,7 +682,7 @@ final class NotebookEditToolTests: XCTestCase {
         try createTestNotebook(at: notebookPath, cells: cells)
 
         let tool = createNotebookEditTool()
-        let context = makeContext(cwd: tempDir)
+        let context = makeTestToolContext(cwd: tempDir)
 
         let input: [String: Any] = [
             "file_path": notebookPath,
@@ -714,7 +706,7 @@ final class NotebookEditToolTests: XCTestCase {
         try createTestNotebook(at: notebookPath, cells: cells)
 
         let tool = createNotebookEditTool()
-        let context = makeContext(cwd: tempDir)
+        let context = makeTestToolContext(cwd: tempDir)
 
         let input: [String: Any] = [
             "file_path": notebookPath,
@@ -737,7 +729,7 @@ final class NotebookEditToolTests: XCTestCase {
         try createTestNotebook(at: notebookPath, cells: cells)
 
         let tool = createNotebookEditTool()
-        let context = makeContext(cwd: tempDir)
+        let context = makeTestToolContext(cwd: tempDir)
 
         let input: [String: Any] = [
             "file_path": notebookPath,
@@ -845,7 +837,7 @@ final class NotebookEditToolTests: XCTestCase {
 
         let tool = createNotebookEditTool()
         // Use cwd=tempDir, pass relative path "subdir/notebook.ipynb"
-        let context = makeContext(cwd: tempDir)
+        let context = makeTestToolContext(cwd: tempDir)
 
         let input: [String: Any] = [
             "file_path": "subdir/notebook.ipynb",
@@ -875,7 +867,7 @@ final class NotebookEditToolTests: XCTestCase {
         try createTestNotebook(at: notebookPath, cells: [])
 
         let tool = createNotebookEditTool()
-        let context = makeContext(cwd: tempDir)
+        let context = makeTestToolContext(cwd: tempDir)
 
         let input: [String: Any] = [
             "file_path": notebookPath,
@@ -908,7 +900,7 @@ final class NotebookEditToolTests: XCTestCase {
         try createTestNotebook(at: notebookPath, cells: [])
 
         let tool = createNotebookEditTool()
-        let context = makeContext(cwd: tempDir)
+        let context = makeTestToolContext(cwd: tempDir)
 
         let input: [String: Any] = [
             "file_path": notebookPath,
@@ -930,7 +922,7 @@ final class NotebookEditToolTests: XCTestCase {
     /// AC4 [P0]: NotebookEdit never throws -- always returns ToolResult even with malformed input.
     func testNotebookEdit_neverThrows_malformedInput() async throws {
         let tool = createNotebookEditTool()
-        let context = makeContext()
+        let context = makeTestToolContext()
 
         let badInputs: [[String: Any]] = [
             [:],  // missing all fields
@@ -955,7 +947,7 @@ final class NotebookEditToolTests: XCTestCase {
         try createTestNotebook(at: notebookPath, cells: cells)
 
         let tool = createNotebookEditTool()
-        let context = makeContext(cwd: tempDir)
+        let context = makeTestToolContext(cwd: tempDir)
 
         let input: [String: Any] = [
             "file_path": notebookPath,
@@ -980,7 +972,7 @@ final class NotebookEditToolTests: XCTestCase {
         try createTestNotebook(at: notebookPath, cells: cells)
 
         let tool = createNotebookEditTool()
-        let context = makeContext(cwd: tempDir)
+        let context = makeTestToolContext(cwd: tempDir)
 
         let input: [String: Any] = [
             "file_path": notebookPath,
@@ -1010,7 +1002,7 @@ final class NotebookEditToolTests: XCTestCase {
         try createTestNotebook(at: notebookPath, cells: cells)
 
         let tool = createNotebookEditTool()
-        let context = makeContext(cwd: tempDir)
+        let context = makeTestToolContext(cwd: tempDir)
 
         let input: [String: Any] = [
             "file_path": notebookPath,

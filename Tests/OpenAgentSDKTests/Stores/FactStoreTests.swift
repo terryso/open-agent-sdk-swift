@@ -1,26 +1,7 @@
 import XCTest
 @testable import OpenAgentSDK
 
-final class FactStoreTests: XCTestCase {
-
-    private var tempDir: String!
-
-    override func setUp() {
-        super.setUp()
-        tempDir = (NSTemporaryDirectory() as NSString)
-            .appendingPathComponent("fact-store-tests-\(UUID().uuidString)")
-        try? FileManager.default.createDirectory(
-            atPath: tempDir,
-            withIntermediateDirectories: true
-        )
-    }
-
-    override func tearDown() {
-        if let tempDir {
-            try? FileManager.default.removeItem(atPath: tempDir)
-        }
-        super.tearDown()
-    }
+final class FactStoreTests: TempDirTestCase {
 
     private func makeFact(
         domain: String = "test",
@@ -104,8 +85,7 @@ final class FactStoreTests: XCTestCase {
 
     func testLazyMigrationFromKnowledgeEntry() async throws {
         // Write a legacy KnowledgeEntry file
-        let dateFormatter = ISO8601DateFormatter()
-        dateFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let dateFormatter = makeISO8601DateFormatter()
         let now = dateFormatter.string(from: Date())
 
         let legacyJSON: [[String: Any]] = [
@@ -145,8 +125,7 @@ final class FactStoreTests: XCTestCase {
         try await store.save(domain: "newdomain", fact: fact)
 
         // Write legacy format
-        let dateFormatter = ISO8601DateFormatter()
-        dateFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let dateFormatter = makeISO8601DateFormatter()
         let now = dateFormatter.string(from: Date())
         let legacyJSON: [[String: Any]] = [["id": "l1", "content": "c", "tags": [], "createdAt": now]]
         let data = try JSONSerialization.data(withJSONObject: legacyJSON, options: .prettyPrinted)

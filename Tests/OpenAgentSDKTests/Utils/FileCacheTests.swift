@@ -10,24 +10,7 @@ import XCTest
 ///   - LRU doubly-linked list with O(1) get/set/invalidate/eviction is implemented
 ///   - Path normalization with symlink resolution and case-insensitive handling
 /// TDD Phase: RED (feature not implemented yet)
-final class FileCacheTests: XCTestCase {
-
-    var tempDir: String!
-
-    override func setUp() {
-        super.setUp()
-        tempDir = NSTemporaryDirectory()
-            .appending("OpenAgentSDKTests-FileCache-\(UUID().uuidString)")
-        try! FileManager.default.createDirectory(
-            atPath: tempDir,
-            withIntermediateDirectories: true
-        )
-    }
-
-    override func tearDown() {
-        try? FileManager.default.removeItem(atPath: tempDir)
-        super.tearDown()
-    }
+final class FileCacheTests: TempDirTestCase {
 
     // MARK: - Helpers
 

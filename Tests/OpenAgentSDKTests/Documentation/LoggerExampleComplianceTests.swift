@@ -7,50 +7,16 @@ import Foundation
 
 final class LoggerExampleComplianceTests: XCTestCase {
 
-    // MARK: - Helper: Resolve project root
-
-    /// Walk upward from this test file to find the directory containing Package.swift.
-    private func projectRoot() -> String {
-        let fileManager = FileManager.default
-        let testFileDir = URL(fileURLWithPath: #file).deletingLastPathComponent().path
-        var dir = testFileDir
-        for _ in 0..<10 {
-            let packagePath = dir + "/Package.swift"
-            if fileManager.fileExists(atPath: packagePath) {
-                return dir
-            }
-            let parent = URL(fileURLWithPath: dir).deletingLastPathComponent().path
-            if parent == dir { break }
-            dir = parent
-        }
-        return testFileDir
-    }
-
-    private func examplesDir() -> String {
-        return projectRoot() + "/Examples"
-    }
+    // MARK: - Helpers
 
     private func examplePath() -> String {
-        return examplesDir() + "/LoggerExample/main.swift"
-    }
-
-    private func fileContent(_ path: String) -> String? {
-        return try? String(contentsOfFile: path, encoding: .utf8)
-    }
-
-    private func packageSwiftContent() -> String {
-        let path = projectRoot() + "/Package.swift"
-        guard let content = try? String(contentsOfFile: path, encoding: .utf8) else {
-            XCTFail("Package.swift should be readable")
-            return ""
-        }
-        return content
+        return DocumentationTestHelpers.examplesDir() + "/LoggerExample/main.swift"
     }
 
     // MARK: - AC9: Package.swift executableTarget Configured
 
     func testPackageSwiftContainsLoggerExampleTarget() {
-        let content = packageSwiftContent()
+        let content = DocumentationTestHelpers.packageSwiftContent()
         XCTAssertTrue(
             content.contains("LoggerExample"),
             "Package.swift should contain LoggerExample executable target"
@@ -58,7 +24,7 @@ final class LoggerExampleComplianceTests: XCTestCase {
     }
 
     func testLoggerExampleTargetDependsOnOpenAgentSDK() {
-        let content = packageSwiftContent()
+        let content = DocumentationTestHelpers.packageSwiftContent()
         XCTAssertTrue(
             content.contains("LoggerExample"),
             "Package.swift should contain LoggerExample target"
@@ -87,7 +53,7 @@ final class LoggerExampleComplianceTests: XCTestCase {
     }
 
     func testLoggerExampleTargetSpecifiesCorrectPath() {
-        let content = packageSwiftContent()
+        let content = DocumentationTestHelpers.packageSwiftContent()
         XCTAssertTrue(
             content.contains("Examples/LoggerExample"),
             "Package.swift LoggerExample target should specify path: \"Examples/LoggerExample\""
@@ -99,7 +65,7 @@ final class LoggerExampleComplianceTests: XCTestCase {
     func testLoggerExampleDirectoryExists() {
         let fileManager = FileManager.default
         var isDir: ObjCBool = false
-        let exists = fileManager.fileExists(atPath: examplesDir() + "/LoggerExample", isDirectory: &isDir)
+        let exists = fileManager.fileExists(atPath: DocumentationTestHelpers.examplesDir() + "/LoggerExample", isDirectory: &isDir)
         XCTAssertTrue(exists, "Examples/LoggerExample/ directory should exist")
         XCTAssertTrue(isDir.boolValue, "Examples/LoggerExample/ should be a directory")
     }
@@ -112,33 +78,24 @@ final class LoggerExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testLoggerExampleImportsOpenAgentSDK() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/LoggerExample/main.swift should be readable")
-            return
-        }
+    func testLoggerExampleImportsOpenAgentSDK() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("import OpenAgentSDK"),
             "LoggerExample should import OpenAgentSDK"
         )
     }
 
-    func testLoggerExampleImportsFoundation() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/LoggerExample/main.swift should be readable")
-            return
-        }
+    func testLoggerExampleImportsFoundation() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("import Foundation"),
             "LoggerExample should import Foundation"
         )
     }
 
-    func testLoggerExampleHasTopLevelDescriptionComment() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/LoggerExample/main.swift should be readable")
-            return
-        }
+    func testLoggerExampleHasTopLevelDescriptionComment() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         let hasDescription = content.contains("// LoggerExample") || content.contains("LoggerExample ")
         XCTAssertTrue(
             hasDescription,
@@ -146,11 +103,8 @@ final class LoggerExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testLoggerExampleHasMultipleInlineComments() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/LoggerExample/main.swift should be readable")
-            return
-        }
+    func testLoggerExampleHasMultipleInlineComments() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         let commentCount = content.components(separatedBy: "// ").count - 1
         XCTAssertGreaterThanOrEqual(
             commentCount, 10,
@@ -158,11 +112,8 @@ final class LoggerExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testLoggerExampleHasMarkSections() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/LoggerExample/main.swift should be readable")
-            return
-        }
+    func testLoggerExampleHasMarkSections() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         let markCount = content.components(separatedBy: "MARK:").count - 1
         XCTAssertGreaterThanOrEqual(
             markCount, 3,
@@ -172,11 +123,8 @@ final class LoggerExampleComplianceTests: XCTestCase {
 
     // MARK: - AC10: Code Quality
 
-    func testLoggerExampleDoesNotUseForceUnwrap() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/LoggerExample/main.swift should be readable")
-            return
-        }
+    func testLoggerExampleDoesNotUseForceUnwrap() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // Allow force unwrap only in string interpolation (e.g., "\(someVar!)")
         // Disallow standalone ! that isn't in string interpolation
         let lines = content.components(separatedBy: "\n")
@@ -218,33 +166,24 @@ final class LoggerExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testLoggerExampleDoesNotExposeRealAPIKeys() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/LoggerExample/main.swift should be readable")
-            return
-        }
+    func testLoggerExampleDoesNotExposeRealAPIKeys() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertFalse(
             content.contains("sk-ant-api03") || content.contains("sk-proj-"),
             "LoggerExample should not contain real API keys"
         )
     }
 
-    func testLoggerExampleUsesLoadDotEnvPattern() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/LoggerExample/main.swift should be readable")
-            return
-        }
+    func testLoggerExampleUsesLoadDotEnvPattern() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("loadDotEnv()"),
             "LoggerExample should use loadDotEnv() helper for API key loading"
         )
     }
 
-    func testLoggerExampleUsesGetEnvPattern() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/LoggerExample/main.swift should be readable")
-            return
-        }
+    func testLoggerExampleUsesGetEnvPattern() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("getEnv("),
             "LoggerExample should use getEnv() helper for environment variable access"
@@ -253,77 +192,56 @@ final class LoggerExampleComplianceTests: XCTestCase {
 
     // MARK: - AC2: Log Levels Demonstrated
 
-    func testLoggerExampleDemonstratesAllLogLevels() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/LoggerExample/main.swift should be readable")
-            return
-        }
+    func testLoggerExampleDemonstratesAllLogLevels() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("LogLevel") || content.contains("logLevel"),
             "LoggerExample should reference LogLevel"
         )
     }
 
-    func testLoggerExampleDemonstratesLogLevelNone() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/LoggerExample/main.swift should be readable")
-            return
-        }
+    func testLoggerExampleDemonstratesLogLevelNone() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains(".none"),
             "LoggerExample should demonstrate LogLevel.none"
         )
     }
 
-    func testLoggerExampleDemonstratesLogLevelError() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/LoggerExample/main.swift should be readable")
-            return
-        }
+    func testLoggerExampleDemonstratesLogLevelError() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains(".error"),
             "LoggerExample should demonstrate LogLevel.error"
         )
     }
 
-    func testLoggerExampleDemonstratesLogLevelWarn() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/LoggerExample/main.swift should be readable")
-            return
-        }
+    func testLoggerExampleDemonstratesLogLevelWarn() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains(".warn"),
             "LoggerExample should demonstrate LogLevel.warn"
         )
     }
 
-    func testLoggerExampleDemonstratesLogLevelInfo() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/LoggerExample/main.swift should be readable")
-            return
-        }
+    func testLoggerExampleDemonstratesLogLevelInfo() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains(".info"),
             "LoggerExample should demonstrate LogLevel.info"
         )
     }
 
-    func testLoggerExampleDemonstratesLogLevelDebug() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/LoggerExample/main.swift should be readable")
-            return
-        }
+    func testLoggerExampleDemonstratesLogLevelDebug() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains(".debug"),
             "LoggerExample should demonstrate LogLevel.debug"
         )
     }
 
-    func testLoggerExampleDemonstratesLevelFiltering() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/LoggerExample/main.swift should be readable")
-            return
-        }
+    func testLoggerExampleDemonstratesLevelFiltering() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // The example should show that higher log levels filter out lower level messages
         // Look for patterns like changing level and showing filtered output
         let hasLevelChange = content.contains("Logger.configure") || content.contains("Logger.shared")
@@ -333,11 +251,8 @@ final class LoggerExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testLoggerExampleUsesLoggerConfigureStaticMethod() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/LoggerExample/main.swift should be readable")
-            return
-        }
+    func testLoggerExampleUsesLoggerConfigureStaticMethod() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("Logger.configure("),
             "LoggerExample should use Logger.configure(level:output:) static method"
@@ -346,11 +261,8 @@ final class LoggerExampleComplianceTests: XCTestCase {
 
     // MARK: - AC3: Console Output
 
-    func testLoggerExampleUsesLogOutputConsole() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/LoggerExample/main.swift should be readable")
-            return
-        }
+    func testLoggerExampleUsesLogOutputConsole() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains(".console"),
             "LoggerExample should demonstrate LogOutput.console"
@@ -359,22 +271,16 @@ final class LoggerExampleComplianceTests: XCTestCase {
 
     // MARK: - AC4: File Output
 
-    func testLoggerExampleUsesLogOutputFile() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/LoggerExample/main.swift should be readable")
-            return
-        }
+    func testLoggerExampleUsesLogOutputFile() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains(".file("),
             "LoggerExample should demonstrate LogOutput.file(URL)"
         )
     }
 
-    func testLoggerExampleCreatesTempFileForLogging() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/LoggerExample/main.swift should be readable")
-            return
-        }
+    func testLoggerExampleCreatesTempFileForLogging() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         let hasTempDir = content.contains("temporaryDirectory") || content.contains("tmp") || content.contains("NSTemporaryDirectory")
         XCTAssertTrue(
             hasTempDir,
@@ -384,22 +290,16 @@ final class LoggerExampleComplianceTests: XCTestCase {
 
     // MARK: - AC5: Custom Output
 
-    func testLoggerExampleUsesLogOutputCustom() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/LoggerExample/main.swift should be readable")
-            return
-        }
+    func testLoggerExampleUsesLogOutputCustom() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains(".custom"),
             "LoggerExample should demonstrate LogOutput.custom closure"
         )
     }
 
-    func testLoggerExampleDemonstratesCustomClosureCapture() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/LoggerExample/main.swift should be readable")
-            return
-        }
+    func testLoggerExampleDemonstratesCustomClosureCapture() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // Should show capturing logs in a buffer via custom closure
         let hasBufferPattern = content.contains("buffer") || content.contains("append") || content.contains("captured")
         XCTAssertTrue(
@@ -410,11 +310,8 @@ final class LoggerExampleComplianceTests: XCTestCase {
 
     // MARK: - AC6: Structured JSON Format
 
-    func testLoggerExampleDemonstratesStructuredJsonFormat() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/LoggerExample/main.swift should be readable")
-            return
-        }
+    func testLoggerExampleDemonstratesStructuredJsonFormat() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // Should reference the structured fields: timestamp, level, module, event, data
         let hasJsonReference = content.contains("JSON") || content.contains("json") || content.contains("timestamp") || content.contains("module")
         XCTAssertTrue(
@@ -423,33 +320,24 @@ final class LoggerExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testLoggerExampleReferencesTimestamp() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/LoggerExample/main.swift should be readable")
-            return
-        }
+    func testLoggerExampleReferencesTimestamp() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("timestamp"),
             "LoggerExample should reference the timestamp field in structured logs"
         )
     }
 
-    func testLoggerExampleReferencesModule() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/LoggerExample/main.swift should be readable")
-            return
-        }
+    func testLoggerExampleReferencesModule() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("module"),
             "LoggerExample should reference the module field in structured logs"
         )
     }
 
-    func testLoggerExampleReferencesEvent() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/LoggerExample/main.swift should be readable")
-            return
-        }
+    func testLoggerExampleReferencesEvent() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("event"),
             "LoggerExample should reference the event field in structured logs"
@@ -458,11 +346,8 @@ final class LoggerExampleComplianceTests: XCTestCase {
 
     // MARK: - AC7: Logger.reset() and outputCount
 
-    func testLoggerExampleUsesLoggerReset() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/LoggerExample/main.swift should be readable")
-            return
-        }
+    func testLoggerExampleUsesLoggerReset() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         let resetCount = content.components(separatedBy: "Logger.reset()").count - 1
         XCTAssertGreaterThanOrEqual(
             resetCount, 2,
@@ -470,22 +355,16 @@ final class LoggerExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testLoggerExampleUsesOutputCount() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/LoggerExample/main.swift should be readable")
-            return
-        }
+    func testLoggerExampleUsesOutputCount() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("outputCount"),
             "LoggerExample should demonstrate Logger.shared.outputCount tracking"
         )
     }
 
-    func testLoggerExampleDemonstratesZeroOverheadNone() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/LoggerExample/main.swift should be readable")
-            return
-        }
+    func testLoggerExampleDemonstratesZeroOverheadNone() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // Should show that .none level produces zero output
         let hasNoneCheck = content.contains(".none") && content.contains("outputCount")
         XCTAssertTrue(
@@ -496,11 +375,8 @@ final class LoggerExampleComplianceTests: XCTestCase {
 
     // MARK: - AC8: Agent Integration
 
-    func testLoggerExampleUsesSDKConfigurationWithLogLevel() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/LoggerExample/main.swift should be readable")
-            return
-        }
+    func testLoggerExampleUsesSDKConfigurationWithLogLevel() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // The example may use AgentOptions with logLevel/logOutput directly
         let hasConfig = content.contains("SDKConfiguration")
             || (content.contains("AgentOptions") && content.contains("logLevel"))
@@ -511,11 +387,8 @@ final class LoggerExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testLoggerExampleCreatesAgentWithLogConfig() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/LoggerExample/main.swift should be readable")
-            return
-        }
+    func testLoggerExampleCreatesAgentWithLogConfig() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("createAgent("),
             "LoggerExample should create an Agent with logging configuration"

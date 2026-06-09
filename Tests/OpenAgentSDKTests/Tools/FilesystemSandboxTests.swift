@@ -30,21 +30,14 @@ private func callToolWithSandbox(
 
 // MARK: - AC1: FileReadTool enforces read-path sandbox
 
-final class FileReadToolSandboxTests: XCTestCase {
+final class FileReadToolSandboxTests: TempDirTestCase {
 
-    var tempDir: String!
     var outsideDir: String!
 
     override func setUp() {
         super.setUp()
-        tempDir = NSTemporaryDirectory()
-            .appending("OpenAgentSDKTests-FileReadSandbox-\(UUID().uuidString)")
         outsideDir = NSTemporaryDirectory()
             .appending("OpenAgentSDKTests-FileReadSandboxOutside-\(UUID().uuidString)")
-        try! FileManager.default.createDirectory(
-            atPath: tempDir,
-            withIntermediateDirectories: true
-        )
         try! FileManager.default.createDirectory(
             atPath: outsideDir,
             withIntermediateDirectories: true
@@ -52,7 +45,6 @@ final class FileReadToolSandboxTests: XCTestCase {
     }
 
     override func tearDown() {
-        try? FileManager.default.removeItem(atPath: tempDir)
         try? FileManager.default.removeItem(atPath: outsideDir)
         super.tearDown()
     }
@@ -127,24 +119,7 @@ final class FileReadToolSandboxTests: XCTestCase {
 
 // MARK: - AC2: FileWriteTool enforces write-path sandbox
 
-final class FileWriteToolSandboxTests: XCTestCase {
-
-    var tempDir: String!
-
-    override func setUp() {
-        super.setUp()
-        tempDir = NSTemporaryDirectory()
-            .appending("OpenAgentSDKTests-FileWriteSandbox-\(UUID().uuidString)")
-        try! FileManager.default.createDirectory(
-            atPath: tempDir,
-            withIntermediateDirectories: true
-        )
-    }
-
-    override func tearDown() {
-        try? FileManager.default.removeItem(atPath: tempDir)
-        super.tearDown()
-    }
+final class FileWriteToolSandboxTests: TempDirTestCase {
 
     /// AC2 [P0]: FileWriteTool denies writes when write path is outside allowed write scope.
     func testFileWriteTool_emptyWritePaths_deniesWrite() async {
@@ -194,24 +169,7 @@ final class FileWriteToolSandboxTests: XCTestCase {
 
 // MARK: - AC3: FileEditTool enforces write-path sandbox
 
-final class FileEditToolSandboxTests: XCTestCase {
-
-    var tempDir: String!
-
-    override func setUp() {
-        super.setUp()
-        tempDir = NSTemporaryDirectory()
-            .appending("OpenAgentSDKTests-FileEditSandbox-\(UUID().uuidString)")
-        try! FileManager.default.createDirectory(
-            atPath: tempDir,
-            withIntermediateDirectories: true
-        )
-    }
-
-    override func tearDown() {
-        try? FileManager.default.removeItem(atPath: tempDir)
-        super.tearDown()
-    }
+final class FileEditToolSandboxTests: TempDirTestCase {
 
     /// AC3 [P0]: FileEditTool allows edits within allowed write paths.
     func testFileEditTool_allowedPath_succeeds() async {
@@ -264,21 +222,14 @@ final class FileEditToolSandboxTests: XCTestCase {
 
 // MARK: - AC4: GlobTool enforces read-path sandbox
 
-final class GlobToolSandboxTests: XCTestCase {
+final class GlobToolSandboxTests: TempDirTestCase {
 
-    var tempDir: String!
     var outsideDir: String!
 
     override func setUp() {
         super.setUp()
-        tempDir = NSTemporaryDirectory()
-            .appending("OpenAgentSDKTests-GlobSandbox-\(UUID().uuidString)")
         outsideDir = NSTemporaryDirectory()
             .appending("OpenAgentSDKTests-GlobSandboxOutside-\(UUID().uuidString)")
-        try! FileManager.default.createDirectory(
-            atPath: tempDir,
-            withIntermediateDirectories: true
-        )
         try! FileManager.default.createDirectory(
             atPath: outsideDir,
             withIntermediateDirectories: true
@@ -286,7 +237,6 @@ final class GlobToolSandboxTests: XCTestCase {
     }
 
     override func tearDown() {
-        try? FileManager.default.removeItem(atPath: tempDir)
         try? FileManager.default.removeItem(atPath: outsideDir)
         super.tearDown()
     }
@@ -334,21 +284,14 @@ final class GlobToolSandboxTests: XCTestCase {
 
 // MARK: - AC5: GrepTool enforces read-path sandbox
 
-final class GrepToolSandboxTests: XCTestCase {
+final class GrepToolSandboxTests: TempDirTestCase {
 
-    var tempDir: String!
     var outsideDir: String!
 
     override func setUp() {
         super.setUp()
-        tempDir = NSTemporaryDirectory()
-            .appending("OpenAgentSDKTests-GrepSandbox-\(UUID().uuidString)")
         outsideDir = NSTemporaryDirectory()
             .appending("OpenAgentSDKTests-GrepSandboxOutside-\(UUID().uuidString)")
-        try! FileManager.default.createDirectory(
-            atPath: tempDir,
-            withIntermediateDirectories: true
-        )
         try! FileManager.default.createDirectory(
             atPath: outsideDir,
             withIntermediateDirectories: true
@@ -356,7 +299,6 @@ final class GrepToolSandboxTests: XCTestCase {
     }
 
     override func tearDown() {
-        try? FileManager.default.removeItem(atPath: tempDir)
         try? FileManager.default.removeItem(atPath: outsideDir)
         super.tearDown()
     }
@@ -402,21 +344,14 @@ final class GrepToolSandboxTests: XCTestCase {
 
 // MARK: - AC6: Symlink escape prevention
 
-final class SymlinkEscapeSandboxTests: XCTestCase {
+final class SymlinkEscapeSandboxTests: TempDirTestCase {
 
-    var tempDir: String!
     var outsideDir: String!
 
     override func setUp() {
         super.setUp()
-        tempDir = NSTemporaryDirectory()
-            .appending("OpenAgentSDKTests-SymlinkEscape-\(UUID().uuidString)")
         outsideDir = NSTemporaryDirectory()
             .appending("OpenAgentSDKTests-SymlinkEscapeOutside-\(UUID().uuidString)")
-        try! FileManager.default.createDirectory(
-            atPath: tempDir,
-            withIntermediateDirectories: true
-        )
         try! FileManager.default.createDirectory(
             atPath: outsideDir,
             withIntermediateDirectories: true
@@ -424,7 +359,6 @@ final class SymlinkEscapeSandboxTests: XCTestCase {
     }
 
     override func tearDown() {
-        try? FileManager.default.removeItem(atPath: tempDir)
         try? FileManager.default.removeItem(atPath: outsideDir)
         super.tearDown()
     }
@@ -459,24 +393,7 @@ final class SymlinkEscapeSandboxTests: XCTestCase {
 
 // MARK: - AC7: Path traversal prevention
 
-final class PathTraversalSandboxTests: XCTestCase {
-
-    var tempDir: String!
-
-    override func setUp() {
-        super.setUp()
-        tempDir = NSTemporaryDirectory()
-            .appending("OpenAgentSDKTests-PathTraversal-\(UUID().uuidString)")
-        try! FileManager.default.createDirectory(
-            atPath: tempDir,
-            withIntermediateDirectories: true
-        )
-    }
-
-    override func tearDown() {
-        try? FileManager.default.removeItem(atPath: tempDir)
-        super.tearDown()
-    }
+final class PathTraversalSandboxTests: TempDirTestCase {
 
     /// AC7 [P0]: FileReadTool denies reading with path traversal that escapes sandbox.
     func testPathTraversal_dotDotEscapesSandbox_denied() async {
@@ -501,24 +418,7 @@ final class PathTraversalSandboxTests: XCTestCase {
 
 // MARK: - AC8: No sandbox = no restrictions (backward compatibility)
 
-final class NoSandboxBackwardCompatTests: XCTestCase {
-
-    var tempDir: String!
-
-    override func setUp() {
-        super.setUp()
-        tempDir = NSTemporaryDirectory()
-            .appending("OpenAgentSDKTests-NoSandbox-\(UUID().uuidString)")
-        try! FileManager.default.createDirectory(
-            atPath: tempDir,
-            withIntermediateDirectories: true
-        )
-    }
-
-    override func tearDown() {
-        try? FileManager.default.removeItem(atPath: tempDir)
-        super.tearDown()
-    }
+final class NoSandboxBackwardCompatTests: TempDirTestCase {
 
     /// AC8 [P0]: FileReadTool works normally when sandbox is nil (no restrictions).
     func testNoSandbox_readTool_worksNormally() async {
@@ -609,24 +509,7 @@ final class NoSandboxBackwardCompatTests: XCTestCase {
 
 // MARK: - AC9: Sandbox check happens BEFORE tool execution
 
-final class SandboxCheckTimingTests: XCTestCase {
-
-    var tempDir: String!
-
-    override func setUp() {
-        super.setUp()
-        tempDir = NSTemporaryDirectory()
-            .appending("OpenAgentSDKTests-SandboxTiming-\(UUID().uuidString)")
-        try! FileManager.default.createDirectory(
-            atPath: tempDir,
-            withIntermediateDirectories: true
-        )
-    }
-
-    override func tearDown() {
-        try? FileManager.default.removeItem(atPath: tempDir)
-        super.tearDown()
-    }
+final class SandboxCheckTimingTests: TempDirTestCase {
 
     /// AC9 [P0]: FileWriteTool does NOT create file when sandbox denies the path.
     func testSandboxCheckBeforeIO_writeDenied_noFileCreated() async {
@@ -683,24 +566,7 @@ final class SandboxCheckTimingTests: XCTestCase {
 
 // MARK: - AC10: deniedPaths takes precedence
 
-final class DeniedPathsPrecedenceTests: XCTestCase {
-
-    var tempDir: String!
-
-    override func setUp() {
-        super.setUp()
-        tempDir = NSTemporaryDirectory()
-            .appending("OpenAgentSDKTests-DeniedPrecedence-\(UUID().uuidString)")
-        try! FileManager.default.createDirectory(
-            atPath: tempDir,
-            withIntermediateDirectories: true
-        )
-    }
-
-    override func tearDown() {
-        try? FileManager.default.removeItem(atPath: tempDir)
-        super.tearDown()
-    }
+final class DeniedPathsPrecedenceTests: TempDirTestCase {
 
     /// AC10 [P0]: File in allowedReadPaths AND deniedPaths is denied.
     func testDeniedPathsOverridesAllowedPaths_readDenied() async {
@@ -763,24 +629,7 @@ final class DeniedPathsPrecedenceTests: XCTestCase {
 
 // MARK: - Edge Cases
 
-final class SandboxEdgeCaseTests: XCTestCase {
-
-    var tempDir: String!
-
-    override func setUp() {
-        super.setUp()
-        tempDir = NSTemporaryDirectory()
-            .appending("OpenAgentSDKTests-SandboxEdge-\(UUID().uuidString)")
-        try! FileManager.default.createDirectory(
-            atPath: tempDir,
-            withIntermediateDirectories: true
-        )
-    }
-
-    override func tearDown() {
-        try? FileManager.default.removeItem(atPath: tempDir)
-        super.tearDown()
-    }
+final class SandboxEdgeCaseTests: TempDirTestCase {
 
     /// Edge case [P1]: Empty SandboxSettings (all empty arrays) = no restrictions.
     func testEmptySandboxSettings_noRestrictions() async {

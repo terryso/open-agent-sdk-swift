@@ -19,86 +19,23 @@ final class WorktreeStoreTests: XCTestCase {
 
     override class func setUp() {
         super.setUp()
-        templateRepoPath = createTemplateGitRepo()
+        templateRepoPath = createTemplateGitRepo(prefix: "worktree-test-template")
     }
 
     override class func tearDown() {
         if let path = templateRepoPath {
-            try? FileManager.default.removeItem(atPath: path)
+            cleanupTempDir(path)
             templateRepoPath = nil
         }
         super.tearDown()
-    }
-
-    /// Creates a template git repo once for all tests to copy from.
-    private static func createTemplateGitRepo() -> String? {
-        let tempDir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("worktree-test-template-\(UUID().uuidString)")
-        do {
-            try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
-
-            let gitInit = Process()
-            gitInit.executableURL = URL(fileURLWithPath: "/usr/bin/git")
-            gitInit.arguments = ["init"]
-            gitInit.currentDirectoryURL = tempDir
-            try gitInit.run()
-            gitInit.waitUntilExit()
-
-            let gitConfig = Process()
-            gitConfig.executableURL = URL(fileURLWithPath: "/usr/bin/git")
-            gitConfig.arguments = ["config", "user.email", "test@example.com"]
-            gitConfig.currentDirectoryURL = tempDir
-            try gitConfig.run()
-            gitConfig.waitUntilExit()
-
-            let gitConfigName = Process()
-            gitConfigName.executableURL = URL(fileURLWithPath: "/usr/bin/git")
-            gitConfigName.arguments = ["config", "user.name", "Test User"]
-            gitConfigName.currentDirectoryURL = tempDir
-            try gitConfigName.run()
-            gitConfigName.waitUntilExit()
-
-            let dummyFile = tempDir.appendingPathComponent("README.md")
-            try "test".write(to: dummyFile, atomically: true, encoding: .utf8)
-
-            let gitAdd = Process()
-            gitAdd.executableURL = URL(fileURLWithPath: "/usr/bin/git")
-            gitAdd.arguments = ["add", "."]
-            gitAdd.currentDirectoryURL = tempDir
-            try gitAdd.run()
-            gitAdd.waitUntilExit()
-
-            let gitCommit = Process()
-            gitCommit.executableURL = URL(fileURLWithPath: "/usr/bin/git")
-            gitCommit.arguments = ["commit", "-m", "Initial commit"]
-            gitCommit.currentDirectoryURL = tempDir
-            try gitCommit.run()
-            gitCommit.waitUntilExit()
-
-            return tempDir.path
-        } catch {
-            return nil
-        }
     }
 
     // MARK: - Helpers
 
     /// Creates a temporary Git repository by copying the shared template.
     /// Returns the path to the temp directory. Caller is responsible for cleanup.
-    private func createTempGitRepo() throws -> String {
-        guard let templatePath = Self.templateRepoPath else {
-            throw NSError(domain: "WorktreeStoreTests", code: -1,
-                          userInfo: [NSLocalizedDescriptionKey: "Template repo not available"])
-        }
-        let newDir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("worktree-test-\(UUID().uuidString)")
-        try FileManager.default.copyItem(at: URL(fileURLWithPath: templatePath), to: newDir)
-        return newDir.path
-    }
-
-    /// Removes a temporary directory created by createTempGitRepo().
-    private func cleanupTempDir(_ path: String) {
-        try? FileManager.default.removeItem(atPath: path)
+    private func cloneTemplateRepo() throws -> String {
+        try createTempGitRepo(fromTemplate: Self.templateRepoPath, prefix: "worktree-test")
     }
 
     // MARK: - AC1: WorktreeStore Actor -- Create
@@ -107,7 +44,7 @@ final class WorktreeStoreTests: XCTestCase {
     func testCreate_returnsEntryWithCorrectFields() async throws {
         // Given: a fresh WorktreeStore and a temp git repo
         let store = WorktreeStore()
-        let tempDir = try createTempGitRepo()
+        let tempDir = try cloneTemplateRepo()
         defer { cleanupTempDir(tempDir) }
 
         // When: creating a worktree with a name
@@ -126,7 +63,7 @@ final class WorktreeStoreTests: XCTestCase {
     func testCreate_autoGeneratesSequentialIds() async throws {
         // Given: a fresh WorktreeStore and a temp git repo
         let store = WorktreeStore()
-        let tempDir = try createTempGitRepo()
+        let tempDir = try cloneTemplateRepo()
         defer { cleanupTempDir(tempDir) }
 
         // When: creating multiple worktrees
@@ -142,7 +79,7 @@ final class WorktreeStoreTests: XCTestCase {
     func testCreate_defaultStatusIsActive() async throws {
         // Given: a fresh WorktreeStore and a temp git repo
         let store = WorktreeStore()
-        let tempDir = try createTempGitRepo()
+        let tempDir = try cloneTemplateRepo()
         defer { cleanupTempDir(tempDir) }
 
         // When: creating a worktree
@@ -182,7 +119,7 @@ final class WorktreeStoreTests: XCTestCase {
     func testGet_existingId_returnsEntry() async throws {
         // Given: a WorktreeStore with a worktree
         let store = WorktreeStore()
-        let tempDir = try createTempGitRepo()
+        let tempDir = try cloneTemplateRepo()
         defer { cleanupTempDir(tempDir) }
 
         let created = try await store.create(name: "find-me", originalCwd: tempDir)
@@ -215,7 +152,7 @@ final class WorktreeStoreTests: XCTestCase {
     func testList_returnsAllEntries() async throws {
         // Given: a WorktreeStore with 3 worktrees
         let store = WorktreeStore()
-        let tempDir = try createTempGitRepo()
+        let tempDir = try cloneTemplateRepo()
         defer { cleanupTempDir(tempDir) }
 
         try await store.create(name: "wt-a", originalCwd: tempDir)
@@ -247,7 +184,7 @@ final class WorktreeStoreTests: XCTestCase {
     func testRemove_existingId_succeeds() async throws {
         // Given: a WorktreeStore with a worktree
         let store = WorktreeStore()
-        let tempDir = try createTempGitRepo()
+        let tempDir = try cloneTemplateRepo()
         defer { cleanupTempDir(tempDir) }
 
         let entry = try await store.create(name: "remove-me", originalCwd: tempDir)
@@ -285,7 +222,7 @@ final class WorktreeStoreTests: XCTestCase {
     func testRemove_withForce_succeeds() async throws {
         // Given: a WorktreeStore with a worktree
         let store = WorktreeStore()
-        let tempDir = try createTempGitRepo()
+        let tempDir = try cloneTemplateRepo()
         defer { cleanupTempDir(tempDir) }
 
         let entry = try await store.create(name: "force-remove", originalCwd: tempDir)
@@ -303,7 +240,7 @@ final class WorktreeStoreTests: XCTestCase {
     func testKeep_existingId_succeeds() async throws {
         // Given: a WorktreeStore with a worktree
         let store = WorktreeStore()
-        let tempDir = try createTempGitRepo()
+        let tempDir = try cloneTemplateRepo()
         defer { cleanupTempDir(tempDir) }
 
         let entry = try await store.create(name: "keep-me", originalCwd: tempDir)
@@ -349,7 +286,7 @@ final class WorktreeStoreTests: XCTestCase {
     func testClear_resetsStore() async throws {
         // Given: a WorktreeStore with worktrees
         let store = WorktreeStore()
-        let tempDir = try createTempGitRepo()
+        let tempDir = try cloneTemplateRepo()
         defer { cleanupTempDir(tempDir) }
 
         try await store.create(name: "wt-1", originalCwd: tempDir)
@@ -373,7 +310,7 @@ final class WorktreeStoreTests: XCTestCase {
     func testWorktreeStore_concurrentAccess() async throws {
         // Given: a WorktreeStore
         let store = WorktreeStore()
-        let tempDir = try createTempGitRepo()
+        let tempDir = try cloneTemplateRepo()
         defer { cleanupTempDir(tempDir) }
 
         // When: creating worktrees concurrently from multiple tasks

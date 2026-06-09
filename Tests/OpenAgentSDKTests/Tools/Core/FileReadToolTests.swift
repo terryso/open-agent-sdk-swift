@@ -11,24 +11,7 @@ import XCTest
 ///   - Directory detection, image file detection, and pagination are implemented
 ///   - POSIX path resolution against ToolContext.cwd works
 /// TDD Phase: RED (feature not implemented yet)
-final class FileReadToolTests: XCTestCase {
-
-    var tempDir: String!
-
-    override func setUp() {
-        super.setUp()
-        tempDir = NSTemporaryDirectory()
-            .appending("OpenAgentSDKTests-FileRead-\(UUID().uuidString)")
-        try! FileManager.default.createDirectory(
-            atPath: tempDir,
-            withIntermediateDirectories: true
-        )
-    }
-
-    override func tearDown() {
-        try? FileManager.default.removeItem(atPath: tempDir)
-        super.tearDown()
-    }
+final class FileReadToolTests: TempDirTestCase {
 
     // MARK: - Helpers
 
@@ -51,11 +34,7 @@ final class FileReadToolTests: XCTestCase {
         input: [String: Any],
         cwd: String? = nil
     ) async -> ToolResult {
-        let context = ToolContext(
-            cwd: cwd ?? tempDir,
-            toolUseId: "test-\(UUID().uuidString)"
-        )
-        return await tool.call(input: input, context: context)
+        await callToolForTest(tool, input: input, cwd: cwd ?? tempDir)
     }
 
     // MARK: - AC1: Read tool reads file content with line numbers

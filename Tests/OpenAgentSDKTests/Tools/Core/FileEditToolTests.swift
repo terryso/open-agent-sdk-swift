@@ -11,24 +11,7 @@ import XCTest
 ///   - Error handling for missing/duplicate matches works
 ///   - POSIX path resolution against ToolContext.cwd works
 /// TDD Phase: RED (feature not implemented yet)
-final class FileEditToolTests: XCTestCase {
-
-    var tempDir: String!
-
-    override func setUp() {
-        super.setUp()
-        tempDir = NSTemporaryDirectory()
-            .appending("OpenAgentSDKTests-FileEdit-\(UUID().uuidString)")
-        try! FileManager.default.createDirectory(
-            atPath: tempDir,
-            withIntermediateDirectories: true
-        )
-    }
-
-    override func tearDown() {
-        try? FileManager.default.removeItem(atPath: tempDir)
-        super.tearDown()
-    }
+final class FileEditToolTests: TempDirTestCase {
 
     // MARK: - Helpers
 
@@ -51,11 +34,7 @@ final class FileEditToolTests: XCTestCase {
         input: [String: Any],
         cwd: String? = nil
     ) async -> ToolResult {
-        let context = ToolContext(
-            cwd: cwd ?? tempDir,
-            toolUseId: "test-\(UUID().uuidString)"
-        )
-        return await tool.call(input: input, context: context)
+        await callToolForTest(tool, input: input, cwd: cwd ?? tempDir)
     }
 
     // MARK: - AC5: Edit tool replaces a unique string in a file

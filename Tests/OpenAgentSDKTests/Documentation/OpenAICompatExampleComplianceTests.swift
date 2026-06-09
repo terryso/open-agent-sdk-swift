@@ -7,50 +7,16 @@ import Foundation
 
 final class OpenAICompatExampleComplianceTests: XCTestCase {
 
-    // MARK: - Helper: Resolve project root
-
-    /// Walk upward from this test file to find the directory containing Package.swift.
-    private func projectRoot() -> String {
-        let fileManager = FileManager.default
-        let testFileDir = URL(fileURLWithPath: #file).deletingLastPathComponent().path
-        var dir = testFileDir
-        for _ in 0..<10 {
-            let packagePath = dir + "/Package.swift"
-            if fileManager.fileExists(atPath: packagePath) {
-                return dir
-            }
-            let parent = URL(fileURLWithPath: dir).deletingLastPathComponent().path
-            if parent == dir { break }
-            dir = parent
-        }
-        return testFileDir
-    }
-
-    private func examplesDir() -> String {
-        return projectRoot() + "/Examples"
-    }
+    // MARK: - Helpers
 
     private func examplePath() -> String {
-        return examplesDir() + "/OpenAICompatExample/main.swift"
-    }
-
-    private func fileContent(_ path: String) -> String? {
-        return try? String(contentsOfFile: path, encoding: .utf8)
-    }
-
-    private func packageSwiftContent() -> String {
-        let path = projectRoot() + "/Package.swift"
-        guard let content = try? String(contentsOfFile: path, encoding: .utf8) else {
-            XCTFail("Package.swift should be readable")
-            return ""
-        }
-        return content
+        return DocumentationTestHelpers.examplesDir() + "/OpenAICompatExample/main.swift"
     }
 
     // MARK: - AC7: Package.swift executableTarget Configured
 
     func testPackageSwiftContainsOpenAICompatExampleTarget() {
-        let content = packageSwiftContent()
+        let content = DocumentationTestHelpers.packageSwiftContent()
         XCTAssertTrue(
             content.contains("OpenAICompatExample"),
             "Package.swift should contain OpenAICompatExample executable target"
@@ -58,7 +24,7 @@ final class OpenAICompatExampleComplianceTests: XCTestCase {
     }
 
     func testOpenAICompatExampleTargetDependsOnOpenAgentSDK() {
-        let content = packageSwiftContent()
+        let content = DocumentationTestHelpers.packageSwiftContent()
         XCTAssertTrue(
             content.contains("OpenAICompatExample"),
             "Package.swift should contain OpenAICompatExample target before checking dependencies"
@@ -78,7 +44,7 @@ final class OpenAICompatExampleComplianceTests: XCTestCase {
     }
 
     func testOpenAICompatExampleTargetSpecifiesCorrectPath() {
-        let content = packageSwiftContent()
+        let content = DocumentationTestHelpers.packageSwiftContent()
         XCTAssertTrue(
             content.contains("OpenAICompatExample"),
             "Package.swift should contain OpenAICompatExample target before checking path"
@@ -103,7 +69,7 @@ final class OpenAICompatExampleComplianceTests: XCTestCase {
         let fileManager = FileManager.default
         var isDir: ObjCBool = false
         let exists = fileManager.fileExists(
-            atPath: examplesDir() + "/OpenAICompatExample",
+            atPath: DocumentationTestHelpers.examplesDir() + "/OpenAICompatExample",
             isDirectory: &isDir
         )
         XCTAssertTrue(exists, "Examples/OpenAICompatExample/ directory should exist")
@@ -118,22 +84,16 @@ final class OpenAICompatExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testOpenAICompatExampleImportsOpenAgentSDK() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
-            return
-        }
+    func testOpenAICompatExampleImportsOpenAgentSDK() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("import OpenAgentSDK"),
             "OpenAICompatExample should import OpenAgentSDK"
         )
     }
 
-    func testOpenAICompatExampleImportsFoundation() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
-            return
-        }
+    func testOpenAICompatExampleImportsFoundation() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("import Foundation"),
             "OpenAICompatExample should import Foundation"
@@ -142,11 +102,8 @@ final class OpenAICompatExampleComplianceTests: XCTestCase {
 
     // MARK: - AC1: Code Quality
 
-    func testOpenAICompatExampleHasTopLevelDescriptionComment() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
-            return
-        }
+    func testOpenAICompatExampleHasTopLevelDescriptionComment() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
         XCTAssertTrue(
             trimmed.hasPrefix("//"),
@@ -154,11 +111,8 @@ final class OpenAICompatExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testOpenAICompatExampleHasMultipleInlineComments() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
-            return
-        }
+    func testOpenAICompatExampleHasMultipleInlineComments() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         let commentLines = content.components(separatedBy: "\n")
             .filter { $0.trimmingCharacters(in: .whitespaces).hasPrefix("//") }
             .count
@@ -168,11 +122,8 @@ final class OpenAICompatExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testOpenAICompatExampleHasMarkSections() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
-            return
-        }
+    func testOpenAICompatExampleHasMarkSections() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         let markCount = content.components(separatedBy: "MARK:").count - 1
         XCTAssertGreaterThanOrEqual(
             markCount, 4,
@@ -180,11 +131,8 @@ final class OpenAICompatExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testOpenAICompatExampleDoesNotUseForceUnwrap() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
-            return
-        }
+    func testOpenAICompatExampleDoesNotUseForceUnwrap() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         let lines = content.components(separatedBy: "\n")
         for line in lines {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
@@ -197,44 +145,32 @@ final class OpenAICompatExampleComplianceTests: XCTestCase {
         }
     }
 
-    func testOpenAICompatExampleDoesNotExposeRealAPIKeys() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
-            return
-        }
+    func testOpenAICompatExampleDoesNotExposeRealAPIKeys() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertFalse(
             content.contains("sk-ant-api03") || content.contains("sk-proj-"),
             "OpenAICompatExample should not contain real API keys"
         )
     }
 
-    func testOpenAICompatExampleUsesLoadDotEnvPattern() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
-            return
-        }
+    func testOpenAICompatExampleUsesLoadDotEnvPattern() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("loadDotEnv()"),
             "OpenAICompatExample should use loadDotEnv() helper pattern"
         )
     }
 
-    func testOpenAICompatExampleUsesGetEnvPattern() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
-            return
-        }
+    func testOpenAICompatExampleUsesGetEnvPattern() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("getEnv("),
             "OpenAICompatExample should use getEnv() helper pattern for API key loading"
         )
     }
 
-    func testOpenAICompatExampleUsesAssertions() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
-            return
-        }
+    func testOpenAICompatExampleUsesAssertions() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("assert("),
             "OpenAICompatExample should use assert() for key validations"
@@ -243,33 +179,24 @@ final class OpenAICompatExampleComplianceTests: XCTestCase {
 
     // MARK: - AC2: OpenAI Provider Configuration
 
-    func testOpenAICompatExampleUsesOpenAIProvider() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
-            return
-        }
+    func testOpenAICompatExampleUsesOpenAIProvider() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains(".openai"),
             "OpenAICompatExample should use provider: .openai"
         )
     }
 
-    func testOpenAICompatExampleConfiguresBaseURL() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
-            return
-        }
+    func testOpenAICompatExampleConfiguresBaseURL() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("baseURL:"),
             "OpenAICompatExample should configure baseURL for the OpenAI-compatible endpoint"
         )
     }
 
-    func testOpenAICompatExampleUsesCodeAnyEnvVars() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
-            return
-        }
+    func testOpenAICompatExampleUsesCodeAnyEnvVars() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("CODEANY_API_KEY"),
             "OpenAICompatExample should use CODEANY_API_KEY environment variable"
@@ -280,11 +207,8 @@ final class OpenAICompatExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testOpenAICompatExampleDetectsUseOpenAIFlag() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
-            return
-        }
+    func testOpenAICompatExampleDetectsUseOpenAIFlag() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("useOpenAI"),
             "OpenAICompatExample should define a useOpenAI flag based on CODEANY_API_KEY detection"
@@ -293,66 +217,48 @@ final class OpenAICompatExampleComplianceTests: XCTestCase {
 
     // MARK: - AC3: Prompt with OpenAI Provider
 
-    func testOpenAICompatExampleUsesCreateAgent() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
-            return
-        }
+    func testOpenAICompatExampleUsesCreateAgent() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("createAgent("),
             "OpenAICompatExample should create an Agent using createAgent()"
         )
     }
 
-    func testOpenAICompatExampleUsesBypassPermissions() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
-            return
-        }
+    func testOpenAICompatExampleUsesBypassPermissions() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("bypassPermissions") || content.contains(".bypassPermissions"),
             "OpenAICompatExample should use permissionMode: .bypassPermissions"
         )
     }
 
-    func testOpenAICompatExampleUsesPrompt() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
-            return
-        }
+    func testOpenAICompatExampleUsesPrompt() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains(".prompt(") || content.contains("agent.prompt("),
             "OpenAICompatExample should use agent.prompt() for a blocking query"
         )
     }
 
-    func testOpenAICompatExampleUsesAwait() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
-            return
-        }
+    func testOpenAICompatExampleUsesAwait() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("await"),
             "OpenAICompatExample should use await for async operations"
         )
     }
 
-    func testOpenAICompatExamplePrintsResponseText() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
-            return
-        }
+    func testOpenAICompatExamplePrintsResponseText() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains(".text"),
             "OpenAICompatExample should print response text from QueryResult"
         )
     }
 
-    func testOpenAICompatExamplePrintsUsageStats() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
-            return
-        }
+    func testOpenAICompatExamplePrintsUsageStats() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("inputTokens") || content.contains("input_tokens"),
             "OpenAICompatExample should print input token usage"
@@ -365,22 +271,16 @@ final class OpenAICompatExampleComplianceTests: XCTestCase {
 
     // MARK: - AC4: Streaming with OpenAI Provider
 
-    func testOpenAICompatExampleUsesStream() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
-            return
-        }
+    func testOpenAICompatExampleUsesStream() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains(".stream(") || content.contains("agent.stream("),
             "OpenAICompatExample should use agent.stream() for streaming query"
         )
     }
 
-    func testOpenAICompatExampleCollectsSDKMessageEvents() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
-            return
-        }
+    func testOpenAICompatExampleCollectsSDKMessageEvents() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         let hasSDKMessage = content.contains("SDKMessage")
             || content.contains(".partialMessage")
             || content.contains(".result(")
@@ -390,33 +290,24 @@ final class OpenAICompatExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testOpenAICompatExampleHandlesPartialMessage() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
-            return
-        }
+    func testOpenAICompatExampleHandlesPartialMessage() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains(".partialMessage"),
             "OpenAICompatExample should handle .partialMessage case in stream"
         )
     }
 
-    func testOpenAICompatExampleHandlesResultCase() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
-            return
-        }
+    func testOpenAICompatExampleHandlesResultCase() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains(".result("),
             "OpenAICompatExample should handle .result case in stream"
         )
     }
 
-    func testOpenAICompatExampleAssertsStreamingResponseNonEmpty() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
-            return
-        }
+    func testOpenAICompatExampleAssertsStreamingResponseNonEmpty() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // Look for assert near stream-related code
         let streamSectionRange = content.range(of: "stream(")
         XCTAssertNotNil(streamSectionRange, "Should find stream( in example code")
@@ -432,22 +323,16 @@ final class OpenAICompatExampleComplianceTests: XCTestCase {
 
     // MARK: - AC5: Tool Use with OpenAI Provider
 
-    func testOpenAICompatExampleUsesDefineTool() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
-            return
-        }
+    func testOpenAICompatExampleUsesDefineTool() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("defineTool("),
             "OpenAICompatExample should use defineTool() to register a custom tool"
         )
     }
 
-    func testOpenAICompatExampleDefinesCodableInputStruct() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
-            return
-        }
+    func testOpenAICompatExampleDefinesCodableInputStruct() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         let hasCodableStruct = content.contains("Codable") && content.contains("struct")
         XCTAssertTrue(
             hasCodableStruct,
@@ -455,33 +340,24 @@ final class OpenAICompatExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testOpenAICompatExampleDefinesInputSchema() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
-            return
-        }
+    func testOpenAICompatExampleDefinesInputSchema() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("inputSchema:"),
             "OpenAICompatExample should define inputSchema for the custom tool"
         )
     }
 
-    func testOpenAICompatExampleCreatesAgentWithTools() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
-            return
-        }
+    func testOpenAICompatExampleCreatesAgentWithTools() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("tools:"),
             "OpenAICompatExample should pass tools parameter to AgentOptions"
         )
     }
 
-    func testOpenAICompatExampleTriggersToolCall() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
-            return
-        }
+    func testOpenAICompatExampleTriggersToolCall() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // The example should have a prompt that triggers tool use and prints tool call details
         let hasToolCallPrint = content.contains("tool") && content.contains("Tool")
         XCTAssertTrue(
@@ -492,22 +368,16 @@ final class OpenAICompatExampleComplianceTests: XCTestCase {
 
     // MARK: - AC6: Provider Comparison
 
-    func testOpenAICompatExampleShowsAnthropicProviderConfig() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
-            return
-        }
+    func testOpenAICompatExampleShowsAnthropicProviderConfig() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains(".anthropic"),
             "OpenAICompatExample should show Anthropic provider configuration for comparison"
         )
     }
 
-    func testOpenAICompatExampleShowsBothProviderOptions() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
-            return
-        }
+    func testOpenAICompatExampleShowsBothProviderOptions() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // Should demonstrate the side-by-side comparison of both providers
         XCTAssertTrue(
             content.contains(".openai") && content.contains(".anthropic"),
@@ -517,11 +387,8 @@ final class OpenAICompatExampleComplianceTests: XCTestCase {
 
     // MARK: - AC1: Structure Validation
 
-    func testOpenAICompatExampleHasFourParts() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
-            return
-        }
+    func testOpenAICompatExampleHasFourParts() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         // Should have four distinct parts
         let partCount = content.components(separatedBy: "Part ").count - 1
             + content.components(separatedBy: "PART ").count - 1
@@ -531,11 +398,8 @@ final class OpenAICompatExampleComplianceTests: XCTestCase {
         )
     }
 
-    func testOpenAICompatExampleUsesAgentOptions() {
-        guard let content = fileContent(examplePath()) else {
-            XCTFail("Examples/OpenAICompatExample/main.swift should be readable")
-            return
-        }
+    func testOpenAICompatExampleUsesAgentOptions() throws {
+        let content = try DocumentationTestHelpers.requireFileContent(examplePath())
         XCTAssertTrue(
             content.contains("AgentOptions("),
             "OpenAICompatExample should use AgentOptions to configure the agent"

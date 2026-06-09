@@ -16,14 +16,6 @@ final class LSPToolTests: XCTestCase {
 
     // MARK: - Helpers
 
-    /// Creates a basic ToolContext with just cwd (no stores needed for LSP tool).
-    private func makeContext(cwd: String = "/tmp") -> ToolContext {
-        return ToolContext(
-            cwd: cwd,
-            toolUseId: "test-tool-use-id"
-        )
-    }
-
     /// Creates a temporary Swift file with known content for testing.
     /// Returns the file path. Caller is responsible for cleanup.
     @discardableResult
@@ -178,7 +170,7 @@ final class LSPToolTests: XCTestCase {
     /// AC8/AC2 [P0]: goToDefinition with missing file_path returns is_error=true.
     func testGoToDefinition_missingFilePath_returnsError() async throws {
         let tool = createLSPTool()
-        let context = makeContext()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = [
             "operation": "goToDefinition",
@@ -197,7 +189,7 @@ final class LSPToolTests: XCTestCase {
     /// AC8/AC2 [P0]: goToDefinition with missing line returns is_error=true.
     func testGoToDefinition_missingLine_returnsError() async throws {
         let tool = createLSPTool()
-        let context = makeContext()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = [
             "operation": "goToDefinition",
@@ -239,7 +231,7 @@ final class LSPToolTests: XCTestCase {
         }
 
         let tool = createLSPTool()
-        let context = makeContext(cwd: tempDir)
+        let context = makeTestToolContext(cwd: tempDir)
 
         // Request goToDefinition at line 3 (line with myTargetFunction), character 15
         let input: [String: Any] = [
@@ -274,7 +266,7 @@ final class LSPToolTests: XCTestCase {
         }
 
         let tool = createLSPTool()
-        let context = makeContext(cwd: tempDir)
+        let context = makeTestToolContext(cwd: tempDir)
 
         let input: [String: Any] = [
             "operation": "goToDefinition",
@@ -292,7 +284,7 @@ final class LSPToolTests: XCTestCase {
     /// AC8/AC2 [P0]: goToImplementation with missing file_path returns is_error=true.
     func testGoToImplementation_missingFilePath_returnsError() async throws {
         let tool = createLSPTool()
-        let context = makeContext()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = [
             "operation": "goToImplementation",
@@ -320,7 +312,7 @@ final class LSPToolTests: XCTestCase {
         }
 
         let tool = createLSPTool()
-        let context = makeContext(cwd: tempDir)
+        let context = makeTestToolContext(cwd: tempDir)
 
         let input: [String: Any] = [
             "operation": "goToImplementation",
@@ -338,7 +330,7 @@ final class LSPToolTests: XCTestCase {
     /// AC8/AC3 [P0]: findReferences with missing file_path returns is_error=true.
     func testFindReferences_missingFilePath_returnsError() async throws {
         let tool = createLSPTool()
-        let context = makeContext()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = [
             "operation": "findReferences",
@@ -352,7 +344,7 @@ final class LSPToolTests: XCTestCase {
     /// AC8/AC3 [P0]: findReferences with missing line returns is_error=true.
     func testFindReferences_missingLine_returnsError() async throws {
         let tool = createLSPTool()
-        let context = makeContext()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = [
             "operation": "findReferences",
@@ -382,7 +374,7 @@ final class LSPToolTests: XCTestCase {
         }
 
         let tool = createLSPTool()
-        let context = makeContext(cwd: tempDir)
+        let context = makeTestToolContext(cwd: tempDir)
 
         let input: [String: Any] = [
             "operation": "findReferences",
@@ -414,7 +406,7 @@ final class LSPToolTests: XCTestCase {
         }
 
         let tool = createLSPTool()
-        let context = makeContext(cwd: tempDir)
+        let context = makeTestToolContext(cwd: tempDir)
 
         let input: [String: Any] = [
             "operation": "findReferences",
@@ -432,7 +424,7 @@ final class LSPToolTests: XCTestCase {
     /// AC4 [P0]: hover returns a hint message about needing a language server.
     func testHover_returnsHintMessage() async throws {
         let tool = createLSPTool()
-        let context = makeContext()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = [
             "operation": "hover"
@@ -451,7 +443,7 @@ final class LSPToolTests: XCTestCase {
     /// AC4 [P0]: hover does not require any parameters.
     func testHover_doesNotRequireParameters() async throws {
         let tool = createLSPTool()
-        let context = makeContext()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = [
             "operation": "hover"
@@ -467,7 +459,7 @@ final class LSPToolTests: XCTestCase {
     /// AC8/AC5 [P0]: documentSymbol with missing file_path returns is_error=true.
     func testDocumentSymbol_missingFilePath_returnsError() async throws {
         let tool = createLSPTool()
-        let context = makeContext()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = [
             "operation": "documentSymbol"
@@ -508,7 +500,7 @@ final class LSPToolTests: XCTestCase {
         }
 
         let tool = createLSPTool()
-        let context = makeContext(cwd: tempDir)
+        let context = makeTestToolContext(cwd: tempDir)
 
         let input: [String: Any] = [
             "operation": "documentSymbol",
@@ -545,7 +537,7 @@ final class LSPToolTests: XCTestCase {
         }
 
         let tool = createLSPTool()
-        let context = makeContext(cwd: tempDir)
+        let context = makeTestToolContext(cwd: tempDir)
 
         let input: [String: Any] = [
             "operation": "documentSymbol",
@@ -561,7 +553,7 @@ final class LSPToolTests: XCTestCase {
     /// AC8/AC6 [P0]: workspaceSymbol with missing query returns is_error=true.
     func testWorkspaceSymbol_missingQuery_returnsError() async throws {
         let tool = createLSPTool()
-        let context = makeContext()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = [
             "operation": "workspaceSymbol"
@@ -592,7 +584,7 @@ final class LSPToolTests: XCTestCase {
         }
 
         let tool = createLSPTool()
-        let context = makeContext(cwd: tempDir)
+        let context = makeTestToolContext(cwd: tempDir)
 
         let input: [String: Any] = [
             "operation": "workspaceSymbol",
@@ -618,7 +610,7 @@ final class LSPToolTests: XCTestCase {
         }
 
         let tool = createLSPTool()
-        let context = makeContext(cwd: tempDir)
+        let context = makeTestToolContext(cwd: tempDir)
 
         let input: [String: Any] = [
             "operation": "workspaceSymbol",
@@ -638,7 +630,7 @@ final class LSPToolTests: XCTestCase {
     /// AC7 [P0]: prepareCallHierarchy returns language server hint.
     func testUnknownOperation_prepareCallHierarchy_returnsLanguageServerHint() async throws {
         let tool = createLSPTool()
-        let context = makeContext()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = [
             "operation": "prepareCallHierarchy"
@@ -655,7 +647,7 @@ final class LSPToolTests: XCTestCase {
     /// AC7 [P0]: incomingCalls returns language server hint.
     func testUnknownOperation_incomingCalls_returnsLanguageServerHint() async throws {
         let tool = createLSPTool()
-        let context = makeContext()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = [
             "operation": "incomingCalls"
@@ -672,7 +664,7 @@ final class LSPToolTests: XCTestCase {
     /// AC7 [P0]: outgoingCalls returns language server hint.
     func testUnknownOperation_outgoingCalls_returnsLanguageServerHint() async throws {
         let tool = createLSPTool()
-        let context = makeContext()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = [
             "operation": "outgoingCalls"
@@ -689,7 +681,7 @@ final class LSPToolTests: XCTestCase {
     /// AC7 [P0]: completely unknown operation returns language server hint.
     func testUnknownOperation_completelyUnknown_returnsLanguageServerHint() async throws {
         let tool = createLSPTool()
-        let context = makeContext()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = [
             "operation": "someFutureOperation"
@@ -708,7 +700,7 @@ final class LSPToolTests: XCTestCase {
     /// AC12 [P0]: LSP tool never throws -- always returns ToolResult even with malformed input.
     func testLSPTool_neverThrows_malformedInput() async throws {
         let tool = createLSPTool()
-        let context = makeContext()
+        let context = makeTestToolContext()
 
         let badInputs: [[String: Any]] = [
             [:],                              // empty dict (missing operation)
@@ -727,7 +719,7 @@ final class LSPToolTests: XCTestCase {
     /// AC12 [P0]: Non-existent file returns is_error=true (doesn't crash the agent loop).
     func testLSPTool_nonExistentFile_returnsError() async throws {
         let tool = createLSPTool()
-        let context = makeContext()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = [
             "operation": "documentSymbol",
@@ -772,7 +764,7 @@ final class LSPToolTests: XCTestCase {
         }
 
         let tool = createLSPTool()
-        let context = makeContext(cwd: tempDir)
+        let context = makeTestToolContext(cwd: tempDir)
 
         let input: [String: Any] = [
             "operation": "workspaceSymbol",

@@ -1,18 +1,13 @@
 import XCTest
 @testable import OpenAgentSDK
 
-final class RunPersistenceTests: XCTestCase {
+final class RunPersistenceTests: TempDirTestCase {
 
-    private var tempDir: String!
     private var persistence: RunPersistenceService!
 
     override func setUp() {
-        tempDir = NSTemporaryDirectory().appending("RunPersistenceTests-\(UUID().uuidString)")
+        super.setUp()
         persistence = RunPersistenceService(baseDirectory: tempDir)
-    }
-
-    override func tearDown() {
-        try? FileManager.default.removeItem(atPath: tempDir)
     }
 
     // MARK: - Record Persistence

@@ -17,25 +17,6 @@ import XCTest
 /// TDD Phase: RED (feature not implemented yet)
 final class TaskToolsTests: XCTestCase {
 
-    // MARK: - Helpers
-
-    /// Creates a ToolContext with an injected TaskStore.
-    private func makeContext(taskStore: TaskStore? = nil) -> ToolContext {
-        return ToolContext(
-            cwd: "/tmp",
-            toolUseId: "test-tool-use-id",
-            taskStore: taskStore
-        )
-    }
-
-    /// Creates a ToolContext without any TaskStore (nil).
-    private func makeContextWithoutStore() -> ToolContext {
-        return ToolContext(
-            cwd: "/tmp",
-            toolUseId: "test-tool-use-id"
-        )
-    }
-
     // MARK: - AC1: TaskCreate Tool
 
     // MARK: AC1 — Factory
@@ -95,7 +76,7 @@ final class TaskToolsTests: XCTestCase {
     func testTaskCreate_subjectOnly_returnsSuccess() async throws {
         let taskStore = TaskStore()
         let tool = createTaskCreateTool()
-        let context = makeContext(taskStore: taskStore)
+        let context = makeTestToolContext(taskStore: taskStore)
 
         let input: [String: Any] = ["subject": "Build feature X"]
         let result = await tool.call(input: input, context: context)
@@ -110,7 +91,7 @@ final class TaskToolsTests: XCTestCase {
     func testTaskCreate_allFields_returnsSuccess() async throws {
         let taskStore = TaskStore()
         let tool = createTaskCreateTool()
-        let context = makeContext(taskStore: taskStore)
+        let context = makeTestToolContext(taskStore: taskStore)
 
         let input: [String: Any] = [
             "subject": "Full task",
@@ -134,7 +115,7 @@ final class TaskToolsTests: XCTestCase {
     func testTaskCreate_defaultStatusIsPending() async throws {
         let taskStore = TaskStore()
         let tool = createTaskCreateTool()
-        let context = makeContext(taskStore: taskStore)
+        let context = makeTestToolContext(taskStore: taskStore)
 
         let input: [String: Any] = ["subject": "Default status task"]
         let result = await tool.call(input: input, context: context)
@@ -150,7 +131,7 @@ final class TaskToolsTests: XCTestCase {
     func testTaskCreate_withInitialStatus_inProgress() async throws {
         let taskStore = TaskStore()
         let tool = createTaskCreateTool()
-        let context = makeContext(taskStore: taskStore)
+        let context = makeTestToolContext(taskStore: taskStore)
 
         let input: [String: Any] = [
             "subject": "Active task",
@@ -172,7 +153,7 @@ final class TaskToolsTests: XCTestCase {
     func testTaskCreate_inputDecodable() async throws {
         let taskStore = TaskStore()
         let tool = createTaskCreateTool()
-        let context = makeContext(taskStore: taskStore)
+        let context = makeTestToolContext(taskStore: taskStore)
 
         // JSON input with all fields
         let input: [String: Any] = [
@@ -239,7 +220,7 @@ final class TaskToolsTests: XCTestCase {
         _ = await taskStore.create(subject: "Task C")
 
         let tool = createTaskListTool()
-        let context = makeContext(taskStore: taskStore)
+        let context = makeTestToolContext(taskStore: taskStore)
 
         let input: [String: Any] = [:]
         let result = await tool.call(input: input, context: context)
@@ -257,7 +238,7 @@ final class TaskToolsTests: XCTestCase {
         _ = await taskStore.create(subject: "Progress task", status: .inProgress)
 
         let tool = createTaskListTool()
-        let context = makeContext(taskStore: taskStore)
+        let context = makeTestToolContext(taskStore: taskStore)
 
         let input: [String: Any] = ["status": "in_progress"]
         let result = await tool.call(input: input, context: context)
@@ -275,7 +256,7 @@ final class TaskToolsTests: XCTestCase {
         _ = await taskStore.create(subject: "Agent2 task", owner: "agent-2")
 
         let tool = createTaskListTool()
-        let context = makeContext(taskStore: taskStore)
+        let context = makeTestToolContext(taskStore: taskStore)
 
         let input: [String: Any] = ["owner": "agent-1"]
         let result = await tool.call(input: input, context: context)
@@ -289,7 +270,7 @@ final class TaskToolsTests: XCTestCase {
     func testTaskList_emptyStore_returnsNoTasks() async throws {
         let taskStore = TaskStore()
         let tool = createTaskListTool()
-        let context = makeContext(taskStore: taskStore)
+        let context = makeTestToolContext(taskStore: taskStore)
 
         let input: [String: Any] = [:]
         let result = await tool.call(input: input, context: context)
@@ -353,7 +334,7 @@ final class TaskToolsTests: XCTestCase {
         let task = await taskStore.create(subject: "Update me")
 
         let tool = createTaskUpdateTool()
-        let context = makeContext(taskStore: taskStore)
+        let context = makeTestToolContext(taskStore: taskStore)
 
         let input: [String: Any] = [
             "id": task.id,
@@ -371,7 +352,7 @@ final class TaskToolsTests: XCTestCase {
         let task = await taskStore.create(subject: "Multi update")
 
         let tool = createTaskUpdateTool()
-        let context = makeContext(taskStore: taskStore)
+        let context = makeTestToolContext(taskStore: taskStore)
 
         let input: [String: Any] = [
             "id": task.id,
@@ -395,7 +376,7 @@ final class TaskToolsTests: XCTestCase {
     func testTaskUpdate_taskNotFound_returnsError() async throws {
         let taskStore = TaskStore()
         let tool = createTaskUpdateTool()
-        let context = makeContext(taskStore: taskStore)
+        let context = makeTestToolContext(taskStore: taskStore)
 
         let input: [String: Any] = [
             "id": "task_999",
@@ -414,7 +395,7 @@ final class TaskToolsTests: XCTestCase {
         let task = await taskStore.create(subject: "Terminal task", status: .completed)
 
         let tool = createTaskUpdateTool()
-        let context = makeContext(taskStore: taskStore)
+        let context = makeTestToolContext(taskStore: taskStore)
 
         let input: [String: Any] = [
             "id": task.id,
@@ -434,7 +415,7 @@ final class TaskToolsTests: XCTestCase {
         let task = await taskStore.create(subject: "Decode test")
 
         let tool = createTaskUpdateTool()
-        let context = makeContext(taskStore: taskStore)
+        let context = makeTestToolContext(taskStore: taskStore)
 
         let input: [String: Any] = [
             "id": task.id,
@@ -498,7 +479,7 @@ final class TaskToolsTests: XCTestCase {
         )
 
         let tool = createTaskGetTool()
-        let context = makeContext(taskStore: taskStore)
+        let context = makeTestToolContext(taskStore: taskStore)
 
         let input: [String: Any] = ["id": task.id]
         let result = await tool.call(input: input, context: context)
@@ -514,7 +495,7 @@ final class TaskToolsTests: XCTestCase {
     func testTaskGet_nonexistentTask_returnsError() async throws {
         let taskStore = TaskStore()
         let tool = createTaskGetTool()
-        let context = makeContext(taskStore: taskStore)
+        let context = makeTestToolContext(taskStore: taskStore)
 
         let input: [String: Any] = ["id": "task_999"]
         let result = await tool.call(input: input, context: context)
@@ -575,7 +556,7 @@ final class TaskToolsTests: XCTestCase {
         let task = await taskStore.create(subject: "Stop me")
 
         let tool = createTaskStopTool()
-        let context = makeContext(taskStore: taskStore)
+        let context = makeTestToolContext(taskStore: taskStore)
 
         let input: [String: Any] = ["id": task.id]
         let result = await tool.call(input: input, context: context)
@@ -597,7 +578,7 @@ final class TaskToolsTests: XCTestCase {
         let task = await taskStore.create(subject: "Stop with reason")
 
         let tool = createTaskStopTool()
-        let context = makeContext(taskStore: taskStore)
+        let context = makeTestToolContext(taskStore: taskStore)
 
         let input: [String: Any] = [
             "id": task.id,
@@ -618,7 +599,7 @@ final class TaskToolsTests: XCTestCase {
     func testTaskStop_nonexistentTask_returnsError() async throws {
         let taskStore = TaskStore()
         let tool = createTaskStopTool()
-        let context = makeContext(taskStore: taskStore)
+        let context = makeTestToolContext(taskStore: taskStore)
 
         let input: [String: Any] = ["id": "task_999"]
         let result = await tool.call(input: input, context: context)
@@ -632,7 +613,7 @@ final class TaskToolsTests: XCTestCase {
         let task = await taskStore.create(subject: "Already done", status: .completed)
 
         let tool = createTaskStopTool()
-        let context = makeContext(taskStore: taskStore)
+        let context = makeTestToolContext(taskStore: taskStore)
 
         let input: [String: Any] = ["id": task.id]
         let result = await tool.call(input: input, context: context)
@@ -690,7 +671,7 @@ final class TaskToolsTests: XCTestCase {
         _ = try await taskStore.update(id: task.id, output: "The result is 42")
 
         let tool = createTaskOutputTool()
-        let context = makeContext(taskStore: taskStore)
+        let context = makeTestToolContext(taskStore: taskStore)
 
         let input: [String: Any] = ["id": task.id]
         let result = await tool.call(input: input, context: context)
@@ -705,7 +686,7 @@ final class TaskToolsTests: XCTestCase {
         let task = await taskStore.create(subject: "No output task")
 
         let tool = createTaskOutputTool()
-        let context = makeContext(taskStore: taskStore)
+        let context = makeTestToolContext(taskStore: taskStore)
 
         let input: [String: Any] = ["id": task.id]
         let result = await tool.call(input: input, context: context)
@@ -719,7 +700,7 @@ final class TaskToolsTests: XCTestCase {
     func testTaskOutput_nonexistentTask_returnsError() async throws {
         let taskStore = TaskStore()
         let tool = createTaskOutputTool()
-        let context = makeContext(taskStore: taskStore)
+        let context = makeTestToolContext(taskStore: taskStore)
 
         let input: [String: Any] = ["id": "task_999"]
         let result = await tool.call(input: input, context: context)
@@ -792,7 +773,7 @@ final class TaskToolsTests: XCTestCase {
     /// AC9 [P0]: TaskCreate returns error when taskStore is nil.
     func testTaskCreate_nilTaskStore_returnsError() async throws {
         let tool = createTaskCreateTool()
-        let context = makeContextWithoutStore()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = ["subject": "Test"]
         let result = await tool.call(input: input, context: context)
@@ -805,7 +786,7 @@ final class TaskToolsTests: XCTestCase {
     /// AC9 [P0]: TaskList returns error when taskStore is nil.
     func testTaskList_nilTaskStore_returnsError() async throws {
         let tool = createTaskListTool()
-        let context = makeContextWithoutStore()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = [:]
         let result = await tool.call(input: input, context: context)
@@ -816,7 +797,7 @@ final class TaskToolsTests: XCTestCase {
     /// AC9 [P0]: TaskUpdate returns error when taskStore is nil.
     func testTaskUpdate_nilTaskStore_returnsError() async throws {
         let tool = createTaskUpdateTool()
-        let context = makeContextWithoutStore()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = ["id": "task_1"]
         let result = await tool.call(input: input, context: context)
@@ -827,7 +808,7 @@ final class TaskToolsTests: XCTestCase {
     /// AC9 [P0]: TaskGet returns error when taskStore is nil.
     func testTaskGet_nilTaskStore_returnsError() async throws {
         let tool = createTaskGetTool()
-        let context = makeContextWithoutStore()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = ["id": "task_1"]
         let result = await tool.call(input: input, context: context)
@@ -838,7 +819,7 @@ final class TaskToolsTests: XCTestCase {
     /// AC9 [P0]: TaskStop returns error when taskStore is nil.
     func testTaskStop_nilTaskStore_returnsError() async throws {
         let tool = createTaskStopTool()
-        let context = makeContextWithoutStore()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = ["id": "task_1"]
         let result = await tool.call(input: input, context: context)
@@ -849,7 +830,7 @@ final class TaskToolsTests: XCTestCase {
     /// AC9 [P0]: TaskOutput returns error when taskStore is nil.
     func testTaskOutput_nilTaskStore_returnsError() async throws {
         let tool = createTaskOutputTool()
-        let context = makeContextWithoutStore()
+        let context = makeTestToolContext()
 
         let input: [String: Any] = ["id": "task_1"]
         let result = await tool.call(input: input, context: context)
@@ -862,7 +843,7 @@ final class TaskToolsTests: XCTestCase {
     /// AC9 [P0]: TaskCreate never throws — always returns ToolResult even with malformed input.
     func testTaskCreate_neverThrows_malformedInput() async throws {
         let tool = createTaskCreateTool()
-        let context = makeContextWithoutStore()
+        let context = makeTestToolContext()
 
         let badInputs: [[String: Any]] = [
             [:],  // missing all fields
@@ -879,7 +860,7 @@ final class TaskToolsTests: XCTestCase {
     /// AC9 [P0]: TaskUpdate never throws — always returns ToolResult even with malformed input.
     func testTaskUpdate_neverThrows_malformedInput() async throws {
         let tool = createTaskUpdateTool()
-        let context = makeContextWithoutStore()
+        let context = makeTestToolContext()
 
         let badInputs: [[String: Any]] = [
             [:],  // missing all fields
@@ -915,7 +896,7 @@ final class TaskToolsTests: XCTestCase {
 
         // Verify they work through ToolContext injection
         let taskStore = TaskStore()
-        let context = makeContext(taskStore: taskStore)
+        let context = makeTestToolContext(taskStore: taskStore)
 
         let result = await createTool.call(
             input: ["subject": "Boundary test"],
@@ -931,7 +912,7 @@ final class TaskToolsTests: XCTestCase {
         let taskStore = TaskStore()
         let createTool = createTaskCreateTool()
         let listTool = createTaskListTool()
-        let context = makeContext(taskStore: taskStore)
+        let context = makeTestToolContext(taskStore: taskStore)
 
         // Create a task
         _ = await createTool.call(
@@ -954,7 +935,7 @@ final class TaskToolsTests: XCTestCase {
         let updateTool = createTaskUpdateTool()
         let outputTool = createTaskOutputTool()
         let stopTool = createTaskStopTool()
-        let context = makeContext(taskStore: taskStore)
+        let context = makeTestToolContext(taskStore: taskStore)
 
         // Step 1: Create
         let createResult = await createTool.call(
@@ -1012,7 +993,7 @@ final class TaskToolsTests: XCTestCase {
         let createTool = createTaskCreateTool()
         let stopTool = createTaskStopTool()
         let outputTool = createTaskOutputTool()
-        let context = makeContext(taskStore: taskStore)
+        let context = makeTestToolContext(taskStore: taskStore)
 
         // Create
         _ = await createTool.call(

@@ -3,6 +3,18 @@ import XCTest
 
 final class SkillEvolutionTypesTests: XCTestCase {
 
+    private static let testEncoder: JSONEncoder = {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        return encoder
+    }()
+
+    private static let testDecoder: JSONDecoder = {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return decoder
+    }()
+
     // MARK: - SkillSignalType
 
     func testSkillSignalTypeCases() {
@@ -336,8 +348,8 @@ final class SkillEvolutionTypesTests: XCTestCase {
 
     func testSkillEvolutionConfigCodableDefaults() throws {
         let config = SkillEvolutionConfig()
-        let data = try JSONEncoder().encode(config)
-        let decoded = try JSONDecoder().decode(SkillEvolutionConfig.self, from: data)
+        let data = try Self.testEncoder.encode(config)
+        let decoded = try Self.testDecoder.decode(SkillEvolutionConfig.self, from: data)
         XCTAssertEqual(decoded.maxSignalsPerEvolution, 5)
         XCTAssertEqual(decoded.minConfidence, 0.4)
         XCTAssertNil(decoded.allowedSignalTypes)
@@ -353,8 +365,8 @@ final class SkillEvolutionTypesTests: XCTestCase {
             dryRun: true,
             preserveOriginal: false
         )
-        let data = try JSONEncoder().encode(config)
-        let decoded = try JSONDecoder().decode(SkillEvolutionConfig.self, from: data)
+        let data = try Self.testEncoder.encode(config)
+        let decoded = try Self.testDecoder.decode(SkillEvolutionConfig.self, from: data)
         XCTAssertEqual(decoded.maxSignalsPerEvolution, 3)
         XCTAssertEqual(decoded.minConfidence, 0.8)
         XCTAssertEqual(decoded.allowedSignalTypes, [.merge, .split])
@@ -392,8 +404,8 @@ final class SkillEvolutionTypesTests: XCTestCase {
             skippedSignals: [],
             changes: ["Updated promptTemplate"]
         )
-        let data = try JSONEncoder().encode(result)
-        let decoded = try JSONDecoder().decode(SkillEvolutionResult.self, from: data)
+        let data = try Self.testEncoder.encode(result)
+        let decoded = try Self.testDecoder.decode(SkillEvolutionResult.self, from: data)
         XCTAssertNotNil(decoded.evolvedSkill)
         XCTAssertEqual(decoded.evolvedSkill?.name, "commit")
         XCTAssertEqual(decoded.evolvedSkill?.lifecycleState, .experimental)
@@ -410,8 +422,8 @@ final class SkillEvolutionTypesTests: XCTestCase {
             skippedSignals: [],
             changes: []
         )
-        let data = try JSONEncoder().encode(result)
-        let decoded = try JSONDecoder().decode(SkillEvolutionResult.self, from: data)
+        let data = try Self.testEncoder.encode(result)
+        let decoded = try Self.testDecoder.decode(SkillEvolutionResult.self, from: data)
         XCTAssertNil(decoded.evolvedSkill)
         XCTAssertTrue(decoded.appliedSignals.isEmpty)
         XCTAssertTrue(decoded.changes.isEmpty)
@@ -432,8 +444,8 @@ final class SkillEvolutionTypesTests: XCTestCase {
             skippedSignals: [skipped],
             changes: []
         )
-        let data = try JSONEncoder().encode(result)
-        let decoded = try JSONDecoder().decode(SkillEvolutionResult.self, from: data)
+        let data = try Self.testEncoder.encode(result)
+        let decoded = try Self.testDecoder.decode(SkillEvolutionResult.self, from: data)
         XCTAssertNil(decoded.evolvedSkill)
         XCTAssertEqual(decoded.appliedSignals.count, 1)
         XCTAssertEqual(decoded.appliedSignals.first?.content, "High")
@@ -485,8 +497,8 @@ final class SkillEvolutionTypesTests: XCTestCase {
 
     func testSkillLifecycleStateCodableRoundTrip() throws {
         for state in SkillLifecycleState.allCases {
-            let data = try JSONEncoder().encode(state)
-            let decoded = try JSONDecoder().decode(SkillLifecycleState.self, from: data)
+            let data = try Self.testEncoder.encode(state)
+            let decoded = try Self.testDecoder.decode(SkillLifecycleState.self, from: data)
             XCTAssertEqual(decoded, state)
         }
     }
@@ -584,12 +596,8 @@ final class SkillEvolutionTypesTests: XCTestCase {
             pinned: true,
             provenance: .agentCreated
         )
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        let jsonData = try encoder.encode(data)
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        let decoded = try decoder.decode(SkillUsageData.self, from: jsonData)
+        let jsonData = try Self.testEncoder.encode(data)
+        let decoded = try Self.testDecoder.decode(SkillUsageData.self, from: jsonData)
         XCTAssertEqual(decoded, data)
     }
 
@@ -625,8 +633,8 @@ final class SkillEvolutionTypesTests: XCTestCase {
 
     func testSkillUsageTrackerConfigCodableRoundTrip() throws {
         let config = SkillUsageTrackerConfig(staleAfterDays: 7, archiveAfterDays: 30, protectExperimental: false)
-        let data = try JSONEncoder().encode(config)
-        let decoded = try JSONDecoder().decode(SkillUsageTrackerConfig.self, from: data)
+        let data = try Self.testEncoder.encode(config)
+        let decoded = try Self.testDecoder.decode(SkillUsageTrackerConfig.self, from: data)
         XCTAssertEqual(decoded, config)
     }
 
@@ -655,12 +663,8 @@ final class SkillEvolutionTypesTests: XCTestCase {
             to: .retired,
             reason: "No longer used"
         )
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        let data = try encoder.encode(transition)
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        let decoded = try decoder.decode(SkillLifecycleTransition.self, from: data)
+        let data = try Self.testEncoder.encode(transition)
+        let decoded = try Self.testDecoder.decode(SkillLifecycleTransition.self, from: data)
         XCTAssertEqual(decoded.skillName, transition.skillName)
         XCTAssertEqual(decoded.from, transition.from)
         XCTAssertEqual(decoded.to, transition.to)
@@ -703,12 +707,8 @@ final class SkillEvolutionTypesTests: XCTestCase {
             lastRunDurationMs: 200,
             lastErrors: ["error A", "error B"]
         )
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        let data = try encoder.encode(state)
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        let decoded = try decoder.decode(CuratorState.self, from: data)
+        let data = try Self.testEncoder.encode(state)
+        let decoded = try Self.testDecoder.decode(CuratorState.self, from: data)
         XCTAssertEqual(decoded, state)
     }
 
@@ -756,8 +756,8 @@ final class SkillEvolutionTypesTests: XCTestCase {
             dryRun: true,
             enabled: false
         )
-        let data = try JSONEncoder().encode(config)
-        let decoded = try JSONDecoder().decode(SkillCuratorConfig.self, from: data)
+        let data = try Self.testEncoder.encode(config)
+        let decoded = try Self.testDecoder.decode(SkillCuratorConfig.self, from: data)
         XCTAssertEqual(decoded, config)
     }
 
@@ -831,12 +831,8 @@ final class SkillEvolutionTypesTests: XCTestCase {
             dryRun: false,
             ranAt: fixedDate
         )
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        let data = try encoder.encode(result)
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        let decoded = try decoder.decode(CuratorRunResult.self, from: data)
+        let data = try Self.testEncoder.encode(result)
+        let decoded = try Self.testDecoder.decode(CuratorRunResult.self, from: data)
         XCTAssertEqual(decoded, result)
     }
 

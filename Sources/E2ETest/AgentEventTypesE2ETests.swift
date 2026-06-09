@@ -7,6 +7,21 @@ import OpenAgentSDK
 /// concurrent usage, existential dispatch, and JSON format validation.
 /// No mocks — uses real JSONEncoder/JSONDecoder and real concurrency primitives.
 struct AgentEventTypesE2ETests {
+
+    /// Shared JSON encoder configured with ISO8601 date strategy for Codable round-trip tests.
+    private static let testEncoder: JSONEncoder = {
+        let e = JSONEncoder()
+        e.dateEncodingStrategy = .iso8601
+        return e
+    }()
+
+    /// Shared JSON decoder configured with ISO8601 date strategy for Codable round-trip tests.
+    private static let testDecoder: JSONDecoder = {
+        let d = JSONDecoder()
+        d.dateDecodingStrategy = .iso8601
+        return d
+    }()
+
     static func run() async {
         section("87-92. Agent Event Types (E2E — Story 26.2)")
         await testSessionCreatedEvent_fullLifecycle()
@@ -75,10 +90,8 @@ struct AgentEventTypesE2ETests {
         }
 
         // Encode → JSON → Decode
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let encoder = Self.testEncoder
+        let decoder = Self.testDecoder
 
         do {
             let data = try encoder.encode(event)
@@ -117,10 +130,8 @@ struct AgentEventTypesE2ETests {
             originalCreatedAt: originalDate
         )
 
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let encoder = Self.testEncoder
+        let decoder = Self.testDecoder
 
         do {
             let data = try encoder.encode(event)
@@ -146,10 +157,8 @@ struct AgentEventTypesE2ETests {
 
     /// AC3 [P0]: Create events for each SessionFinalStatus, serialize, verify status survives.
     static func testSessionClosedEvent_allStatuses() async {
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let encoder = Self.testEncoder
+        let decoder = Self.testDecoder
 
         for status in SessionFinalStatus.allCases {
             let event = SessionClosedEvent(sessionId: "e2e-close-\(status.rawValue)", finalStatus: status)
@@ -213,8 +222,7 @@ struct AgentEventTypesE2ETests {
 
     /// AC1-AC4 [P0]: Verify JSON output matches expected SSE format (flat, snake_case keys).
     static func testSessionEvents_jsonFormatSseCompatible() async {
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
+        let encoder = Self.testEncoder
 
         // SessionCreatedEvent
         do {
@@ -296,10 +304,8 @@ struct AgentEventTypesE2ETests {
             return
         }
 
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let encoder = Self.testEncoder
+        let decoder = Self.testDecoder
 
         do {
             let data = try encoder.encode(event)
@@ -333,10 +339,8 @@ struct AgentEventTypesE2ETests {
             resultText: "Analysis complete"
         )
 
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let encoder = Self.testEncoder
+        let decoder = Self.testDecoder
 
         do {
             let data = try encoder.encode(event)
@@ -426,8 +430,7 @@ struct AgentEventTypesE2ETests {
     // MARK: Test 98: Agent events JSON format SSE-compatible
 
     static func testAgentEvents_jsonFormatSseCompatible() async {
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
+        let encoder = Self.testEncoder
 
         // AgentStartedEvent
         do {
@@ -571,10 +574,8 @@ struct AgentEventTypesE2ETests {
             return
         }
 
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let encoder = Self.testEncoder
+        let decoder = Self.testDecoder
 
         do {
             let data = try encoder.encode(event)
@@ -607,10 +608,8 @@ struct AgentEventTypesE2ETests {
             chunk: "partial output data chunk"
         )
 
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let encoder = Self.testEncoder
+        let decoder = Self.testDecoder
 
         do {
             let data = try encoder.encode(event)
@@ -695,8 +694,7 @@ struct AgentEventTypesE2ETests {
     // MARK: Test 107: Tool events JSON format SSE-compatible
 
     static func testToolEvents_jsonFormatSseCompatible() async {
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
+        let encoder = Self.testEncoder
 
         // ToolStartedEvent
         do {
@@ -806,10 +804,8 @@ struct AgentEventTypesE2ETests {
             isError: false
         )
 
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let encoder = Self.testEncoder
+        let decoder = Self.testDecoder
 
         do {
             let data = try encoder.encode(event)
@@ -856,10 +852,8 @@ struct AgentEventTypesE2ETests {
             error: "Command timed out after 30s"
         )
 
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let encoder = Self.testEncoder
+        let decoder = Self.testDecoder
 
         do {
             let data = try encoder.encode(event)
@@ -922,10 +916,8 @@ struct AgentEventTypesE2ETests {
             isError: false
         )
 
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let encoder = Self.testEncoder
+        let decoder = Self.testDecoder
 
         do {
             // Verify all events share the same toolUseId
@@ -1053,10 +1045,8 @@ struct AgentEventTypesE2ETests {
             return
         }
 
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let encoder = Self.testEncoder
+        let decoder = Self.testDecoder
 
         do {
             let data = try encoder.encode(event)
@@ -1094,10 +1084,8 @@ struct AgentEventTypesE2ETests {
             durationMs: 4200
         )
 
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let encoder = Self.testEncoder
+        let decoder = Self.testDecoder
 
         do {
             let data = try encoder.encode(event)
@@ -1135,10 +1123,8 @@ struct AgentEventTypesE2ETests {
             estimatedCostUsd: 0.15
         )
 
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let encoder = Self.testEncoder
+        let decoder = Self.testDecoder
 
         do {
             let data = try encoder.encode(event)
@@ -1183,10 +1169,8 @@ struct AgentEventTypesE2ETests {
             estimatedCostUsd: 0.01
         )
 
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let encoder = Self.testEncoder
+        let decoder = Self.testDecoder
 
         do {
             let data = try encoder.encode(event)
@@ -1293,8 +1277,7 @@ struct AgentEventTypesE2ETests {
     // MARK: Test 122: LLM events JSON format SSE-compatible
 
     static func testLLMEvents_jsonFormatSseCompatible() async {
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
+        let encoder = Self.testEncoder
 
         // LLMRequestStartedEvent
         do {
@@ -1369,10 +1352,8 @@ struct AgentEventTypesE2ETests {
             estimatedCostUsd: 0.15
         )
 
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let encoder = Self.testEncoder
+        let decoder = Self.testDecoder
 
         do {
             let decodedStarted = try decoder.decode(LLMRequestStartedEvent.self, from: encoder.encode(started))
@@ -1429,10 +1410,8 @@ struct AgentEventTypesE2ETests {
             estimatedCostUsd: 0.001
         )
 
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let encoder = Self.testEncoder
+        let decoder = Self.testDecoder
 
         do {
             let data = try encoder.encode(event)
@@ -1517,10 +1496,8 @@ struct AgentEventTypesE2ETests {
             estimatedCostUsd: 0.045
         )
 
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let encoder = Self.testEncoder
+        let decoder = Self.testDecoder
 
         do {
             let data = try encoder.encode(event)
