@@ -46,9 +46,7 @@ public func createTeamCreateTool() -> ToolProtocol {
         inputSchema: teamCreateSchema,
         isReadOnly: false
     ) { (input: TeamCreateInput, context: ToolContext) async throws -> ToolExecuteResult in
-        guard let teamStore = context.teamStore else {
-            return ToolExecuteResult(content: "Error: TeamStore not available.", isError: true)
-        }
+        let teamStore = try context.requireStore(context.teamStore, name: "TeamStore")
         let members: [TeamMember] = input.members?.map { TeamMember(name: $0) } ?? []
         let team = await teamStore.create(
             name: input.name,

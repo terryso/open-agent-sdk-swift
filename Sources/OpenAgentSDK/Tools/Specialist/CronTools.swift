@@ -87,9 +87,7 @@ public func createCronCreateTool() -> ToolProtocol {
         inputSchema: cronCreateSchema,
         isReadOnly: false
     ) { (input: CronCreateInput, context: ToolContext) async throws -> ToolExecuteResult in
-        guard let cronStore = context.cronStore else {
-            return ToolExecuteResult(content: "Error: CronStore not available.", isError: true)
-        }
+        let cronStore = try context.requireStore(context.cronStore, name: "CronStore")
         let job = await cronStore.create(name: input.name, schedule: input.schedule, command: input.command)
         return ToolExecuteResult(
             content: "Cron job created: \(job.id) \"\(job.name)\" schedule=\"\(job.schedule)\"",
@@ -116,9 +114,7 @@ public func createCronDeleteTool() -> ToolProtocol {
         inputSchema: cronDeleteSchema,
         isReadOnly: false
     ) { (input: CronDeleteInput, context: ToolContext) async throws -> ToolExecuteResult in
-        guard let cronStore = context.cronStore else {
-            return ToolExecuteResult(content: "Error: CronStore not available.", isError: true)
-        }
+        let cronStore = try context.requireStore(context.cronStore, name: "CronStore")
         do {
             _ = try await cronStore.delete(id: input.id)
             return ToolExecuteResult(content: "Cron job deleted: \(input.id)", isError: false)
@@ -146,9 +142,7 @@ public func createCronListTool() -> ToolProtocol {
         inputSchema: cronListSchema,
         isReadOnly: true
     ) { (input: CronListInput, context: ToolContext) async throws -> ToolExecuteResult in
-        guard let cronStore = context.cronStore else {
-            return ToolExecuteResult(content: "Error: CronStore not available.", isError: true)
-        }
+        let cronStore = try context.requireStore(context.cronStore, name: "CronStore")
         let jobs = await cronStore.list()
         if jobs.isEmpty {
             return ToolExecuteResult(content: "No cron jobs scheduled.", isError: false)
