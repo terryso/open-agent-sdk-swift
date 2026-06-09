@@ -101,13 +101,7 @@ final class IntelligentCuratorTests: TempDirTestCase {
         viewCount: Int = 5,
         lastViewedAt: Date? = Date()
     ) async throws {
-        let data = SkillUsageData(
-            skillName: name,
-            viewCount: viewCount,
-            lastViewedAt: lastViewedAt,
-            provenance: .agentCreated
-        )
-        try await store.setUsage(skillName: name, data: data)
+        try await seedSkill(store: store, name: name, viewCount: viewCount, lastViewedAt: lastViewedAt, provenance: .agentCreated)
     }
 
     // MARK: - Mocks
