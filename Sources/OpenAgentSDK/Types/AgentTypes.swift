@@ -920,8 +920,11 @@ public struct QueryResult: Sendable {
     public let errors: [String]?
     /// All tool invocation/result pairs collected during the run.
     public let toolPairs: [SDKMessage.ToolExecutionPair]
+    /// Input tokens from the last LLM API call in this agent run.
+    /// `nil` when no LLM calls were made (e.g., error before first API call).
+    public let lastTurnInputTokens: Int?
 
-    public init(text: String, usage: TokenUsage, numTurns: Int, durationMs: Int, messages: [SDKMessage], status: QueryStatus = .success, totalCostUsd: Double = 0.0, costBreakdown: [CostBreakdownEntry] = [], isCancelled: Bool = false, errors: [String]? = nil, toolPairs: [SDKMessage.ToolExecutionPair] = []) {
+    public init(text: String, usage: TokenUsage, numTurns: Int, durationMs: Int, messages: [SDKMessage], status: QueryStatus = .success, totalCostUsd: Double = 0.0, costBreakdown: [CostBreakdownEntry] = [], isCancelled: Bool = false, errors: [String]? = nil, toolPairs: [SDKMessage.ToolExecutionPair] = [], lastTurnInputTokens: Int? = nil) {
         self.text = text
         self.usage = usage
         self.numTurns = numTurns
@@ -933,6 +936,7 @@ public struct QueryResult: Sendable {
         self.isCancelled = isCancelled
         self.errors = errors
         self.toolPairs = toolPairs
+        self.lastTurnInputTokens = lastTurnInputTokens
     }
 }
 

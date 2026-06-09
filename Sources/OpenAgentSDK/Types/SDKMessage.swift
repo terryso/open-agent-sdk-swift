@@ -283,6 +283,13 @@ public enum SDKMessage: Sendable, Equatable {
         /// All tool invocation/result pairs collected during the agent loop, matched by toolUseId.
         /// Empty when no tools were called.
         public let toolPairs: [ToolExecutionPair]
+        /// Input tokens from the last LLM API call in this agent run.
+        ///
+        /// Unlike `usage.inputTokens` (which is the **cumulative sum** of all API calls' input tokens),
+        /// this represents the actual context window size at the moment of the last API call.
+        /// Use this for context usage display and auto-compact threshold decisions.
+        /// `nil` when no LLM calls were made (e.g., skill error path).
+        public let lastTurnInputTokens: Int?
 
         /// Creates result data with the original fields.
         ///
@@ -300,7 +307,8 @@ public enum SDKMessage: Sendable, Equatable {
         ///   - errors: Error messages for error subtypes. Defaults to `nil`.
         ///   - durationApiMs: Cumulative API call duration. Defaults to `nil`.
         ///   - toolPairs: Tool invocation/result pairs. Defaults to `[]`.
-        public init(subtype: Subtype, text: String, usage: TokenUsage?, numTurns: Int, durationMs: Int, totalCostUsd: Double = 0.0, costBreakdown: [CostBreakdownEntry] = [], structuredOutput: SendableStructuredOutput? = nil, permissionDenials: [SDKPermissionDenial]? = nil, modelUsage: [ModelUsageEntry]? = nil, errors: [String]? = nil, durationApiMs: Int? = nil, toolPairs: [ToolExecutionPair] = []) {
+        ///   - lastTurnInputTokens: Input tokens from the last LLM call. Defaults to `nil`.
+        public init(subtype: Subtype, text: String, usage: TokenUsage?, numTurns: Int, durationMs: Int, totalCostUsd: Double = 0.0, costBreakdown: [CostBreakdownEntry] = [], structuredOutput: SendableStructuredOutput? = nil, permissionDenials: [SDKPermissionDenial]? = nil, modelUsage: [ModelUsageEntry]? = nil, errors: [String]? = nil, durationApiMs: Int? = nil, toolPairs: [ToolExecutionPair] = [], lastTurnInputTokens: Int? = nil) {
             self.subtype = subtype
             self.text = text
             self.usage = usage
@@ -314,6 +322,7 @@ public enum SDKMessage: Sendable, Equatable {
             self.errors = errors
             self.durationApiMs = durationApiMs
             self.toolPairs = toolPairs
+            self.lastTurnInputTokens = lastTurnInputTokens
         }
 
     }

@@ -777,7 +777,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                         numTurns: result.numTurns,
                         durationMs: result.durationMs,
                         totalCostUsd: result.totalCostUsd,
-                        costBreakdown: result.costBreakdown
+                        costBreakdown: result.costBreakdown,
+                        lastTurnInputTokens: result.lastTurnInputTokens
                     )))
                 }
                 continuation.finish()
@@ -1397,6 +1398,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
         var status: QueryStatus = .success
         var loopExitedCleanly = false
         var maxTokensRecoveryAttempts = 0
+        var lastTurnInputTokens: Int? = nil
         let MAX_TOKENS_RECOVERY = 3
         var compactState = createAutoCompactState()
         var costByModel: [String: CostBreakdownEntry] = [:]
@@ -1547,6 +1549,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                                 eventBus: options.eventBus, sessionId: resolvedSessionId,
                                 agentLabel: options.agentLabel
                             )
+                            lastTurnInputTokens = usage["input_tokens"] as? Int ?? 0
                         }
                         let content = fallbackResponse["content"]
                         if let content {
@@ -1624,7 +1627,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                     totalCostUsd: totalCostUsd,
                     costBreakdown: Array(costByModel.values),
                     isCancelled: isCancelled,
-                    errors: ["[\(statusCode)] \(errorMessage)"]
+                    errors: ["[\(statusCode)] \(errorMessage)"],
+                    lastTurnInputTokens: lastTurnInputTokens
                 )
             }
 
@@ -1653,6 +1657,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                     eventBus: options.eventBus, sessionId: resolvedSessionId,
                     agentLabel: options.agentLabel
                 )
+                lastTurnInputTokens = usage["input_tokens"] as? Int ?? 0
             }
 
             // Structured log for LLM response
@@ -1873,7 +1878,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
             totalCostUsd: totalCostUsd,
             costBreakdown: Array(costByModel.values),
             isCancelled: isCancelled,
-            toolPairs: collectedToolPairs
+            toolPairs: collectedToolPairs,
+            lastTurnInputTokens: lastTurnInputTokens
         )
         _lastQueryMessages = result.messages
         return result
@@ -2134,6 +2140,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                 var costByModel: [String: CostBreakdownEntry] = [:]
                 var collectedToolPairs: [SDKMessage.ToolExecutionPair] = []
                 var modelCallCount = 0
+                var lastTurnInputTokens: Int? = nil
 
                 // CostTracker: structured cost accumulation (additive layer alongside existing inline tracking)
                 var streamCostTracker = CostTracker(model: capturedModel, maxBudgetUsd: capturedMaxBudgetUsd, label: capturedAgentLabel)
@@ -2164,7 +2171,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                             totalCostUsd: totalCostUsd,
                             costBreakdown: Array(costByModel.values),
                             hookRegistry: capturedHookRegistry,
-                            cwd: capturedCwd
+                            cwd: capturedCwd,
+                            lastTurnInputTokens: lastTurnInputTokens
                         )
                         return
                     }
@@ -2255,7 +2263,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                             continuation: continuation, text: "",
                             usage: totalUsage, turnCount: turnCount, startTime: startTime,
                             totalCostUsd: totalCostUsd,
-                            costBreakdown: Array(costByModel.values)
+                            costBreakdown: Array(costByModel.values),
+                            lastTurnInputTokens: lastTurnInputTokens
                         )
                         return
                     }
@@ -2288,6 +2297,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                                         eventBus: capturedEventBus, sessionId: resolvedSessionId,
                                         agentLabel: capturedAgentLabel
                                     )
+                                    lastTurnInputTokens = msgUsage["input_tokens"] as? Int ?? 0
                                 }
 
                                 // Check budget after input token cost accumulation
@@ -2305,7 +2315,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                                         costByModel: costByModel,
                                         hookRegistry: capturedHookRegistry,
                                         cwd: capturedCwd,
-                                        traceRecorder: streamTraceRecorder
+                                        traceRecorder: streamTraceRecorder,
+                                        lastTurnInputTokens: lastTurnInputTokens
                                     )
                                     return
                                 }
@@ -2373,6 +2384,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                                     eventBus: capturedEventBus, sessionId: resolvedSessionId,
                                     agentLabel: capturedAgentLabel
                                 )
+                                lastTurnInputTokens = usage["input_tokens"] as? Int ?? 0
 
                                 // Check budget after cost accumulation via CostTracker + inline fallback
                                 if Self.isBudgetExceeded(checkResult: streamCostTracker.checkBudget(), maxBudgetUsd: capturedMaxBudgetUsd, totalCostUsd: totalCostUsd) {
@@ -2389,7 +2401,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                                         costByModel: costByModel,
                                         hookRegistry: capturedHookRegistry,
                                         cwd: capturedCwd,
-                                        traceRecorder: streamTraceRecorder
+                                        traceRecorder: streamTraceRecorder,
+                                        lastTurnInputTokens: lastTurnInputTokens
                                     )
                                     return
                                 }
@@ -2427,7 +2440,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                                         durationMs: durationMs,
                                         totalCostUsd: totalCostUsd,
                                         costBreakdown: Array(costByModel.values),
-                                        toolPairs: collectedToolPairs
+                                        toolPairs: collectedToolPairs,
+                                        lastTurnInputTokens: lastTurnInputTokens
                                     ))
                                     continuation.yield(maxCallsResultMsg)
                                     if let trace = streamTraceRecorder, let mapped = TraceEventMapping.traceEvent(from: maxCallsResultMsg) {
@@ -2484,7 +2498,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                                     continuation: continuation, text: accumulatedText,
                                     usage: totalUsage, turnCount: turnCount, startTime: startTime,
                                     totalCostUsd: totalCostUsd,
-                                    costBreakdown: Array(costByModel.values)
+                                    costBreakdown: Array(costByModel.values),
+                                    lastTurnInputTokens: lastTurnInputTokens
                                 )
                                 return
 
@@ -2511,7 +2526,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                                 totalCostUsd: totalCostUsd,
                                 costBreakdown: Array(costByModel.values),
                                 hookRegistry: capturedHookRegistry,
-                                cwd: capturedCwd
+                                cwd: capturedCwd,
+                                lastTurnInputTokens: lastTurnInputTokens
                             )
                             return
                         }
@@ -2524,7 +2540,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                             continuation: continuation, text: accumulatedText,
                             usage: totalUsage, turnCount: turnCount, startTime: startTime,
                             totalCostUsd: totalCostUsd,
-                            costBreakdown: Array(costByModel.values)
+                            costBreakdown: Array(costByModel.values),
+                            lastTurnInputTokens: lastTurnInputTokens
                         )
                         return
                     }
@@ -2548,7 +2565,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                             totalCostUsd: totalCostUsd,
                             costBreakdown: Array(costByModel.values),
                             hookRegistry: capturedHookRegistry,
-                            cwd: capturedCwd
+                            cwd: capturedCwd,
+                            lastTurnInputTokens: lastTurnInputTokens
                         )
                         return
                     }
@@ -2736,7 +2754,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                     durationMs: durationMs,
                     totalCostUsd: totalCostUsd,
                     costBreakdown: Array(costByModel.values),
-                    toolPairs: collectedToolPairs
+                    toolPairs: collectedToolPairs,
+                    lastTurnInputTokens: lastTurnInputTokens
                 ))
                 continuation.yield(resultMsg)
                 if let trace = streamTraceRecorder, let mapped = TraceEventMapping.traceEvent(from: resultMsg) {
@@ -2955,7 +2974,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
         turnCount: Int,
         startTime: ContinuousClock.Instant,
         totalCostUsd: Double = 0.0,
-        costBreakdown: [CostBreakdownEntry] = []
+        costBreakdown: [CostBreakdownEntry] = [],
+        lastTurnInputTokens: Int? = nil
     ) {
         continuation.yield(.result(SDKMessage.ResultData(
             subtype: .errorDuringExecution,
@@ -2964,7 +2984,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
             numTurns: turnCount,
             durationMs: computeDurationMs(ContinuousClock.now - startTime),
             totalCostUsd: totalCostUsd,
-            costBreakdown: costBreakdown
+            costBreakdown: costBreakdown,
+            lastTurnInputTokens: lastTurnInputTokens
         )))
         continuation.finish()
     }
@@ -2980,7 +3001,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
         totalCostUsd: Double,
         costBreakdown: [CostBreakdownEntry],
         hookRegistry: HookRegistry?,
-        cwd: String?
+        cwd: String?,
+        lastTurnInputTokens: Int? = nil
     ) async {
         if let hookRegistry = hookRegistry {
             let stopInput = HookInput(event: .stop, cwd: cwd)
@@ -2993,7 +3015,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
             numTurns: turnCount,
             durationMs: computeDurationMs(ContinuousClock.now - startTime),
             totalCostUsd: totalCostUsd,
-            costBreakdown: costBreakdown
+            costBreakdown: costBreakdown,
+            lastTurnInputTokens: lastTurnInputTokens
         )))
         if let hookRegistry = hookRegistry {
             let endInput = HookInput(event: .sessionEnd, cwd: cwd)
@@ -3305,7 +3328,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
         costByModel: [String: CostBreakdownEntry],
         hookRegistry: HookRegistry?,
         cwd: String?,
-        traceRecorder: TraceRecorder?
+        traceRecorder: TraceRecorder?,
+        lastTurnInputTokens: Int? = nil
     ) async {
         let elapsed = ContinuousClock.now - startTime
         let durationMs = computeDurationMs(elapsed)
@@ -3331,7 +3355,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
             numTurns: turnsUsed,
             durationMs: durationMs,
             totalCostUsd: totalCostUsd,
-            costBreakdown: Array(costByModel.values)
+            costBreakdown: Array(costByModel.values),
+            lastTurnInputTokens: lastTurnInputTokens
         ))
         continuation.yield(resultMsg)
         if let trace = traceRecorder, let mapped = TraceEventMapping.traceEvent(from: resultMsg) {
