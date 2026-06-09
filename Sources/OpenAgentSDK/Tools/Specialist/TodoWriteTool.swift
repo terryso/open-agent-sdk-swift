@@ -58,9 +58,7 @@ public func createTodoWriteTool() -> ToolProtocol {
         inputSchema: todoWriteSchema,
         isReadOnly: false
     ) { (input: TodoWriteInput, context: ToolContext) async throws -> ToolExecuteResult in
-        guard let todoStore = context.todoStore else {
-            return ToolExecuteResult(content: "Error: TodoStore not available.", isError: true)
-        }
+        let todoStore = try context.requireStore(context.todoStore, name: "TodoStore")
 
         switch input.action {
         case "add":

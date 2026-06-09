@@ -134,19 +134,14 @@ public actor AnthropicClient: LLMClient {
             throw SDKError.apiError(statusCode: 0, message: "Invalid URL")
         }
 
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.timeoutInterval = 300
-        request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
-        request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
-        request.setValue("application/json", forHTTPHeaderField: "content-type")
-
-        do {
-            request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
-        } catch {
-            throw SDKError.apiError(statusCode: 0, message: "Failed to serialize request body")
-        }
-
-        return request
+        return try buildJSONPostRequest(
+            url: url,
+            body: body,
+            headers: [
+                "x-api-key": apiKey,
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json",
+            ]
+        )
     }
 }

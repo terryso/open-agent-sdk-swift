@@ -59,9 +59,7 @@ public func createEnterPlanModeTool() -> ToolProtocol {
         inputSchema: enterPlanModeSchema,
         isReadOnly: false
     ) { (input: EnterPlanModeInput, context: ToolContext) async throws -> ToolExecuteResult in
-        guard let planStore = context.planStore else {
-            return ToolExecuteResult(content: "Error: PlanStore not available.", isError: true)
-        }
+        let planStore = try context.requireStore(context.planStore, name: "PlanStore")
         do {
             _ = try await planStore.enterPlanMode()
             return ToolExecuteResult(
@@ -97,9 +95,7 @@ public func createExitPlanModeTool() -> ToolProtocol {
         inputSchema: exitPlanModeSchema,
         isReadOnly: false
     ) { (input: ExitPlanModeInput, context: ToolContext) async throws -> ToolExecuteResult in
-        guard let planStore = context.planStore else {
-            return ToolExecuteResult(content: "Error: PlanStore not available.", isError: true)
-        }
+        let planStore = try context.requireStore(context.planStore, name: "PlanStore")
         do {
             let entry = try await planStore.exitPlanMode(plan: input.plan, approved: input.approved)
             let status = entry.approved ? "approved" : "pending approval"

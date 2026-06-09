@@ -41,58 +41,28 @@ public actor RunTracker {
 
     /// Transition a run from `queued` to `running`.
     public func startRun(runId: String) throws {
-        guard var run = runs[runId] else {
-            throw RunTrackerError.runNotFound(runId: runId)
-        }
-        guard run.status == .queued else {
-            throw RunTrackerError.invalidTransition(from: run.status, to: .running)
-        }
-        run.status = .running
-        run.updatedAt = currentTimestamp()
-        runs[runId] = run
+        try transitionRun(runId: runId, from: .queued, to: .running) { _ in }
     }
 
     /// Transition a run from `running` to `completed`.
     public func completeRun(runId: String, resultText: String?, totalSteps: Int, durationMs: Int?) throws {
-        guard var run = runs[runId] else {
-            throw RunTrackerError.runNotFound(runId: runId)
+        try transitionRun(runId: runId, from: .running, to: .completed) { run in
+            run.resultText = resultText
+            run.totalSteps = totalSteps
+            run.durationMs = durationMs
         }
-        guard run.status == .running else {
-            throw RunTrackerError.invalidTransition(from: run.status, to: .completed)
-        }
-        run.status = .completed
-        run.updatedAt = currentTimestamp()
-        run.resultText = resultText
-        run.totalSteps = totalSteps
-        run.durationMs = durationMs
-        runs[runId] = run
     }
 
     /// Transition a run from `running` to `failed`.
     public func failRun(runId: String, error: String) throws {
-        guard var run = runs[runId] else {
-            throw RunTrackerError.runNotFound(runId: runId)
+        try transitionRun(runId: runId, from: .running, to: .failed) { run in
+            run.error = error
         }
-        guard run.status == .running else {
-            throw RunTrackerError.invalidTransition(from: run.status, to: .failed)
-        }
-        run.status = .failed
-        run.updatedAt = currentTimestamp()
-        run.error = error
-        runs[runId] = run
     }
 
     /// Transition a run from `running` to `cancelled`.
     public func cancelRun(runId: String) throws {
-        guard var run = runs[runId] else {
-            throw RunTrackerError.runNotFound(runId: runId)
-        }
-        guard run.status == .running else {
-            throw RunTrackerError.invalidTransition(from: run.status, to: .cancelled)
-        }
-        run.status = .cancelled
-        run.updatedAt = currentTimestamp()
-        runs[runId] = run
+        try transitionRun(runId: runId, from: .running, to: .cancelled) { _ in }
     }
 
     /// Flexible update for run fields, used by runHandler callbacks.
@@ -150,6 +120,26 @@ public actor RunTracker {
     }
 
     // MARK: - Private Helpers
+
+    /// Validates a state transition and applies it with a timestamp update.
+    /// Callers pass a closure to set transition-specific fields on the run.
+    private func transitionRun(
+        runId: String,
+        from expectedStatus: APIRunStatus,
+        to newStatus: APIRunStatus,
+        _ configure: (inout TrackedRun) -> Void
+    ) throws {
+        guard var run = runs[runId] else {
+            throw RunTrackerError.runNotFound(runId: runId)
+        }
+        guard run.status == expectedStatus else {
+            throw RunTrackerError.invalidTransition(from: run.status, to: newStatus)
+        }
+        run.status = newStatus
+        run.updatedAt = currentTimestamp()
+        configure(&run)
+        runs[runId] = run
+    }
 
     private func generateRunId() -> String {
         let formatter = DateFormatter()

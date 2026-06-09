@@ -73,9 +73,7 @@ public func createEnterWorktreeTool() -> ToolProtocol {
         inputSchema: enterWorktreeSchema,
         isReadOnly: false
     ) { (input: EnterWorktreeInput, context: ToolContext) async throws -> ToolExecuteResult in
-        guard let worktreeStore = context.worktreeStore else {
-            return ToolExecuteResult(content: "Error: WorktreeStore not available.", isError: true)
-        }
+        let worktreeStore = try context.requireStore(context.worktreeStore, name: "WorktreeStore")
         do {
             let entry = try await worktreeStore.create(
                 name: input.name,
@@ -112,9 +110,7 @@ public func createExitWorktreeTool() -> ToolProtocol {
         inputSchema: exitWorktreeSchema,
         isReadOnly: false
     ) { (input: ExitWorktreeInput, context: ToolContext) async throws -> ToolExecuteResult in
-        guard let worktreeStore = context.worktreeStore else {
-            return ToolExecuteResult(content: "Error: WorktreeStore not available.", isError: true)
-        }
+        let worktreeStore = try context.requireStore(context.worktreeStore, name: "WorktreeStore")
         let action = input.action ?? "remove"
         do {
             if action == "keep" {

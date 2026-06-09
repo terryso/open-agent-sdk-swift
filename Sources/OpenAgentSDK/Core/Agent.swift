@@ -434,7 +434,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
 
         // 4. Persist compacted messages back to session store
         let metadata = PartialSessionMetadata(
-            cwd: options.cwd ?? FileManager.default.currentDirectoryPath,
+            cwd: options.resolvedCwd,
             model: model,
             summary: nil
         )
@@ -532,6 +532,66 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
     /// Internal: Sets up the pause handler for stream() execution.
     /// The handler emits pause events via the continuation, suspends on CheckedContinuation,
     /// and returns the human context when resumed.
+    /// Core pause-and-wait logic shared by both stream and prompt pause handlers.
+    ///
+    /// Suspends on a `CheckedContinuation` until resume/abort/timeout, optionally
+    /// emitting paused/pausedTimeout events via the provided callbacks.
+    ///
+    /// - Parameters:
+    ///   - reason: The reason string from the pause_for_human tool.
+    ///   - pauseTimeoutMs: Timeout in milliseconds; 0 means no timeout.
+    ///   - onPauseStart: Optional callback invoked when the pause starts (e.g., to emit a stream event).
+    ///   - onPauseTimeout: Optional callback invoked when the pause times out (before resuming the sentinel).
+    /// - Returns: The ``PauseResult`` indicating how the pause resolved.
+    private func performPauseAndWait(
+        reason: String,
+        pauseTimeoutMs: Int,
+        onPauseStart: (@Sendable () -> Void)?,
+        onPauseTimeout: (@Sendable () -> Void)?
+    ) async -> PauseResult {
+        onPauseStart?()
+
+        // Suspend on CheckedContinuation until resume/abort/timeout
+        let result: String = await withCheckedContinuation { cont in
+            _pauseLock.withLock {
+                _pauseContinuation = cont
+                _paused = true
+                _pauseReason = reason
+            }
+
+            // Start timeout task if configured
+            if pauseTimeoutMs > 0 {
+                let timeoutTask = _Concurrency.Task { [weak self] in
+                    try? await _Concurrency.Task.sleep(nanoseconds: UInt64(pauseTimeoutMs) * 1_000_000)
+                    guard !_Concurrency.Task.isCancelled else { return }
+
+                    onPauseTimeout?()
+
+                    let contToResume = self?._pauseLock.withLock { () -> CheckedContinuation<String, Never>? in
+                        let c = self?._pauseContinuation
+                        self?._pauseContinuation = nil
+                        self?._paused = false
+                        self?._pauseReason = nil
+                        return c
+                    }
+                    contToResume?.resume(returning: "__PAUSE_TIMEOUT__")
+                }
+                _pauseLock.withLock {
+                    _pauseTimeoutTask = timeoutTask
+                }
+            }
+        }
+
+        // Interpret the result
+        if result == "__PAUSE_ABORT__" {
+            return .aborted
+        } else if result == "__PAUSE_TIMEOUT__" {
+            return .timedOut
+        } else {
+            return .resumed(context: result)
+        }
+    }
+
     private func setupPauseHandler(
         continuation: AsyncStream<SDKMessage>.Continuation,
         pauseTimeoutMs: Int,
@@ -542,61 +602,26 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                 return .timedOut
             }
 
-            let pausedData = SDKMessage.PausedData(reason: reason)
-
-            // Emit paused event
-            continuation.yield(.system(SDKMessage.SystemData(
-                subtype: .paused,
-                message: "Agent paused: \(reason)",
-                sessionId: sessionId,
-                pausedData: pausedData
-            )))
-
-            // Suspend on CheckedContinuation until resume/abort/timeout
-            let result: String = await withCheckedContinuation { cont in
-                self._pauseLock.withLock {
-                    self._pauseContinuation = cont
-                    self._paused = true
-                    self._pauseReason = reason
+            return await self.performPauseAndWait(
+                reason: reason,
+                pauseTimeoutMs: pauseTimeoutMs,
+                onPauseStart: {
+                    continuation.yield(.system(SDKMessage.SystemData(
+                        subtype: .paused,
+                        message: "Agent paused: \(reason)",
+                        sessionId: sessionId,
+                        pausedData: SDKMessage.PausedData(reason: reason)
+                    )))
+                },
+                onPauseTimeout: {
+                    continuation.yield(.system(SDKMessage.SystemData(
+                        subtype: .pausedTimeout,
+                        message: "Pause timed out after \(pauseTimeoutMs)ms",
+                        sessionId: sessionId,
+                        pausedData: SDKMessage.PausedData(reason: reason, canResume: false)
+                    )))
                 }
-
-                // Start timeout task if configured
-                if pauseTimeoutMs > 0 {
-                    let timeoutTask = _Concurrency.Task {
-                        try? await _Concurrency.Task.sleep(nanoseconds: UInt64(pauseTimeoutMs) * 1_000_000)
-                        guard !_Concurrency.Task.isCancelled else { return }
-
-                        // Timeout fired: emit pausedTimeout and resume with sentinel
-                        continuation.yield(.system(SDKMessage.SystemData(
-                            subtype: .pausedTimeout,
-                            message: "Pause timed out after \(pauseTimeoutMs)ms",
-                            sessionId: sessionId,
-                            pausedData: SDKMessage.PausedData(reason: reason, canResume: false)
-                        )))
-
-                        let contToResume = self._pauseLock.withLock { () -> CheckedContinuation<String, Never>? in
-                            let c = self._pauseContinuation
-                            self._pauseContinuation = nil
-                            self._paused = false
-                            self._pauseReason = nil
-                            return c
-                        }
-                        contToResume?.resume(returning: "__PAUSE_TIMEOUT__")
-                    }
-                    self._pauseLock.withLock {
-                        self._pauseTimeoutTask = timeoutTask
-                    }
-                }
-            }
-
-            // Interpret the result
-            if result == "__PAUSE_ABORT__" {
-                return .aborted
-            } else if result == "__PAUSE_TIMEOUT__" {
-                return .timedOut
-            } else {
-                return .resumed(context: result)
-            }
+            )
         }
     }
 
@@ -608,42 +633,12 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                 return .timedOut
             }
 
-            // Suspend on CheckedContinuation until resume/abort/timeout
-            let result: String = await withCheckedContinuation { cont in
-                self._pauseLock.withLock {
-                    self._pauseContinuation = cont
-                    self._paused = true
-                    self._pauseReason = reason
-                }
-
-                // Start timeout task if configured
-                if pauseTimeoutMs > 0 {
-                    let timeoutTask = _Concurrency.Task {
-                        try? await _Concurrency.Task.sleep(nanoseconds: UInt64(pauseTimeoutMs) * 1_000_000)
-                        guard !_Concurrency.Task.isCancelled else { return }
-
-                        let contToResume = self._pauseLock.withLock { () -> CheckedContinuation<String, Never>? in
-                            let c = self._pauseContinuation
-                            self._pauseContinuation = nil
-                            self._paused = false
-                            self._pauseReason = nil
-                            return c
-                        }
-                        contToResume?.resume(returning: "__PAUSE_TIMEOUT__")
-                    }
-                    self._pauseLock.withLock {
-                        self._pauseTimeoutTask = timeoutTask
-                    }
-                }
-            }
-
-            if result == "__PAUSE_ABORT__" {
-                return .aborted
-            } else if result == "__PAUSE_TIMEOUT__" {
-                return .timedOut
-            } else {
-                return .resumed(context: result)
-            }
+            return await self.performPauseAndWait(
+                reason: reason,
+                pauseTimeoutMs: pauseTimeoutMs,
+                onPauseStart: nil,
+                onPauseTimeout: nil
+            )
         }
     }
 
@@ -855,7 +850,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
             let existing = try? await sessionStore.load(sessionId: sessionId)
             if existing == nil {
                 let metadata = PartialSessionMetadata(
-                    cwd: options.cwd ?? FileManager.default.currentDirectoryPath,
+                    cwd: options.resolvedCwd,
                     model: model,
                     summary: nil
                 )
@@ -1160,7 +1155,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
         } else {
             basePrompt = options.systemPrompt
         }
-        let cwd = options.cwd ?? FileManager.default.currentDirectoryPath
+        let cwd = options.resolvedCwd
         let gitContext = gitContextCollector.collectGitContext(
             cwd: cwd,
             ttl: options.gitCacheTTL
@@ -1593,7 +1588,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                         messages: messages,
                         sessionId: sessionId,
                         sessionStore: sessionStore,
-                        cwd: options.cwd ?? FileManager.default.currentDirectoryPath,
+                        cwd: options.resolvedCwd,
                         model: model,
                         eventBus: options.eventBus
                     )
@@ -1724,7 +1719,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                         toolUseBlocks: toolUseBlocks,
                         tools: registeredTools,
                         context: Self.buildToolContext(
-                            cwd: options.cwd ?? FileManager.default.currentDirectoryPath,
+                            cwd: options.resolvedCwd,
                             sessionId: resolvedSessionId,
                             agentSpawner: spawner,
                             mailboxStore: options.mailboxStore,
@@ -1924,7 +1919,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
         let capturedClient = client
         let capturedMaxBudgetUsd = options.maxBudgetUsd
         let capturedToolProtocols: [ToolProtocol] = options.tools ?? []
-        let capturedCwd = options.cwd ?? FileManager.default.currentDirectoryPath
+        let capturedCwd = options.resolvedCwd
         let capturedRetryConfig = options.retryConfig ?? RetryConfig.default
         let capturedApiKey = options.apiKey ?? ""
         let capturedBaseURL = options.baseURL

@@ -105,9 +105,6 @@ public struct OutputFormat: Sendable, Equatable {
         self._jsonSchema = SendableJSONSchema(schema: jsonSchema)
     }
 
-    public static func == (lhs: OutputFormat, rhs: OutputFormat) -> Bool {
-        return lhs.type == rhs.type && lhs._jsonSchema == rhs._jsonSchema
-    }
 }
 
 // MARK: - SettingSource
@@ -493,6 +490,14 @@ public struct AgentOptions: Sendable {
     /// When `true`, emit ``LLMTokenStreamEvent`` for each streaming text chunk.
     /// Defaults to `false` — high-frequency events, enable only for TUI scenarios.
     public var emitTokenStream: Bool
+
+    /// Resolved working directory, falling back to the process current directory.
+    ///
+    /// Eliminates the need to repeat `cwd ?? FileManager.default.currentDirectoryPath`
+    /// at every call site that needs a concrete working directory path.
+    public var resolvedCwd: String {
+        cwd ?? FileManager.default.currentDirectoryPath
+    }
 
     // MARK: - Memberwise Init
 
