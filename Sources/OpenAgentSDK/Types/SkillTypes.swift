@@ -151,6 +151,28 @@ public struct Skill: Sendable, Equatable {
         self.lifecycleState = lifecycleState
     }
 
+    /// Returns a copy of this skill with an updated `baseDir`.
+    ///
+    /// All other fields are preserved unchanged. Used after persisting a skill
+    /// to disk to update the registry entry with the resolved directory path.
+    public func withBaseDir(_ baseDir: String) -> Skill {
+        Skill(
+            name: name,
+            description: description,
+            aliases: aliases,
+            userInvocable: userInvocable,
+            toolRestrictions: toolRestrictions,
+            modelOverride: modelOverride,
+            isAvailable: isAvailable,
+            promptTemplate: promptTemplate,
+            whenToUse: whenToUse,
+            argumentHint: argumentHint,
+            baseDir: baseDir,
+            supportingFiles: supportingFiles,
+            lifecycleState: lifecycleState
+        )
+    }
+
     public static func == (lhs: Skill, rhs: Skill) -> Bool {
         lhs.name == rhs.name &&
         lhs.description == rhs.description &&

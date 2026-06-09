@@ -54,7 +54,7 @@ public struct PromptEvolverEngine: Sendable {
         }
 
         // Step 4: Parse response
-        let responseText = extractTextFromResponse(response)
+        let responseText = extractFirstTextFromResponse(response)
         let result = parseEvolutionResponse(responseText, config: config)
 
         return result
@@ -117,51 +117,11 @@ public struct PromptEvolverEngine: Sendable {
         """
     }
 
-    private func extractTextFromResponse(_ response: [String: Any]) -> String {
-        guard let content = response["content"] as? [[String: Any]] else {
-            return ""
-        }
-        for block in content {
-            if block["type"] as? String == "text",
-               let text = block["text"] as? String {
-                return text
-            }
-        }
-        return ""
-    }
-
-    private func stripCodeFences(_ text: String) -> String {
-        var trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        if trimmed.hasPrefix("```") {
-            if let newlineRange = trimmed.range(of: "\n", options: [], range: trimmed.startIndex..<trimmed.endIndex) {
-                trimmed = String(trimmed[newlineRange.upperBound...])
-            } else {
-                trimmed = String(trimmed.dropFirst(3))
-            }
-        }
-
-        if trimmed.hasSuffix("```") {
-            trimmed = String(trimmed[..<trimmed.index(trimmed.endIndex, offsetBy: -3)])
-        }
-
-        return trimmed.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
     private func parseEvolutionResponse(
         _ text: String,
         config: PromptEvolutionConfig
     ) -> PromptEvolutionResult {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else {
-            return PromptEvolutionResult.noEvolution()
-        }
-
-        let jsonText = stripCodeFences(trimmed)
-
-        guard let data = jsonText.data(using: .utf8),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-        else {
+        guard let json = parseLLMResponseAsObject(text) else {
             return PromptEvolutionResult.noEvolution()
         }
 

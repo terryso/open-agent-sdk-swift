@@ -112,14 +112,6 @@ public struct ExperienceSignal: Codable, Sendable, Equatable {
         return djb2Hash(input)
     }
 
-    /// djb2 hash algorithm for deterministic string hashing.
-    private static func djb2Hash(_ string: String) -> String {
-        var hash: UInt64 = 5381
-        for byte in string.utf8 {
-            hash = ((hash &<< 5) &+ hash) &+ UInt64(byte)
-        }
-        return String(hash, radix: 16)
-    }
 }
 
 // MARK: - ExtractionConfig
@@ -274,14 +266,8 @@ public struct FrozenSnapshot: Sendable, Codable, Equatable {
     }
 
     private static func computeSnapshotId(domain: String, frozenAt: Date) -> String {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        let input = domain + ":" + formatter.string(from: frozenAt)
-        var hash: UInt64 = 5381
-        for byte in input.utf8 {
-            hash = ((hash &<< 5) &+ hash) &+ UInt64(byte)
-        }
-        return String(hash, radix: 16)
+        let input = domain + ":" + makeISO8601DateFormatter().string(from: frozenAt)
+        return djb2Hash(input)
     }
 }
 

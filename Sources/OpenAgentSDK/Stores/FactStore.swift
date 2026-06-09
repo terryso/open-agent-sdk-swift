@@ -28,22 +28,9 @@ public actor FactStore {
 
     private let customMemoryDir: String?
     private var cache: [String: [MemoryFact]] = [:]
-    private let jsonEncoder: JSONEncoder = {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        encoder.dateEncodingStrategy = .iso8601
-        return encoder
-    }()
-    private let jsonDecoder: JSONDecoder = {
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return decoder
-    }()
-    private let legacyDateFormatter: ISO8601DateFormatter = {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return f
-    }()
+    private let jsonEncoder = makeSDKJSONEncoder()
+    private let jsonDecoder = makeSDKJSONDecoder()
+    private let legacyDateFormatter = makeISO8601DateFormatter()
 
     // MARK: - Initialization
 
@@ -52,16 +39,8 @@ public actor FactStore {
     /// - Parameter memoryDir: Optional custom directory path. Defaults to `~/.agent/memory/`.
     public init(memoryDir: String? = nil) {
         self.customMemoryDir = memoryDir
-        let resolvedDir = Self.resolveMemoryDir(customDir: memoryDir)
-        self.cache = Self.loadAllDomainsSync(from: resolvedDir, decoder: {
-            let d = JSONDecoder()
-            d.dateDecodingStrategy = .iso8601
-            return d
-        }(), legacyDateFormatter: {
-            let f = ISO8601DateFormatter()
-            f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-            return f
-        }())
+        let resolvedDir = resolveMemoryDir(customDir: memoryDir)
+        self.cache = Self.loadAllDomainsSync(from: resolvedDir, decoder: makeSDKJSONDecoder(), legacyDateFormatter: makeISO8601DateFormatter())
     }
 
     // MARK: - Public API
@@ -235,25 +214,8 @@ public actor FactStore {
 
     // MARK: - Private: Disk I/O
 
-    nonisolated private static func resolveMemoryDir(customDir: String?) -> String {
-        if let custom = customDir {
-            return custom
-        }
-        let home: String
-        #if os(Linux)
-        if let homeEnv = getenv("HOME") {
-            home = String(cString: homeEnv)
-        } else {
-            home = "/tmp"
-        }
-        #else
-        home = NSHomeDirectory()
-        #endif
-        return (home as NSString).appendingPathComponent(".agent/memory")
-    }
-
     private func getMemoryDir() -> String {
-        Self.resolveMemoryDir(customDir: customMemoryDir)
+        resolveMemoryDir(customDir: customMemoryDir)
     }
 
     nonisolated private static func loadAllDomainsSync(
@@ -306,15 +268,7 @@ public actor FactStore {
             throw SDKError.sessionError(message: "Failed to serialize facts for domain '\(domain)': \(error.localizedDescription)")
         }
 
-        do {
-            try FileManager.default.createDirectory(
-                atPath: memoryDir,
-                withIntermediateDirectories: true,
-                attributes: [.posixPermissions: 0o700]
-            )
-        } catch {
-            throw SDKError.sessionError(message: "Failed to create memory directory: \(error.localizedDescription)")
-        }
+        try ensureDirectoryExists(atPath: memoryDir, label: "memory directory")
 
         do {
             try jsonData.write(to: URL(fileURLWithPath: filePath), options: .atomic)
@@ -330,14 +284,6 @@ public actor FactStore {
     }
 
     private func validateDomainName(_ domain: String) throws {
-        guard !domain.isEmpty else {
-            throw SDKError.sessionError(message: "Domain name must not be empty")
-        }
-        let forbidden = ["/", "\\", ".."]
-        for component in forbidden {
-            if domain.contains(component) {
-                throw SDKError.sessionError(message: "Domain name contains invalid character: '\(component)'")
-            }
-        }
+        try validatePathSafeIdentifier(domain, label: "Domain name")
     }
 }

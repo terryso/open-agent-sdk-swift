@@ -41,48 +41,21 @@ final class DefaultSubAgentSpawner: SubAgentSpawner, @unchecked Sendable {
         allowedTools: [String]?,
         maxTurns: Int?
     ) async -> SubAgentResult {
-        // 1. Filter out AgentTool to prevent infinite recursion
-        var subTools = parentTools.filter { $0.name != "Agent" }
-
-        // 2. If allowedTools specified, further filter to only those tools
-        if let allowed = allowedTools, !allowed.isEmpty {
-            let allowedSet = Set(allowed)
-            subTools = subTools.filter { allowedSet.contains($0.name) }
-        }
-
-        // 3. Create sub-agent with resolved configuration
-        let resolvedModel = model ?? parentModel
-        let resolvedMaxTurns = maxTurns ?? 10
-
-        let options = AgentOptions(
-            apiKey: apiKey,
-            model: resolvedModel,
-            baseURL: baseURL,
-            provider: provider,
+        await spawn(
+            prompt: prompt,
+            model: model,
             systemPrompt: systemPrompt,
-            maxTurns: resolvedMaxTurns,
-            tools: subTools.isEmpty ? nil : subTools
-        )
-
-        let agent: Agent
-        if let client = client {
-            agent = Agent(options: options, client: client)
-        } else {
-            agent = Agent(options: options)
-        }
-
-        // 4. Execute sub-agent and collect result
-        let result = await agent.prompt(prompt)
-
-        let isError = result.status != .success
-        let text = result.text.isEmpty
-            ? "(Subagent completed with no text output)"
-            : result.text
-
-        return SubAgentResult(
-            text: text,
-            toolCalls: [],
-            isError: isError
+            allowedTools: allowedTools,
+            maxTurns: maxTurns,
+            disallowedTools: nil,
+            mcpServers: nil,
+            skills: nil,
+            runInBackground: nil,
+            isolation: nil,
+            name: nil,
+            teamName: nil,
+            mode: nil,
+            resume: nil
         )
     }
 
@@ -106,22 +79,10 @@ final class DefaultSubAgentSpawner: SubAgentSpawner, @unchecked Sendable {
         mode: PermissionMode?,
         resume: String?
     ) async -> SubAgentResult {
-        // 1. Filter out AgentTool to prevent infinite recursion
-        var subTools = parentTools.filter { $0.name != "Agent" }
+        // 1. Filter tools
+        let subTools = filterTools(allowedTools: allowedTools, disallowedTools: disallowedTools)
 
-        // 2. If allowedTools specified, further filter to only those tools
-        if let allowed = allowedTools, !allowed.isEmpty {
-            let allowedSet = Set(allowed)
-            subTools = subTools.filter { allowedSet.contains($0.name) }
-        }
-
-        // 3. Apply disallowedTools filtering (takes priority over allowedTools)
-        if let disallowed = disallowedTools, !disallowed.isEmpty {
-            let disallowedSet = Set(disallowed)
-            subTools = subTools.filter { !disallowedSet.contains($0.name) }
-        }
-
-        // 4. Resolve MCP servers from spec (reference lookup or inline)
+        // 2. Resolve MCP servers from spec (reference lookup or inline)
         var resolvedMcpServers: [String: McpServerConfig] = [:]
         if let mcpServers {
             for spec in mcpServers {
@@ -139,7 +100,7 @@ final class DefaultSubAgentSpawner: SubAgentSpawner, @unchecked Sendable {
             }
         }
 
-        // 5. Create sub-agent with resolved configuration
+        // 3. Build options
         let resolvedModel = model ?? parentModel
         let resolvedMaxTurns = maxTurns ?? 10
 
@@ -153,25 +114,38 @@ final class DefaultSubAgentSpawner: SubAgentSpawner, @unchecked Sendable {
             tools: subTools.isEmpty ? nil : subTools
         )
 
-        // Apply MCP servers if any were resolved
-        if !resolvedMcpServers.isEmpty {
-            options.mcpServers = resolvedMcpServers
-        }
-
-        // Apply permission mode if specified
-        if let mode {
-            options.permissionMode = mode
-        }
-
-        // Apply agent name if specified
-        if let name {
-            options.agentName = name
-        }
+        if !resolvedMcpServers.isEmpty { options.mcpServers = resolvedMcpServers }
+        if let mode { options.permissionMode = mode }
+        if let name { options.agentName = name }
 
         // Note: skills, runInBackground, isolation, teamName, and resume
         // are declared fields but full runtime wiring is deferred.
-        // These are passed through for future implementation.
 
+        // 4. Execute and collect result
+        return await executeAgent(prompt: prompt, options: options)
+    }
+
+    // MARK: - Private
+
+    /// Filter parent tools: remove AgentTool, apply allowed/disallowed lists.
+    private func filterTools(allowedTools: [String]?, disallowedTools: [String]?) -> [ToolProtocol] {
+        var subTools = parentTools.filter { $0.name != "Agent" }
+
+        if let allowed = allowedTools, !allowed.isEmpty {
+            let allowedSet = Set(allowed)
+            subTools = subTools.filter { allowedSet.contains($0.name) }
+        }
+
+        if let disallowed = disallowedTools, !disallowed.isEmpty {
+            let disallowedSet = Set(disallowed)
+            subTools = subTools.filter { !disallowedSet.contains($0.name) }
+        }
+
+        return subTools
+    }
+
+    /// Create an Agent with the given options, execute its prompt, and return a SubAgentResult.
+    private func executeAgent(prompt: String, options: AgentOptions) async -> SubAgentResult {
         let agent: Agent
         if let client = client {
             agent = Agent(options: options, client: client)
@@ -179,7 +153,6 @@ final class DefaultSubAgentSpawner: SubAgentSpawner, @unchecked Sendable {
             agent = Agent(options: options)
         }
 
-        // Execute sub-agent and collect result
         let result = await agent.prompt(prompt)
 
         let isError = result.status != .success

@@ -90,7 +90,7 @@ public func createReadMcpResourceTool() -> ToolProtocol {
                     textParts.append(text)
                 } else if let rawValue = item.rawValue {
                     // Serialize non-text content as JSON-like string
-                    textParts.append(jsonStringifyValue(rawValue))
+                    textParts.append(jsonStringify(rawValue, quoteStrings: false))
                 }
             }
 
@@ -113,30 +113,4 @@ public func createReadMcpResourceTool() -> ToolProtocol {
             )
         }
     }
-}
-
-// MARK: - JSON Serialization Helper
-
-/// Serializes an arbitrary value to a JSON-like string representation.
-/// Used for non-text MCP content items.
-///
-/// Note: Unlike ConfigTool's `jsonString` (which wraps strings in quotes),
-/// this function returns string values unwrapped. This is intentional:
-/// MCP content text is already user-facing and should not be quoted.
-private func jsonStringifyValue(_ value: Any) -> String {
-    if let str = value as? String { return str }
-    if let bool = value as? Bool { return bool ? "true" : "false" }
-    if let num = value as? Double {
-        return num.truncatingRemainder(dividingBy: 1) == 0 ? "\(Int(num))" : "\(num)"
-    }
-    if let num = value as? Int { return "\(num)" }
-    if let arr = value as? [Any] {
-        let items = arr.map { jsonStringifyValue($0) }
-        return "[\(items.joined(separator: ", "))]"
-    }
-    if let dict = value as? [String: Any] {
-        let pairs = dict.map { "\"\($0.key)\": \(jsonStringifyValue($0.value))" }
-        return "{\(pairs.joined(separator: ", "))}"
-    }
-    return String(describing: value)
 }

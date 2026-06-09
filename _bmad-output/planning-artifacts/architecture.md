@@ -468,13 +468,15 @@ open-agent-sdk-swift/
 │           ├── Retry.swift             # withRetry, 指数退避, 错误分类
 │           ├── Tokens.swift            # MODEL_PRICING, 阈值
 │           ├── Logger.swift            # 结构化日志
-│           ├── EnvUtils.swift          # 环境变量工具
+│           ├── EnvUtils.swift          # 共享工具中心：目录解析、文件I/O、验证、工厂函数、哈希、YAML、JSON
+│           ├── LLMResponseHelpers.swift # LLM 响应解析中心：extractFirstTextFromResponse、stripCodeFences、parseJSONToDict
 │           ├── SandboxChecker.swift    # 沙盒路径检查
 │           ├── SandboxPathNormalizer.swift
 │           ├── JSONOutputHandler.swift  # JSON 输出处理
 │           ├── TerminalOutputHandler.swift
 │           ├── TraceRecorder.swift      # Trace 事件记录
 │           ├── TraceEventMapping.swift
+│           ├── AgentEventSSEMapping.swift # Agent 事件 SSE 映射
 │           ├── MemoryReviewHook.swift   # [Epic 21] sessionEnd 记忆审查 Hook
 │           ├── LLMExperienceExtractor.swift # [Epic 21] LLM 驱动的经验提取
 │           ├── MemoryLifecycleService.swift # 记忆生命周期管理
@@ -498,6 +500,9 @@ open-agent-sdk-swift/
 │
 ├── Tests/
 │   └── OpenAgentSDKTests/
+│       ├── TempDirTestCase.swift         # 共享测试基类：临时目录 setUp/tearDown
+│       ├── GitTestHelpers.swift          # 共享测试工具：makeTestToolContext/makeTestSkill/seedSkill/callToolForTest
+│       ├── MockURLProtocolHelpers.swift  # 共享测试工具：readRequestBodyFromStream/makeMockURLSession
 │       ├── Core/         # Agent, ToolExecutor, PrefixCache tests
 │       ├── Tools/        # Core/, Advanced/, Specialist/, Review/ tests
 │       ├── Stores/       # All store tests
@@ -506,6 +511,7 @@ open-agent-sdk-swift/
 │       ├── MCP/          # MCPClient, AgentMCPServer tests
 │       ├── Skills/       # SkillLoader tests
 │       ├── HTTP/         # HTTP server tests
+│       ├── Documentation/ # 文档合规测试 + DocumentationTestHelpers.swift
 │       └── Utils/        # All util tests (experience, skill, review, etc.)
 │
 ├── Examples/

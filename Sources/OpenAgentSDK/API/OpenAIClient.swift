@@ -27,19 +27,8 @@ public actor OpenAIClient: LLMClient {
     ///   - urlSession: Optional custom URLSession (useful for testing).
     public init(apiKey: String, baseURL: String? = nil, urlSession: URLSession? = nil) {
         self.apiKey = apiKey
-
-        let urlString = baseURL ?? "https://api.openai.com/v1"
-        if let parsedURL = URL(string: urlString) {
-            self.baseURL = parsedURL
-        } else {
-            self.baseURL = URL(string: "https://api.openai.com/v1")!
-        }
-
-        if let urlSession {
-            self.urlSession = urlSession
-        } else {
-            self.urlSession = URLSession.shared
-        }
+        self.baseURL = resolveBaseURL(custom: baseURL, default: "https://api.openai.com/v1")
+        self.urlSession = urlSession ?? URLSession.shared
     }
 
     // MARK: - LLMClient Conformance
@@ -56,26 +45,14 @@ public actor OpenAIClient: LLMClient {
     ) async throws -> [String: Any] {
         let openAIMessages = Self.convertMessages(messages: messages, system: system)
         let openAITools = tools.map { Self.convertTools($0) }
-
-        var body: [String: Any] = [
-            "model": model,
-            "messages": openAIMessages,
-            "max_tokens": maxTokens,
-            "stream": false,
-        ]
-        if let openAITools {
-            body["tools"] = openAITools
-        }
-        if let toolChoice {
-            body["tool_choice"] = Self.convertToolChoice(toolChoice)
-        }
-        if let temperature {
-            body["temperature"] = temperature
-        }
+        let body = Self.buildRequestBody(
+            model: model, messages: openAIMessages, maxTokens: maxTokens,
+            stream: false, tools: openAITools, toolChoice: toolChoice, temperature: temperature
+        )
 
         let request = try buildRequest(body: body)
-        let (data, response) = try await sendRequest(request, urlSession: urlSession)
-        try validateHTTPResponse(response, data: data, apiKey: apiKey)
+        let (data, response) = try await performLLMRequest(request, urlSession: urlSession, apiKey: apiKey)
+        try validateLLMHTTPResponse(response, data: data, apiKey: apiKey)
 
         return try Self.convertResponse(data: data)
     }
@@ -92,26 +69,14 @@ public actor OpenAIClient: LLMClient {
     ) async throws -> AsyncThrowingStream<SSEEvent, Error> {
         let openAIMessages = Self.convertMessages(messages: messages, system: system)
         let openAITools = tools.map { Self.convertTools($0) }
-
-        var body: [String: Any] = [
-            "model": model,
-            "messages": openAIMessages,
-            "max_tokens": maxTokens,
-            "stream": true,
-        ]
-        if let openAITools {
-            body["tools"] = openAITools
-        }
-        if let toolChoice {
-            body["tool_choice"] = Self.convertToolChoice(toolChoice)
-        }
-        if let temperature {
-            body["temperature"] = temperature
-        }
+        let body = Self.buildRequestBody(
+            model: model, messages: openAIMessages, maxTokens: maxTokens,
+            stream: true, tools: openAITools, toolChoice: toolChoice, temperature: temperature
+        )
 
         let request = try buildRequest(body: body)
-        let (data, response) = try await sendRequest(request, urlSession: urlSession)
-        try validateHTTPResponse(response, data: data, apiKey: apiKey)
+        let (data, response) = try await performLLMRequest(request, urlSession: urlSession, apiKey: apiKey)
+        try validateLLMHTTPResponse(response, data: data, apiKey: apiKey)
 
         guard let responseText = String(data: data, encoding: .utf8) else {
             throw SDKError.apiError(statusCode: 0, message: "Empty streaming response")
@@ -129,6 +94,34 @@ public actor OpenAIClient: LLMClient {
     }
 
     // MARK: - Request Building
+
+    /// Builds the common request body dictionary shared by both send and stream calls.
+    private static func buildRequestBody(
+        model: String,
+        messages: [[String: Any]],
+        maxTokens: Int,
+        stream: Bool,
+        tools: [[String: Any]]?,
+        toolChoice: [String: Any]?,
+        temperature: Double?
+    ) -> [String: Any] {
+        var body: [String: Any] = [
+            "model": model,
+            "messages": messages,
+            "max_tokens": maxTokens,
+            "stream": stream,
+        ]
+        if let tools {
+            body["tools"] = tools
+        }
+        if let toolChoice {
+            body["tool_choice"] = convertToolChoice(toolChoice)
+        }
+        if let temperature {
+            body["temperature"] = temperature
+        }
+        return body
+    }
 
     private nonisolated func buildRequest(body: [String: Any]) throws -> URLRequest {
         guard let url = URL(string: baseURL.absoluteString + "/chat/completions") else {
@@ -148,43 +141,6 @@ public actor OpenAIClient: LLMClient {
         }
 
         return request
-    }
-
-    // MARK: - Network
-
-    private nonisolated func sendRequest(
-        _ request: URLRequest,
-        urlSession: URLSession
-    ) async throws -> (Data, URLResponse) {
-        do {
-            return try await urlSession.data(for: request)
-        } catch let error as URLError {
-            let statusCode = error.code == .timedOut ? 408 : 0
-            let safeMessage = error.localizedDescription.replacingOccurrences(of: apiKey, with: "***")
-            throw SDKError.apiError(statusCode: statusCode, message: safeMessage)
-        }
-    }
-
-    private nonisolated func validateHTTPResponse(
-        _ response: URLResponse?,
-        data: Data?,
-        apiKey: String
-    ) throws {
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw SDKError.apiError(statusCode: 0, message: "Invalid response")
-        }
-
-        guard (200...299).contains(httpResponse.statusCode) else {
-            var errorMessage = "HTTP \(httpResponse.statusCode)"
-            if let data,
-               let json = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any],
-               let error = json["error"] as? [String: Any],
-               let message = error["message"] as? String {
-                errorMessage = message
-            }
-            let safeMessage = errorMessage.replacingOccurrences(of: apiKey, with: "***")
-            throw SDKError.apiError(statusCode: httpResponse.statusCode, message: safeMessage)
-        }
     }
 
     // MARK: - Message Conversion (Anthropic → OpenAI)
@@ -372,7 +328,7 @@ public actor OpenAIClient: LLMClient {
                 let function = toolCall["function"] as? [String: Any] ?? [:]
                 let name = function["name"] as? String ?? ""
                 let argumentsStr = function["arguments"] as? String ?? "{}"
-                let input = parseInputJson(argumentsStr)
+                let input = parseJSONToDict(argumentsStr) ?? [:]
 
                 content.append([
                     "type": "tool_use",
@@ -573,16 +529,5 @@ public actor OpenAIClient: LLMClient {
         }
 
         return events
-    }
-
-    // MARK: - Helpers
-
-    private static func parseInputJson(_ jsonString: String) -> [String: Any] {
-        guard !jsonString.isEmpty,
-              let data = jsonString.data(using: .utf8),
-              let dict = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any] else {
-            return [:]
-        }
-        return dict
     }
 }

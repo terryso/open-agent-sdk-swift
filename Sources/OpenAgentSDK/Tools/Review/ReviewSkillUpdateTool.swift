@@ -39,19 +39,14 @@ public func createReviewSkillUpdateTool(
             "required": ["skillName", "updates", "reason"]
         ]
     ) { (input: ReviewSkillUpdateInput, _: ToolContext) async -> String in
-        guard !input.skillName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            return reviewJSONResponse(["success": false, "error": "'skillName' must not be empty"] as [String: Any])
-        }
+        if let err = requireNonEmptyInput(input.skillName, field: "skillName") { return err }
         guard let skill = skillRegistry.find(input.skillName) else {
-            return reviewJSONResponse([
-                "success": false,
-                "error": "Skill '\(input.skillName)' not found"
-            ] as [String: Any])
+            return reviewErrorResponse("Skill '\(input.skillName)' not found")
         }
 
         guard let updatesData = input.updates.data(using: .utf8),
               let _ = try? JSONSerialization.jsonObject(with: updatesData) as? [String: Any] else {
-            return reviewJSONResponse(["success": false, "error": "Invalid JSON in updates field"] as [String: Any])
+            return reviewErrorResponse("Invalid JSON in updates field")
         }
 
         let signal = SkillSignal.create(
@@ -83,21 +78,7 @@ public func createReviewSkillUpdateTool(
                 let skillDir = try SkillWriter.write(skill: evolved, to: resolvedSkillsDir)
 
                 // Update registry with correct baseDir
-                let updatedSkill = Skill(
-                    name: evolved.name,
-                    description: evolved.description,
-                    aliases: evolved.aliases,
-                    userInvocable: evolved.userInvocable,
-                    toolRestrictions: evolved.toolRestrictions,
-                    modelOverride: evolved.modelOverride,
-                    promptTemplate: evolved.promptTemplate,
-                    whenToUse: evolved.whenToUse,
-                    argumentHint: evolved.argumentHint,
-                    baseDir: skillDir,
-                    supportingFiles: evolved.supportingFiles,
-                    lifecycleState: evolved.lifecycleState
-                )
-                skillRegistry.replace(updatedSkill)
+                skillRegistry.replace(evolved.withBaseDir(skillDir))
 
                 return reviewJSONResponse([
                     "success": true,
@@ -112,10 +93,7 @@ public func createReviewSkillUpdateTool(
                 "changes": [] as [String]
             ] as [String: Any])
         } catch {
-            return reviewJSONResponse([
-                "success": false,
-                "error": error.localizedDescription
-            ] as [String: Any])
+            return reviewErrorResponse(error.localizedDescription)
         }
     }
 }

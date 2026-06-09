@@ -52,13 +52,13 @@ public enum SkillWriter {
         frontmatter += "name: \(skill.name)\n"
 
         if !skill.description.isEmpty {
-            frontmatter += "description: \(escapeYAML(skill.description))\n"
+            frontmatter += "description: \(yamlQuote(skill.description))\n"
         }
         if let whenToUse = skill.whenToUse, !whenToUse.isEmpty {
-            frontmatter += "when-to-use: \(escapeYAML(whenToUse))\n"
+            frontmatter += "when-to-use: \(yamlQuote(whenToUse))\n"
         }
         if let argumentHint = skill.argumentHint, !argumentHint.isEmpty {
-            frontmatter += "argument-hint: \(escapeYAML(argumentHint))\n"
+            frontmatter += "argument-hint: \(yamlQuote(argumentHint))\n"
         }
         if !skill.aliases.isEmpty {
             frontmatter += "aliases: \(skill.aliases.joined(separator: ", "))\n"
@@ -72,20 +72,4 @@ public enum SkillWriter {
         return frontmatter
     }
 
-    /// Escapes a string for safe inclusion in a YAML value.
-    ///
-    /// Wraps in double quotes if the value contains characters that need escaping.
-    private static func escapeYAML(_ value: String) -> String {
-        let needsQuoting = value.contains(":") || value.contains("#") || value.contains("\"")
-            || value.contains("'") || value.contains("\n") || value.hasPrefix(" ")
-            || value.hasSuffix(" ")
-        if needsQuoting {
-            let escaped = value
-                .replacingOccurrences(of: "\\", with: "\\\\")
-                .replacingOccurrences(of: "\"", with: "\\\"")
-                .replacingOccurrences(of: "\n", with: "\\n")
-            return "\"\(escaped)\""
-        }
-        return value
-    }
 }

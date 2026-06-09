@@ -12,17 +12,8 @@ public actor SkillUsageStore {
 
     private let customSkillsDir: String?
     private var cache: [String: SkillUsageData] = [:]
-    private let jsonEncoder: JSONEncoder = {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        encoder.dateEncodingStrategy = .iso8601
-        return encoder
-    }()
-    private let jsonDecoder: JSONDecoder = {
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return decoder
-    }()
+    private let jsonEncoder = makeSDKJSONEncoder()
+    private let jsonDecoder = makeSDKJSONDecoder()
 
     // MARK: - Initialization
 
@@ -31,12 +22,8 @@ public actor SkillUsageStore {
     /// - Parameter skillsDir: Optional custom directory path. Defaults to `~/.open-agent-sdk/skills/`.
     public init(skillsDir: String? = nil) {
         self.customSkillsDir = skillsDir
-        let resolvedDir = Self.resolveSkillsDir(customDir: skillsDir)
-        self.cache = Self.loadSync(from: resolvedDir, decoder: {
-            let d = JSONDecoder()
-            d.dateDecodingStrategy = .iso8601
-            return d
-        }())
+        let resolvedDir = resolveSkillsDir(customDir: skillsDir)
+        self.cache = Self.loadSync(from: resolvedDir, decoder: makeSDKJSONDecoder())
     }
 
     // MARK: - Public API
@@ -93,33 +80,10 @@ public actor SkillUsageStore {
     // MARK: - Private: Path Resolution
 
     /// The default skills directory path when no custom directory is provided.
-    public static let defaultSkillsDir: String = {
-        let home: String
-        #if os(Linux)
-        if let homeEnv = getenv("HOME") {
-            home = String(cString: homeEnv)
-        } else {
-            home = "/tmp"
-        }
-        #else
-        home = NSHomeDirectory()
-        #endif
-        return (home as NSString).appendingPathComponent(".open-agent-sdk/skills")
-    }()
-
-    nonisolated private static func resolveSkillsDir(customDir: String?) -> String {
-        if let custom = customDir {
-            return custom
-        }
-        return defaultSkillsDir
-    }
+    public static let defaultSkillsDir: String = defaultSkillsDir
 
     private func getSkillsDir() -> String {
-        Self.resolveSkillsDir(customDir: customSkillsDir)
-    }
-
-    private func getUsageFilePath() -> String {
-        (getSkillsDir() as NSString).appendingPathComponent(".usage.json")
+        resolveSkillsDir(customDir: customSkillsDir)
     }
 
     // MARK: - Private: Loading
@@ -148,7 +112,6 @@ public actor SkillUsageStore {
 
     private func flushToDisk() throws {
         let skillsDir = getSkillsDir()
-        let filePath = getUsageFilePath()
 
         let jsonData: Data
         do {
@@ -159,33 +122,6 @@ public actor SkillUsageStore {
             )
         }
 
-        do {
-            try FileManager.default.createDirectory(
-                atPath: skillsDir,
-                withIntermediateDirectories: true,
-                attributes: [.posixPermissions: 0o700]
-            )
-        } catch {
-            throw SDKError.sessionError(
-                message: "Failed to create skills directory: \(error.localizedDescription)"
-            )
-        }
-
-        // Atomic write: write to temp file, then replace final location
-        let tempFileName = ".usage.json.tmp.\(UUID().uuidString)"
-        let tempFilePath = (skillsDir as NSString).appendingPathComponent(tempFileName)
-
-        do {
-            try jsonData.write(to: URL(fileURLWithPath: tempFilePath), options: .atomic)
-            if FileManager.default.fileExists(atPath: filePath) {
-                try FileManager.default.removeItem(atPath: filePath)
-            }
-            try FileManager.default.moveItem(atPath: tempFilePath, toPath: filePath)
-        } catch {
-            try? FileManager.default.removeItem(atPath: tempFilePath)
-            throw SDKError.sessionError(
-                message: "Failed to write usage data at \(filePath): \(error.localizedDescription)"
-            )
-        }
+        try atomicWriteJSON(data: jsonData, toDirectory: skillsDir, fileName: ".usage.json", contentType: "skill usage data")
     }
 }

@@ -87,10 +87,7 @@ public actor AgentMCPServer {
     ///   client-side of a connected pair. Connect an MCP `Client` to this transport.
     public func createSession() async throws -> (Server, InMemoryTransport) {
         let server = await getOrCreateMCPServer()
-        let session = await server.createSession()
-        let (clientTransport, serverTransport) = await InMemoryTransport.createConnectedPair()
-        try await session.start(transport: serverTransport)
-        return (session, clientTransport)
+        return try await createMCPSession(server)
     }
 
     // MARK: - Stdio Server
@@ -133,50 +130,8 @@ public actor AgentMCPServer {
         let server = MCPServer(name: name, version: version)
 
         // Register each ToolProtocol tool as a closure-based MCP tool
-        for tool in tools {
-            let toolName = tool.name
-            let toolDescription = tool.description
-            let inputSchema = schemaToValue(tool.inputSchema)
-            let capturedCwd = cwd
-
-            // Each tool is already Sendable (ToolProtocol: Sendable)
-            let sendableTool = tool
-
-            do {
-                try await server.register(
-                    name: toolName,
-                    description: toolDescription,
-                    inputSchema: inputSchema
-                ) { (args: [String: Value], context: HandlerContext) async throws -> String in
-                    // Convert MCP Value arguments to [String: Any]
-                    let inputArgs = args.mapValues { value in
-                        Self.mcpValueToAny(value)
-                    }
-
-                    // Build ToolContext with cwd and a generated toolUseId for tracing
-                    let toolContext = ToolContext(
-                        cwd: capturedCwd,
-                        toolUseId: UUID().uuidString
-                    )
-
-                    // Call the tool (never throws per rule #38)
-                    let result = await sendableTool.call(
-                        input: inputArgs,
-                        context: toolContext
-                    )
-
-                    // If the tool returned an error, throw so MCP returns isError: true
-                    if result.isError {
-                        throw ToolExecutionError(message: result.content)
-                    }
-
-                    return result.content
-                }
-            } catch {
-                // Tool registration failed -- log but don't crash
-                // (duplicate name, schema issue, etc.)
-                Logger.shared.error("AgentMCPServer", "Failed to register tool '\(toolName)': \(error)")
-            }
+        await registerToolsOnMCPServer(tools, server: server, cwd: cwd) { toolName, error in
+            Logger.shared.error("AgentMCPServer", "Failed to register tool '\(toolName)': \(error)")
         }
 
         // Register the special agent_prompt tool
@@ -223,48 +178,4 @@ public actor AgentMCPServer {
 
     // MARK: - Schema Conversion
 
-    /// Converts a `ToolInputSchema` (`[String: Any]`) to MCP `Value`.
-    ///
-    /// Recursively converts dictionary structures to MCP-compatible `Value` types.
-    private func schemaToValue(_ schema: ToolInputSchema) -> Value {
-        .object(schema.mapValues { Self.anyToMCPValue($0) })
-    }
-
-    /// Recursively converts a plain Swift value to an MCP `Value`.
-    private static func anyToMCPValue(_ value: Any) -> Value {
-        switch value {
-        case is NSNull: return .null
-        case let b as Bool: return .bool(b)
-        case let i as Int: return .int(i)
-        case let d as Double: return .double(d)
-        case let s as String: return .string(s)
-        case let arr as [Any]: return .array(arr.map { anyToMCPValue($0) })
-        case let dict as [String: Any]: return .object(dict.mapValues { anyToMCPValue($0) })
-        default: return .string("\(value)")
-        }
-    }
-
-    /// Recursively converts an MCP `Value` to a plain Swift value.
-    private static func mcpValueToAny(_ value: Value) -> Any {
-        switch value {
-        case .null: return NSNull()
-        case .bool(let b): return b
-        case .int(let i): return i
-        case .double(let d): return d
-        case .string(let s): return s
-        case .array(let arr): return arr.map { mcpValueToAny($0) }
-        case .object(let dict): return dict.mapValues { mcpValueToAny($0) }
-        case .data(_, let data): return data
-        }
-    }
-}
-
-// MARK: - ToolExecutionError
-
-/// Error thrown when a tool execution returns `isError: true`.
-///
-/// This is caught by MCPServer's CallTool handler and converted to
-/// `isError: true` in the MCP response (rule #38).
-private struct ToolExecutionError: Error, Sendable {
-    let message: String
 }

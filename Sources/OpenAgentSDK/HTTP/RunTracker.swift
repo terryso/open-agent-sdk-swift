@@ -27,9 +27,7 @@ public actor RunTracker {
     /// Submit a new run and return the created TrackedRun.
     public func submitRun(task: String) -> TrackedRun {
         let runId = generateRunId()
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        let now = formatter.string(from: Date())
+        let now = makeISO8601DateFormatter().string(from: Date())
 
         let run = TrackedRun(
             runId: runId,
@@ -163,8 +161,6 @@ public actor RunTracker {
     }
 
     private func currentTimestamp() -> String {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter.string(from: Date())
+        return makeISO8601DateFormatter().string(from: Date())
     }
 }

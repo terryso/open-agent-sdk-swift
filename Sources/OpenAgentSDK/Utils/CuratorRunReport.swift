@@ -94,7 +94,7 @@ public struct CuratorRunReport: Sendable, Equatable {
 
     /// Generates a human-readable Markdown report.
     public func renderMarkdown() -> String {
-        let isoDate = ISO8601DateFormatter().string(from: startedAt)
+        let isoDate = makeISO8601DateFormatter().string(from: startedAt)
         let secs = durationMs / 1000
         let durLabel = secs >= 60 ? "\(secs / 60)m \(secs % 60)s" : "\(secs)s"
 
@@ -231,20 +231,4 @@ public struct CuratorRunReport: Sendable, Equatable {
         return toolCalls
     }
 
-    private func yamlQuote(_ value: String) -> String {
-        let yamlReserved: Set<String> = ["true", "false", "null", "yes", "no", "on", "off", "y", "n"]
-        if value.contains(":") || value.contains("#") || value.contains("'") || value.contains("\"")
-            || yamlReserved.contains(value.lowercased()) || value.isEmpty
-            || value.hasPrefix(" ") || value.hasSuffix(" ") {
-            return "\"\(yamlEscape(value))\""
-        }
-        return value
-    }
-
-    private func yamlEscape(_ value: String) -> String {
-        value
-            .replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "\"", with: "\\\"")
-            .replacingOccurrences(of: "\n", with: "\\n")
-    }
 }

@@ -57,11 +57,7 @@ public final class Logger: @unchecked Sendable {
     /// Cached date formatter for ISO 8601 timestamps with milliseconds.
     /// `ISO8601DateFormatter` is not `Sendable` but is safe to use from
     /// multiple threads because we only call the read-only `string(from:)` method.
-    private nonisolated(unsafe) static let dateFormatter: ISO8601DateFormatter = {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter
-    }()
+    private nonisolated(unsafe) static let dateFormatter = makeISO8601DateFormatter()
 
     // MARK: - Initialization
 

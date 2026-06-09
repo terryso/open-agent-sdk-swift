@@ -5,7 +5,7 @@ date: '2026-04-11'
 sections_completed:
   ['technology_stack', 'language_rules', 'framework_rules', 'testing_rules', 'quality_rules', 'workflow_rules', 'anti_patterns']
 status: 'complete'
-rule_count: 48
+rule_count: 56
 optimized_for_llm: true
 ---
 
@@ -107,7 +107,7 @@ _本文档包含 AI 代理在实现代码时必须遵循的关键规则和模式
 
 ### 开发工作流规则
 
-35. **项目结构**：`Sources/OpenAgentSDK/` 为主源码目录（160+ 个 Swift 文件），子目录为 Types/（28+ 文件）、API/（5 文件）、Core/（3 文件）、HTTP/（8 文件）、Tools/（36 文件，含 Core/、Advanced/、Specialist/、MCP/ 四个子目录）、Stores/（10+ 文件）、Hooks/（2 文件）、Utils/（24+ 文件，含 LLMExperienceExtractor、MemoryReviewHook、MemorySecurityScanner 等LLM驱动服务）、Skills/（技能加载器）、Documentation.docc/（DocC 文档）
+35. **项目结构**：`Sources/OpenAgentSDK/` 为主源码目录（158 个 Swift 文件），子目录为 Types/（34 文件）、API/（5 文件）、Core/（3 文件）、HTTP/（8 文件）、Tools/（43 文件，含 Core/、Advanced/、Specialist/、MCP/ 四个子目录）、Stores/（13 文件）、Hooks/（2 文件）、Utils/（39 文件）、Skills/（技能加载器）、Documentation.docc/（DocC 文档）
 36. **不使用 Apple 专属框架**：代码必须同时在 macOS 和 Linux 上运行。使用 Foundation 和 POSIX API。
 37. **POSIX shell 执行**：使用 `Process`（macOS Foundation）/ `posix_spawn`（Linux）执行 shell 钩子，通过 stdin JSON 输入、stdout JSON 输出。
 38. **会话存储路径**：`~/.open-agent-sdk/sessions/{sessionId}/transcript.json`
@@ -123,6 +123,18 @@ _本文档包含 AI 代理在实现代码时必须遵循的关键规则和模式
 45. **不要**对可变共享状态使用 struct/class — 必须是 actor
 46. **不要**将 Set 用于有序集合 — 使用 Array（工具列表、消息历史）
 47. **不要**在工具中使用 async let 或 unstructured Task — 使用 TaskGroup 的结构化并发
+48. **不要**内联构建 JSONEncoder/JSONDecoder/ISO8601DateFormatter** — 使用 EnvUtils.swift 中的共享工厂函数（makeSDKJSONEncoder/makeSDKJSONDecoder/makeISO8601DateFormatter）
+49. **不要**内联解析 LLM API 响应** — 使用 LLMResponseHelpers.swift 中的共享函数（extractFirstTextFromResponse、stripCodeFences、parseJSONToDict、parseLLMResponseAsObject/Array）
+50. **不要**手写 tempDir setUp/tearDown** — 测试文件继承 TempDirTestCase 基类
+51. **不要**重复实现 ToolContext 构建** — 使用 GitTestHelpers.swift 中的 makeTestToolContext()
+
+### 共享基础设施规则
+
+52. **EnvUtils.swift 是共享工具中心**：所有跨文件复用的纯函数工具集中在此文件，包括：目录解析（defaultHomeDir/defaultSkillsDir/defaultMemoryDir/defaultSessionsDir/defaultTracesDir/defaultApiRunsDir + resolve*Dir 函数）、文件 I/O（atomicWriteJSON、ensureDirectoryExists）、验证（validatePathSafeIdentifier）、工厂（makeISO8601DateFormatter、makeSDKJSONEncoder、makeSDKJSONDecoder）、哈希（djb2Hash）、YAML（yamlEscape、yamlQuote）、JSON（jsonStringify）、路径（normalizePath）。新写跨文件复用的纯函数工具应放入此文件。
+53. **LLMResponseHelpers.swift 是 LLM 响应解析中心**：extractFirstTextFromResponse、stripCodeFences、parseJSONToDict、parseLLMResponseAsObject、parseLLMResponseAsArray。所有 LLM 驱动工具（LLMSkillEvolver、PromptEvolverEngine、LLMExperienceExtractor、Compact）使用此文件的共享函数。
+54. **LLMClient.swift 包含共享 LLM 客户端基础设施**：performLLMRequest（URLError→SDKError 映射）、validateLLMHTTPResponse（HTTP 响应验证）、resolveBaseURL（URL 解析）、buildJSONPostRequest（POST 请求构建）。AnthropicClient 和 OpenAIClient 均通过这些共享函数避免重复。
+55. **MCPTypes.swift 包含共享 MCP 基础设施**：schemaToMCPValue/anyToMCPValue/mcpValueToAny（MCP 值转换）、registerToolsOnMCPServer（工具注册循环）、createMCPSession（会话创建）、ToolExecutionError（错误类型）。InProcessMCPServer、MCPClientManager、AgentMCPServer 均使用这些共享函数。
+56. **测试基础设施**：Tests/OpenAgentSDKTests/ 根目录包含 3 个共享测试文件：TempDirTestCase.swift（临时目录管理基类，47+ 测试文件已迁移）、GitTestHelpers.swift（makeTestToolContext/makeTestSkill/seedSkill/date/callToolForTest/createTemplateGitRepo 等）、MockURLProtocolHelpers.swift（readRequestBodyFromStream/makeMockURLSession）。新测试应使用这些共享基础设施而非重复定义。
 
 ---
 
@@ -143,4 +155,4 @@ _本文档包含 AI 代理在实现代码时必须遵循的关键规则和模式
 - 定期审查过时规则
 - 规则变得显而易见时移除
 
-Last Updated: 2026-05-20
+Last Updated: 2026-06-09

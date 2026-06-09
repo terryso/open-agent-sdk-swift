@@ -35,3 +35,62 @@ public protocol LLMClient: Sendable {
         temperature: Double?
     ) async throws -> AsyncThrowingStream<SSEEvent, Error>
 }
+
+// MARK: - Shared LLM Client Helpers
+
+/// Performs a URL request, mapping `URLError` to `SDKError` with API-key-safe messages.
+///
+/// Both `AnthropicClient` and `OpenAIClient` use this to centralize the
+/// timeout→408 mapping and API-key sanitization in error paths.
+func performLLMRequest(
+    _ request: URLRequest,
+    urlSession: URLSession,
+    apiKey: String
+) async throws -> (Data, URLResponse) {
+    do {
+        return try await urlSession.data(for: request)
+    } catch let error as URLError {
+        let statusCode = error.code == .timedOut ? 408 : 0
+        let safeMessage = error.localizedDescription.replacingOccurrences(of: apiKey, with: "***")
+        throw SDKError.apiError(statusCode: statusCode, message: safeMessage)
+    }
+}
+
+/// Validates an HTTP response, throwing `SDKError` for non-2xx status codes.
+///
+/// Extracts the error message from the JSON response body when available,
+/// and sanitizes the API key from error messages for security.
+func validateLLMHTTPResponse(
+    _ response: URLResponse?,
+    data: Data?,
+    apiKey: String
+) throws {
+    guard let httpResponse = response as? HTTPURLResponse else {
+        throw SDKError.apiError(statusCode: 0, message: "Invalid response")
+    }
+
+    guard (200...299).contains(httpResponse.statusCode) else {
+        var errorMessage = "HTTP \(httpResponse.statusCode)"
+
+        if let data,
+           let json = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any],
+           let error = json["error"] as? [String: Any],
+           let message = error["message"] as? String {
+            errorMessage = message
+        }
+
+        let safeMessage = errorMessage.replacingOccurrences(of: apiKey, with: "***")
+        throw SDKError.apiError(statusCode: httpResponse.statusCode, message: safeMessage)
+    }
+}
+
+/// Resolves a base URL from an optional custom string, falling back to a default.
+///
+/// If the custom string is nil or produces an invalid URL, the default is used.
+func resolveBaseURL(custom: String?, default defaultURL: String) -> URL {
+    let urlString = custom ?? defaultURL
+    if let parsedURL = URL(string: urlString) {
+        return parsedURL
+    }
+    return URL(string: defaultURL)!
+}

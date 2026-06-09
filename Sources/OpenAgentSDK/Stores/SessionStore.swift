@@ -7,11 +7,7 @@ public actor SessionStore {
     // MARK: - Properties
 
     private let customSessionsDir: String?
-    private let dateFormatter: ISO8601DateFormatter = {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return f
-    }()
+    private let dateFormatter = makeISO8601DateFormatter()
 
     // MARK: - Initialization
 
@@ -70,15 +66,7 @@ public actor SessionStore {
         ]
 
         // Create session directory (mkdir -p equivalent)
-        do {
-            try FileManager.default.createDirectory(
-                atPath: sessionPath,
-                withIntermediateDirectories: true,
-                attributes: [.posixPermissions: 0o700]
-            )
-        } catch {
-            throw SDKError.sessionError(message: "Failed to create session directory: \(error.localizedDescription)")
-        }
+        try ensureDirectoryExists(atPath: sessionPath, label: "session directory")
 
         // Serialize to JSON
         let jsonData: Data
@@ -364,35 +352,12 @@ public actor SessionStore {
     /// Resolve the sessions directory path.
     /// Uses custom directory if provided, otherwise defaults to `~/.open-agent-sdk/sessions/`.
     private func getSessionsDir() -> String {
-        if let custom = customSessionsDir {
-            return custom
-        }
-
-        let home: String
-        #if os(Linux)
-        if let homeEnv = getenv("HOME") {
-            home = String(cString: homeEnv)
-        } else {
-            home = "/tmp"
-        }
-        #else
-        home = NSHomeDirectory()
-        #endif
-
-        return (home as NSString).appendingPathComponent(".open-agent-sdk/sessions")
+        resolveSessionsDir(customDir: customSessionsDir)
     }
 
     /// Validate that a sessionId does not contain path traversal sequences.
     private func validateSessionId(_ sessionId: String) throws {
-        guard !sessionId.isEmpty else {
-            throw SDKError.sessionError(message: "Session ID must not be empty")
-        }
-        let forbidden = ["/", "\\", ".."]
-        for component in forbidden {
-            if sessionId.contains(component) {
-                throw SDKError.sessionError(message: "Session ID contains invalid character: '\(component)'")
-            }
-        }
+        try validatePathSafeIdentifier(sessionId, label: "Session ID")
     }
 
     /// Get the full path for a specific session directory.

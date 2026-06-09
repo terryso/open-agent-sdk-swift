@@ -1,5 +1,57 @@
 import Foundation
 
+// MARK: - Shared Helpers
+
+/// Filter, sort, and limit knowledge entries based on query parameters and max age.
+///
+/// Shared by both `InMemoryStore` and `FileBasedMemoryStore` to eliminate
+/// duplicated filter/sort/limit logic in their `query` methods.
+///
+/// - Parameters:
+///   - entries: The candidate entries to filter.
+///   - filter: Optional filter criteria (tags, date range, limit).
+///   - maxAge: Maximum entry age in seconds; entries older than this are excluded.
+/// - Returns: Filtered, sorted, and limited entries.
+private func filterAndSortEntries(
+    _ entries: [KnowledgeEntry],
+    filter: KnowledgeQueryFilter?,
+    maxAge: TimeInterval
+) -> [KnowledgeEntry] {
+    let expiryCutoff = Date().addingTimeInterval(-maxAge)
+
+    var results = entries.filter { entry in
+        // Auto-expiry: skip entries exceeding maxAge
+        guard entry.createdAt > expiryCutoff else { return false }
+
+        // Tag filter: match entries with any of the specified tags
+        if let tags = filter?.tags, !tags.isEmpty {
+            guard entry.tags.contains(where: { tags.contains($0) }) else {
+                return false
+            }
+        }
+
+        // Date range filters
+        if let olderThan = filter?.olderThan {
+            guard entry.createdAt < olderThan else { return false }
+        }
+        if let newerThan = filter?.newerThan {
+            guard entry.createdAt > newerThan else { return false }
+        }
+
+        return true
+    }
+
+    // Sort by createdAt ascending (oldest first)
+    results.sort { $0.createdAt < $1.createdAt }
+
+    // Apply limit
+    if let limit = filter?.limit, limit > 0 {
+        results = Array(results.prefix(limit))
+    }
+
+    return results
+}
+
 // MARK: - InMemoryStore
 
 /// In-memory knowledge store using actor isolation.
@@ -38,40 +90,7 @@ public actor InMemoryStore: MemoryStoreProtocol {
         guard let entries = storage[domain] else {
             return []
         }
-
-        let expiryCutoff = Date().addingTimeInterval(-maxAge)
-
-        var results = entries.filter { entry in
-            // Auto-expiry: skip entries exceeding maxAge
-            guard entry.createdAt > expiryCutoff else { return false }
-
-            // Tag filter: match entries with any of the specified tags
-            if let tags = filter?.tags, !tags.isEmpty {
-                guard entry.tags.contains(where: { tags.contains($0) }) else {
-                    return false
-                }
-            }
-
-            // Date range filters
-            if let olderThan = filter?.olderThan {
-                guard entry.createdAt < olderThan else { return false }
-            }
-            if let newerThan = filter?.newerThan {
-                guard entry.createdAt > newerThan else { return false }
-            }
-
-            return true
-        }
-
-        // Sort by createdAt ascending (oldest first)
-        results.sort { $0.createdAt < $1.createdAt }
-
-        // Apply limit
-        if let limit = filter?.limit, limit > 0 {
-            results = Array(results.prefix(limit))
-        }
-
-        return results
+        return filterAndSortEntries(entries, filter: filter, maxAge: maxAge)
     }
 
     public func delete(domain: String, olderThan: Date) async throws -> Int {
@@ -113,11 +132,7 @@ public actor FileBasedMemoryStore: MemoryStoreProtocol {
 
     private let customMemoryDir: String?
     private var cache: [String: [KnowledgeEntry]] = [:]
-    private let dateFormatter: ISO8601DateFormatter = {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return f
-    }()
+    private let dateFormatter = makeISO8601DateFormatter()
 
     /// Maximum age for entries in seconds. Entries older than this are
     /// automatically filtered out during query. Defaults to 30 days (2,592,000 seconds).
@@ -136,10 +151,8 @@ public actor FileBasedMemoryStore: MemoryStoreProtocol {
 
         // Load all domain files on init using a static helper
         // (actor init is nonisolated, so we cannot call actor-isolated methods)
-        let memoryDir = FileBasedMemoryStore.resolveMemoryDir(customDir: memoryDir)
-        let dateFormatter = ISO8601DateFormatter()
-        dateFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        self.cache = Self.loadAllDomainsSync(from: memoryDir, dateFormatter: dateFormatter)
+        let memoryDir = resolveMemoryDir(customDir: memoryDir)
+        self.cache = Self.loadAllDomainsSync(from: memoryDir, dateFormatter: makeISO8601DateFormatter())
     }
 
     // MARK: - MemoryStoreProtocol
@@ -159,40 +172,7 @@ public actor FileBasedMemoryStore: MemoryStoreProtocol {
         guard let entries = cache[domain] else {
             return []
         }
-
-        let expiryCutoff = Date().addingTimeInterval(-maxAge)
-
-        var results = entries.filter { entry in
-            // Auto-expiry: skip entries exceeding maxAge
-            guard entry.createdAt > expiryCutoff else { return false }
-
-            // Tag filter
-            if let tags = filter?.tags, !tags.isEmpty {
-                guard entry.tags.contains(where: { tags.contains($0) }) else {
-                    return false
-                }
-            }
-
-            // Date range filters
-            if let olderThan = filter?.olderThan {
-                guard entry.createdAt < olderThan else { return false }
-            }
-            if let newerThan = filter?.newerThan {
-                guard entry.createdAt > newerThan else { return false }
-            }
-
-            return true
-        }
-
-        // Sort by createdAt ascending
-        results.sort { $0.createdAt < $1.createdAt }
-
-        // Apply limit
-        if let limit = filter?.limit, limit > 0 {
-            results = Array(results.prefix(limit))
-        }
-
-        return results
+        return filterAndSortEntries(entries, filter: filter, maxAge: maxAge)
     }
 
     public func delete(domain: String, olderThan: Date) throws -> Int {
@@ -222,29 +202,9 @@ public actor FileBasedMemoryStore: MemoryStoreProtocol {
 
     // MARK: - Private: Disk I/O
 
-    /// Resolve the memory directory path (static, callable from nonisolated init).
-    nonisolated private static func resolveMemoryDir(customDir: String?) -> String {
-        if let custom = customDir {
-            return custom
-        }
-
-        let home: String
-        #if os(Linux)
-        if let homeEnv = getenv("HOME") {
-            home = String(cString: homeEnv)
-        } else {
-            home = "/tmp"
-        }
-        #else
-        home = NSHomeDirectory()
-        #endif
-
-        return (home as NSString).appendingPathComponent(".agent/memory")
-    }
-
     /// Resolve the memory directory path (instance convenience).
     private func getMemoryDir() -> String {
-        Self.resolveMemoryDir(customDir: customMemoryDir)
+        resolveMemoryDir(customDir: customMemoryDir)
     }
 
     /// Load all domain JSON files from disk into a cache dictionary (static, for init).
@@ -347,15 +307,7 @@ public actor FileBasedMemoryStore: MemoryStoreProtocol {
         }
 
         // Ensure directory exists
-        do {
-            try FileManager.default.createDirectory(
-                atPath: memoryDir,
-                withIntermediateDirectories: true,
-                attributes: [.posixPermissions: 0o700]
-            )
-        } catch {
-            throw SDKError.sessionError(message: "Failed to create memory directory: \(error.localizedDescription)")
-        }
+        try ensureDirectoryExists(atPath: memoryDir, label: "memory directory")
 
         // Write file with 0600 permissions
         let permissions: [FileAttributeKey: Any] = [.posixPermissions: 0o600]
@@ -378,14 +330,6 @@ public actor FileBasedMemoryStore: MemoryStoreProtocol {
 
     /// Validate that a domain name does not contain path traversal sequences.
     private func validateDomainName(_ domain: String) throws {
-        guard !domain.isEmpty else {
-            throw SDKError.sessionError(message: "Domain name must not be empty")
-        }
-        let forbidden = ["/", "\\", ".."]
-        for component in forbidden {
-            if domain.contains(component) {
-                throw SDKError.sessionError(message: "Domain name contains invalid character: '\(component)'")
-            }
-        }
+        try validatePathSafeIdentifier(domain, label: "Domain name")
     }
 }

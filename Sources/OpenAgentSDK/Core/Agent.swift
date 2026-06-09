@@ -666,6 +666,16 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
         _closedLock.withLock { _closed }
     }
 
+    /// Convenience factory for the error result returned when the agent is closed.
+    private static func closedQueryResult() -> QueryResult {
+        QueryResult(
+            text: "", usage: TokenUsage(inputTokens: 0, outputTokens: 0),
+            numTurns: 0, durationMs: 0, messages: [],
+            status: .errorDuringExecution,
+            errors: ["Agent is already closed"]
+        )
+    }
+
     /// Thread-safe write to ``_closed``.
     private func setClosed(_ value: Bool) {
         _closedLock.withLock { _closed = value }
@@ -1212,14 +1222,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
     ///   turn count, duration, collected messages, and a ``QueryStatus`` indicating
     ///   how the query terminated.
     public func prompt(_ text: String) async -> QueryResult {
-        guard !isClosed else {
-            return QueryResult(
-                text: "", usage: TokenUsage(inputTokens: 0, outputTokens: 0),
-                numTurns: 0, durationMs: 0, messages: [],
-                status: .errorDuringExecution,
-                errors: ["Agent is already closed"]
-            )
-        }
+        guard !isClosed else { return Self.closedQueryResult() }
         _interrupted = false
         return await promptImpl(text)
     }
@@ -1237,41 +1240,19 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
     ///   - args: Optional user arguments appended to the skill's prompt template.
     /// - Returns: A ``QueryResult`` with the agent's response.
     public func executeSkill(_ skillName: String, args: String? = nil) async -> QueryResult {
-        guard !isClosed else {
+        guard !isClosed else { return Self.closedQueryResult() }
+
+        let (skill, prompt): (Skill, String)
+        switch resolveSkillForExecution(skillName, args: args) {
+        case .success(let resolved):
+            (skill, prompt) = resolved
+        case .failure(let error):
             return QueryResult(
                 text: "", usage: TokenUsage(inputTokens: 0, outputTokens: 0),
                 numTurns: 0, durationMs: 0, messages: [],
                 status: .errorDuringExecution,
-                errors: ["Agent is already closed"]
+                errors: [error.message]
             )
-        }
-
-        // Find skill in registry
-        guard let skill = options.skillRegistry?.find(skillName) else {
-            return QueryResult(
-                text: "", usage: TokenUsage(inputTokens: 0, outputTokens: 0),
-                numTurns: 0, durationMs: 0, messages: [],
-                status: .errorDuringExecution,
-                errors: ["Skill \"\(skillName)\" not found or not registered"]
-            )
-        }
-
-        // Check availability
-        guard skill.isAvailable() else {
-            return QueryResult(
-                text: "", usage: TokenUsage(inputTokens: 0, outputTokens: 0),
-                numTurns: 0, durationMs: 0, messages: [],
-                status: .errorDuringExecution,
-                errors: ["Skill \"\(skillName)\" is not available in the current environment"]
-            )
-        }
-
-        // Build prompt from skill template + args
-        let prompt: String
-        if let args, !args.isEmpty {
-            prompt = "\(skill.promptTemplate)\n\n---\nUser request: \(args)"
-        } else {
-            prompt = skill.promptTemplate
         }
 
         // Save current state for restoration after execution
@@ -1323,7 +1304,11 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
             return AsyncStream<SDKMessage> { $0.finish() }
         }
 
-        guard let skill = options.skillRegistry?.find(skillName) else {
+        let (skill, prompt): (Skill, String)
+        switch resolveSkillForExecution(skillName, args: args) {
+        case .success(let resolved):
+            (skill, prompt) = resolved
+        case .failure(let error):
             return AsyncStream<SDKMessage> { continuation in
                 continuation.yield(.result(SDKMessage.ResultData(
                     subtype: .errorDuringExecution,
@@ -1332,32 +1317,10 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                     numTurns: 0,
                     durationMs: 0,
                     totalCostUsd: 0,
-                    errors: ["Skill \"\(skillName)\" not found or not registered"]
+                    errors: [error.message]
                 )))
                 continuation.finish()
             }
-        }
-
-        guard skill.isAvailable() else {
-            return AsyncStream<SDKMessage> { continuation in
-                continuation.yield(.result(SDKMessage.ResultData(
-                    subtype: .errorDuringExecution,
-                    text: "",
-                    usage: nil,
-                    numTurns: 0,
-                    durationMs: 0,
-                    totalCostUsd: 0,
-                    errors: ["Skill \"\(skillName)\" is not available in the current environment"]
-                )))
-                continuation.finish()
-            }
-        }
-
-        let prompt: String
-        if let args, !args.isEmpty {
-            prompt = "\(skill.promptTemplate)\n\n---\nUser request: \(args)"
-        } else {
-            prompt = skill.promptTemplate
         }
 
         let savedAllowedTools = options.allowedTools
@@ -1422,52 +1385,15 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
         let (mcpTools, mcpManager) = await assembleFullToolPool()
 
         // Session lifecycle wiring (Story 17-7)
-        // Resolve the active session ID based on continueRecentSession / forkSession options.
-        // Execution order: continueRecentSession → forkSession → session restore → resumeSessionAt
-        var resolvedSessionId = options.sessionId
-        if let sessionStore = options.sessionStore {
-            // continueRecentSession: if no explicit sessionId, resolve most recent session
-            if options.continueRecentSession,
-               resolvedSessionId == nil || resolvedSessionId?.isEmpty == true {
-                if let sessions = try? await sessionStore.list(), let mostRecent = sessions.first {
-                    resolvedSessionId = mostRecent.id
-                }
-                // If no sessions exist, resolvedSessionId stays nil → new session behavior
-            }
-
-            // forkSession: fork the resolved session into a new copy
-            if options.forkSession, let sourceId = resolvedSessionId {
-                if let forkedId = try? await sessionStore.fork(sourceSessionId: sourceId) {
-                    resolvedSessionId = forkedId
-                }
-                // If fork returns nil (source doesn't exist), keep original sessionId
-            }
-        }
-
-        // Session restore: load history if sessionStore and resolvedSessionId are configured
-        var messages: [[String: Any]]
-        if let sessionStore = options.sessionStore, let sessionId = resolvedSessionId {
-            if let sessionData = try? await sessionStore.load(sessionId: sessionId) {
-                messages = sessionData.messages
-            } else {
-                messages = []
-            }
-
-            // resumeSessionAt: truncate history to the message with matching UUID
-            if let resumeAt = options.resumeSessionAt, !messages.isEmpty {
-                if let truncateIndex = messages.firstIndex(where: { msg in
-                    (msg["uuid"] as? String) == resumeAt || (msg["id"] as? String) == resumeAt
-                }) {
-                    messages = Array(messages[0...truncateIndex])
-                }
-                // If UUID not found, keep full history (no truncation, no error)
-            }
-
-            // Append new user message to restored (or empty) history
-            messages.append(["role": "user", "content": text])
-        } else {
-            messages = buildMessages(prompt: text)
-        }
+        let (resolvedSessionId, resolvedMessages) = await Self.resolveSessionMessages(
+            sessionStore: options.sessionStore,
+            sessionId: options.sessionId,
+            continueRecentSession: options.continueRecentSession,
+            forkSession: options.forkSession,
+            resumeSessionAt: options.resumeSessionAt,
+            text: text
+        )
+        var messages: [[String: Any]] = resolvedMessages ?? buildMessages(prompt: text)
 
         var totalUsage = TokenUsage(inputTokens: 0, outputTokens: 0)
         var totalCostUsd: Double = 0.0
@@ -1494,12 +1420,11 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
         var costTracker = CostTracker(model: model, maxBudgetUsd: options.maxBudgetUsd, label: options.agentLabel)
 
         // TraceRecorder: opt-in execution trace (JSONL)
-        var traceRecorder: TraceRecorder? = nil
-        if options.traceEnabled {
-            let traceBaseURL: URL? = options.traceBaseURL.map { URL(fileURLWithPath: $0) }
-            let runIdForTrace = options.runId ?? UUID().uuidString
-            traceRecorder = try? TraceRecorder(runId: runIdForTrace, baseURL: traceBaseURL)
-        }
+        let traceRecorder: TraceRecorder? = Self.createTraceRecorder(
+            enabled: options.traceEnabled,
+            baseURL: options.traceBaseURL,
+            runId: options.runId
+        )
         var traceStepIndex = 0
 
         // Emit SessionCreatedEvent (zero-overhead when sessionStore or eventBus is nil)
@@ -1568,20 +1493,13 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                 let retryThinking = Self.computeThinkingConfig(from: self.options)
 
                 // Emit LLMRequestStartedEvent with message summaries
-                if let eventBus = options.eventBus {
-                    let summaries: [MessageSummary] = messages.flatMap { msg -> [MessageSummary] in
-                        guard let role = msg["role"] as? String else { return [] }
-                        let (length, preview) = Self.extractContentInfo(from: msg)
-                        return [MessageSummary(role: role, contentLength: length, preview: preview)]
-                    }
-                    await eventBus.publish(LLMRequestStartedEvent(
-                        sessionId: resolvedSessionId,
-                        model: retryModel,
-                        systemPromptLength: retrySystemPrompt?.count ?? 0,
-                        messageCount: messages.count,
-                        messages: summaries
-                    ))
-                }
+                await Self.emitLLMRequestStarted(
+                    eventBus: options.eventBus,
+                    sessionId: resolvedSessionId,
+                    model: retryModel,
+                    systemPrompt: retrySystemPrompt,
+                    messages: messages
+                )
 
                 response = try await withRetry({
                     try await retryClient.sendMessage(
@@ -1627,31 +1545,12 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                         // by assigning to `response` and continuing below
                         turnCount += 1
                         if let usage = fallbackResponse["usage"] as? [String: Any] {
-                            let turnUsage = TokenUsage(
-                                inputTokens: usage["input_tokens"] as? Int ?? 0,
-                                outputTokens: usage["output_tokens"] as? Int ?? 0
-                            )
-                            totalUsage = totalUsage + turnUsage
-                            let turnCost = estimateCost(model: fallbackModel, usage: turnUsage)
-                            totalCostUsd += turnCost
-                            costTracker.recordUsage(model: fallbackModel, usage: turnUsage)
-                            if let eventBus = options.eventBus {
-                                await eventBus.publish(LLMCostEvent(
-                                    sessionId: resolvedSessionId,
-                                    model: fallbackModel,
-                                    inputTokens: turnUsage.inputTokens,
-                                    outputTokens: turnUsage.outputTokens,
-                                    cacheCreationInputTokens: usage["cache_creation_input_tokens"] as? Int,
-                                    cacheReadInputTokens: usage["cache_read_input_tokens"] as? Int,
-                                    estimatedCostUsd: turnCost
-                                ))
-                            }
-                            costByModel[fallbackModel] = CostBreakdownEntry(
-                                label: options.agentLabel,
-                                model: fallbackModel,
-                                inputTokens: turnUsage.inputTokens,
-                                outputTokens: turnUsage.outputTokens,
-                                costUsd: turnCost
+                            await Self.trackTurnCost(
+                                usage: usage, model: fallbackModel,
+                                totalUsage: &totalUsage, totalCostUsd: &totalCostUsd,
+                                costByModel: &costByModel, costTracker: &costTracker,
+                                eventBus: options.eventBus, sessionId: resolvedSessionId,
+                                agentLabel: options.agentLabel
                             )
                         }
                         let content = fallbackResponse["content"]
@@ -1678,18 +1577,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                 }
 
                 // Structured log for API error
-                let statusCode: String
-                let errorMessage: String
-                if let sdkError = error as? SDKError, let code = sdkError.statusCode {
-                    statusCode = String(code)
-                    errorMessage = sdkError.message
-                } else if let urlError = error as? URLError {
-                    statusCode = String(urlError.errorCode)
-                    errorMessage = urlError.localizedDescription
-                } else {
-                    statusCode = "0"
-                    errorMessage = error.localizedDescription
-                }
+                let (statusCode, errorMessage) = Self.classifyError(error)
                 Logger.shared.error("QueryEngine", "api_error", data: [
                     "statusCode": statusCode,
                     "message": errorMessage
@@ -1701,23 +1589,14 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                 }
                 // Session auto-save on error: persist whatever messages we have so far
                 if let sessionStore = options.sessionStore, let sessionId = resolvedSessionId, options.persistSession {
-                    let metadata = PartialSessionMetadata(
+                    await Self.saveSessionMessages(
+                        messages: messages,
+                        sessionId: sessionId,
+                        sessionStore: sessionStore,
                         cwd: options.cwd ?? FileManager.default.currentDirectoryPath,
                         model: model,
-                        summary: nil
+                        eventBus: options.eventBus
                     )
-                    if let messagesData = try? JSONSerialization.data(withJSONObject: messages, options: []),
-                       let deserializedMessages = try? JSONSerialization.jsonObject(with: messagesData, options: []) as? [[String: Any]] {
-                        let savedMessageCount = deserializedMessages.count
-                        try? await sessionStore.save(sessionId: sessionId, messages: deserializedMessages, metadata: metadata)
-                        // Emit SessionAutoSavedEvent on error path (zero-overhead when eventBus is nil)
-                        if let eventBus = options.eventBus {
-                            await eventBus.publish(SessionAutoSavedEvent(
-                                sessionId: resolvedSessionId,
-                                messageCount: savedMessageCount
-                            ))
-                        }
-                    }
                 }
                 // Hook: stop — trigger on error path (loop terminated by exception)
                 if let hookRegistry = options.hookRegistry {
@@ -1734,12 +1613,10 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                     || _interrupted
                     || (error as? URLError)?.code == .cancelled
                 // Emit AgentFailedEvent or AgentInterruptedEvent in error path
-                if let eventBus = options.eventBus {
-                    if isCancelled {
-                        await eventBus.publish(AgentInterruptedEvent(sessionId: resolvedSessionId, stepsCompleted: turnCount))
-                    } else {
-                        await eventBus.publish(AgentFailedEvent(sessionId: resolvedSessionId, error: "[\(statusCode)] \(errorMessage)", stepsCompleted: turnCount))
-                    }
+                if isCancelled {
+                    await Self.emitAgentInterrupted(eventBus: options.eventBus, sessionId: resolvedSessionId, stepsCompleted: turnCount)
+                } else {
+                    await Self.emitAgentFailed(eventBus: options.eventBus, sessionId: resolvedSessionId, error: "[\(statusCode)] \(errorMessage)", stepsCompleted: turnCount)
                 }
                 let resultStatus: QueryStatus = isCancelled ? .cancelled : .errorDuringExecution
                 return QueryResult(
@@ -1774,47 +1651,13 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
 
             // Parse usage from response
             if let usage = response["usage"] as? [String: Any] {
-                let turnUsage = TokenUsage(
-                    inputTokens: usage["input_tokens"] as? Int ?? 0,
-                    outputTokens: usage["output_tokens"] as? Int ?? 0
+                await Self.trackTurnCost(
+                    usage: usage, model: model,
+                    totalUsage: &totalUsage, totalCostUsd: &totalCostUsd,
+                    costByModel: &costByModel, costTracker: &costTracker,
+                    eventBus: options.eventBus, sessionId: resolvedSessionId,
+                    agentLabel: options.agentLabel
                 )
-                totalUsage = totalUsage + turnUsage
-                let turnCost = estimateCost(model: model, usage: turnUsage)
-                totalCostUsd += turnCost
-                costTracker.recordUsage(model: model, usage: turnUsage)
-                if let eventBus = options.eventBus {
-                    await eventBus.publish(LLMCostEvent(
-                        sessionId: resolvedSessionId,
-                        model: model,
-                        inputTokens: turnUsage.inputTokens,
-                        outputTokens: turnUsage.outputTokens,
-                        cacheCreationInputTokens: usage["cache_creation_input_tokens"] as? Int,
-                        cacheReadInputTokens: usage["cache_read_input_tokens"] as? Int,
-                        estimatedCostUsd: turnCost
-                    ))
-                }
-                // Track per-model cost breakdown
-                let currentModel = model
-                if var existing = costByModel[currentModel] {
-                    let newInput = existing.inputTokens + turnUsage.inputTokens
-                    let newOutput = existing.outputTokens + turnUsage.outputTokens
-                    let newCost = existing.costUsd + turnCost
-                    costByModel[currentModel] = CostBreakdownEntry(
-                        label: options.agentLabel,
-                        model: currentModel,
-                        inputTokens: newInput,
-                        outputTokens: newOutput,
-                        costUsd: newCost
-                    )
-                } else {
-                    costByModel[currentModel] = CostBreakdownEntry(
-                        label: options.agentLabel,
-                        model: currentModel,
-                        inputTokens: turnUsage.inputTokens,
-                        outputTokens: turnUsage.outputTokens,
-                        costUsd: turnCost
-                    )
-                }
             }
 
             // Structured log for LLM response
@@ -1831,16 +1674,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
             }
 
             // Check budget via CostTracker (structured check) with inline fallback for backward compat
-            let budgetResult = costTracker.checkBudget()
-            let budgetExceeded: Bool
-            if case .budgetExceeded = budgetResult {
-                budgetExceeded = true
-            } else if let budget = options.maxBudgetUsd, totalCostUsd > budget {
-                budgetExceeded = true
-            } else {
-                budgetExceeded = false
-            }
-            if budgetExceeded {
+            if Self.isBudgetExceeded(checkResult: costTracker.checkBudget(), maxBudgetUsd: options.maxBudgetUsd, totalCostUsd: totalCostUsd) {
                 status = .errorMaxBudgetUsd
                 // Structured log for budget exceeded
                 Logger.shared.warn("QueryEngine", "budget_exceeded", data: [
@@ -1879,22 +1713,19 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                     // Use MCP-merged tool pool for execution
                     let registeredTools = mcpTools
                     // Create agent spawner if AgentTool is registered
-                    let spawner: SubAgentSpawner? = {
-                        let hasAgentTool = registeredTools.contains { $0.name == "Agent" }
-                        guard hasAgentTool else { return nil }
-                        return DefaultSubAgentSpawner(
-                            apiKey: options.apiKey ?? "",
-                            baseURL: options.baseURL,
-                            parentModel: model,
-                            parentTools: registeredTools,
-                            provider: options.provider
-                        )
-                    }()
+                    let spawner = Self.createSubAgentSpawner(
+                        tools: registeredTools,
+                        apiKey: options.apiKey ?? "",
+                        baseURL: options.baseURL,
+                        parentModel: model,
+                        provider: options.provider
+                    )
                     let toolResults = await ToolExecutor.executeTools(
                         toolUseBlocks: toolUseBlocks,
                         tools: registeredTools,
-                        context: ToolContext(
+                        context: Self.buildToolContext(
                             cwd: options.cwd ?? FileManager.default.currentDirectoryPath,
+                            sessionId: resolvedSessionId,
                             agentSpawner: spawner,
                             mailboxStore: options.mailboxStore,
                             teamStore: options.teamStore,
@@ -1910,14 +1741,11 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                             canUseTool: options.canUseTool,
                             skillRegistry: options.skillRegistry,
                             restrictionStack: restrictionStack,
-                            skillNestingDepth: restrictionStack?.nestingDepth ?? 0,
                             maxSkillRecursionDepth: options.maxSkillRecursionDepth,
                             fileCache: fileCache,
                             sandbox: options.sandbox,
-                            mcpConnections: nil,
                             env: options.env,
-                            eventBus: options.eventBus,
-                            sessionId: resolvedSessionId
+                            eventBus: options.eventBus
                         )
                     )
 
@@ -2007,24 +1835,14 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
 
         // Session auto-save: persist updated messages if sessionStore is configured and persistSession is true
         if let sessionStore = options.sessionStore, let sessionId = resolvedSessionId, options.persistSession {
-            let metadata = PartialSessionMetadata(
+            await Self.saveSessionMessages(
+                messages: messages,
+                sessionId: sessionId,
+                sessionStore: sessionStore,
                 cwd: options.cwd ?? "",
                 model: model,
-                summary: nil
+                eventBus: options.eventBus
             )
-            // Serialize messages to Data for Sendable compliance when crossing actor boundary
-            if let messagesData = try? JSONSerialization.data(withJSONObject: messages, options: []),
-               let deserializedMessages = try? JSONSerialization.jsonObject(with: messagesData, options: []) as? [[String: Any]] {
-                let savedMessageCount = deserializedMessages.count
-                try? await sessionStore.save(sessionId: sessionId, messages: deserializedMessages, metadata: metadata)
-                // Emit SessionAutoSavedEvent (zero-overhead when eventBus is nil)
-                if let eventBus = options.eventBus {
-                    await eventBus.publish(SessionAutoSavedEvent(
-                        sessionId: resolvedSessionId,
-                        messageCount: savedMessageCount
-                    ))
-                }
-            }
         }
 
         // Hook: sessionEnd — trigger before returning the result
@@ -2036,17 +1854,15 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
         let isCancelled = (status == .cancelled)
 
         // Emit AgentCompletedEvent / AgentInterruptedEvent
-        if let eventBus = options.eventBus {
-            if isCancelled {
-                await eventBus.publish(AgentInterruptedEvent(sessionId: resolvedSessionId, stepsCompleted: turnCount))
-            } else {
-                await eventBus.publish(AgentCompletedEvent(
-                    sessionId: resolvedSessionId,
-                    totalSteps: turnCount,
-                    durationMs: Self.computeDurationMs(ContinuousClock.now - startTime),
-                    resultText: lastAssistantText.isEmpty ? nil : lastAssistantText
-                ))
-            }
+        if isCancelled {
+            await Self.emitAgentInterrupted(eventBus: options.eventBus, sessionId: resolvedSessionId, stepsCompleted: turnCount)
+        } else if let eventBus = options.eventBus {
+            await eventBus.publish(AgentCompletedEvent(
+                sessionId: resolvedSessionId,
+                totalSteps: turnCount,
+                durationMs: Self.computeDurationMs(ContinuousClock.now - startTime),
+                resultText: lastAssistantText.isEmpty ? nil : lastAssistantText
+            ))
         }
 
         // Close trace recorder if active (promptImpl path doesn't yield SDKMessages,
@@ -2245,44 +2061,17 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
 
                 // Session lifecycle wiring (Story 17-7)
                 // Resolve the active session ID based on continueRecentSession / forkSession options.
-                // Execution order: continueRecentSession → forkSession → session restore → resumeSessionAt
-                var resolvedSessionId = capturedSessionId
-                if let sessionStore = capturedSessionStore {
-                    // continueRecentSession: if no explicit sessionId, resolve most recent session
-                    if capturedContinueRecentSession,
-                       resolvedSessionId == nil || resolvedSessionId?.isEmpty == true {
-                        if let sessions = try? await sessionStore.list(), let mostRecent = sessions.first {
-                            resolvedSessionId = mostRecent.id
-                        }
-                    }
-
-                    // forkSession: fork the resolved session into a new copy
-                    if capturedForkSession, let sourceId = resolvedSessionId {
-                        if let forkedId = try? await sessionStore.fork(sourceSessionId: sourceId) {
-                            resolvedSessionId = forkedId
-                        }
-                    }
-                }
-
-                // Session restore: load history if sessionStore and resolvedSessionId are configured
-                if let sessionStore = capturedSessionStore, let sessionId = resolvedSessionId {
-                    if let sessionData = try? await sessionStore.load(sessionId: sessionId) {
-                        messages = sessionData.messages
-                    } else {
-                        messages = []
-                    }
-
-                    // resumeSessionAt: truncate history to the message with matching UUID
-                    if let resumeAt = capturedResumeSessionAt, !messages.isEmpty {
-                        if let truncateIndex = messages.firstIndex(where: { msg in
-                            (msg["uuid"] as? String) == resumeAt || (msg["id"] as? String) == resumeAt
-                        }) {
-                            messages = Array(messages[0...truncateIndex])
-                        }
-                    }
-
-                    // Append new user message to restored (or empty) history
-                    messages.append(["role": "user", "content": text])
+                // Session lifecycle wiring (Story 17-7)
+                let (resolvedSessionId, resolvedSessionMessages) = await Self.resolveSessionMessages(
+                    sessionStore: capturedSessionStore,
+                    sessionId: capturedSessionId,
+                    continueRecentSession: capturedContinueRecentSession,
+                    forkSession: capturedForkSession,
+                    resumeSessionAt: capturedResumeSessionAt,
+                    text: text
+                )
+                if let resolvedMsgs = resolvedSessionMessages {
+                    messages = resolvedMsgs
                 }
 
                 let currentInvocationMessageStartIndex = messages.count
@@ -2355,21 +2144,18 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                 var streamCostTracker = CostTracker(model: capturedModel, maxBudgetUsd: capturedMaxBudgetUsd, label: capturedAgentLabel)
 
                 // TraceRecorder: opt-in execution trace (JSONL)
-                var streamTraceRecorder: TraceRecorder? = nil
-                if capturedTraceEnabled {
-                    let traceBaseURL: URL? = capturedTraceBaseURL.map { URL(fileURLWithPath: $0) }
-                    let runIdForTrace = capturedRunId ?? UUID().uuidString
-                    streamTraceRecorder = try? TraceRecorder(runId: runIdForTrace, baseURL: traceBaseURL)
-                }
+                let streamTraceRecorder: TraceRecorder? = Self.createTraceRecorder(
+                    enabled: capturedTraceEnabled,
+                    baseURL: capturedTraceBaseURL,
+                    runId: capturedRunId
+                )
                 var traceStepIndex = 0
 
                 while turnCount < capturedMaxTurns {
                     // Cancellation check (FR60): cooperative cancellation via Task.isCancelled
                     if _Concurrency.Task.isCancelled {
                         // Emit AgentInterruptedEvent before yielding cancelled
-                        if let eventBus = capturedEventBus {
-                            await eventBus.publish(AgentInterruptedEvent(sessionId: resolvedSessionId, stepsCompleted: turnCount))
-                        }
+                        await Self.emitAgentInterrupted(eventBus: capturedEventBus, sessionId: resolvedSessionId, stepsCompleted: turnCount)
                         let finalText = Self.extractCollectedText(
                             messages: messages,
                             startingAt: currentInvocationMessageStartIndex
@@ -2439,20 +2225,13 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                         let retryThinking = Self.computeThinkingConfig(from: self.options)
 
                         // Emit LLMRequestStartedEvent with message summaries
-                        if let eventBus = capturedEventBus {
-                            let summaries: [MessageSummary] = retryMessages.flatMap { msg -> [MessageSummary] in
-                                guard let role = msg["role"] as? String else { return [] }
-                                let (length, preview) = Self.extractContentInfo(from: msg)
-                                return [MessageSummary(role: role, contentLength: length, preview: preview)]
-                            }
-                            await eventBus.publish(LLMRequestStartedEvent(
-                                sessionId: capturedSessionId,
-                                model: retryModel,
-                                systemPromptLength: retrySystemPrompt?.count ?? 0,
-                                messageCount: retryMessages.count,
-                                messages: summaries
-                            ))
-                        }
+                        await Self.emitLLMRequestStarted(
+                            eventBus: capturedEventBus,
+                            sessionId: capturedSessionId,
+                            model: retryModel,
+                            systemPrompt: retrySystemPrompt,
+                            messages: retryMessages
+                        )
 
                         eventStream = try await withRetry({
                             try await retryClient.streamMessage(
@@ -2468,33 +2247,15 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                         }, retryConfig: retryCfg)
                     } catch {
                         // Structured log for API error in stream
-                        let statusCode: String
-                        let errorMessage: String
-                        if let sdkError = error as? SDKError, let code = sdkError.statusCode {
-                            statusCode = String(code)
-                            errorMessage = sdkError.message
-                        } else if let urlError = error as? URLError {
-                            statusCode = String(urlError.errorCode)
-                            errorMessage = urlError.localizedDescription
-                        } else {
-                            statusCode = "0"
-                            errorMessage = error.localizedDescription
-                        }
+                        let (statusCode, errorMessage) = Self.classifyError(error)
                         Logger.shared.error("QueryEngine", "api_error", data: [
                             "statusCode": statusCode,
                             "message": errorMessage
                         ])
                         // API connection error — fire hooks before yielding error
-                        if let hookRegistry = capturedHookRegistry {
-                            let stopInput = HookInput(event: .stop, cwd: capturedCwd)
-                            await hookRegistry.execute(.stop, input: stopInput)
-                            let endInput = HookInput(event: .sessionEnd, cwd: capturedCwd)
-                            await hookRegistry.execute(.sessionEnd, input: endInput)
-                        }
+                        await Self.fireStopAndEndHooks(hookRegistry: capturedHookRegistry, cwd: capturedCwd)
                         // Emit AgentFailedEvent before yielding error
-                        if let eventBus = capturedEventBus {
-                            await eventBus.publish(AgentFailedEvent(sessionId: resolvedSessionId, error: "[\(statusCode)] \(errorMessage)", stepsCompleted: turnCount))
-                        }
+                        await Self.emitAgentFailed(eventBus: capturedEventBus, sessionId: resolvedSessionId, error: "[\(statusCode)] \(errorMessage)", stepsCompleted: turnCount)
                         Self.yieldStreamError(
                             continuation: continuation, text: "",
                             usage: totalUsage, turnCount: turnCount, startTime: startTime,
@@ -2521,98 +2282,36 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                             switch event {
                             case .messageStart(let message):
                                 currentModel = message["model"] as? String ?? capturedModel
-                                // Extract input_tokens from the nested message.usage object
-                                if let msgUsage = message["usage"] as? [String: Any] {
-                                    let inputTokens = msgUsage["input_tokens"] as? Int ?? 0
-                                    totalUsage = totalUsage + TokenUsage(
-                                        inputTokens: inputTokens,
-                                        outputTokens: 0
+                                // Extract input_tokens from the nested message.usage object.
+                                // messageStart only tracks input tokens; output tokens arrive in messageDelta.
+                                if var msgUsage = message["usage"] as? [String: Any] {
+                                    msgUsage["output_tokens"] = 0
+                                    await Self.trackTurnCost(
+                                        usage: msgUsage, model: currentModel,
+                                        totalUsage: &totalUsage, totalCostUsd: &totalCostUsd,
+                                        costByModel: &costByModel, costTracker: &streamCostTracker,
+                                        eventBus: capturedEventBus, sessionId: resolvedSessionId,
+                                        agentLabel: capturedAgentLabel
                                     )
-                                    // Calculate cost for input tokens at message start
-                                    let turnCost = estimateCost(model: currentModel, usage: TokenUsage(inputTokens: inputTokens, outputTokens: 0))
-                                    totalCostUsd += turnCost
-                                    streamCostTracker.recordUsage(model: currentModel, usage: TokenUsage(inputTokens: inputTokens, outputTokens: 0))
-                                    if let eventBus = capturedEventBus {
-                                        await eventBus.publish(LLMCostEvent(
-                                            sessionId: resolvedSessionId,
-                                            model: currentModel,
-                                            inputTokens: inputTokens,
-                                            outputTokens: 0,
-                                            cacheCreationInputTokens: msgUsage["cache_creation_input_tokens"] as? Int,
-                                            cacheReadInputTokens: msgUsage["cache_read_input_tokens"] as? Int,
-                                            estimatedCostUsd: turnCost
-                                        ))
-                                    }
-                                    // Track per-model cost breakdown
-                                    let modelKey = currentModel
-                                    if var existing = costByModel[modelKey] {
-                                        costByModel[modelKey] = CostBreakdownEntry(
-                                            label: capturedAgentLabel,
-                                            model: modelKey,
-                                            inputTokens: existing.inputTokens + inputTokens,
-                                            outputTokens: existing.outputTokens,
-                                            costUsd: existing.costUsd + turnCost
-                                        )
-                                    } else {
-                                        costByModel[modelKey] = CostBreakdownEntry(
-                                            label: capturedAgentLabel,
-                                            model: modelKey,
-                                            inputTokens: inputTokens,
-                                            outputTokens: 0,
-                                            costUsd: turnCost
-                                        )
-                                    }
                                 }
 
                                 // Check budget after input token cost accumulation
-                                let streamBudgetResult = streamCostTracker.checkBudget()
-                                let streamBudgetExceeded: Bool
-                                if case .budgetExceeded = streamBudgetResult {
-                                    streamBudgetExceeded = true
-                                } else if let budget = capturedMaxBudgetUsd, totalCostUsd > budget {
-                                    streamBudgetExceeded = true
-                                } else {
-                                    streamBudgetExceeded = false
-                                }
-                                if streamBudgetExceeded {
-                                    let elapsed = ContinuousClock.now - startTime
-                                    let durationMs = Self.computeDurationMs(elapsed)
-                                    let previousText = Self.extractCollectedText(
+                                if Self.isBudgetExceeded(checkResult: streamCostTracker.checkBudget(), maxBudgetUsd: capturedMaxBudgetUsd, totalCostUsd: totalCostUsd) {
+                                    await Self.handleBudgetExceededInStream(
+                                        continuation: continuation,
                                         messages: messages,
                                         startingAt: currentInvocationMessageStartIndex,
-                                        separator: " "
-                                    )
-
-                                    // Structured log for budget exceeded
-                                    Logger.shared.warn("QueryEngine", "budget_exceeded", data: [
-                                        "costUsd": String(format: "%.4f", totalCostUsd),
-                                        "budgetUsd": String(format: "%.4f", capturedMaxBudgetUsd ?? 0),
-                                        "turnsUsed": String(turnCount)
-                                    ])
-
-                                    // Fire hooks before yielding budget error
-                                    if let hookRegistry = capturedHookRegistry {
-                                        let stopInput = HookInput(event: .stop, cwd: capturedCwd)
-                                        await hookRegistry.execute(.stop, input: stopInput)
-                                        let endInput = HookInput(event: .sessionEnd, cwd: capturedCwd)
-                                        await hookRegistry.execute(.sessionEnd, input: endInput)
-                                    }
-
-                                    let budgetStartResultMsg = SDKMessage.result(SDKMessage.ResultData(
-                                        subtype: .errorMaxBudgetUsd,
-                                        text: previousText,
+                                        accumulatedText: "",
                                         usage: totalUsage,
-                                        numTurns: turnCount,
-                                        durationMs: durationMs,
+                                        turnsUsed: turnCount,
+                                        startTime: startTime,
                                         totalCostUsd: totalCostUsd,
-                                        costBreakdown: Array(costByModel.values)
-                                    ))
-                                    continuation.yield(budgetStartResultMsg)
-                                    if let trace = streamTraceRecorder, let mapped = TraceEventMapping.traceEvent(from: budgetStartResultMsg) {
-                                        await trace.record(event: mapped.event, payload: mapped.payload)
-                                    }
-                                    await streamTraceRecorder?.close()
-                                    continuation.finish()
+                                        maxBudgetUsd: capturedMaxBudgetUsd,
+                                        costByModel: costByModel,
+                                        hookRegistry: capturedHookRegistry,
+                                        cwd: capturedCwd,
+                                        traceRecorder: streamTraceRecorder
+                                    )
                                     return
                                 }
 
@@ -2653,7 +2352,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                                         "type": "tool_use",
                                         "id": accumulated.id,
                                         "name": accumulated.name,
-                                        "input": Self.parseInputJson(accumulated.inputJson)
+                                        "input": parseJSONToDict(accumulated.inputJson) ?? [:]
                                     ]
                                     contentBlocks.append(block)
 
@@ -2672,95 +2371,31 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
 
                             case .messageDelta(let delta, let usage):
                                 currentStopReason = delta["stop_reason"] as? String ?? ""
-                                let turnUsage = TokenUsage(
-                                    inputTokens: usage["input_tokens"] as? Int ?? 0,
-                                    outputTokens: usage["output_tokens"] as? Int ?? 0
+                                await Self.trackTurnCost(
+                                    usage: usage, model: currentModel,
+                                    totalUsage: &totalUsage, totalCostUsd: &totalCostUsd,
+                                    costByModel: &costByModel, costTracker: &streamCostTracker,
+                                    eventBus: capturedEventBus, sessionId: resolvedSessionId,
+                                    agentLabel: capturedAgentLabel
                                 )
-                                totalUsage = totalUsage + turnUsage
-                                let turnCost = estimateCost(model: currentModel, usage: turnUsage)
-                                totalCostUsd += turnCost
-                                streamCostTracker.recordUsage(model: currentModel, usage: turnUsage)
-                                if let eventBus = capturedEventBus {
-                                    await eventBus.publish(LLMCostEvent(
-                                        sessionId: resolvedSessionId,
-                                        model: currentModel,
-                                        inputTokens: turnUsage.inputTokens,
-                                        outputTokens: turnUsage.outputTokens,
-                                        cacheCreationInputTokens: usage["cache_creation_input_tokens"] as? Int,
-                                        cacheReadInputTokens: usage["cache_read_input_tokens"] as? Int,
-                                        estimatedCostUsd: turnCost
-                                    ))
-                                }
-                                // Track per-model cost breakdown
-                                let modelKey = currentModel
-                                if var existing = costByModel[modelKey] {
-                                    costByModel[modelKey] = CostBreakdownEntry(
-                                        label: capturedAgentLabel,
-                                        model: modelKey,
-                                        inputTokens: existing.inputTokens + turnUsage.inputTokens,
-                                        outputTokens: existing.outputTokens + turnUsage.outputTokens,
-                                        costUsd: existing.costUsd + turnCost
-                                    )
-                                } else {
-                                    costByModel[modelKey] = CostBreakdownEntry(
-                                        label: capturedAgentLabel,
-                                        model: modelKey,
-                                        inputTokens: turnUsage.inputTokens,
-                                        outputTokens: turnUsage.outputTokens,
-                                        costUsd: turnCost
-                                    )
-                                }
 
                                 // Check budget after cost accumulation via CostTracker + inline fallback
-                                let deltaBudgetResult = streamCostTracker.checkBudget()
-                                let deltaBudgetExceeded: Bool
-                                if case .budgetExceeded = deltaBudgetResult {
-                                    deltaBudgetExceeded = true
-                                } else if let budget = capturedMaxBudgetUsd, totalCostUsd > budget {
-                                    deltaBudgetExceeded = true
-                                } else {
-                                    deltaBudgetExceeded = false
-                                }
-                                if deltaBudgetExceeded {
-                                    let elapsed = ContinuousClock.now - startTime
-                                    let durationMs = Self.computeDurationMs(elapsed)
-                                    let previousText = Self.extractCollectedText(
+                                if Self.isBudgetExceeded(checkResult: streamCostTracker.checkBudget(), maxBudgetUsd: capturedMaxBudgetUsd, totalCostUsd: totalCostUsd) {
+                                    await Self.handleBudgetExceededInStream(
+                                        continuation: continuation,
                                         messages: messages,
                                         startingAt: currentInvocationMessageStartIndex,
-                                        separator: " "
-                                    )
-                                    let finalText = previousText.isEmpty ? accumulatedText : "\(previousText) \(accumulatedText)"
-
-                                    // Structured log for budget exceeded
-                                    Logger.shared.warn("QueryEngine", "budget_exceeded", data: [
-                                        "costUsd": String(format: "%.4f", totalCostUsd),
-                                        "budgetUsd": String(format: "%.4f", capturedMaxBudgetUsd ?? 0),
-                                        "turnsUsed": String(turnCount + 1)
-                                    ])
-
-                                    // Fire hooks before yielding budget error
-                                    if let hookRegistry = capturedHookRegistry {
-                                        let stopInput = HookInput(event: .stop, cwd: capturedCwd)
-                                        await hookRegistry.execute(.stop, input: stopInput)
-                                        let endInput = HookInput(event: .sessionEnd, cwd: capturedCwd)
-                                        await hookRegistry.execute(.sessionEnd, input: endInput)
-                                    }
-
-                                    let budgetResultMsg = SDKMessage.result(SDKMessage.ResultData(
-                                        subtype: .errorMaxBudgetUsd,
-                                        text: finalText,
+                                        accumulatedText: accumulatedText,
                                         usage: totalUsage,
-                                        numTurns: turnCount + 1,
-                                        durationMs: durationMs,
+                                        turnsUsed: turnCount + 1,
+                                        startTime: startTime,
                                         totalCostUsd: totalCostUsd,
-                                        costBreakdown: Array(costByModel.values)
-                                    ))
-                                    continuation.yield(budgetResultMsg)
-                                    if let trace = streamTraceRecorder, let mapped = TraceEventMapping.traceEvent(from: budgetResultMsg) {
-                                        await trace.record(event: mapped.event, payload: mapped.payload)
-                                    }
-                                    await streamTraceRecorder?.close()
-                                    continuation.finish()
+                                        maxBudgetUsd: capturedMaxBudgetUsd,
+                                        costByModel: costByModel,
+                                        hookRegistry: capturedHookRegistry,
+                                        cwd: capturedCwd,
+                                        traceRecorder: streamTraceRecorder
+                                    )
                                     return
                                 }
 
@@ -2847,16 +2482,9 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
 
                             case .error:
                                 // SSE error event — fire hooks before yielding error
-                                if let hookRegistry = capturedHookRegistry {
-                                    let stopInput = HookInput(event: .stop, cwd: capturedCwd)
-                                    await hookRegistry.execute(.stop, input: stopInput)
-                                    let endInput = HookInput(event: .sessionEnd, cwd: capturedCwd)
-                                    await hookRegistry.execute(.sessionEnd, input: endInput)
-                                }
+                                await Self.fireStopAndEndHooks(hookRegistry: capturedHookRegistry, cwd: capturedCwd)
                                 // Emit AgentFailedEvent before yielding error
-                                if let eventBus = capturedEventBus {
-                                    await eventBus.publish(AgentFailedEvent(sessionId: resolvedSessionId, error: "SSE error event", stepsCompleted: turnCount))
-                                }
+                                await Self.emitAgentFailed(eventBus: capturedEventBus, sessionId: resolvedSessionId, error: "SSE error event", stepsCompleted: turnCount)
                                 Self.yieldStreamError(
                                     continuation: continuation, text: accumulatedText,
                                     usage: totalUsage, turnCount: turnCount, startTime: startTime,
@@ -2873,9 +2501,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                         // Check if this is a cancellation (not a real error)
                         if error is CancellationError || _Concurrency.Task.isCancelled || (error as? URLError)?.code == .cancelled {
                             // Emit AgentInterruptedEvent before yielding cancelled
-                            if let eventBus = capturedEventBus {
-                                await eventBus.publish(AgentInterruptedEvent(sessionId: resolvedSessionId, stepsCompleted: turnCount))
-                            }
+                            await Self.emitAgentInterrupted(eventBus: capturedEventBus, sessionId: resolvedSessionId, stepsCompleted: turnCount)
                             let previousText = Self.extractCollectedText(
                                 messages: messages,
                                 startingAt: currentInvocationMessageStartIndex
@@ -2896,16 +2522,9 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                         }
 
                         // Stream iteration error — fire hooks before yielding error
-                        if let hookRegistry = capturedHookRegistry {
-                            let stopInput = HookInput(event: .stop, cwd: capturedCwd)
-                            await hookRegistry.execute(.stop, input: stopInput)
-                            let endInput = HookInput(event: .sessionEnd, cwd: capturedCwd)
-                            await hookRegistry.execute(.sessionEnd, input: endInput)
-                        }
+                        await Self.fireStopAndEndHooks(hookRegistry: capturedHookRegistry, cwd: capturedCwd)
                         // Emit AgentFailedEvent before yielding error
-                        if let eventBus = capturedEventBus {
-                            await eventBus.publish(AgentFailedEvent(sessionId: resolvedSessionId, error: error.localizedDescription, stepsCompleted: turnCount))
-                        }
+                        await Self.emitAgentFailed(eventBus: capturedEventBus, sessionId: resolvedSessionId, error: error.localizedDescription, stepsCompleted: turnCount)
                         Self.yieldStreamError(
                             continuation: continuation, text: accumulatedText,
                             usage: totalUsage, turnCount: turnCount, startTime: startTime,
@@ -2919,9 +2538,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                     // Cancellation check after SSE event stream ends (FR60)
                     if _Concurrency.Task.isCancelled {
                         // Emit AgentInterruptedEvent before yielding cancelled
-                        if let eventBus = capturedEventBus {
-                            await eventBus.publish(AgentInterruptedEvent(sessionId: resolvedSessionId, stepsCompleted: turnCount))
-                        }
+                        await Self.emitAgentInterrupted(eventBus: capturedEventBus, sessionId: resolvedSessionId, stepsCompleted: turnCount)
                         let finalText = Self.extractCollectedText(
                             messages: messages,
                             startingAt: currentInvocationMessageStartIndex
@@ -2950,7 +2567,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                     if currentStopReason == "tool_use" && !toolUseAccumulator.isEmpty {
                         // Convert accumulated tool_use data to ToolUseBlock array
                         let toolUseBlocks = toolUseAccumulator.sorted(by: { $0.key < $1.key }).map { _, item in
-                            ToolUseBlock(id: item.id, name: item.name, input: Self.parseInputJson(item.inputJson))
+                            ToolUseBlock(id: item.id, name: item.name, input: parseJSONToDict(item.inputJson) ?? [:])
                         }
 
                         if !toolUseBlocks.isEmpty {
@@ -2963,25 +2580,22 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                             }
 
                             // Create agent spawner if AgentTool is registered
-                            let streamSpawner: SubAgentSpawner? = {
-                                let hasAgentTool = allToolProtocols.contains { $0.name == "Agent" }
-                                guard hasAgentTool else { return nil }
-                                return DefaultSubAgentSpawner(
-                                    apiKey: capturedApiKey,
-                                    baseURL: capturedBaseURL,
-                                    parentModel: capturedModel,
-                                    parentTools: allToolProtocols,
-                                    provider: capturedProvider
-                                )
-                            }()
+                            let streamSpawner = Self.createSubAgentSpawner(
+                                tools: allToolProtocols,
+                                apiKey: capturedApiKey,
+                                baseURL: capturedBaseURL,
+                                parentModel: capturedModel,
+                                provider: capturedProvider
+                            )
                             let (capturedPermissionMode, capturedCanUseTool) = _permissionLock.withLock {
                                 (self.options.permissionMode, self.options.canUseTool)
                             }
                             let toolResults = await ToolExecutor.executeTools(
                                 toolUseBlocks: toolUseBlocks,
                                 tools: allToolProtocols,
-                                context: ToolContext(
+                                context: Self.buildToolContext(
                                     cwd: capturedCwd,
+                                    sessionId: resolvedSessionId,
                                     agentSpawner: streamSpawner,
                                     mailboxStore: capturedMailboxStore,
                                     teamStore: capturedTeamStore,
@@ -2997,14 +2611,11 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                                     canUseTool: capturedCanUseTool,
                                     skillRegistry: capturedSkillRegistry,
                                     restrictionStack: capturedRestrictionStack,
-                                    skillNestingDepth: capturedRestrictionStack?.nestingDepth ?? 0,
                                     maxSkillRecursionDepth: capturedMaxSkillRecursionDepth,
                                     fileCache: capturedFileCache,
                                     sandbox: capturedSandbox,
-                                    mcpConnections: nil,
                                     env: capturedEnv,
-                                    eventBus: capturedEventBus,
-                                    sessionId: resolvedSessionId
+                                    eventBus: capturedEventBus
                                 )
                             )
 
@@ -3168,24 +2779,14 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                 // reused across stream() calls. Cleanup happens in agent.close().
                 // Session auto-save: persist updated messages if sessionStore is configured and persistSession is true
                 if let sessionStore = capturedSessionStore, let sessionId = resolvedSessionId, capturedPersistSession {
-                    let metadata = PartialSessionMetadata(
+                    await Self.saveSessionMessages(
+                        messages: messages,
+                        sessionId: sessionId,
+                        sessionStore: sessionStore,
                         cwd: capturedCwd,
                         model: capturedModel,
-                        summary: nil
+                        eventBus: capturedEventBus
                     )
-                    // Serialize messages to Data for Sendable compliance when crossing actor boundary
-                    if let messagesData = try? JSONSerialization.data(withJSONObject: messages, options: []),
-                       let deserializedMessages = try? JSONSerialization.jsonObject(with: messagesData, options: []) as? [[String: Any]] {
-                        let savedMessageCount = deserializedMessages.count
-                        try? await sessionStore.save(sessionId: sessionId, messages: deserializedMessages, metadata: metadata)
-                        // Emit SessionAutoSavedEvent (zero-overhead when capturedEventBus is nil)
-                        if let eventBus = capturedEventBus {
-                            await eventBus.publish(SessionAutoSavedEvent(
-                                sessionId: resolvedSessionId,
-                                messageCount: savedMessageCount
-                            ))
-                        }
-                    }
                 }
                 // Hook: sessionEnd — trigger before finishing the stream
                 if let hookRegistry = capturedHookRegistry {
@@ -3349,20 +2950,6 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
         return await microCompact(client: client, model: model, content: content)
     }
 
-    /// Parse a JSON string into a dictionary, returning empty dict on failure.
-    ///
-    /// Used when converting accumulated tool_use input JSON from SSE deltas.
-    /// - Parameter jsonString: The JSON string to parse.
-    /// - Returns: The parsed dictionary, or an empty dictionary on failure.
-    private static func parseInputJson(_ jsonString: String) -> [String: Any] {
-        guard !jsonString.isEmpty,
-              let data = jsonString.data(using: .utf8),
-              let dict = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any] else {
-            return [:]
-        }
-        return dict
-    }
-
     /// Yield an error result to the stream continuation and finish it.
     ///
     /// Used by all three error paths in `stream()` to avoid duplication.
@@ -3429,6 +3016,78 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
             + Int(elapsed.components.attoseconds / 1_000_000_000_000)
     }
 
+    /// Resolve session lifecycle: continueRecentSession → forkSession → session restore → resumeSessionAt.
+    ///
+    /// Returns `(resolvedSessionId, messages)` where `messages` is nil when no session is configured
+    /// (caller should fall back to `buildMessages()` or use pre-loaded messages).
+    private static func resolveSessionMessages(
+        sessionStore: SessionStore?,
+        sessionId: String?,
+        continueRecentSession: Bool,
+        forkSession: Bool,
+        resumeSessionAt: String?,
+        text: String
+    ) async -> (resolvedSessionId: String?, messages: [[String: Any]]?) {
+        var resolvedSessionId = sessionId
+
+        if let sessionStore = sessionStore {
+            // continueRecentSession: if no explicit sessionId, resolve most recent session
+            if continueRecentSession,
+               resolvedSessionId == nil || resolvedSessionId?.isEmpty == true {
+                if let sessions = try? await sessionStore.list(), let mostRecent = sessions.first {
+                    resolvedSessionId = mostRecent.id
+                }
+                // If no sessions exist, resolvedSessionId stays nil → new session behavior
+            }
+
+            // forkSession: fork the resolved session into a new copy
+            if forkSession, let sourceId = resolvedSessionId {
+                if let forkedId = try? await sessionStore.fork(sourceSessionId: sourceId) {
+                    resolvedSessionId = forkedId
+                }
+                // If fork returns nil (source doesn't exist), keep original sessionId
+            }
+        }
+
+        // Session restore: load history if sessionStore and resolvedSessionId are configured
+        if let sessionStore = sessionStore, let sessionId = resolvedSessionId {
+            var messages: [[String: Any]]
+            if let sessionData = try? await sessionStore.load(sessionId: sessionId) {
+                messages = sessionData.messages
+            } else {
+                messages = []
+            }
+
+            // resumeSessionAt: truncate history to the message with matching UUID
+            if let resumeAt = resumeSessionAt, !messages.isEmpty {
+                if let truncateIndex = messages.firstIndex(where: { msg in
+                    (msg["uuid"] as? String) == resumeAt || (msg["id"] as? String) == resumeAt
+                }) {
+                    messages = Array(messages[0...truncateIndex])
+                }
+                // If UUID not found, keep full history (no truncation, no error)
+            }
+
+            // Append new user message to restored (or empty) history
+            messages.append(["role": "user", "content": text])
+            return (resolvedSessionId, messages)
+        }
+
+        return (resolvedSessionId, nil)
+    }
+
+    /// Create a TraceRecorder if tracing is enabled.
+    private static func createTraceRecorder(
+        enabled: Bool,
+        baseURL: String?,
+        runId: String?
+    ) -> TraceRecorder? {
+        guard enabled else { return nil }
+        let traceBaseURL: URL? = baseURL.map { URL(fileURLWithPath: $0) }
+        let runIdForTrace = runId ?? UUID().uuidString
+        return try? TraceRecorder(runId: runIdForTrace, baseURL: traceBaseURL)
+    }
+
     /// Extract assistant text generated during the current invocation.
     /// - Parameters:
     ///   - messages: Full conversation messages, including restored history.
@@ -3449,11 +3108,373 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
         }.joined(separator: separator)
     }
 
+    /// Record cost breakdown for a model, accumulating into an existing entry if present.
+    ///
+    /// Centralizes the `costByModel` dictionary update pattern used in both `promptImpl`
+    /// and `stream` to avoid duplicated if-else branching at every cost tracking site.
+    private static func recordCostBreakdown(
+        costByModel: inout [String: CostBreakdownEntry],
+        model: String,
+        label: String?,
+        inputTokens: Int,
+        outputTokens: Int,
+        cost: Double
+    ) {
+        if var existing = costByModel[model] {
+            costByModel[model] = CostBreakdownEntry(
+                label: label,
+                model: model,
+                inputTokens: existing.inputTokens + inputTokens,
+                outputTokens: existing.outputTokens + outputTokens,
+                costUsd: existing.costUsd + cost
+            )
+        } else {
+            costByModel[model] = CostBreakdownEntry(
+                label: label,
+                model: model,
+                inputTokens: inputTokens,
+                outputTokens: outputTokens,
+                costUsd: cost
+            )
+        }
+    }
+
+    /// Persist conversation messages to session storage and emit a SessionAutoSavedEvent.
+    ///
+    /// Centralizes the serialize → save → emit pattern used at session auto-save points
+    /// in both `promptImpl` (error and success paths) and `stream`.
+    private static func saveSessionMessages(
+        messages: [[String: Any]],
+        sessionId: String,
+        sessionStore: SessionStore,
+        cwd: String,
+        model: String,
+        eventBus: EventBus?
+    ) async {
+        let metadata = PartialSessionMetadata(cwd: cwd, model: model, summary: nil)
+        // Serialize messages to Data for Sendable compliance when crossing actor boundary
+        guard let messagesData = try? JSONSerialization.data(withJSONObject: messages, options: []),
+              let deserializedMessages = try? JSONSerialization.jsonObject(with: messagesData, options: []) as? [[String: Any]] else { return }
+        let savedMessageCount = deserializedMessages.count
+        try? await sessionStore.save(sessionId: sessionId, messages: deserializedMessages, metadata: metadata)
+        if let eventBus {
+            await eventBus.publish(SessionAutoSavedEvent(
+                sessionId: sessionId,
+                messageCount: savedMessageCount
+            ))
+        }
+    }
+
+    // MARK: - Skill Execution Helpers
+
+    /// Lightweight error for skill resolution failures.
+    private struct SkillResolutionError: Error {
+        let message: String
+    }
+
+    /// Resolves a skill by name, validates availability, and builds the execution prompt.
+    ///
+    /// Centralizes the skill lookup → availability check → prompt assembly sequence
+    /// duplicated between `executeSkill` and `executeSkillStream`.
+    /// Returns `.success((skill, prompt))` or `.failure(SkillResolutionError)`.
+    private func resolveSkillForExecution(_ skillName: String, args: String?) -> Result<(Skill, String), SkillResolutionError> {
+        guard let skill = options.skillRegistry?.find(skillName) else {
+            return .failure(SkillResolutionError(message: "Skill \"\(skillName)\" not found or not registered"))
+        }
+        guard skill.isAvailable() else {
+            return .failure(SkillResolutionError(message: "Skill \"\(skillName)\" is not available in the current environment"))
+        }
+        let prompt: String
+        if let args, !args.isEmpty {
+            prompt = "\(skill.promptTemplate)\n\n---\nUser request: \(args)"
+        } else {
+            prompt = skill.promptTemplate
+        }
+        return .success((skill, prompt))
+    }
+
+    /// Creates a sub-agent spawner if the tool pool contains the Agent tool.
+    ///
+    /// Centralizes the hasAgentTool check + DefaultSubAgentSpawner construction
+    /// duplicated between `promptImpl` and `stream` tool execution blocks.
+    private static func createSubAgentSpawner(
+        tools: [ToolProtocol],
+        apiKey: String,
+        baseURL: String?,
+        parentModel: String,
+        provider: LLMProvider
+    ) -> SubAgentSpawner? {
+        let hasAgentTool = tools.contains { $0.name == "Agent" }
+        guard hasAgentTool else { return nil }
+        return DefaultSubAgentSpawner(
+            apiKey: apiKey,
+            baseURL: baseURL,
+            parentModel: parentModel,
+            parentTools: tools,
+            provider: provider
+        )
+    }
+
+    /// Fire `.stop` and `.sessionEnd` hooks in sequence.
+    ///
+    /// Centralizes the paired hook execution pattern used at every error / budget / max-turns
+    /// exit point in `promptImpl` and `stream`. Does nothing when `hookRegistry` is `nil`.
+    private static func fireStopAndEndHooks(hookRegistry: HookRegistry?, cwd: String?) async {
+        guard let hookRegistry else { return }
+        await hookRegistry.execute(.stop, input: HookInput(event: .stop, cwd: cwd))
+        await hookRegistry.execute(.sessionEnd, input: HookInput(event: .sessionEnd, cwd: cwd))
+    }
+
+    /// Publish an `AgentInterruptedEvent` if the event bus is configured.
+    private static func emitAgentInterrupted(eventBus: EventBus?, sessionId: String?, stepsCompleted: Int) async {
+        guard let eventBus else { return }
+        await eventBus.publish(AgentInterruptedEvent(sessionId: sessionId, stepsCompleted: stepsCompleted))
+    }
+
+    /// Publish an `AgentFailedEvent` if the event bus is configured.
+    private static func emitAgentFailed(eventBus: EventBus?, sessionId: String?, error: String, stepsCompleted: Int) async {
+        guard let eventBus else { return }
+        await eventBus.publish(AgentFailedEvent(sessionId: sessionId, error: error, stepsCompleted: stepsCompleted))
+    }
+
+    /// Emit an `LLMRequestStartedEvent` with message summaries.
+    ///
+    /// Centralizes the summary construction (flatMap → extractContentInfo) and event
+    /// publication duplicated between `promptImpl` and `stream` LLM call sites.
+    private static func emitLLMRequestStarted(
+        eventBus: EventBus?,
+        sessionId: String?,
+        model: String,
+        systemPrompt: String?,
+        messages: [[String: Any]]
+    ) async {
+        guard let eventBus else { return }
+        let summaries: [MessageSummary] = messages.flatMap { msg -> [MessageSummary] in
+            guard let role = msg["role"] as? String else { return [] }
+            let (length, preview) = Self.extractContentInfo(from: msg)
+            return [MessageSummary(role: role, contentLength: length, preview: preview)]
+        }
+        await eventBus.publish(LLMRequestStartedEvent(
+            sessionId: sessionId,
+            model: model,
+            systemPromptLength: systemPrompt?.count ?? 0,
+            messageCount: messages.count,
+            messages: summaries
+        ))
+    }
+
+    /// Classify an error into a (statusCode, message) tuple for logging and event emission.
+    ///
+    /// Handles three error types: SDKError (API errors with status codes), URLError (network
+    /// errors with integer codes), and generic errors (code "0").
+    private static func classifyError(_ error: Error) -> (statusCode: String, message: String) {
+        if let sdkError = error as? SDKError, let code = sdkError.statusCode {
+            return (String(code), sdkError.message)
+        } else if let urlError = error as? URLError {
+            return (String(urlError.errorCode), urlError.localizedDescription)
+        } else {
+            return ("0", error.localizedDescription)
+        }
+    }
+
+    /// Check whether the budget has been exceeded via either CostTracker or inline fallback.
+    ///
+    /// Unifies the 3 identical budget-check patterns across promptImpl and stream.
+    private static func isBudgetExceeded(
+        checkResult: BudgetCheckResult,
+        maxBudgetUsd: Double?,
+        totalCostUsd: Double
+    ) -> Bool {
+        if case .budgetExceeded = checkResult {
+            return true
+        } else if let budget = maxBudgetUsd, totalCostUsd > budget {
+            return true
+        }
+        return false
+    }
+
+    /// Handle budget exceeded in the streaming path: log warning, fire hooks, yield result,
+    /// record trace, close recorder, and finish continuation.
+    ///
+    /// Used by the two budget-check sites in `stream()` (messageStart and messageDelta).
+    private static func handleBudgetExceededInStream(
+        continuation: AsyncStream<SDKMessage>.Continuation,
+        messages: [[String: Any]],
+        startingAt: Int,
+        accumulatedText: String,
+        usage: TokenUsage,
+        turnsUsed: Int,
+        startTime: ContinuousClock.Instant,
+        totalCostUsd: Double,
+        maxBudgetUsd: Double?,
+        costByModel: [String: CostBreakdownEntry],
+        hookRegistry: HookRegistry?,
+        cwd: String?,
+        traceRecorder: TraceRecorder?
+    ) async {
+        let elapsed = ContinuousClock.now - startTime
+        let durationMs = computeDurationMs(elapsed)
+        let previousText = extractCollectedText(
+            messages: messages,
+            startingAt: startingAt,
+            separator: " "
+        )
+        let text = previousText.isEmpty ? accumulatedText : "\(previousText) \(accumulatedText)"
+
+        Logger.shared.warn("QueryEngine", "budget_exceeded", data: [
+            "costUsd": String(format: "%.4f", totalCostUsd),
+            "budgetUsd": String(format: "%.4f", maxBudgetUsd ?? 0),
+            "turnsUsed": String(turnsUsed)
+        ])
+
+        await fireStopAndEndHooks(hookRegistry: hookRegistry, cwd: cwd)
+
+        let resultMsg = SDKMessage.result(SDKMessage.ResultData(
+            subtype: .errorMaxBudgetUsd,
+            text: text,
+            usage: usage,
+            numTurns: turnsUsed,
+            durationMs: durationMs,
+            totalCostUsd: totalCostUsd,
+            costBreakdown: Array(costByModel.values)
+        ))
+        continuation.yield(resultMsg)
+        if let trace = traceRecorder, let mapped = TraceEventMapping.traceEvent(from: resultMsg) {
+            await trace.record(event: mapped.event, payload: mapped.payload)
+        }
+        await traceRecorder?.close()
+        continuation.finish()
+    }
+
     /// Extract plain text from Anthropic API response content blocks.
     ///
     /// The API returns content as an array of blocks, each with a `type` field.
     /// This helper filters for `type == "text"` blocks and joins their text content.
     /// - Parameter content: The raw content value from the API response.
+    /// Track turn-level cost: parse usage → accumulate totals → emit events → record breakdown.
+    ///
+    /// Centralizes the cost-tracking pipeline duplicated at 4 sites: promptImpl fallback model,
+    /// promptImpl main loop, stream messageStart, and stream messageDelta.
+    private static func trackTurnCost(
+        usage: [String: Any],
+        model: String,
+        totalUsage: inout TokenUsage,
+        totalCostUsd: inout Double,
+        costByModel: inout [String: CostBreakdownEntry],
+        costTracker: inout CostTracker,
+        eventBus: EventBus?,
+        sessionId: String?,
+        agentLabel: String?
+    ) async {
+        let turnUsage = TokenUsage(
+            inputTokens: usage["input_tokens"] as? Int ?? 0,
+            outputTokens: usage["output_tokens"] as? Int ?? 0
+        )
+        totalUsage = totalUsage + turnUsage
+        let turnCost = estimateCost(model: model, usage: turnUsage)
+        totalCostUsd += turnCost
+        costTracker.recordUsage(model: model, usage: turnUsage)
+        await Self.emitLLMCostEvent(
+            eventBus: eventBus,
+            sessionId: sessionId,
+            model: model,
+            inputTokens: turnUsage.inputTokens,
+            outputTokens: turnUsage.outputTokens,
+            cacheUsage: usage,
+            estimatedCostUsd: turnCost
+        )
+        Self.recordCostBreakdown(
+            costByModel: &costByModel,
+            model: model,
+            label: agentLabel,
+            inputTokens: turnUsage.inputTokens,
+            outputTokens: turnUsage.outputTokens,
+            cost: turnCost
+        )
+    }
+
+    /// Publish an `LLMCostEvent` to the event bus (no-op when bus is nil).
+    ///
+    /// Centralizes the 8-field LLMCostEvent construction used by ``trackTurnCost``.
+    private static func emitLLMCostEvent(
+        eventBus: EventBus?,
+        sessionId: String?,
+        model: String,
+        inputTokens: Int,
+        outputTokens: Int,
+        cacheUsage: [String: Any],
+        estimatedCostUsd: Double
+    ) async {
+        guard let eventBus else { return }
+        await eventBus.publish(LLMCostEvent(
+            sessionId: sessionId,
+            model: model,
+            inputTokens: inputTokens,
+            outputTokens: outputTokens,
+            cacheCreationInputTokens: cacheUsage["cache_creation_input_tokens"] as? Int,
+            cacheReadInputTokens: cacheUsage["cache_read_input_tokens"] as? Int,
+            estimatedCostUsd: estimatedCostUsd
+        ))
+    }
+
+    /// Build a `ToolContext` from the resolved execution parameters.
+    ///
+    /// Centralizes the 24-field ToolContext construction that is duplicated between promptImpl
+    /// (using `options.*` directly) and stream (using pre-captured `captured*` values).
+    /// The caller passes all varying fields; the helper only fills in the fixed defaults
+    /// (`mcpConnections: nil`, `toolUseId: ""`).
+    private static func buildToolContext(
+        cwd: String,
+        sessionId: String?,
+        agentSpawner: (any SubAgentSpawner)?,
+        mailboxStore: MailboxStore?,
+        teamStore: TeamStore?,
+        senderName: String?,
+        taskStore: TaskStore?,
+        worktreeStore: WorktreeStore?,
+        planStore: PlanStore?,
+        cronStore: CronStore?,
+        todoStore: TodoStore?,
+        memoryStore: (any MemoryStoreProtocol)?,
+        hookRegistry: HookRegistry?,
+        permissionMode: PermissionMode?,
+        canUseTool: CanUseToolFn?,
+        skillRegistry: SkillRegistry?,
+        restrictionStack: ToolRestrictionStack?,
+        maxSkillRecursionDepth: Int,
+        fileCache: FileCache?,
+        sandbox: SandboxSettings?,
+        env: [String: String]?,
+        eventBus: EventBus?
+    ) -> ToolContext {
+        ToolContext(
+            cwd: cwd,
+            agentSpawner: agentSpawner,
+            mailboxStore: mailboxStore,
+            teamStore: teamStore,
+            senderName: senderName,
+            taskStore: taskStore,
+            worktreeStore: worktreeStore,
+            planStore: planStore,
+            cronStore: cronStore,
+            todoStore: todoStore,
+            memoryStore: memoryStore,
+            hookRegistry: hookRegistry,
+            permissionMode: permissionMode,
+            canUseTool: canUseTool,
+            skillRegistry: skillRegistry,
+            restrictionStack: restrictionStack,
+            skillNestingDepth: restrictionStack?.nestingDepth ?? 0,
+            maxSkillRecursionDepth: maxSkillRecursionDepth,
+            fileCache: fileCache,
+            sandbox: sandbox,
+            mcpConnections: nil,
+            env: env,
+            eventBus: eventBus,
+            sessionId: sessionId
+        )
+    }
+
     /// - Returns: The concatenated text from all text blocks, or a string representation
     ///   of the content if it cannot be parsed.
     private func extractText(from content: Any) -> String {

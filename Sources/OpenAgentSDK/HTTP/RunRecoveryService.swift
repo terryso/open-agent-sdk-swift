@@ -27,11 +27,7 @@ public enum RunRecoveryService {
                 let originalStatus = run.status.rawValue
                 run.status = .failed
                 run.error = "server interrupted"
-                run.updatedAt = {
-                    let formatter = ISO8601DateFormatter()
-                    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-                    return formatter.string(from: Date())
-                }()
+                run.updatedAt = makeISO8601DateFormatter().string(from: Date())
                 persistenceService.persistRecordSafely(run)
                 logger.info("Run \(run.runId): \(originalStatus) → failed")
 

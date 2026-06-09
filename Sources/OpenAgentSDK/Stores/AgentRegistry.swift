@@ -7,11 +7,7 @@ public actor AgentRegistry {
 
     private var agents: [String: AgentRegistryEntry] = [:]  // agentId -> entry
     private var nameIndex: [String: String] = [:]  // name -> agentId (reverse index)
-    private let dateFormatter: ISO8601DateFormatter = {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return f
-    }()
+    private let dateFormatter = makeISO8601DateFormatter()
 
     // MARK: - Initialization
 

@@ -40,7 +40,7 @@ public struct LLMExperienceExtractor: ExperienceExtractor, Sendable {
             throw SDKError.apiError(statusCode: 0, message: "Experience extraction failed: \(error.localizedDescription)")
         }
 
-        let responseText = extractTextFromResponse(response)
+        let responseText = extractFirstTextFromResponse(response)
         let parsed = parseExtractionResponse(responseText)
 
         var filtered: [ExperienceSignal] = []
@@ -151,15 +151,7 @@ public struct LLMExperienceExtractor: ExperienceExtractor, Sendable {
     }
 
     private func parseExtractionResponse(_ text: String) -> ParsedExtraction {
-        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            return ParsedExtraction(signals: [], parseFailureCount: 0)
-        }
-
-        let jsonText = stripCodeFences(text)
-
-        guard let data = jsonText.data(using: .utf8),
-              let jsonArray = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]]
-        else {
+        guard let jsonArray = parseLLMResponseAsArray(text) else {
             Logger.shared.warn("LLMExperienceExtractor", "malformed_json_response", data: [
                 "responsePreview": String(text.prefix(200)),
             ])
@@ -183,36 +175,5 @@ public struct LLMExperienceExtractor: ExperienceExtractor, Sendable {
         return ParsedExtraction(signals: signals, parseFailureCount: parseFailures)
     }
 
-    private func stripCodeFences(_ text: String) -> String {
-        var trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        // Strip opening fence: ```json or ```
-        if trimmed.hasPrefix("```") {
-            if let newlineRange = trimmed.range(of: "\n", options: [], range: trimmed.startIndex..<trimmed.endIndex) {
-                trimmed = String(trimmed[newlineRange.upperBound...])
-            } else {
-                trimmed = String(trimmed.dropFirst(3))
-            }
-        }
-
-        // Strip closing fence: ```
-        if trimmed.hasSuffix("```") {
-            trimmed = String(trimmed[..<trimmed.index(trimmed.endIndex, offsetBy: -3)])
-        }
-
-        return trimmed.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    private func extractTextFromResponse(_ response: [String: Any]) -> String {
-        guard let content = response["content"] as? [[String: Any]] else {
-            return ""
-        }
-        for block in content {
-            if block["type"] as? String == "text",
-               let text = block["text"] as? String {
-                return text
-            }
-        }
-        return ""
-    }
 }
+

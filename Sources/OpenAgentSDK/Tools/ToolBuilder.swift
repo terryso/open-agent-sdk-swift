@@ -154,18 +154,7 @@ private struct RawInputTool: ToolProtocol, @unchecked Sendable {
         }
 
         let result = await executeClosure(dict, context)
-        if let typedContent = result.typedContent {
-            return ToolResult(
-                toolUseId: context.toolUseId,
-                typedContent: typedContent,
-                isError: result.isError
-            )
-        }
-        return ToolResult(
-            toolUseId: context.toolUseId,
-            content: result.content,
-            isError: result.isError
-        )
+        return toolResultFromExecute(result, toolUseId: context.toolUseId)
     }
 }
 
@@ -204,6 +193,79 @@ public func defineTool(
     )
 }
 
+// MARK: - Shared Input Decoding Helpers
+
+/// Result of attempting to decode raw `Any` input into a Codable type.
+/// - `decoded(T)`: Successfully decoded input value
+/// - `toolResult(ToolResult)`: Error ToolResult to return from call()
+private enum CodableInputResult<T> {
+    case decoded(T)
+    case toolResult(ToolResult)
+}
+
+/// Decodes raw `Any` input to a Codable `Input` type through the
+/// dictionary cast → JSON serialization → JSONDecoder pipeline.
+///
+/// Used by both `CodableTool` and `StructuredCodableTool` to eliminate
+/// duplicated input decoding logic in their `call()` methods.
+private func decodeCodableInput<Input: Codable>(
+    _ input: Any,
+    toolUseId: String
+) -> CodableInputResult<Input> {
+    // Step 1: Cast raw input to dictionary
+    guard let dict = input as? [String: Any] else {
+        return .toolResult(ToolResult(
+            toolUseId: toolUseId,
+            content: "Error: Expected dictionary input, got \(type(of: input))",
+            isError: true
+        ))
+    }
+
+    // Step 2: Serialize dictionary to JSON Data
+    let data: Data
+    do {
+        data = try JSONSerialization.data(withJSONObject: dict, options: [])
+    } catch {
+        return .toolResult(ToolResult(
+            toolUseId: toolUseId,
+            content: "Error: Failed to serialize input - \(error.localizedDescription)",
+            isError: true
+        ))
+    }
+
+    // Step 3: Decode JSON Data into Codable Input type
+    do {
+        let decoded = try JSONDecoder().decode(Input.self, from: data)
+        return .decoded(decoded)
+    } catch {
+        return .toolResult(ToolResult(
+            toolUseId: toolUseId,
+            content: "Failed to decode input: \(error.localizedDescription)",
+            isError: true
+        ))
+    }
+}
+
+/// Maps a ``ToolExecuteResult`` to a ``ToolResult``, handling both
+/// typed content and plain string content paths.
+///
+/// Used by both `RawInputTool` and `StructuredCodableTool` to eliminate
+/// duplicated result-mapping logic.
+private func toolResultFromExecute(_ result: ToolExecuteResult, toolUseId: String) -> ToolResult {
+    if let typedContent = result.typedContent {
+        return ToolResult(toolUseId: toolUseId, typedContent: typedContent, isError: result.isError)
+    }
+    return ToolResult(toolUseId: toolUseId, content: result.content, isError: result.isError)
+}
+
+/// Creates a ``ToolResult`` representing a tool execution error.
+///
+/// Used by `CodableTool`, `StructuredCodableTool`, and `NoInputTool`
+/// to eliminate duplicated error-return patterns in their catch blocks.
+private func executionErrorResult(_ error: Error, toolUseId: String) -> ToolResult {
+    ToolResult(toolUseId: toolUseId, content: "Error: \(error.localizedDescription)", isError: true)
+}
+
 // MARK: - CodableTool (Internal Implementation — String return)
 
 /// Internal implementation of `ToolProtocol` that bridges raw JSON to Codable types.
@@ -239,53 +301,17 @@ private struct CodableTool<Input: Codable>: ToolProtocol, @unchecked Sendable {
     }
 
     func call(input: Any, context: ToolContext) async -> ToolResult {
-        // Step 1: Cast raw input to dictionary
-        guard let dict = input as? [String: Any] else {
-            return ToolResult(
-                toolUseId: context.toolUseId,
-                content: "Error: Expected dictionary input, got \(type(of: input))",
-                isError: true
-            )
-        }
-
-        // Step 2: Serialize dictionary to JSON Data
-        let data: Data
-        do {
-            data = try JSONSerialization.data(withJSONObject: dict, options: [])
-        } catch {
-            return ToolResult(
-                toolUseId: context.toolUseId,
-                content: "Error: Failed to serialize input - \(error.localizedDescription)",
-                isError: true
-            )
-        }
-
-        // Step 3: Decode JSON Data into Codable Input type
-        let decoded: Input
-        do {
-            decoded = try JSONDecoder().decode(Input.self, from: data)
-        } catch {
-            return ToolResult(
-                toolUseId: context.toolUseId,
-                content: "Failed to decode input: \(error.localizedDescription)",
-                isError: true
-            )
-        }
-
-        // Step 4: Invoke execute closure with decoded input (wrapped in do/catch)
-        do {
-            let result = try await executeClosure(decoded, context)
-            return ToolResult(
-                toolUseId: context.toolUseId,
-                content: result,
-                isError: false
-            )
-        } catch {
-            return ToolResult(
-                toolUseId: context.toolUseId,
-                content: "Error: \(error.localizedDescription)",
-                isError: true
-            )
+        let decoded: CodableInputResult<Input> = decodeCodableInput(input, toolUseId: context.toolUseId)
+        switch decoded {
+        case .decoded(let value):
+            do {
+                let result = try await executeClosure(value, context)
+                return ToolResult(toolUseId: context.toolUseId, content: result, isError: false)
+            } catch {
+                return executionErrorResult(error, toolUseId: context.toolUseId)
+            }
+        case .toolResult(let result):
+            return result
         }
     }
 }
@@ -322,60 +348,17 @@ private struct StructuredCodableTool<Input: Codable>: ToolProtocol, @unchecked S
     }
 
     func call(input: Any, context: ToolContext) async -> ToolResult {
-        // Step 1: Cast raw input to dictionary
-        guard let dict = input as? [String: Any] else {
-            return ToolResult(
-                toolUseId: context.toolUseId,
-                content: "Error: Expected dictionary input, got \(type(of: input))",
-                isError: true
-            )
-        }
-
-        // Step 2: Serialize dictionary to JSON Data
-        let data: Data
-        do {
-            data = try JSONSerialization.data(withJSONObject: dict, options: [])
-        } catch {
-            return ToolResult(
-                toolUseId: context.toolUseId,
-                content: "Error: Failed to serialize input - \(error.localizedDescription)",
-                isError: true
-            )
-        }
-
-        // Step 3: Decode JSON Data into Codable Input type
-        let decoded: Input
-        do {
-            decoded = try JSONDecoder().decode(Input.self, from: data)
-        } catch {
-            return ToolResult(
-                toolUseId: context.toolUseId,
-                content: "Failed to decode input: \(error.localizedDescription)",
-                isError: true
-            )
-        }
-
-        // Step 4: Invoke execute closure and map structured result to ToolResult
-        do {
-            let result = try await executeClosure(decoded, context)
-            if let typedContent = result.typedContent {
-                return ToolResult(
-                    toolUseId: context.toolUseId,
-                    typedContent: typedContent,
-                    isError: result.isError
-                )
+        let decoded: CodableInputResult<Input> = decodeCodableInput(input, toolUseId: context.toolUseId)
+        switch decoded {
+        case .decoded(let value):
+            do {
+                let result = try await executeClosure(value, context)
+                return toolResultFromExecute(result, toolUseId: context.toolUseId)
+            } catch {
+                return executionErrorResult(error, toolUseId: context.toolUseId)
             }
-            return ToolResult(
-                toolUseId: context.toolUseId,
-                content: result.content,
-                isError: result.isError
-            )
-        } catch {
-            return ToolResult(
-                toolUseId: context.toolUseId,
-                content: "Error: \(error.localizedDescription)",
-                isError: true
-            )
+        case .toolResult(let result):
+            return result
         }
     }
 }
@@ -420,11 +403,7 @@ private struct NoInputTool: ToolProtocol, @unchecked Sendable {
                 isError: false
             )
         } catch {
-            return ToolResult(
-                toolUseId: context.toolUseId,
-                content: "Error: \(error.localizedDescription)",
-                isError: true
-            )
+            return executionErrorResult(error, toolUseId: context.toolUseId)
         }
     }
 }
