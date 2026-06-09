@@ -3,6 +3,9 @@ import XCTest
 
 final class TokenUsageTests: XCTestCase {
 
+    private static let testEncoder = JSONEncoder()
+    private static let testDecoder = JSONDecoder()
+
     // MARK: - Initialization
 
     func testInit_defaultOptionalsNil() {
@@ -113,7 +116,7 @@ final class TokenUsageTests: XCTestCase {
 
     func testEncode_snakeCaseKeys() throws {
         let usage = TokenUsage(inputTokens: 100, outputTokens: 50, cacheCreationInputTokens: 10, cacheReadInputTokens: 5)
-        let data = try JSONEncoder().encode(usage)
+        let data = try Self.testEncoder.encode(usage)
         let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
         XCTAssertEqual(json["input_tokens"] as? Int, 100)
         XCTAssertEqual(json["output_tokens"] as? Int, 50)
@@ -125,7 +128,7 @@ final class TokenUsageTests: XCTestCase {
         let json = """
         {"input_tokens": 200, "output_tokens": 100}
         """.data(using: .utf8)!
-        let decoded = try JSONDecoder().decode(TokenUsage.self, from: json)
+        let decoded = try Self.testDecoder.decode(TokenUsage.self, from: json)
         XCTAssertEqual(decoded.inputTokens, 200)
         XCTAssertEqual(decoded.outputTokens, 100)
         XCTAssertNil(decoded.cacheCreationInputTokens)
@@ -136,22 +139,22 @@ final class TokenUsageTests: XCTestCase {
         let json = """
         {"input_tokens": 100, "output_tokens": 50, "cache_creation_input_tokens": 5}
         """.data(using: .utf8)!
-        let decoded = try JSONDecoder().decode(TokenUsage.self, from: json)
+        let decoded = try Self.testDecoder.decode(TokenUsage.self, from: json)
         XCTAssertEqual(decoded.cacheCreationInputTokens, 5)
         XCTAssertNil(decoded.cacheReadInputTokens)
     }
 
     func testRoundTrip_withOptionals() throws {
         let original = TokenUsage(inputTokens: 100, outputTokens: 50, cacheCreationInputTokens: 10, cacheReadInputTokens: 5)
-        let data = try JSONEncoder().encode(original)
-        let decoded = try JSONDecoder().decode(TokenUsage.self, from: data)
+        let data = try Self.testEncoder.encode(original)
+        let decoded = try Self.testDecoder.decode(TokenUsage.self, from: data)
         XCTAssertEqual(original, decoded)
     }
 
     func testRoundTrip_withoutOptionals() throws {
         let original = TokenUsage(inputTokens: 100, outputTokens: 50)
-        let data = try JSONEncoder().encode(original)
-        let decoded = try JSONDecoder().decode(TokenUsage.self, from: data)
+        let data = try Self.testEncoder.encode(original)
+        let decoded = try Self.testDecoder.decode(TokenUsage.self, from: data)
         XCTAssertEqual(original, decoded)
     }
 }
