@@ -105,9 +105,6 @@ public struct OutputFormat: Sendable, Equatable {
         self._jsonSchema = SendableJSONSchema(schema: jsonSchema)
     }
 
-    public static func == (lhs: OutputFormat, rhs: OutputFormat) -> Bool {
-        return lhs.type == rhs.type && lhs._jsonSchema == rhs._jsonSchema
-    }
 }
 
 // MARK: - SettingSource
