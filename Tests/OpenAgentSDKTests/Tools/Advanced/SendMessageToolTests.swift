@@ -25,23 +25,6 @@ final class SendMessageToolTests: XCTestCase {
         )
     }
 
-    // MARK: - Helper: Build ToolContext with stores
-
-    /// Creates a ToolContext with injected stores and sender name.
-    private func makeContext(
-        mailboxStore: MailboxStore? = nil,
-        teamStore: TeamStore? = nil,
-        senderName: String? = nil
-    ) -> ToolContext {
-        return ToolContext(
-            cwd: "/tmp",
-            toolUseId: "test-tool-use-id",
-            mailboxStore: mailboxStore,
-            teamStore: teamStore,
-            senderName: senderName
-        )
-    }
-
     // MARK: - AC1: Factory returns valid ToolProtocol
 
     /// AC1 [P0]: createSendMessageTool() returns a ToolProtocol with name "SendMessage".
@@ -108,7 +91,7 @@ final class SendMessageToolTests: XCTestCase {
         )
 
         let tool = createSendMessageTool()
-        let context = makeContext(
+        let context = makeTestToolContext(
             mailboxStore: mailboxStore,
             teamStore: teamStore,
             senderName: senderName
@@ -148,7 +131,7 @@ final class SendMessageToolTests: XCTestCase {
         )
 
         let tool = createSendMessageTool()
-        let context = makeContext(
+        let context = makeTestToolContext(
             mailboxStore: mailboxStore,
             teamStore: teamStore,
             senderName: agentName
@@ -187,7 +170,7 @@ final class SendMessageToolTests: XCTestCase {
         )
 
         let tool = createSendMessageTool()
-        let context = makeContext(
+        let context = makeTestToolContext(
             mailboxStore: mailboxStore,
             teamStore: teamStore,
             senderName: senderName
@@ -220,7 +203,7 @@ final class SendMessageToolTests: XCTestCase {
         // No team created
 
         let tool = createSendMessageTool()
-        let context = makeContext(
+        let context = makeTestToolContext(
             mailboxStore: mailboxStore,
             teamStore: teamStore,
             senderName: "lonely-agent"
@@ -255,7 +238,7 @@ final class SendMessageToolTests: XCTestCase {
         )
 
         let tool = createSendMessageTool()
-        let context = makeContext(
+        let context = makeTestToolContext(
             mailboxStore: mailboxStore,
             teamStore: teamStore,
             senderName: senderName
@@ -289,7 +272,7 @@ final class SendMessageToolTests: XCTestCase {
         )
 
         let tool = createSendMessageTool()
-        let context = makeContext(
+        let context = makeTestToolContext(
             mailboxStore: mailboxStore,
             teamStore: teamStore,
             senderName: senderName
@@ -313,7 +296,7 @@ final class SendMessageToolTests: XCTestCase {
     func testSendMessage_noMailboxStore_returnsError() async throws {
         let teamStore = TeamStore()
         let tool = createSendMessageTool()
-        let context = makeContext(
+        let context = makeTestToolContext(
             mailboxStore: nil,
             teamStore: teamStore,
             senderName: "alice"
@@ -334,7 +317,7 @@ final class SendMessageToolTests: XCTestCase {
     func testSendMessage_noTeamStore_returnsError() async throws {
         let mailboxStore = MailboxStore()
         let tool = createSendMessageTool()
-        let context = makeContext(
+        let context = makeTestToolContext(
             mailboxStore: mailboxStore,
             teamStore: nil,
             senderName: "alice"
@@ -356,7 +339,7 @@ final class SendMessageToolTests: XCTestCase {
         let mailboxStore = MailboxStore()
         let teamStore = TeamStore()
         let tool = createSendMessageTool()
-        let context = makeContext(
+        let context = makeTestToolContext(
             mailboxStore: mailboxStore,
             teamStore: teamStore,
             senderName: nil
@@ -460,7 +443,7 @@ final class SendMessageToolTests: XCTestCase {
             leaderId: "alice"
         )
 
-        let context = makeContext(
+        let context = makeTestToolContext(
             mailboxStore: mailboxStore,
             teamStore: teamStore,
             senderName: "alice"
@@ -488,7 +471,7 @@ final class SendMessageToolTests: XCTestCase {
         )
 
         let tool = createSendMessageTool()
-        let context = makeContext(
+        let context = makeTestToolContext(
             mailboxStore: mailboxStore,
             teamStore: teamStore,
             senderName: "alice"
@@ -526,7 +509,7 @@ final class SendMessageToolTests: XCTestCase {
         )
 
         let tool = createSendMessageTool()
-        let context = makeContext(
+        let context = makeTestToolContext(
             mailboxStore: mailboxStore,
             teamStore: teamStore,
             senderName: senderName

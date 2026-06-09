@@ -10,17 +10,6 @@ import XCTest
 /// TDD Phase: RED (feature not implemented yet)
 final class TeamToolsTests: XCTestCase {
 
-    // MARK: - Helpers
-
-    /// Creates a ToolContext with an injected TeamStore.
-    private func makeContext(teamStore: TeamStore? = nil) -> ToolContext {
-        return ToolContext(
-            cwd: "/tmp",
-            toolUseId: "test-tool-use-id",
-            teamStore: teamStore
-        )
-    }
-
     // MARK: - AC1: TeamCreate Tool
 
     // MARK: AC1 -- Factory
@@ -75,7 +64,7 @@ final class TeamToolsTests: XCTestCase {
     func testTeamCreate_nameOnly_returnsSuccess() async throws {
         let teamStore = TeamStore()
         let tool = createTeamCreateTool()
-        let context = makeContext(teamStore: teamStore)
+        let context = makeTestToolContext(teamStore: teamStore)
 
         let input: [String: Any] = ["name": "Alpha Team"]
         let result = await tool.call(input: input, context: context)
@@ -89,7 +78,7 @@ final class TeamToolsTests: XCTestCase {
     func testTeamCreate_withMembers_returnsSuccess() async throws {
         let teamStore = TeamStore()
         let tool = createTeamCreateTool()
-        let context = makeContext(teamStore: teamStore)
+        let context = makeTestToolContext(teamStore: teamStore)
 
         let input: [String: Any] = [
             "name": "Beta Team",
@@ -107,7 +96,7 @@ final class TeamToolsTests: XCTestCase {
     func testTeamCreate_defaultMembersEmpty() async throws {
         let teamStore = TeamStore()
         let tool = createTeamCreateTool()
-        let context = makeContext(teamStore: teamStore)
+        let context = makeTestToolContext(teamStore: teamStore)
 
         let input: [String: Any] = ["name": "Solo Team"]
         let result = await tool.call(input: input, context: context)
@@ -124,7 +113,7 @@ final class TeamToolsTests: XCTestCase {
     func testTeamCreate_inputDecodable() async throws {
         let teamStore = TeamStore()
         let tool = createTeamCreateTool()
-        let context = makeContext(teamStore: teamStore)
+        let context = makeTestToolContext(teamStore: teamStore)
 
         // JSON input with all fields
         let input: [String: Any] = [
@@ -142,7 +131,7 @@ final class TeamToolsTests: XCTestCase {
     func testTeamCreate_verifyTeamInStore() async throws {
         let teamStore = TeamStore()
         let tool = createTeamCreateTool()
-        let context = makeContext(teamStore: teamStore)
+        let context = makeTestToolContext(teamStore: teamStore)
 
         let input: [String: Any] = [
             "name": "Verified Team",
@@ -205,7 +194,7 @@ final class TeamToolsTests: XCTestCase {
         let team = await teamStore.create(name: "To Delete")
 
         let tool = createTeamDeleteTool()
-        let context = makeContext(teamStore: teamStore)
+        let context = makeTestToolContext(teamStore: teamStore)
 
         let input: [String: Any] = ["id": team.id]
         let result = await tool.call(input: input, context: context)
@@ -220,7 +209,7 @@ final class TeamToolsTests: XCTestCase {
     func testTeamDelete_nonexistentTeam_returnsError() async throws {
         let teamStore = TeamStore()
         let tool = createTeamDeleteTool()
-        let context = makeContext(teamStore: teamStore)
+        let context = makeTestToolContext(teamStore: teamStore)
 
         let input: [String: Any] = ["id": "team_999"]
         let result = await tool.call(input: input, context: context)
@@ -238,7 +227,7 @@ final class TeamToolsTests: XCTestCase {
         _ = try await teamStore.delete(id: team.id)
 
         let tool = createTeamDeleteTool()
-        let context = makeContext(teamStore: teamStore)
+        let context = makeTestToolContext(teamStore: teamStore)
 
         let input: [String: Any] = ["id": team.id]
         let result = await tool.call(input: input, context: context)
@@ -254,7 +243,7 @@ final class TeamToolsTests: XCTestCase {
         let team = await teamStore.create(name: "Remove Me")
 
         let tool = createTeamDeleteTool()
-        let context = makeContext(teamStore: teamStore)
+        let context = makeTestToolContext(teamStore: teamStore)
 
         let input: [String: Any] = ["id": team.id]
         _ = await tool.call(input: input, context: context)
@@ -388,7 +377,7 @@ final class TeamToolsTests: XCTestCase {
 
         // Verify they work through ToolContext injection
         let teamStore = TeamStore()
-        let context = makeContext(teamStore: teamStore)
+        let context = makeTestToolContext(teamStore: teamStore)
 
         let result = await createTool.call(
             input: ["name": "Boundary test"],
@@ -404,7 +393,7 @@ final class TeamToolsTests: XCTestCase {
         let teamStore = TeamStore()
         let createTool = createTeamCreateTool()
         let deleteTool = createTeamDeleteTool()
-        let context = makeContext(teamStore: teamStore)
+        let context = makeTestToolContext(teamStore: teamStore)
 
         // Step 1: Create a team
         let createResult = await createTool.call(
