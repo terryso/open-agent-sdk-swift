@@ -45,11 +45,7 @@ final class ToolSearchToolTests: XCTestCase {
         input: [String: Any],
         cwd: String? = nil
     ) async -> ToolResult {
-        let context = ToolContext(
-            cwd: cwd ?? NSTemporaryDirectory(),
-            toolUseId: "test-\(UUID().uuidString)"
-        )
-        return await tool.call(input: input, context: context)
+        await callToolForTest(tool, input: input, cwd: cwd ?? NSTemporaryDirectory())
     }
 
     // MARK: - AC7: ToolSearch searches available tools

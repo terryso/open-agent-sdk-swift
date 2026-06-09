@@ -48,11 +48,7 @@ final class GrepToolTests: TempDirTestCase {
         input: [String: Any],
         cwd: String? = nil
     ) async -> ToolResult {
-        let context = ToolContext(
-            cwd: cwd ?? tempDir,
-            toolUseId: "test-\(UUID().uuidString)"
-        )
-        return await tool.call(input: input, context: context)
+        await callToolForTest(tool, input: input, cwd: cwd ?? tempDir)
     }
 
     // MARK: - AC4: Grep searches file content
