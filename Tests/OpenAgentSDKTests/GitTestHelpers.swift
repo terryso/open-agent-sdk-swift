@@ -181,6 +181,28 @@ func seedSkill(
     try await store.setUsage(skillName: name, data: data)
 }
 
+// MARK: - Tool Invocation Test Helpers
+
+/// Calls a tool with the given input and working directory, returning the result.
+///
+/// Creates a fresh `ToolContext` with a unique `toolUseId` on each call.
+/// Test classes should wrap this with a convenience method that provides
+/// their preferred default `cwd` (e.g., `tempDir` or `NSTemporaryDirectory()`).
+///
+/// - Parameters:
+///   - tool: The tool to invoke.
+///   - input: The input dictionary.
+///   - cwd: The working directory for the tool context.
+/// - Returns: The `ToolResult` from invoking the tool.
+func callToolForTest(
+    _ tool: ToolProtocol,
+    input: [String: Any],
+    cwd: String
+) async -> ToolResult {
+    let context = ToolContext(cwd: cwd, toolUseId: "test-\(UUID().uuidString)")
+    return await tool.call(input: input, context: context)
+}
+
 // MARK: - Skill Test Helpers
 
 /// Creates a test `Skill` with sensible defaults for unit testing.
