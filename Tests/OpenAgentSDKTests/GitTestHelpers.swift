@@ -138,6 +138,49 @@ func makeTestToolContext(
     )
 }
 
+// MARK: - Date Test Helpers
+
+/// Returns a `Date` offset by the given number of days ago from now.
+///
+/// Useful for testing time-based logic (stale skills, usage tracking, etc.).
+///
+/// - Parameter daysAgo: The number of days to subtract from the current date.
+/// - Returns: The computed date.
+func date(daysAgo: Int) -> Date {
+    Calendar.current.date(byAdding: .day, value: -daysAgo, to: Date())!
+}
+
+// MARK: - Skill Seeding Helpers
+
+/// Seeds a `SkillUsageStore` with a single skill's usage data.
+///
+/// Useful for setting up test fixtures in skill usage and curation tests.
+///
+/// - Parameters:
+///   - store: The usage store to seed.
+///   - name: The skill name.
+///   - viewCount: Number of views (default: `10`).
+///   - lastViewedAt: When the skill was last viewed (default: `nil`).
+///   - pinned: Whether the skill is pinned (default: `false`).
+///   - provenance: The skill's provenance (default: `.userDefined`).
+func seedSkill(
+    store: SkillUsageStore,
+    name: String,
+    viewCount: Int = 10,
+    lastViewedAt: Date?,
+    pinned: Bool = false,
+    provenance: SkillProvenance = .userDefined
+) async throws {
+    let data = SkillUsageData(
+        skillName: name,
+        viewCount: viewCount,
+        lastViewedAt: lastViewedAt,
+        pinned: pinned,
+        provenance: provenance
+    )
+    try await store.setUsage(skillName: name, data: data)
+}
+
 // MARK: - Skill Test Helpers
 
 /// Creates a test `Skill` with sensible defaults for unit testing.

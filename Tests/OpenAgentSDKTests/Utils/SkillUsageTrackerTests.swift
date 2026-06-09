@@ -3,32 +3,8 @@ import XCTest
 
 final class SkillUsageTrackerTests: TempDirTestCase {
 
-    // MARK: - Helpers
-
     private func makeStore() -> SkillUsageStore {
         SkillUsageStore(skillsDir: tempDir)
-    }
-
-    private func date(daysAgo: Int) -> Date {
-        Calendar.current.date(byAdding: .day, value: -daysAgo, to: Date())!
-    }
-
-    private func seedSkill(
-        store: SkillUsageStore,
-        name: String,
-        viewCount: Int = 10,
-        lastViewedAt: Date?,
-        pinned: Bool = false,
-        provenance: SkillProvenance = .userDefined
-    ) async throws {
-        let data = SkillUsageData(
-            skillName: name,
-            viewCount: viewCount,
-            lastViewedAt: lastViewedAt,
-            pinned: pinned,
-            provenance: provenance
-        )
-        try await store.setUsage(skillName: name, data: data)
     }
 
     // MARK: - Active → Deprecated after staleAfterDays
