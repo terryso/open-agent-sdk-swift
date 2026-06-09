@@ -265,6 +265,16 @@ public struct ToolExecuteResult: Sendable, Equatable {
     }
 }
 
+/// Error thrown when a required store dependency is not available in ``ToolContext``.
+///
+/// Caught by the tool framework's error handler and converted to an error `ToolResult`
+/// with content `"Error: <name> not available."`.
+public struct StoreUnavailableError: Error, LocalizedError {
+    /// The store type name (e.g., "TaskStore").
+    public let name: String
+    public var errorDescription: String? { "\(name) not available." }
+}
+
 /// Context provided to tool executions.
 public struct ToolContext: Sendable {
     public let cwd: String
@@ -418,6 +428,23 @@ public struct ToolContext: Sendable {
         self.agentId = agentId
         self.eventBus = eventBus
         self.sessionId = sessionId
+    }
+
+    /// Requires a store dependency to be available, throwing if nil.
+    ///
+    /// Used by tool implementations to guard against missing store dependencies.
+    /// The thrown error is caught by the tool framework and converted to an
+    /// error `ToolResult` with content `"Error: <name> not available."`.
+    ///
+    /// - Parameters:
+    ///   - optional: The optional store value to unwrap.
+    ///   - name: The store type name for the error message (e.g., "TaskStore").
+    /// - Returns: The unwrapped store value.
+    public func requireStore<T: Sendable>(_ optional: T?, name: String) throws -> T {
+        guard let value = optional else {
+            throw StoreUnavailableError(name: name)
+        }
+        return value
     }
 
     /// Returns a copy of this context with the toolUseId replaced.

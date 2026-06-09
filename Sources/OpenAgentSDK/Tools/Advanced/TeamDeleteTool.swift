@@ -37,9 +37,7 @@ public func createTeamDeleteTool() -> ToolProtocol {
         inputSchema: teamDeleteSchema,
         isReadOnly: false
     ) { (input: TeamDeleteInput, context: ToolContext) async throws -> ToolExecuteResult in
-        guard let teamStore = context.teamStore else {
-            return ToolExecuteResult(content: "Error: TeamStore not available.", isError: true)
-        }
+        let teamStore = try context.requireStore(context.teamStore, name: "TeamStore")
         do {
             let team = await teamStore.get(id: input.id)
             let teamName = team?.name ?? input.id

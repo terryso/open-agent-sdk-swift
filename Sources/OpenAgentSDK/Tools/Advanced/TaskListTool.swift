@@ -39,9 +39,7 @@ public func createTaskListTool() -> ToolProtocol {
         inputSchema: taskListSchema,
         isReadOnly: true
     ) { (input: TaskListInput, context: ToolContext) async throws -> ToolExecuteResult in
-        guard let taskStore = context.taskStore else {
-            return ToolExecuteResult(content: "Error: TaskStore not available.", isError: true)
-        }
+        let taskStore = try context.requireStore(context.taskStore, name: "TaskStore")
         let status: TaskStatus? = input.status.flatMap { TaskStatus.parse($0) }
         let tasks = await taskStore.list(status: status, owner: input.owner)
         if tasks.isEmpty {

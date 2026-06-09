@@ -44,9 +44,7 @@ public func createTaskCreateTool() -> ToolProtocol {
         inputSchema: taskCreateSchema,
         isReadOnly: false
     ) { (input: TaskCreateInput, context: ToolContext) async throws -> ToolExecuteResult in
-        guard let taskStore = context.taskStore else {
-            return ToolExecuteResult(content: "Error: TaskStore not available.", isError: true)
-        }
+        let taskStore = try context.requireStore(context.taskStore, name: "TaskStore")
         let initialStatus: TaskStatus = input.status.flatMap { TaskStatus.parse($0) } ?? .pending
         let task = await taskStore.create(
             subject: input.subject,

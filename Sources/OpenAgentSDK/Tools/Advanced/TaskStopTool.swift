@@ -40,9 +40,7 @@ public func createTaskStopTool() -> ToolProtocol {
         inputSchema: taskStopSchema,
         isReadOnly: false
     ) { (input: TaskStopInput, context: ToolContext) async throws -> ToolExecuteResult in
-        guard let taskStore = context.taskStore else {
-            return ToolExecuteResult(content: "Error: TaskStore not available.", isError: true)
-        }
+        let taskStore = try context.requireStore(context.taskStore, name: "TaskStore")
         let stopOutput = input.reason.map { "Stopped: \($0)" }
         do {
             _ = try await taskStore.update(id: input.id, status: .cancelled, output: stopOutput)
