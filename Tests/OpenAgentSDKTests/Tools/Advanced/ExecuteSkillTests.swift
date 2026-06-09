@@ -4,28 +4,6 @@ import XCTest
 /// Tests for Agent.executeSkill() — direct skill execution bypassing LLM skill-discovery.
 final class ExecuteSkillTests: XCTestCase {
 
-    // MARK: - Helper: Create a test skill
-
-    private func makeSkill(
-        name: String = "test_skill",
-        description: String = "A test skill",
-        aliases: [String] = [],
-        toolRestrictions: [ToolRestriction]? = nil,
-        modelOverride: String? = nil,
-        isAvailable: @escaping @Sendable () -> Bool = { true },
-        promptTemplate: String = "Test prompt template"
-    ) -> Skill {
-        Skill(
-            name: name,
-            description: description,
-            aliases: aliases,
-            toolRestrictions: toolRestrictions,
-            modelOverride: modelOverride,
-            isAvailable: isAvailable,
-            promptTemplate: promptTemplate
-        )
-    }
-
     // MARK: - Error Cases
 
     /// Returns error when skill is not found in registry.
@@ -47,7 +25,7 @@ final class ExecuteSkillTests: XCTestCase {
     /// Returns error when skill is registered but not available.
     func testExecuteSkill_notAvailable_returnsError() async {
         let registry = SkillRegistry()
-        registry.register(makeSkill(
+        registry.register(makeTestSkill(
             name: "unavailable",
             isAvailable: { false }
         ))
@@ -68,7 +46,7 @@ final class ExecuteSkillTests: XCTestCase {
     /// Returns error when agent is closed.
     func testExecuteSkill_agentClosed_returnsError() async {
         let registry = SkillRegistry()
-        registry.register(makeSkill(name: "commit"))
+        registry.register(makeTestSkill(name: "commit"))
 
         let agent = createAgent(options: AgentOptions(
             apiKey: "test-key",
@@ -88,7 +66,7 @@ final class ExecuteSkillTests: XCTestCase {
     /// Resolves skill by alias.
     func testExecuteSkill_resolvesByAlias() async {
         let registry = SkillRegistry()
-        registry.register(makeSkill(
+        registry.register(makeTestSkill(
             name: "commit",
             aliases: ["ci"],
             promptTemplate: "Create a commit"
@@ -102,7 +80,7 @@ final class ExecuteSkillTests: XCTestCase {
     /// Restores allowedTools after skill execution.
     func testExecuteSkill_restoresAllowedTools() async {
         let registry = SkillRegistry()
-        registry.register(makeSkill(
+        registry.register(makeTestSkill(
             name: "restricted-skill",
             toolRestrictions: [.bash, .read],
             promptTemplate: "Do restricted things"
@@ -126,7 +104,7 @@ final class ExecuteSkillTests: XCTestCase {
     /// Restores model after skill execution when skill has modelOverride.
     func testExecuteSkill_restoresModel() async {
         let registry = SkillRegistry()
-        registry.register(makeSkill(
+        registry.register(makeTestSkill(
             name: "opus-skill",
             modelOverride: "claude-opus-4-6",
             promptTemplate: "Do opus things"
@@ -149,7 +127,7 @@ final class ExecuteSkillTests: XCTestCase {
     /// Does not change model when skill has no modelOverride.
     func testExecuteSkill_noModelOverride_keepsModel() async {
         let registry = SkillRegistry()
-        registry.register(makeSkill(
+        registry.register(makeTestSkill(
             name: "basic-skill",
             modelOverride: nil,
             promptTemplate: "Do basic things"
@@ -172,7 +150,7 @@ final class ExecuteSkillTests: XCTestCase {
     /// When skill has toolRestrictions, they are applied during execution and restored after.
     func testExecuteSkill_toolRestrictions_appliedDuringExecution() async {
         let registry = SkillRegistry()
-        registry.register(makeSkill(
+        registry.register(makeTestSkill(
             name: "restricted",
             toolRestrictions: [.bash, .read],
             promptTemplate: "Restricted execution"
