@@ -49,28 +49,6 @@ final class ExecuteSkillStreamTests: XCTestCase {
         ]
     }
 
-    // MARK: - Helper: Create a test skill
-
-    private func makeSkill(
-        name: String = "test_skill",
-        description: String = "A test skill",
-        aliases: [String] = [],
-        toolRestrictions: [ToolRestriction]? = nil,
-        modelOverride: String? = nil,
-        isAvailable: @escaping @Sendable () -> Bool = { true },
-        promptTemplate: String = "Test prompt template"
-    ) -> Skill {
-        Skill(
-            name: name,
-            description: description,
-            aliases: aliases,
-            toolRestrictions: toolRestrictions,
-            modelOverride: modelOverride,
-            isAvailable: isAvailable,
-            promptTemplate: promptTemplate
-        )
-    }
-
     // MARK: - Error Cases
 
     /// Returns error result when skill is not found in registry.
@@ -102,7 +80,7 @@ final class ExecuteSkillStreamTests: XCTestCase {
     /// Returns error result when skill is registered but not available.
     func testExecuteSkillStream_notAvailable_returnsError() async {
         let registry = SkillRegistry()
-        registry.register(makeSkill(
+        registry.register(makeTestSkill(
             name: "unavailable",
             isAvailable: { false }
         ))
@@ -132,7 +110,7 @@ final class ExecuteSkillStreamTests: XCTestCase {
     /// Returns empty stream when agent is closed.
     func testExecuteSkillStream_agentClosed_returnsEmpty() async {
         let registry = SkillRegistry()
-        registry.register(makeSkill(name: "closed-test"))
+        registry.register(makeTestSkill(name: "closed-test"))
 
         let agent = createAgent(options: AgentOptions(
             apiKey: "test-key",
@@ -156,7 +134,7 @@ final class ExecuteSkillStreamTests: XCTestCase {
     /// Restores allowedTools after streaming skill execution.
     func testExecuteSkillStream_restoresAllowedTools() async {
         let registry = SkillRegistry()
-        registry.register(makeSkill(
+        registry.register(makeTestSkill(
             name: "restricted-skill",
             toolRestrictions: [.bash, .read],
             promptTemplate: "Do restricted things"
@@ -183,7 +161,7 @@ final class ExecuteSkillStreamTests: XCTestCase {
     /// Restores model after streaming skill execution when skill has modelOverride.
     func testExecuteSkillStream_restoresModel() async {
         let registry = SkillRegistry()
-        registry.register(makeSkill(
+        registry.register(makeTestSkill(
             name: "opus-skill",
             modelOverride: "claude-opus-4-6",
             promptTemplate: "Do opus things"
@@ -209,7 +187,7 @@ final class ExecuteSkillStreamTests: XCTestCase {
     /// Does not change model when skill has no modelOverride.
     func testExecuteSkillStream_noModelOverride_keepsModel() async {
         let registry = SkillRegistry()
-        registry.register(makeSkill(
+        registry.register(makeTestSkill(
             name: "basic-skill",
             modelOverride: nil,
             promptTemplate: "Do basic things"

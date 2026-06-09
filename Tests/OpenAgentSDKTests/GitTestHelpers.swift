@@ -137,3 +137,41 @@ func makeTestToolContext(
         mcpConnections: mcpConnections
     )
 }
+
+// MARK: - Skill Test Helpers
+
+/// Creates a test `Skill` with sensible defaults for unit testing.
+///
+/// All parameters have defaults, so the simplest usage is `makeTestSkill()`.
+///
+/// - Parameters:
+///   - name: The skill name (default: `"test_skill"`).
+///   - description: The skill description (default: `"A test skill"`).
+///   - aliases: Alternative names (default: `[]`).
+///   - userInvocable: Whether the skill is user-invocable (default: `true`).
+///   - toolRestrictions: Optional tool restrictions (default: `nil`).
+///   - modelOverride: Optional model override (default: `nil`).
+///   - isAvailable: Closure to check availability (default: always `true`).
+///   - promptTemplate: The prompt template (default: `"Test prompt template"`).
+/// - Returns: A `Skill` configured with the given parameters.
+func makeTestSkill(
+    name: String = "test_skill",
+    description: String = "A test skill",
+    aliases: [String] = [],
+    userInvocable: Bool = true,
+    toolRestrictions: [ToolRestriction]? = nil,
+    modelOverride: String? = nil,
+    isAvailable: @escaping @Sendable () -> Bool = { true },
+    promptTemplate: String = "Test prompt template"
+) -> Skill {
+    Skill(
+        name: name,
+        description: description,
+        aliases: aliases,
+        userInvocable: userInvocable,
+        toolRestrictions: toolRestrictions,
+        modelOverride: modelOverride,
+        isAvailable: isAvailable,
+        promptTemplate: promptTemplate
+    )
+}
