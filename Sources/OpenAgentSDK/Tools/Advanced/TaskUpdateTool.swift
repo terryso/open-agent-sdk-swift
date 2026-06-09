@@ -45,9 +45,7 @@ public func createTaskUpdateTool() -> ToolProtocol {
         inputSchema: taskUpdateSchema,
         isReadOnly: false
     ) { (input: TaskUpdateInput, context: ToolContext) async throws -> ToolExecuteResult in
-        guard let taskStore = context.taskStore else {
-            return ToolExecuteResult(content: "Error: TaskStore not available.", isError: true)
-        }
+        let taskStore = try context.requireStore(context.taskStore, name: "TaskStore")
         let status: TaskStatus? = input.status.flatMap { TaskStatus.parse($0) }
         do {
             let task = try await taskStore.update(

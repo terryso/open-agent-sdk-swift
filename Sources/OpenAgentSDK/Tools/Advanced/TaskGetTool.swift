@@ -37,9 +37,7 @@ public func createTaskGetTool() -> ToolProtocol {
         inputSchema: taskGetSchema,
         isReadOnly: true
     ) { (input: TaskGetInput, context: ToolContext) async throws -> ToolExecuteResult in
-        guard let taskStore = context.taskStore else {
-            return ToolExecuteResult(content: "Error: TaskStore not available.", isError: true)
-        }
+        let taskStore = try context.requireStore(context.taskStore, name: "TaskStore")
         guard let task = await taskStore.get(id: input.id) else {
             return ToolExecuteResult(content: "Task not found: \(input.id)", isError: true)
         }
