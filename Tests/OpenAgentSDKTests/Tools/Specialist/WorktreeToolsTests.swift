@@ -31,17 +31,6 @@ final class WorktreeToolsTests: XCTestCase {
         super.tearDown()
     }
 
-    // MARK: - Helpers
-
-    /// Creates a ToolContext with an injected WorktreeStore.
-    private func makeContext(worktreeStore: WorktreeStore? = nil, cwd: String = "/tmp") -> ToolContext {
-        return ToolContext(
-            cwd: cwd,
-            toolUseId: "test-tool-use-id",
-            worktreeStore: worktreeStore
-        )
-    }
-
     /// Creates a temporary Git repository by copying the shared template.
     /// Returns the path to the temp directory. Caller is responsible for cleanup.
     private func cloneTemplateRepo() throws -> String {
@@ -93,7 +82,7 @@ final class WorktreeToolsTests: XCTestCase {
         defer { cleanupTempDir(tempDir) }
 
         let tool = createEnterWorktreeTool()
-        let context = makeContext(worktreeStore: worktreeStore, cwd: tempDir)
+        let context = makeTestToolContext(cwd: tempDir, worktreeStore: worktreeStore)
 
         let input: [String: Any] = ["name": "feature-branch"]
         let result = await tool.call(input: input, context: context)
@@ -110,7 +99,7 @@ final class WorktreeToolsTests: XCTestCase {
         defer { cleanupTempDir(tempDir) }
 
         let tool = createEnterWorktreeTool()
-        let context = makeContext(worktreeStore: worktreeStore, cwd: tempDir)
+        let context = makeTestToolContext(cwd: tempDir, worktreeStore: worktreeStore)
 
         _ = await tool.call(input: ["name": "tracked"], context: context)
 
@@ -128,7 +117,7 @@ final class WorktreeToolsTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: tempDir) }
 
         let tool = createEnterWorktreeTool()
-        let context = makeContext(worktreeStore: worktreeStore, cwd: tempDir.path)
+        let context = makeTestToolContext(cwd: tempDir.path, worktreeStore: worktreeStore)
 
         let input: [String: Any] = ["name": "fail"]
         let result = await tool.call(input: input, context: context)
@@ -143,7 +132,7 @@ final class WorktreeToolsTests: XCTestCase {
         defer { cleanupTempDir(tempDir) }
 
         let tool = createEnterWorktreeTool()
-        let context = makeContext(worktreeStore: worktreeStore, cwd: tempDir)
+        let context = makeTestToolContext(cwd: tempDir, worktreeStore: worktreeStore)
 
         let input: [String: Any] = ["name": "decode-test"]
         let result = await tool.call(input: input, context: context)
@@ -209,7 +198,7 @@ final class WorktreeToolsTests: XCTestCase {
         let entry = try await worktreeStore.create(name: "to-remove", originalCwd: tempDir)
 
         let tool = createExitWorktreeTool()
-        let context = makeContext(worktreeStore: worktreeStore, cwd: tempDir)
+        let context = makeTestToolContext(cwd: tempDir, worktreeStore: worktreeStore)
 
         let input: [String: Any] = ["id": entry.id, "action": "remove"]
         let result = await tool.call(input: input, context: context)
@@ -229,7 +218,7 @@ final class WorktreeToolsTests: XCTestCase {
         let entry = try await worktreeStore.create(name: "default-remove", originalCwd: tempDir)
 
         let tool = createExitWorktreeTool()
-        let context = makeContext(worktreeStore: worktreeStore, cwd: tempDir)
+        let context = makeTestToolContext(cwd: tempDir, worktreeStore: worktreeStore)
 
         // No action specified -- should default to remove
         let input: [String: Any] = ["id": entry.id]
@@ -249,7 +238,7 @@ final class WorktreeToolsTests: XCTestCase {
         let entry = try await worktreeStore.create(name: "to-keep", originalCwd: tempDir)
 
         let tool = createExitWorktreeTool()
-        let context = makeContext(worktreeStore: worktreeStore, cwd: tempDir)
+        let context = makeTestToolContext(cwd: tempDir, worktreeStore: worktreeStore)
 
         let input: [String: Any] = ["id": entry.id, "action": "keep"]
         let result = await tool.call(input: input, context: context)
@@ -268,7 +257,7 @@ final class WorktreeToolsTests: XCTestCase {
     func testExitWorktree_nonexistentWorktree_returnsError() async throws {
         let worktreeStore = WorktreeStore()
         let tool = createExitWorktreeTool()
-        let context = makeContext(worktreeStore: worktreeStore)
+        let context = makeTestToolContext(worktreeStore: worktreeStore)
 
         let input: [String: Any] = ["id": "worktree_999"]
         let result = await tool.call(input: input, context: context)
@@ -405,7 +394,7 @@ final class WorktreeToolsTests: XCTestCase {
 
         // Verify they work through ToolContext injection
         let worktreeStore = WorktreeStore()
-        let context = makeContext(worktreeStore: worktreeStore)
+        let context = makeTestToolContext(worktreeStore: worktreeStore)
 
         // EnterWorktree requires git repo for real call, just check error
         let result = await enterTool.call(input: ["name": "test"], context: context)
@@ -424,7 +413,7 @@ final class WorktreeToolsTests: XCTestCase {
 
         let enterTool = createEnterWorktreeTool()
         let exitTool = createExitWorktreeTool()
-        let context = makeContext(worktreeStore: worktreeStore, cwd: tempDir)
+        let context = makeTestToolContext(cwd: tempDir, worktreeStore: worktreeStore)
 
         // Step 1: Enter a worktree
         let enterResult = await enterTool.call(
@@ -457,7 +446,7 @@ final class WorktreeToolsTests: XCTestCase {
 
         let enterTool = createEnterWorktreeTool()
         let exitTool = createExitWorktreeTool()
-        let context = makeContext(worktreeStore: worktreeStore, cwd: tempDir)
+        let context = makeTestToolContext(cwd: tempDir, worktreeStore: worktreeStore)
 
         // Step 1: Enter a worktree
         let enterResult = await enterTool.call(

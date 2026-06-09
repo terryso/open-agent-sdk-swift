@@ -93,17 +93,47 @@ func cleanupTempDir(_ path: String) {
 
 // MARK: - ToolContext Test Helpers
 
-/// Creates a minimal `ToolContext` with no store dependencies.
+/// Creates a minimal `ToolContext` with optional store dependencies.
 ///
-/// Useful for error-path tests that verify behavior when a store is nil.
+/// Useful for both error-path tests (no store) and integration tests (with store).
 ///
 /// - Parameters:
 ///   - cwd: The working directory (default: `"/tmp"`).
 ///   - toolUseId: The tool use ID (default: `"test-tool-use-id"`).
-/// - Returns: A `ToolContext` with the given `cwd` and `toolUseId`.
-func makeTestToolContext(cwd: String = "/tmp", toolUseId: String = "test-tool-use-id") -> ToolContext {
+///   - mailboxStore: Optional mailbox store for messaging tools.
+///   - teamStore: Optional team store for team tools.
+///   - senderName: Optional sender name for messaging tools.
+///   - taskStore: Optional task store for task tools.
+///   - worktreeStore: Optional worktree store for worktree tools.
+///   - planStore: Optional plan store for plan tools.
+///   - cronStore: Optional cron store for cron tools.
+///   - todoStore: Optional todo store for todo tools.
+///   - mcpConnections: Optional MCP connection list for MCP resource tools.
+/// - Returns: A `ToolContext` with the given parameters.
+func makeTestToolContext(
+    cwd: String = "/tmp",
+    toolUseId: String = "test-tool-use-id",
+    mailboxStore: MailboxStore? = nil,
+    teamStore: TeamStore? = nil,
+    senderName: String? = nil,
+    taskStore: TaskStore? = nil,
+    worktreeStore: WorktreeStore? = nil,
+    planStore: PlanStore? = nil,
+    cronStore: CronStore? = nil,
+    todoStore: TodoStore? = nil,
+    mcpConnections: [MCPConnectionInfo]? = nil
+) -> ToolContext {
     return ToolContext(
         cwd: cwd,
-        toolUseId: toolUseId
+        toolUseId: toolUseId,
+        mailboxStore: mailboxStore,
+        teamStore: teamStore,
+        senderName: senderName,
+        taskStore: taskStore,
+        worktreeStore: worktreeStore,
+        planStore: planStore,
+        cronStore: cronStore,
+        todoStore: todoStore,
+        mcpConnections: mcpConnections
     )
 }
