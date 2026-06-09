@@ -316,21 +316,6 @@ public enum SDKMessage: Sendable, Equatable {
             self.toolPairs = toolPairs
         }
 
-        public static func == (lhs: ResultData, rhs: ResultData) -> Bool {
-            return lhs.subtype == rhs.subtype
-                && lhs.text == rhs.text
-                && lhs.usage == rhs.usage
-                && lhs.numTurns == rhs.numTurns
-                && lhs.durationMs == rhs.durationMs
-                && lhs.totalCostUsd == rhs.totalCostUsd
-                && lhs.costBreakdown == rhs.costBreakdown
-                && lhs.structuredOutput == rhs.structuredOutput
-                && lhs.permissionDenials == rhs.permissionDenials
-                && lhs.modelUsage == rhs.modelUsage
-                && lhs.errors == rhs.errors
-                && lhs.durationApiMs == rhs.durationApiMs
-                && lhs.toolPairs == rhs.toolPairs
-        }
     }
 
     /// Partial text data during streaming.
@@ -460,23 +445,6 @@ public enum SDKMessage: Sendable, Equatable {
             self.pausedData = pausedData
         }
 
-        public static func == (lhs: SystemData, rhs: SystemData) -> Bool {
-            return lhs.subtype == rhs.subtype
-                && lhs.message == rhs.message
-                && lhs.sessionId == rhs.sessionId
-                && lhs.tools == rhs.tools
-                && lhs.model == rhs.model
-                && lhs.permissionMode == rhs.permissionMode
-                && lhs.mcpServers == rhs.mcpServers
-                && lhs.cwd == rhs.cwd
-                && lhs.compactMetadata == rhs.compactMetadata
-                && lhs.statusValue == rhs.statusValue
-                && lhs.compactResult == rhs.compactResult
-                && lhs.compactError == rhs.compactError
-                && lhs.taskNotificationInfo == rhs.taskNotificationInfo
-                && lhs.rateLimitInfo == rhs.rateLimitInfo
-                && lhs.pausedData == rhs.pausedData
-        }
     }
 
     // MARK: - New Message Data Types (Story 17-1)
