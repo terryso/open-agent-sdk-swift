@@ -7,6 +7,9 @@ import XCTest
 /// Focuses on TaskStatus.parse(), Codable round-trips, and error type behaviors.
 final class TaskTypesExtendedTests: XCTestCase {
 
+    private static let testEncoder = JSONEncoder()
+    private static let testDecoder = JSONDecoder()
+
     // MARK: - TaskStatus.parse() — camelCase direct match
 
     /// parse() returns correct status for exact camelCase rawValues.
@@ -54,8 +57,8 @@ final class TaskTypesExtendedTests: XCTestCase {
     /// TaskStatus encodes and decodes correctly through Codable.
     func testTaskStatus_codableRoundTrip() throws {
         for status in TaskStatus.allCases {
-            let encoded = try JSONEncoder().encode(status)
-            let decoded = try JSONDecoder().decode(TaskStatus.self, from: encoded)
+            let encoded = try Self.testEncoder.encode(status)
+            let decoded = try Self.testDecoder.decode(TaskStatus.self, from: encoded)
             XCTAssertEqual(decoded, status, "Round-trip failed for \(status.rawValue)")
         }
     }
@@ -78,8 +81,8 @@ final class TaskTypesExtendedTests: XCTestCase {
             metadata: ["priority": "high", "source": "manual"]
         )
 
-        let data = try JSONEncoder().encode(task)
-        let decoded = try JSONDecoder().decode(Task.self, from: data)
+        let data = try Self.testEncoder.encode(task)
+        let decoded = try Self.testDecoder.decode(Task.self, from: data)
 
         XCTAssertEqual(decoded, task)
         XCTAssertEqual(decoded.blockedBy, ["task_1", "task_2"])
@@ -96,8 +99,8 @@ final class TaskTypesExtendedTests: XCTestCase {
             updatedAt: "2026-01-01T00:00:00Z"
         )
 
-        let data = try JSONEncoder().encode(task)
-        let decoded = try JSONDecoder().decode(Task.self, from: data)
+        let data = try Self.testEncoder.encode(task)
+        let decoded = try Self.testDecoder.decode(Task.self, from: data)
 
         XCTAssertEqual(decoded, task)
         XCTAssertNil(decoded.description)
@@ -120,8 +123,8 @@ final class TaskTypesExtendedTests: XCTestCase {
             type: .text
         )
 
-        let data = try JSONEncoder().encode(message)
-        let decoded = try JSONDecoder().decode(AgentMessage.self, from: data)
+        let data = try Self.testEncoder.encode(message)
+        let decoded = try Self.testDecoder.decode(AgentMessage.self, from: data)
 
         XCTAssertEqual(decoded, message)
     }
@@ -136,8 +139,8 @@ final class TaskTypesExtendedTests: XCTestCase {
             type: .shutdownRequest
         )
 
-        let data = try JSONEncoder().encode(message)
-        let decoded = try JSONDecoder().decode(AgentMessage.self, from: data)
+        let data = try Self.testEncoder.encode(message)
+        let decoded = try Self.testDecoder.decode(AgentMessage.self, from: data)
 
         XCTAssertEqual(decoded.type, .shutdownRequest)
         XCTAssertEqual(decoded.content, "Please shut down")
