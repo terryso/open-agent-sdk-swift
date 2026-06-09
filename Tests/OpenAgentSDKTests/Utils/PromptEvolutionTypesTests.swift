@@ -3,6 +3,9 @@ import XCTest
 
 final class PromptEvolutionTypesTests: XCTestCase {
 
+    private static let testEncoder = JSONEncoder()
+    private static let testDecoder = JSONDecoder()
+
     // MARK: - PromptEvolutionStrategy
 
     func testStrategyAllCases() {
@@ -28,8 +31,8 @@ final class PromptEvolutionTypesTests: XCTestCase {
 
     func testStrategyCodableRoundTrip() throws {
         for strategy in PromptEvolutionStrategy.allCases {
-            let data = try JSONEncoder().encode(strategy)
-            let decoded = try JSONDecoder().decode(PromptEvolutionStrategy.self, from: data)
+            let data = try Self.testEncoder.encode(strategy)
+            let decoded = try Self.testDecoder.decode(PromptEvolutionStrategy.self, from: data)
             XCTAssertEqual(decoded, strategy)
         }
     }
@@ -72,8 +75,8 @@ final class PromptEvolutionTypesTests: XCTestCase {
             minConversationLength: 4,
             maxChangesPerEvolution: 8
         )
-        let data = try JSONEncoder().encode(config)
-        let decoded = try JSONDecoder().decode(PromptEvolutionConfig.self, from: data)
+        let data = try Self.testEncoder.encode(config)
+        let decoded = try Self.testDecoder.decode(PromptEvolutionConfig.self, from: data)
         XCTAssertEqual(decoded, config)
     }
 
@@ -147,8 +150,8 @@ final class PromptEvolutionTypesTests: XCTestCase {
             modified: "concise text",
             rationale: "reduce verbosity"
         )
-        let data = try JSONEncoder().encode(change)
-        let decoded = try JSONDecoder().decode(PromptChange.self, from: data)
+        let data = try Self.testEncoder.encode(change)
+        let decoded = try Self.testDecoder.decode(PromptChange.self, from: data)
         XCTAssertEqual(decoded, change)
     }
 

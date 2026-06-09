@@ -13,6 +13,9 @@ import XCTest
 /// TDD Phase: RED (feature not implemented yet)
 final class TaskTypesTests: XCTestCase {
 
+    private static let testEncoder = JSONEncoder()
+    private static let testDecoder = JSONDecoder()
+
     // MARK: - AC6: TaskStatus enum
 
     /// AC6 [P0]: TaskStatus enum has all required cases and is CaseIterable.
@@ -175,8 +178,8 @@ final class TaskTypesTests: XCTestCase {
         )
 
         // When: encoding and decoding
-        let data = try JSONEncoder().encode(team)
-        let decoded = try JSONDecoder().decode(Team.self, from: data)
+        let data = try Self.testEncoder.encode(team)
+        let decoded = try Self.testDecoder.decode(Team.self, from: data)
 
         // Then: the decoded team matches the original
         XCTAssertEqual(decoded, team)
@@ -223,8 +226,8 @@ final class TaskTypesTests: XCTestCase {
         let member = TeamMember(name: "carol", role: .leader)
 
         // When: encoding and decoding
-        let data = try JSONEncoder().encode(member)
-        let decoded = try JSONDecoder().decode(TeamMember.self, from: data)
+        let data = try Self.testEncoder.encode(member)
+        let decoded = try Self.testDecoder.decode(TeamMember.self, from: data)
 
         // Then: the decoded member matches the original
         XCTAssertEqual(decoded, member)
@@ -260,8 +263,8 @@ final class TaskTypesTests: XCTestCase {
         )
 
         // When: encoding and decoding
-        let data = try JSONEncoder().encode(entry)
-        let decoded = try JSONDecoder().decode(AgentRegistryEntry.self, from: data)
+        let data = try Self.testEncoder.encode(entry)
+        let decoded = try Self.testDecoder.decode(AgentRegistryEntry.self, from: data)
 
         // Then: the decoded entry matches the original
         XCTAssertEqual(decoded, entry)
