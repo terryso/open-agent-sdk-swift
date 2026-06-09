@@ -25,11 +25,7 @@ final class BashBackgroundATDDTests: XCTestCase {
         input: [String: Any],
         cwd: String? = nil
     ) async -> ToolResult {
-        let context = ToolContext(
-            cwd: cwd ?? NSTemporaryDirectory(),
-            toolUseId: "test-\(UUID().uuidString)"
-        )
-        return await tool.call(input: input, context: context)
+        await callToolForTest(tool, input: input, cwd: cwd ?? NSTemporaryDirectory())
     }
 
     // MARK: - AC3: BashInput schema includes run_in_background
