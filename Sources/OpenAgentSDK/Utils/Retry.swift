@@ -39,9 +39,10 @@ public struct RetryConfig: Sendable {
 
 /// Determine whether an error qualifies for automatic retry.
 ///
-/// Only `SDKError.apiError` with a status code in the configured retryable set
-/// is considered retryable. All other errors (including non-SDK errors) are
-/// not retried.
+/// `SDKError.apiError` with status code `0` (network-layer failures such as
+/// connection lost, DNS failure, or host unreachable) is always retryable.
+/// Status codes in the configured `retryableStatusCodes` set are also retryable.
+/// All other errors (including non-SDK errors) are not retried.
 ///
 /// - Parameter error: The error to evaluate.
 /// - Parameter config: The retry configuration to use for status code lookup.
@@ -55,6 +56,8 @@ func isRetryableError(
           case .apiError(let statusCode, _) = sdkError else {
         return false
     }
+    // statusCode 0 = network-layer error (URLError: connection lost, DNS failure, etc.)
+    if statusCode == 0 { return true }
     return config.retryableStatusCodes.contains(statusCode)
 }
 

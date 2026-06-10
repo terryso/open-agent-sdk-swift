@@ -130,6 +130,36 @@ final class IsRetryableErrorTests: XCTestCase {
         XCTAssertFalse(isRetryableError(error),
                        "Non-SDKError types should NOT be retryable")
     }
+
+    /// [P0]: statusCode 0 (network-layer error: connection lost, DNS failure) is retryable.
+    func testStatusCodeZeroIsRetryable() {
+        let error = SDKError.apiError(statusCode: 0, message: "The network connection was lost")
+        XCTAssertTrue(isRetryableError(error),
+                      "statusCode 0 (network error) should be retryable")
+    }
+
+    /// [P0]: withRetry retries on statusCode 0 (network-layer error).
+    func testRetryOnNetworkError() async throws {
+        let fastConfig = RetryConfig(
+            maxRetries: 3,
+            baseDelayMs: 1,
+            maxDelayMs: 1,
+            retryableStatusCodes: [429, 500, 502, 503, 529]
+        )
+
+        var callCount = 0
+        let result = try await withRetry({
+            callCount += 1
+            if callCount < 3 {
+                throw SDKError.apiError(statusCode: 0, message: "The network connection was lost")
+            }
+            return "recovered"
+        }, retryConfig: fastConfig)
+        XCTAssertEqual(result, "recovered",
+                       "Should recover after retrying network errors")
+        XCTAssertEqual(callCount, 3,
+                       "Should have retried twice then succeeded on third attempt")
+    }
 }
 
 // MARK: - getRetryDelay
