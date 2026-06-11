@@ -142,27 +142,112 @@ public enum SkillLoader {
     // MARK: - Internal
 
     /// Parses YAML frontmatter into a flat key-value dictionary.
+    ///
+    /// Supports:
+    /// - Simple `key: value` pairs
+    /// - Single/double quoted values (`key: 'value'`, `key: "value"`)
+    /// - YAML block scalars (`key: >` folded, `key: |` literal, with optional chomp modifiers `-`/`+`)
+    /// - Nested mappings (skipped — only top-level string values are captured)
     static func parseFrontmatter(_ content: String) -> [String: String]? {
         let lines = content.components(separatedBy: "\n")
         guard lines.first?.trimmingCharacters(in: .whitespaces) == "---" else { return nil }
 
         var result: [String: String] = [:]
         var endFound = false
+        var i = 1
 
-        for i in 1..<lines.count {
-            let line = lines[i].trimmingCharacters(in: .whitespaces)
-            if line == "---" {
+        while i < lines.count {
+            let line = lines[i]
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+
+            if trimmed == "---" {
                 endFound = true
                 break
             }
-            if let colonRange = line.range(of: ":") {
+
+            // Find first colon (only for top-level keys — no leading whitespace)
+            if !line.hasPrefix(" ") && !line.hasPrefix("\t"),
+               let colonRange = line.range(of: ":") {
                 let key = String(line[..<colonRange.lowerBound]).trimmingCharacters(in: .whitespaces)
-                let value = String(line[colonRange.upperBound...]).trimmingCharacters(in: .whitespaces)
-                result[key] = value
+                let rawValue = String(line[colonRange.upperBound...]).trimmingCharacters(in: .whitespaces)
+
+                if isBlockScalarIndicator(rawValue) {
+                    // YAML block scalar: collect subsequent indented lines
+                    let isLiteral = rawValue.hasPrefix("|")
+                    let (blockValue, linesConsumed) = collectBlockScalar(lines: lines, startIndex: i + 1, isLiteral: isLiteral)
+                    result[key] = blockValue
+                    i += linesConsumed
+                } else if rawValue.isEmpty {
+                    // Value is empty — might be a nested mapping (skip its indented children)
+                    // Just store empty string; nested keys are ignored
+                    result[key] = ""
+                } else {
+                    result[key] = stripOuterQuotes(rawValue)
+                }
             }
+            // Lines starting with whitespace are either block scalar content
+            // or nested mapping children — both are handled above or skipped
+
+            i += 1
         }
 
         return endFound ? result : nil
+    }
+
+    /// Returns `true` if the value is a YAML block scalar indicator (`>`, `|-`, `>+`, etc.)
+    private static func isBlockScalarIndicator(_ value: String) -> Bool {
+        let indicators = [">", ">-", ">+", "|", "|-", "|+"]
+        return indicators.contains(value)
+    }
+
+    /// Collects lines belonging to a YAML block scalar starting at `startIndex`.
+    ///
+    /// Folded (`>`) joins lines with spaces; literal (`|`) preserves newlines.
+    /// Trailing blank lines are stripped. Returns the resolved value and the number
+    /// of lines consumed.
+    private static func collectBlockScalar(lines: [String], startIndex: Int, isLiteral: Bool) -> (value: String, consumed: Int) {
+        var blockLines: [String] = []
+        var j = startIndex
+
+        // Skip leading blank lines
+        while j < lines.count && lines[j].trimmingCharacters(in: .whitespaces).isEmpty {
+            j += 1
+        }
+
+        // Collect indented (or blank) lines
+        while j < lines.count {
+            let line = lines[j]
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+
+            // End block at closing --- or non-blank non-indented line
+            if trimmed == "---" { break }
+            if !trimmed.isEmpty && !line.hasPrefix(" ") && !line.hasPrefix("\t") { break }
+
+            blockLines.append(trimmed)
+            j += 1
+        }
+
+        // Strip trailing blank lines
+        while !blockLines.isEmpty && blockLines.last!.isEmpty {
+            blockLines.removeLast()
+        }
+
+        // Folded (`>`): join with spaces; Literal (`|`): join with newlines
+        let value = blockLines.joined(separator: isLiteral ? "\n" : " ")
+        return (value, j - startIndex)
+    }
+
+    /// Strips matching outer single or double quotes from a YAML value.
+    private static func stripOuterQuotes(_ value: String) -> String {
+        guard value.count >= 2 else { return value }
+        let start = value.startIndex
+        let end = value.index(before: value.endIndex)
+        let first = value[start]
+        let last = value[end]
+        if (first == "'" && last == "'") || (first == "\"" && last == "\"") {
+            return String(value[value.index(after: start)..<end])
+        }
+        return value
     }
 
     /// Extracts the Markdown body after the YAML frontmatter.

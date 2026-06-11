@@ -80,13 +80,47 @@ final class SkillLoaderTests: TempDirTestCase {
         XCTAssertEqual(result?.count, 0)
     }
 
-    /// 带引号的 frontmatter 值
+    /// 带引号的 frontmatter 值 — 引号应被去除
     func testParseFrontmatter_QuotedValues() {
         let content = "---\nname: \"my skill\"\ndescription: 'A test'\n---\nBody"
         let result = SkillLoader.parseFrontmatter(content)
 
-        XCTAssertEqual(result?["name"], "\"my skill\"")
-        XCTAssertEqual(result?["description"], "'A test'")
+        XCTAssertEqual(result?["name"], "my skill")
+        XCTAssertEqual(result?["description"], "A test")
+    }
+
+    /// YAML 折叠块标量 (>) 正确解析为单行
+    func testParseFrontmatter_FoldedBlockScalar() {
+        let content = "---\nname: teambition\ndescription: >\n  Teambition 项目管理。用于一切与 Teambition 任务和项目相关的增删改查操作。\nmetadata:\n  version: v1\n---\nBody"
+        let result = SkillLoader.parseFrontmatter(content)
+
+        XCTAssertEqual(result?["name"], "teambition")
+        XCTAssertEqual(result?["description"], "Teambition 项目管理。用于一切与 Teambition 任务和项目相关的增删改查操作。")
+    }
+
+    /// YAML 折叠块标量多行折叠为空格连接
+    func testParseFrontmatter_FoldedBlockScalar_MultipleLines() {
+        let content = "---\nname: test\ndescription: >\n  Line one.\n  Line two.\n  Line three.\n---\nBody"
+        let result = SkillLoader.parseFrontmatter(content)
+
+        XCTAssertEqual(result?["description"], "Line one. Line two. Line three.")
+    }
+
+    /// YAML 字面块标量 (|) 保留换行
+    func testParseFrontmatter_LiteralBlockScalar() {
+        let content = "---\nname: test\ndescription: |\n  Line one.\n  Line two.\n---\nBody"
+        let result = SkillLoader.parseFrontmatter(content)
+
+        XCTAssertEqual(result?["description"], "Line one.\nLine two.")
+    }
+
+    /// 块标量后紧跟新键时正确终止
+    func testParseFrontmatter_BlockScalar_TerminatedByNextKey() {
+        let content = "---\nname: test\ndescription: >\n  Some description text.\naliases: a, b\n---\nBody"
+        let result = SkillLoader.parseFrontmatter(content)
+
+        XCTAssertEqual(result?["description"], "Some description text.")
+        XCTAssertEqual(result?["aliases"], "a, b")
     }
 
     /// 含 allowed-tools 的复杂 frontmatter
