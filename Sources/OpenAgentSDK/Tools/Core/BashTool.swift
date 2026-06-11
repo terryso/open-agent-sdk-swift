@@ -257,90 +257,99 @@ private func executeBashProcess(
     timeoutMs: Int,
     env: [String: String]? = nil
 ) async -> ToolExecuteResult {
-    return await withCheckedContinuation { continuation in
-        let accumulator = ProcessOutputAccumulator()
-        let process = configureBashProcess(command: command, cwd: cwd, env: env)
-        let stdoutPipe = Pipe()
-        let stderrPipe = Pipe()
+    let accumulator = ProcessOutputAccumulator()
+    let process = configureBashProcess(command: command, cwd: cwd, env: env)
+    let stdoutPipe = Pipe()
+    let stderrPipe = Pipe()
 
-        process.standardOutput = stdoutPipe
-        process.standardError = stderrPipe
+    process.standardOutput = stdoutPipe
+    process.standardError = stderrPipe
 
-        stdoutPipe.fileHandleForReading.readabilityHandler = { handler in
-            accumulator.stdoutData.append(handler.availableData)
-        }
-        stderrPipe.fileHandleForReading.readabilityHandler = { handler in
-            accumulator.stderrData.append(handler.availableData)
-        }
+    stdoutPipe.fileHandleForReading.readabilityHandler = { handler in
+        accumulator.stdoutData.append(handler.availableData)
+    }
+    stderrPipe.fileHandleForReading.readabilityHandler = { handler in
+        accumulator.stderrData.append(handler.availableData)
+    }
 
-        // Timeout: terminate process if it exceeds the limit.
-        // Captures process weakly to avoid retain cycles.
-        // Uses accumulator.timeoutFired (thread-safe via @unchecked Sendable)
-        // instead of DispatchWorkItem.isCancelled to avoid capturing a non-Sendable type.
-        DispatchQueue.global().asyncAfter(
-            deadline: .now() + .milliseconds(timeoutMs)
-        ) { [weak process] in
-            if let process = process, process.isRunning {
-                accumulator.timeoutFired = true
-                process.terminate()
+    return await withTaskCancellationHandler {
+        await withCheckedContinuation { continuation in
+            // Timeout: terminate process if it exceeds the limit.
+            // Captures process weakly to avoid retain cycles.
+            // Uses accumulator.timeoutFired (thread-safe via @unchecked Sendable)
+            // instead of DispatchWorkItem.isCancelled to avoid capturing a non-Sendable type.
+            DispatchQueue.global().asyncAfter(
+                deadline: .now() + .milliseconds(timeoutMs)
+            ) { [weak process] in
+                if let process = process, process.isRunning {
+                    accumulator.timeoutFired = true
+                    process.terminate()
+                }
             }
-        }
 
-        process.terminationHandler = { _ in
-            stdoutPipe.fileHandleForReading.readabilityHandler = nil
-            stderrPipe.fileHandleForReading.readabilityHandler = nil
+            process.terminationHandler = { _ in
+                stdoutPipe.fileHandleForReading.readabilityHandler = nil
+                stderrPipe.fileHandleForReading.readabilityHandler = nil
 
-            // Read any remaining data
-            accumulator.stdoutData.append(stdoutPipe.fileHandleForReading.readDataToEndOfFile())
-            accumulator.stderrData.append(stderrPipe.fileHandleForReading.readDataToEndOfFile())
+                // Read any remaining data
+                accumulator.stdoutData.append(stdoutPipe.fileHandleForReading.readDataToEndOfFile())
+                accumulator.stderrData.append(stderrPipe.fileHandleForReading.readDataToEndOfFile())
 
-            let stdout = String(data: accumulator.stdoutData, encoding: .utf8) ?? ""
-            let stderr = String(data: accumulator.stderrData, encoding: .utf8) ?? ""
-            let exitCode = process.terminationStatus
+                let stdout = String(data: accumulator.stdoutData, encoding: .utf8) ?? ""
+                let stderr = String(data: accumulator.stderrData, encoding: .utf8) ?? ""
+                let exitCode = process.terminationStatus
 
-            var output = ""
+                var output = ""
 
-            if accumulator.timeoutFired {
-                // Timeout was the cause of termination
-                output = "Command timed out after \(timeoutMs)ms."
-                if !stdout.isEmpty {
-                    output += "\n--- stdout so far ---\n" + stdout
+                if accumulator.timeoutFired {
+                    // Timeout was the cause of termination
+                    output = "Command timed out after \(timeoutMs)ms."
+                    if !stdout.isEmpty {
+                        output += "\n--- stdout so far ---\n" + stdout
+                    }
+                    if !stderr.isEmpty {
+                        output += "\n--- stderr so far ---\n" + stderr
+                    }
+                    let truncated = truncateOutput(output)
+                    guard !accumulator.resumed else { return }
+                    accumulator.resumed = true
+                    continuation.resume(returning: ToolExecuteResult(content: truncated, isError: true))
+                    return
                 }
+
+                // Normal completion
+                if !stdout.isEmpty { output += stdout }
                 if !stderr.isEmpty {
-                    output += "\n--- stderr so far ---\n" + stderr
+                    output += (output.isEmpty ? "" : "\n") + stderr
                 }
+                if exitCode != 0 {
+                    output += "\nExit code: \(exitCode)"
+                }
+
+                // Truncate if needed
                 let truncated = truncateOutput(output)
                 guard !accumulator.resumed else { return }
                 accumulator.resumed = true
-                continuation.resume(returning: ToolExecuteResult(content: truncated, isError: true))
-                return
+                continuation.resume(returning: ToolExecuteResult(content: truncated, isError: false))
             }
 
-            // Normal completion
-            if !stdout.isEmpty { output += stdout }
-            if !stderr.isEmpty {
-                output += (output.isEmpty ? "" : "\n") + stderr
+            do {
+                try process.run()
+            } catch {
+                guard !accumulator.resumed else { return }
+                accumulator.resumed = true
+                continuation.resume(returning: ToolExecuteResult(
+                    content: "Error starting process: \(error.localizedDescription)",
+                    isError: true
+                ))
             }
-            if exitCode != 0 {
-                output += "\nExit code: \(exitCode)"
-            }
-
-            // Truncate if needed
-            let truncated = truncateOutput(output)
-            guard !accumulator.resumed else { return }
-            accumulator.resumed = true
-            continuation.resume(returning: ToolExecuteResult(content: truncated, isError: false))
         }
-
-        do {
-            try process.run()
-        } catch {
-            guard !accumulator.resumed else { return }
-            accumulator.resumed = true
-            continuation.resume(returning: ToolExecuteResult(
-                content: "Error starting process: \(error.localizedDescription)",
-                isError: true
-            ))
+    } onCancel: {
+        // Cooperative cancellation (e.g., agent.interrupt() → Task.cancel()):
+        // Terminate the child process so the termination handler fires
+        // and resumes the continuation.
+        if process.isRunning {
+            process.terminate()
         }
     }
 }
