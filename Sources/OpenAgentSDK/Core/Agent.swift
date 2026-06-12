@@ -2264,7 +2264,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                             usage: totalUsage, turnCount: turnCount, startTime: startTime,
                             totalCostUsd: totalCostUsd,
                             costBreakdown: Array(costByModel.values),
-                            lastTurnInputTokens: lastTurnInputTokens
+                            lastTurnInputTokens: lastTurnInputTokens,
+                            errors: ["[\(statusCode)] \(errorMessage)"]
                         )
                         return
                     }
@@ -2489,17 +2490,20 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                                     "content": assistantContent
                                 ])
 
-                            case .error:
+                            case .error(let sseErrData):
                                 // SSE error event — fire hooks before yielding error
+                                let sseErrMsg = (sseErrData["error"] as? [String: Any])?["message"] as? String
+                                    ?? String(describing: sseErrData)
                                 await Self.fireStopAndEndHooks(hookRegistry: capturedHookRegistry, cwd: capturedCwd)
                                 // Emit AgentFailedEvent before yielding error
-                                await Self.emitAgentFailed(eventBus: capturedEventBus, sessionId: resolvedSessionId, error: "SSE error event", stepsCompleted: turnCount)
+                                await Self.emitAgentFailed(eventBus: capturedEventBus, sessionId: resolvedSessionId, error: sseErrMsg, stepsCompleted: turnCount)
                                 Self.yieldStreamError(
                                     continuation: continuation, text: accumulatedText,
                                     usage: totalUsage, turnCount: turnCount, startTime: startTime,
                                     totalCostUsd: totalCostUsd,
                                     costBreakdown: Array(costByModel.values),
-                                    lastTurnInputTokens: lastTurnInputTokens
+                                    lastTurnInputTokens: lastTurnInputTokens,
+                                    errors: [sseErrMsg]
                                 )
                                 return
 
@@ -2541,7 +2545,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                             usage: totalUsage, turnCount: turnCount, startTime: startTime,
                             totalCostUsd: totalCostUsd,
                             costBreakdown: Array(costByModel.values),
-                            lastTurnInputTokens: lastTurnInputTokens
+                            lastTurnInputTokens: lastTurnInputTokens,
+                            errors: [error.localizedDescription]
                         )
                         return
                     }
@@ -2975,7 +2980,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
         startTime: ContinuousClock.Instant,
         totalCostUsd: Double = 0.0,
         costBreakdown: [CostBreakdownEntry] = [],
-        lastTurnInputTokens: Int? = nil
+        lastTurnInputTokens: Int? = nil,
+        errors: [String] = []
     ) {
         continuation.yield(.result(SDKMessage.ResultData(
             subtype: .errorDuringExecution,
@@ -2985,6 +2991,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
             durationMs: computeDurationMs(ContinuousClock.now - startTime),
             totalCostUsd: totalCostUsd,
             costBreakdown: costBreakdown,
+            errors: errors.isEmpty ? nil : errors,
             lastTurnInputTokens: lastTurnInputTokens
         )))
         continuation.finish()
