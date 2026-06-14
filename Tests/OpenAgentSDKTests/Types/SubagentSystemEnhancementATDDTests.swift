@@ -43,6 +43,22 @@ final class AgentMcpServerSpecATDDTests: XCTestCase {
         }
     }
 
+    /// AC4 [P0]: AgentMcpServerSpec has .referenceWithTools(name:tools:) case
+    /// for Claude Code-style `{ name, tools }` MCP server references.
+    func testAgentMcpServerSpec_referenceWithToolsCase() {
+        let spec = AgentMcpServerSpec.referenceWithTools(
+            name: "github",
+            tools: ["list_prs", "create_issue"]
+        )
+
+        if case .referenceWithTools(let name, let tools) = spec {
+            XCTAssertEqual(name, "github")
+            XCTAssertEqual(tools, ["list_prs", "create_issue"])
+        } else {
+            XCTFail("Expected .referenceWithTools case")
+        }
+    }
+
     /// AC4 [P0]: AgentMcpServerSpec conforms to Sendable.
     func testAgentMcpServerSpec_conformsToSendable() {
         let spec = AgentMcpServerSpec.reference("server")
@@ -62,6 +78,16 @@ final class AgentMcpServerSpecATDDTests: XCTestCase {
         let a = AgentMcpServerSpec.reference("alpha")
         let b = AgentMcpServerSpec.reference("alpha")
         let c = AgentMcpServerSpec.reference("beta")
+        XCTAssertEqual(a, b)
+        XCTAssertNotEqual(a, c)
+    }
+
+    /// AC4 [P1]: AgentMcpServerSpec.referenceWithTools equality includes
+    /// both server name and optional tool list.
+    func testAgentMcpServerSpec_referenceWithToolsEquality_byNameAndTools() {
+        let a = AgentMcpServerSpec.referenceWithTools(name: "github", tools: ["list_prs"])
+        let b = AgentMcpServerSpec.referenceWithTools(name: "github", tools: ["list_prs"])
+        let c = AgentMcpServerSpec.referenceWithTools(name: "github", tools: ["create_issue"])
         XCTAssertEqual(a, b)
         XCTAssertNotEqual(a, c)
     }

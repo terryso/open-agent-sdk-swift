@@ -1022,18 +1022,25 @@ public struct AgentDefinition: Sendable {
 
 /// Specification for an MCP server to be made available to a sub-agent.
 ///
-/// Supports two modes:
+/// Supports three forms:
 /// - `.reference(String)`: References a parent agent's MCP server by name for lookup at spawn time.
+/// - `.referenceWithTools(name:tools:)`: References a parent MCP server and optionally exposes a tool subset.
 /// - `.inline(McpServerConfig)`: Provides a full MCP server configuration directly.
 ///
 /// ```swift
 /// let ref = AgentMcpServerSpec.reference("github-mcp")
+/// let filteredRef = AgentMcpServerSpec.referenceWithTools(name: "github-mcp", tools: ["list_prs"])
 /// let inline = AgentMcpServerSpec.inline(.stdio(McpStdioConfig(command: "npx", args: ["my-server"])))
 /// ```
 public enum AgentMcpServerSpec: Sendable, Equatable {
     /// Reference a parent agent's MCP server by name.
     /// The server is resolved at spawn time from the parent's `mcpServers` configuration.
     case reference(String)
+    /// Reference a parent MCP server by name and optionally restrict which tools are exposed.
+    ///
+    /// Mirrors Claude Code's `{ name: string, tools?: string[] }` subagent MCP server
+    /// shape while preserving the existing ``reference(_:)`` shorthand.
+    case referenceWithTools(name: String, tools: [String]?)
     /// Provide an inline MCP server configuration directly.
     case inline(McpServerConfig)
 }
@@ -1161,9 +1168,10 @@ public enum SubAgentFieldDiagnosticReason: String, Sendable, Equatable, CaseIter
     case isolationNotImplemented
     /// A non-empty `team_name` was supplied but team coordination runtime is not implemented.
     case teamCoordinationNotImplemented
-    /// A non-empty `skills` array was supplied but child skill registry wiring is deferred.
+    /// Legacy diagnostic retained for source compatibility with SDKs that emitted it
+    /// before child skill registry inheritance was wired.
     case skillsWiringDeferred
-    /// An `AgentMcpServerSpec.reference(...)` appeared but parent MCP config resolution is deferred.
+    /// An `AgentMcpServerSpec.reference(...)` could not be resolved from inherited MCP context.
     case mcpReferenceResolutionDeferred
 }
 
@@ -1185,9 +1193,9 @@ extension SubAgentFieldDiagnosticReason {
         case .teamCoordinationNotImplemented:
             return "team coordination is not implemented"
         case .skillsWiringDeferred:
-            return "child skill registry wiring is deferred"
+            return "child skill registry wiring was deferred by an older SDK"
         case .mcpReferenceResolutionDeferred:
-            return "parent MCP server reference resolution is deferred"
+            return "parent MCP server reference could not be resolved"
         }
     }
 }
@@ -1196,10 +1204,9 @@ extension SubAgentFieldDiagnosticReason {
 /// does not fully wire at runtime (Story 29.6).
 ///
 /// - `fieldName`: the schema field name (e.g. `"run_in_background"`, `"resume"`,
-///   `"isolation"`, `"team_name"`, `"skills"`, `"mcp_server_reference"`).
+///   `"isolation"`, `"team_name"`, `"mcp_server_reference"`).
 /// - `rawValue`: the user-supplied input stringified (e.g. `"true"`, `"abc123"`,
-///   `"worktree"`, `"github-mcp"`; multi-value inputs like `skills: ["a","b"]` are
-///   comma-joined in order with no surrounding whitespace).
+///   `"worktree"`, `"github-mcp"`).
 /// - `reason`: why the field is not wired (machine-readable enum).
 public struct SubAgentFieldDiagnostics: Sendable, Equatable {
     public let fieldName: String

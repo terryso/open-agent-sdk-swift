@@ -11,8 +11,8 @@ import XCTest
 /// Coverage:
 /// - AC1: Build compilation verification (example story)
 /// - AC2: AgentDefinition field completeness verification (9 fields)
-/// - AC3: AgentMcpServerSpec verification (2 modes)
-/// - AC4: Agent tool input type verification (11 fields)
+/// - AC3: AgentMcpServerSpec verification (3 forms)
+/// - AC4: Agent tool input type verification (13 fields)
 /// - AC5: Agent tool output type verification (3 status discriminations)
 /// - AC6: Subagent hook event verification
 /// - AC7: Multi-subagent orchestration demonstration
@@ -122,7 +122,10 @@ final class SubagentSystemCompatTests: XCTestCase {
         XCTAssertNil(def.mcpServers,
                      "AgentDefinition.mcpServers defaults to nil")
 
-        let defWithMcp = AgentDefinition(name: "test", mcpServers: [.reference("my-server")])
+        let defWithMcp = AgentDefinition(
+            name: "test",
+            mcpServers: [.referenceWithTools(name: "my-server", tools: ["read_file"])]
+        )
         XCTAssertNotNil(defWithMcp.mcpServers,
                        "AgentDefinition.mcpServers accepts AgentMcpServerSpec array")
     }
@@ -202,20 +205,28 @@ final class SubagentSystemCompatTests: XCTestCase {
     // MARK: - AC3: AgentMcpServerSpec Verification
 
     // ================================================================
-    // AC3: AgentMcpServerSpec two modes -- PASS (resolved by Story 17-6)
+    // AC3: AgentMcpServerSpec forms -- PASS
     // ================================================================
 
-    /// AC3 [PASS]: TS supports two MCP spec modes for subagents.
-    /// Swift AgentMcpServerSpec now has .reference(String) and .inline(McpServerConfig) cases.
+    /// AC3 [PASS]: TS supports string MCP refs, `{ name, tools }` refs,
+    /// and inline configs for subagents.
     func testAgentMcpServerSpec_missing() {
-        // Verify AgentMcpServerSpec exists with both modes
+        // Verify AgentMcpServerSpec exists with all supported forms
         let ref = AgentMcpServerSpec.reference("my-server")
+        let filteredRef = AgentMcpServerSpec.referenceWithTools(name: "github", tools: ["list_prs"])
         let inline = AgentMcpServerSpec.inline(.stdio(McpStdioConfig(command: "test", args: [])))
 
         if case .reference(let name) = ref {
             XCTAssertEqual(name, "my-server", "AgentMcpServerSpec.reference holds server name")
         } else {
             XCTFail("Expected .reference case")
+        }
+
+        if case .referenceWithTools(let name, let tools) = filteredRef {
+            XCTAssertEqual(name, "github", "AgentMcpServerSpec.referenceWithTools holds server name")
+            XCTAssertEqual(tools, ["list_prs"], "AgentMcpServerSpec.referenceWithTools holds tool subset")
+        } else {
+            XCTFail("Expected .referenceWithTools case")
         }
 
         if case .inline = inline {
@@ -225,9 +236,9 @@ final class SubagentSystemCompatTests: XCTestCase {
         }
 
         // Verify mcpServers field exists on AgentDefinition
-        let def = AgentDefinition(name: "test", mcpServers: [ref, inline])
+        let def = AgentDefinition(name: "test", mcpServers: [ref, filteredRef, inline])
         XCTAssertNotNil(def.mcpServers, "AgentDefinition.mcpServers accepts AgentMcpServerSpec array")
-        XCTAssertEqual(def.mcpServers?.count, 2, "AgentDefinition.mcpServers holds both reference and inline specs")
+        XCTAssertEqual(def.mcpServers?.count, 3, "AgentDefinition.mcpServers holds reference, filtered reference, and inline specs")
     }
 
     // MARK: - AC4: Agent Tool Input Type Verification
@@ -374,17 +385,43 @@ final class SubagentSystemCompatTests: XCTestCase {
                      "Agent tool schema has 'isolation' field matching TS isolation?: 'worktree'")
     }
 
+    // ================================================================
+    // AC4 #12: skills -- PASS
+    // ================================================================
+
+    /// AC4 #12 [PASS]: TS `skills?: string[]` maps to AgentToolInput.skills.
+    func testAgentToolInput_skills_pass() {
+        let schema = agentToolInputSchema
+        let properties = schema["properties"] as? [String: [String: Any]] ?? [:]
+        XCTAssertNotNil(properties["skills"],
+                     "Agent tool schema has 'skills' field matching TS skills?: string[]")
+    }
+
+    // ================================================================
+    // AC4 #13: mcpServers -- PASS
+    // ================================================================
+
+    /// AC4 #13 [PASS]: TS `mcpServers?: Array<string | { name, tools? }>`
+    /// maps to AgentToolInput.mcpServers.
+    func testAgentToolInput_mcpServers_pass() {
+        let schema = agentToolInputSchema
+        let properties = schema["properties"] as? [String: [String: Any]] ?? [:]
+        XCTAssertNotNil(properties["mcpServers"],
+                     "Agent tool schema has 'mcpServers' field matching TS mcpServers")
+    }
+
     /// AC4 [P0]: Summary of all AgentToolInput fields.
     func testAgentToolInput_coverageSummary() {
-        // AgentToolInput: 11 PASS + 0 PARTIAL + 0 MISSING = 11 fields
+        // AgentToolInput: 13 PASS + 0 PARTIAL + 0 MISSING = 13 fields
         // PASS: prompt, description, subagent_type, model, name, maxTurns,
-        //       resume, run_in_background, team_name, mode, isolation
-        let passCount = 11
+        //       resume, run_in_background, team_name, mode, isolation, skills,
+        //       mcpServers
+        let passCount = 13
         let missingCount = 0
         let total = passCount + missingCount
 
-        XCTAssertEqual(total, 11, "Should verify all 11 TS AgentInput fields")
-        XCTAssertEqual(passCount, 11, "11 AgentToolInput fields PASS")
+        XCTAssertEqual(total, 13, "Should verify all 13 TS AgentInput fields")
+        XCTAssertEqual(passCount, 13, "13 AgentToolInput fields PASS")
         XCTAssertEqual(missingCount, 0, "0 AgentToolInput fields MISSING (all resolved by Story 17-6)")
     }
 
@@ -627,7 +664,7 @@ final class SubagentSystemCompatTests: XCTestCase {
             FieldMapping(tsField: "AgentDefinition.maxTurns", swiftField: "AgentDefinition.maxTurns", status: "PASS", category: "agentDefinition"),
             FieldMapping(tsField: "AgentDefinition.criticalSystemReminder_EXPERIMENTAL", swiftField: "AgentDefinition.criticalSystemReminderExperimental: String?", status: "PASS", category: "agentDefinition"),
 
-            // AgentToolInput (11 TS fields)
+            // AgentToolInput (13 TS fields)
             FieldMapping(tsField: "AgentInput.prompt", swiftField: "AgentToolInput.prompt", status: "PASS", category: "agentToolInput"),
             FieldMapping(tsField: "AgentInput.description", swiftField: "AgentToolInput.description", status: "PASS", category: "agentToolInput"),
             FieldMapping(tsField: "AgentInput.subagent_type", swiftField: "AgentToolInput.subagent_type", status: "PASS", category: "agentToolInput"),
@@ -639,6 +676,8 @@ final class SubagentSystemCompatTests: XCTestCase {
             FieldMapping(tsField: "AgentInput.team_name", swiftField: "AgentToolInput.team_name", status: "PASS", category: "agentToolInput"),
             FieldMapping(tsField: "AgentInput.mode", swiftField: "AgentToolInput.mode", status: "PASS", category: "agentToolInput"),
             FieldMapping(tsField: "AgentInput.isolation", swiftField: "AgentToolInput.isolation", status: "PASS", category: "agentToolInput"),
+            FieldMapping(tsField: "AgentInput.skills", swiftField: "AgentToolInput.skills", status: "PASS", category: "agentToolInput"),
+            FieldMapping(tsField: "AgentInput.mcpServers", swiftField: "AgentToolInput.mcpServers", status: "PASS", category: "agentToolInput"),
 
             // AgentOutput / SubAgentResult (14 TS fields/statuses)
             FieldMapping(tsField: "AgentOutput.text", swiftField: "SubAgentResult.text", status: "PASS", category: "agentOutput"),
@@ -682,8 +721,8 @@ final class SubagentSystemCompatTests: XCTestCase {
         let partialCount = allFields.filter { $0.status == "PARTIAL" }.count
         let missingCount = allFields.filter { $0.status == "MISSING" }.count
 
-        XCTAssertEqual(allFields.count, 49, "Should have exactly 49 subagent system field verifications")
-        XCTAssertEqual(passCount, 45, "45 items PASS")
+        XCTAssertEqual(allFields.count, 51, "Should have exactly 51 subagent system field verifications")
+        XCTAssertEqual(passCount, 47, "47 items PASS")
         XCTAssertEqual(partialCount, 3, "3 items PARTIAL")
         XCTAssertEqual(missingCount, 0, "0 items MISSING")
     }
@@ -691,28 +730,28 @@ final class SubagentSystemCompatTests: XCTestCase {
     /// AC8 [P0]: Category-level breakdown summary.
     func testCompatReport_categoryBreakdown() {
         // AgentDefinition: 7 PASS + 2 PARTIAL + 0 MISSING = 9
-        // AgentToolInput: 11 PASS + 0 PARTIAL + 0 MISSING = 11
+        // AgentToolInput: 13 PASS + 0 PARTIAL + 0 MISSING = 13
         // AgentOutput: 14 PASS + 0 PARTIAL + 0 MISSING = 14
         // Hooks: 2 PASS + 1 PARTIAL = 3
         // Spawner: 9 PASS + 0 PARTIAL + 0 MISSING = 9
         // Builtins: 2 PASS + 0 PARTIAL + 1 N/A = 3
-        // Total: 45 PASS + 3 PARTIAL + 0 MISSING + 1 N/A = 49 (N/A excluded from PASS/PARTIAL/MISSING)
-        let grandTotal = 9 + 11 + 14 + 3 + 9 + 3
+        // Total: 47 PASS + 3 PARTIAL + 0 MISSING + 1 N/A = 51 (N/A excluded from PASS/PARTIAL/MISSING)
+        let grandTotal = 9 + 13 + 14 + 3 + 9 + 3
 
-        XCTAssertEqual(grandTotal, 49, "Total subagent system verifications should be 49")
+        XCTAssertEqual(grandTotal, 51, "Total subagent system verifications should be 51")
     }
 
     /// AC8 [P0]: Overall compatibility summary counts.
     func testCompatReport_overallSummary() {
-        // 45 PASS + 3 PARTIAL + 0 MISSING = 48 (1 N/A excluded: registerAgents design difference)
-        // Total with N/A = 49
-        let totalPass = 45
+        // 47 PASS + 3 PARTIAL + 0 MISSING = 50 (1 N/A excluded: registerAgents design difference)
+        // Total with N/A = 51
+        let totalPass = 47
         let totalPartial = 3
         let totalMissing = 0
         let total = totalPass + totalPartial + totalMissing
 
-        XCTAssertEqual(total, 48, "Total PASS+PARTIAL+MISSING should be 48 (plus 1 N/A = 49)")
-        XCTAssertEqual(totalPass, 45, "45 items PASS")
+        XCTAssertEqual(total, 50, "Total PASS+PARTIAL+MISSING should be 50 (plus 1 N/A = 51)")
+        XCTAssertEqual(totalPass, 47, "47 items PASS")
         XCTAssertEqual(totalPartial, 3, "3 items PARTIAL")
         XCTAssertEqual(totalMissing, 0, "0 items MISSING")
 

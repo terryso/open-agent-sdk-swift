@@ -1773,7 +1773,18 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                         apiKey: options.apiKey ?? "",
                         baseURL: options.baseURL,
                         parentModel: model,
-                        provider: options.provider
+                        provider: options.provider,
+                        inheritanceContext: SubAgentInheritanceContext(
+                            mcpServers: options.mcpServers,
+                            skillRegistry: options.skillRegistry,
+                            permissionMode: options.permissionMode,
+                            canUseTool: options.canUseTool,
+                            cwd: options.resolvedCwd,
+                            env: options.env,
+                            sandbox: options.sandbox,
+                            eventBus: options.eventBus,
+                            maxSkillRecursionDepth: options.maxSkillRecursionDepth
+                        )
                     )
                     let toolResults = await ToolExecutor.executeTools(
                         toolUseBlocks: toolUseBlocks,
@@ -2652,17 +2663,29 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                                 )))
                             }
 
+                            let (capturedPermissionMode, capturedCanUseTool) = _permissionLock.withLock {
+                                (self.options.permissionMode, self.options.canUseTool)
+                            }
+
                             // Create agent spawner if AgentTool is registered
                             let streamSpawner = Self.createSubAgentSpawner(
                                 tools: allToolProtocols,
                                 apiKey: capturedApiKey,
                                 baseURL: capturedBaseURL,
                                 parentModel: capturedModel,
-                                provider: capturedProvider
+                                provider: capturedProvider,
+                                inheritanceContext: SubAgentInheritanceContext(
+                                    mcpServers: capturedMcpServers,
+                                    skillRegistry: capturedSkillRegistry,
+                                    permissionMode: capturedPermissionMode,
+                                    canUseTool: capturedCanUseTool,
+                                    cwd: capturedCwd,
+                                    env: capturedEnv,
+                                    sandbox: capturedSandbox,
+                                    eventBus: capturedEventBus,
+                                    maxSkillRecursionDepth: capturedMaxSkillRecursionDepth
+                                )
                             )
-                            let (capturedPermissionMode, capturedCanUseTool) = _permissionLock.withLock {
-                                (self.options.permissionMode, self.options.canUseTool)
-                            }
                             let toolResults = await ToolExecutor.executeTools(
                                 toolUseBlocks: toolUseBlocks,
                                 tools: allToolProtocols,
@@ -3338,7 +3361,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
         apiKey: String,
         baseURL: String?,
         parentModel: String,
-        provider: LLMProvider
+        provider: LLMProvider,
+        inheritanceContext: SubAgentInheritanceContext = .empty
     ) -> SubAgentSpawner? {
         let hasLauncher = tools.contains { SubAgentLauncherNames.contains($0.name) }
         guard hasLauncher else { return nil }
@@ -3347,7 +3371,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
             baseURL: baseURL,
             parentModel: parentModel,
             parentTools: tools,
-            provider: provider
+            provider: provider,
+            inheritanceContext: inheritanceContext
         )
     }
 

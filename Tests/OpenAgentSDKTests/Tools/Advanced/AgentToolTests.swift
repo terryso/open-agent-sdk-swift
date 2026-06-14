@@ -478,11 +478,46 @@ final class AgentToolTests: XCTestCase {
 
         let expectedKeys: Set<String> = [
             "prompt", "description", "subagent_type", "model", "name",
-            "maxTurns", "run_in_background", "isolation", "team_name",
-            "mode", "resume"
+            "maxTurns", "skills", "mcpServers", "run_in_background",
+            "isolation", "team_name", "mode", "resume"
         ]
         XCTAssertEqual(Set(taskProps!.keys), expectedKeys)
         XCTAssertEqual(Set(taskProps!.keys), Set(agentProps!.keys))
+    }
+
+    /// Claude Code parity: Task tool input accepts `skills` and `mcpServers`
+    /// and forwards both to the sub-agent spawner.
+    func testTaskTool_forwardsSkillsAndMcpServers() async throws {
+        let mockSpawner = MockSubAgentSpawner(result: SubAgentResult(
+            text: "Spawned", toolCalls: [], isError: false
+        ))
+        let tool = createTaskTool()
+        let context = ToolContext(cwd: "/tmp", agentSpawner: mockSpawner)
+
+        let input: [String: Any] = [
+            "prompt": "Run a pipeline step",
+            "description": "Pipeline step",
+            "skills": ["bmad-create-story", "bmad-dev-story"],
+            "mcpServers": [
+                "github",
+                [
+                    "name": "filesystem",
+                    "tools": ["read_file", "write_file"]
+                ] as [String: Any]
+            ]
+        ]
+
+        let result = await tool.call(input: input, context: context)
+
+        XCTAssertFalse(result.isError)
+        let call = try XCTUnwrap(mockSpawner.lastCall)
+        XCTAssertEqual(call.skills, ["bmad-create-story", "bmad-dev-story"])
+        XCTAssertEqual(call.mcpServers?.count, 2)
+        XCTAssertEqual(call.mcpServers?.first, .reference("github"))
+        XCTAssertEqual(
+            call.mcpServers?.dropFirst().first,
+            .referenceWithTools(name: "filesystem", tools: ["read_file", "write_file"])
+        )
     }
 
     /// AC2 [P0]: Task tool success path mirrors Agent's -- returns text result.

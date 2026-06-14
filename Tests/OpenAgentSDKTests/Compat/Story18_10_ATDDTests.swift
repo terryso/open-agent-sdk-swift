@@ -12,7 +12,7 @@
 //        mode, isolation upgraded from MISSING to PASS
 // - AC3: AgentOutput three-state discrimination PASS -- completed/async_launched/sub_agent_entered
 //        and all associated fields upgraded from MISSING to PASS
-// - AC4: AgentMcpServerSpec PASS -- reference and inline modes upgraded from MISSING to PASS
+// - AC4: AgentMcpServerSpec PASS -- reference, filtered reference, and inline modes
 // - AC5: SubAgentSpawner extended params PASS -- disallowedTools, mcpServers, skills,
 //        runInBackground upgraded from MISSING to PASS
 // - AC6: Summary counts updated -- all FieldMapping tables and overall counts reflect new PASS counts
@@ -389,10 +389,11 @@ final class Story18_10_AgentOutputATDDTests: XCTestCase {
 }
 
 // ================================================================
-// MARK: - AC4: AgentMcpServerSpec PASS (3 tests)
+// MARK: - AC4: AgentMcpServerSpec PASS (4 tests)
 // ================================================================
 
-/// Verifies AgentMcpServerSpec supports both reference and inline modes.
+/// Verifies AgentMcpServerSpec supports string reference, filtered reference,
+/// and inline config modes.
 final class Story18_10_McpServerSpecATDDTests: XCTestCase {
 
     /// AC4 [P0]: AgentMcpServerSpec.reference(String) exists.
@@ -418,18 +419,30 @@ final class Story18_10_McpServerSpecATDDTests: XCTestCase {
         }
     }
 
-    /// AC4 [P0]: MCP server spec table should be 2 PASS, 0 MISSING.
-    /// After 18-10: 2 MISSING upgraded to PASS.
-    func testAC4_mcpServerMappings_2PASS() {
+    /// AC4 [P0]: AgentMcpServerSpec.referenceWithTools(name:tools:) exists.
+    func testAC4_referenceWithToolsMode_pass() {
+        let ref = AgentMcpServerSpec.referenceWithTools(name: "github", tools: ["list_prs"])
+
+        if case .referenceWithTools(let name, let tools) = ref {
+            XCTAssertEqual(name, "github")
+            XCTAssertEqual(tools, ["list_prs"])
+        } else {
+            XCTFail("Expected .referenceWithTools case")
+        }
+    }
+
+    /// AC4 [P0]: MCP server spec table should be 3 PASS, 0 MISSING.
+    /// After Claude Code parity update: filtered reference is also PASS.
+    func testAC4_mcpServerMappings_3PASS() {
         // After 18-10 implementation:
-        // PASS (2): string reference, inline config
+        // PASS (3): string reference, filtered reference, inline config
         // MISSING (0): all resolved
-        let passCount = 2
+        let passCount = 3
         let missingCount = 0
         let total = passCount + missingCount
 
-        XCTAssertEqual(total, 2, "MCP server spec table has 2 entries")
-        XCTAssertEqual(passCount, 2, "2 AgentMcpServerSpec modes PASS")
+        XCTAssertEqual(total, 3, "MCP server spec table has 3 entries")
+        XCTAssertEqual(passCount, 3, "3 AgentMcpServerSpec modes PASS")
         XCTAssertEqual(missingCount, 0, "0 AgentMcpServerSpec modes MISSING")
     }
 }
@@ -556,54 +569,54 @@ final class Story18_10_SubAgentSpawnerATDDTests: XCTestCase {
 /// must be updated to reflect. They serve as the TDD RED phase specification.
 final class Story18_10_CompatReportATDDTests: XCTestCase {
 
-    /// AC6 [P0]: Complete field-level coverage should be 45 PASS, 3 PARTIAL, 0 MISSING, 1 N/A (49 total).
+    /// AC6 [P0]: Complete field-level coverage should be 47 PASS, 3 PARTIAL, 0 MISSING, 1 N/A (51 total).
     ///
     /// After 18-10, the FieldMapping arrays in testCompatReport_completeFieldLevelCoverage()
     /// should reflect:
     /// - AgentDefinition: 7 PASS + 2 PARTIAL + 0 MISSING = 9 (4 MISSING -> PASS)
-    /// - AgentToolInput: 11 PASS + 0 PARTIAL + 0 MISSING = 11 (5 MISSING -> PASS)
+    /// - AgentToolInput: 13 PASS + 0 PARTIAL + 0 MISSING = 13 (7 MISSING -> PASS)
     /// - AgentOutput: 14 PASS + 0 PARTIAL + 0 MISSING = 14 (11 MISSING -> PASS)
     /// - Hooks: 2 PASS + 1 PARTIAL + 0 MISSING = 3 (unchanged)
     /// - Spawner: 9 PASS + 0 PARTIAL + 0 MISSING = 9 (4 MISSING -> PASS)
     /// - Builtins: 2 PASS + 0 PARTIAL + 1 N/A = 3 (registerAgents reclassified from MISSING to N/A)
-    /// Total: 45 PASS + 3 PARTIAL + 0 MISSING + 1 N/A = 49 (was: 21 PASS, 3 PARTIAL, 25 MISSING)
+    /// Total: 47 PASS + 3 PARTIAL + 0 MISSING + 1 N/A = 51
     func testAC6_compatReport_completeFieldLevelCoverage() {
         // Expected after 18-10 implementation:
         // registerAgents() reclassified from MISSING to N/A (design difference, not a compat gap)
-        let expectedPass = 45     // was 21, now +24 (4+5+11+4 hook fields unchanged in this test)
+        let expectedPass = 47
         let expectedPartial = 3   // unchanged: description, model, hookInput.agent_id
         let expectedMissing = 0   // was 25, now 0 (all resolved; registerAgents reclassified to N/A)
         let expectedNA = 1        // registerAgents() (design difference)
 
-        XCTAssertEqual(expectedPass, 45, "45 items PASS after 18-10")
+        XCTAssertEqual(expectedPass, 47, "47 items PASS after Claude Code parity update")
         XCTAssertEqual(expectedPartial, 3, "3 items PARTIAL after 18-10")
         XCTAssertEqual(expectedMissing, 0, "0 items MISSING after 18-10")
-        XCTAssertEqual(expectedPass + expectedPartial + expectedMissing + expectedNA, 49,
-                       "Total should be 49 field verifications (45 PASS + 3 PARTIAL + 0 MISSING + 1 N/A)")
+        XCTAssertEqual(expectedPass + expectedPartial + expectedMissing + expectedNA, 51,
+                       "Total should be 51 field verifications (47 PASS + 3 PARTIAL + 0 MISSING + 1 N/A)")
     }
 
     /// AC6 [P0]: Category-level breakdown should reflect updated counts.
     ///
     /// After 18-10:
     /// - AgentDefinition: 7 PASS + 2 PARTIAL + 0 MISSING = 9
-    /// - AgentToolInput: 11 PASS + 0 PARTIAL + 0 MISSING = 11
+    /// - AgentToolInput: 13 PASS + 0 PARTIAL + 0 MISSING = 13
     /// - AgentOutput: 14 PASS + 0 PARTIAL + 0 MISSING = 14
     /// - Hooks: 2 PASS + 1 PARTIAL + 0 MISSING = 3
     /// - Spawner: 9 PASS + 0 PARTIAL + 0 MISSING = 9
     /// - Builtins: 2 PASS + 0 PARTIAL + 1 N/A = 3 (registerAgents is N/A, not MISSING)
     func testAC6_compatReport_categoryBreakdown() {
         let agentDef = 9
-        let agentInput = 11
+        let agentInput = 13
         let agentOutput = 14
         let hooks = 3
         let spawner = 9
         let builtins = 3
         let grandTotal = agentDef + agentInput + agentOutput + hooks + spawner + builtins
 
-        XCTAssertEqual(grandTotal, 49, "Total subagent system verifications should be 49")
+        XCTAssertEqual(grandTotal, 51, "Total subagent system verifications should be 51")
     }
 
-    /// AC6 [P0]: Overall compatibility summary should be 45 PASS, 3 PARTIAL, 0 MISSING, 1 N/A.
+    /// AC6 [P0]: Overall compatibility summary should be 47 PASS, 3 PARTIAL, 0 MISSING, 1 N/A.
     ///
     /// This test verifies the expected counts for testCompatReport_overallSummary().
     /// After 18-10, all 25 MISSING items are upgraded to PASS or N/A:
@@ -617,13 +630,13 @@ final class Story18_10_CompatReportATDDTests: XCTestCase {
     /// - PARTIAL: description (optionality), model (no enum), hookInput.agent_id (generic)
     func testAC6_compatReport_overallSummary() {
         // Expected after 18-10 implementation:
-        let expectedTotalPass = 45     // was 21, upgraded by 24 (25 minus registerAgents which became N/A)
+        let expectedTotalPass = 47
         let expectedTotalPartial = 3   // unchanged
         let expectedTotalMissing = 0   // was 25, all resolved or reclassified
         let total = expectedTotalPass + expectedTotalPartial + expectedTotalMissing
 
-        XCTAssertEqual(total, 48, "Total PASS+PARTIAL+MISSING should be 48 (plus 1 N/A = 49)")
-        XCTAssertEqual(expectedTotalPass, 45, "45 items PASS after 18-10")
+        XCTAssertEqual(total, 50, "Total PASS+PARTIAL+MISSING should be 50 (plus 1 N/A = 51)")
+        XCTAssertEqual(expectedTotalPass, 47, "47 items PASS after Claude Code parity update")
         XCTAssertEqual(expectedTotalPartial, 3, "3 items PARTIAL after 18-10")
         XCTAssertEqual(expectedTotalMissing, 0, "0 items MISSING after 18-10")
     }

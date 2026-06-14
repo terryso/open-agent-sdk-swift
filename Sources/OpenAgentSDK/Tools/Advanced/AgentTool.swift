@@ -39,6 +39,10 @@ private struct AgentToolInput: Codable {
     let model: String?
     let name: String?
     let maxTurns: Int?
+    /// Optional list of skill names to make available to the child agent.
+    let skills: [String]?
+    /// Optional MCP server references/configs to make available to the child agent.
+    let mcpServers: [AgentMcpServerSpec]?
     /// Whether to launch the sub-agent in the background.
     let runInBackground: Bool?
     /// Isolation mode for the sub-agent (e.g., "worktree").
@@ -57,6 +61,9 @@ private struct AgentToolInput: Codable {
         case model
         case name
         case maxTurns
+        case skills
+        case mcpServers
+        case mcp_servers
         case run_in_background
         case isolation
         case team_name
@@ -72,6 +79,8 @@ private struct AgentToolInput: Codable {
         model = try container.decodeIfPresent(String.self, forKey: .model)
         name = try container.decodeIfPresent(String.self, forKey: .name)
         maxTurns = try container.decodeIfPresent(Int.self, forKey: .maxTurns)
+        skills = try container.decodeIfPresent([String].self, forKey: .skills)
+        mcpServers = try Self.decodeMcpServers(from: container)
         runInBackground = try container.decodeIfPresent(Bool.self, forKey: .run_in_background)
         isolation = try container.decodeIfPresent(String.self, forKey: .isolation)
         teamName = try container.decodeIfPresent(String.self, forKey: .team_name)
@@ -87,11 +96,68 @@ private struct AgentToolInput: Codable {
         try container.encodeIfPresent(model, forKey: .model)
         try container.encodeIfPresent(name, forKey: .name)
         try container.encodeIfPresent(maxTurns, forKey: .maxTurns)
+        try container.encodeIfPresent(skills, forKey: .skills)
+        try container.encodeIfPresent(mcpServers?.map { McpServerToolInput(spec: $0) }, forKey: .mcpServers)
         try container.encodeIfPresent(runInBackground, forKey: .run_in_background)
         try container.encodeIfPresent(isolation, forKey: .isolation)
         try container.encodeIfPresent(teamName, forKey: .team_name)
         try container.encodeIfPresent(mode, forKey: .mode)
         try container.encodeIfPresent(resume, forKey: .resume)
+    }
+
+    private static func decodeMcpServers(from container: KeyedDecodingContainer<CodingKeys>) throws -> [AgentMcpServerSpec]? {
+        if let items = try container.decodeIfPresent([McpServerToolInput].self, forKey: .mcpServers) {
+            return items.map(\.spec)
+        }
+        if let items = try container.decodeIfPresent([McpServerToolInput].self, forKey: .mcp_servers) {
+            return items.map(\.spec)
+        }
+        return nil
+    }
+}
+
+/// Codable bridge for Claude Code-style `mcpServers` tool input.
+///
+/// Accepts both string references (`"github"`) and object references
+/// (`{"name":"github","tools":["list_prs"]}`).
+private struct McpServerToolInput: Codable {
+    let spec: AgentMcpServerSpec
+
+    private enum CodingKeys: String, CodingKey {
+        case name
+        case tools
+    }
+
+    init(spec: AgentMcpServerSpec) {
+        self.spec = spec
+    }
+
+    init(from decoder: Decoder) throws {
+        let singleValue = try decoder.singleValueContainer()
+        if let name = try? singleValue.decode(String.self) {
+            spec = .reference(name)
+            return
+        }
+
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let name = try container.decode(String.self, forKey: .name)
+        let tools = try container.decodeIfPresent([String].self, forKey: .tools)
+        spec = .referenceWithTools(name: name, tools: tools)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        switch spec {
+        case .reference(let name):
+            var singleValue = encoder.singleValueContainer()
+            try singleValue.encode(name)
+        case .referenceWithTools(let name, let tools):
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(name, forKey: .name)
+            try container.encodeIfPresent(tools, forKey: .tools)
+        case .inline:
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode("<inline>", forKey: .name)
+        }
     }
 }
 
@@ -106,6 +172,31 @@ private nonisolated(unsafe) let subAgentLauncherSchema: ToolInputSchema = [
         "model": ["type": "string", "description": "Optional model override for this agent"] as [String: Any],
         "name": ["type": "string", "description": "Name for the spawned agent"] as [String: Any],
         "maxTurns": ["type": "integer", "description": "Optional max turns override for this agent"] as [String: Any],
+        "skills": [
+            "type": "array",
+            "items": ["type": "string"],
+            "description": "Optional skill names to make available to the sub-agent"
+        ] as [String: Any],
+        "mcpServers": [
+            "type": "array",
+            "items": [
+                "anyOf": [
+                    ["type": "string"],
+                    [
+                        "type": "object",
+                        "properties": [
+                            "name": ["type": "string"],
+                            "tools": [
+                                "type": "array",
+                                "items": ["type": "string"]
+                            ] as [String: Any],
+                        ] as [String: Any],
+                        "required": ["name"],
+                    ] as [String: Any],
+                ]
+            ] as [String: Any],
+            "description": "Optional MCP server references to make available to the sub-agent"
+        ] as [String: Any],
         "run_in_background": ["type": "boolean", "description": "Whether to launch the sub-agent in the background"] as [String: Any],
         "isolation": ["type": "string", "description": "Isolation mode for the sub-agent (e.g., \"worktree\")"] as [String: Any],
         "team_name": ["type": "string", "description": "Team name for multi-agent coordination"] as [String: Any],
@@ -158,8 +249,8 @@ private func createSubAgentLauncherTool(name: String, description: String) -> To
             allowedTools: agentDef?.tools,
             maxTurns: input.maxTurns ?? agentDef?.maxTurns,
             disallowedTools: agentDef?.disallowedTools,
-            mcpServers: agentDef?.mcpServers,
-            skills: agentDef?.skills,
+            mcpServers: input.mcpServers ?? agentDef?.mcpServers,
+            skills: input.skills ?? agentDef?.skills,
             runInBackground: input.runInBackground,
             isolation: input.isolation,
             name: input.name,

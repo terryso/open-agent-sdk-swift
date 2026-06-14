@@ -22,6 +22,49 @@ enum SubAgentLauncherNames {
     }
 }
 
+// MARK: - SubAgentInheritanceContext
+
+/// Parent agent context inherited by a spawned child agent.
+///
+/// The parent tool pool still carries concrete tool availability, but Claude Code
+/// parity also requires child agents to inherit the host's configured skill
+/// registry, MCP server config, cwd/env, and permission boundary.
+struct SubAgentInheritanceContext: Sendable {
+    var mcpServers: [String: McpServerConfig]?
+    var skillRegistry: SkillRegistry?
+    var permissionMode: PermissionMode?
+    var canUseTool: CanUseToolFn?
+    var cwd: String?
+    var env: [String: String]?
+    var sandbox: SandboxSettings?
+    var eventBus: EventBus?
+    var maxSkillRecursionDepth: Int
+
+    static let empty = SubAgentInheritanceContext()
+
+    init(
+        mcpServers: [String: McpServerConfig]? = nil,
+        skillRegistry: SkillRegistry? = nil,
+        permissionMode: PermissionMode? = nil,
+        canUseTool: CanUseToolFn? = nil,
+        cwd: String? = nil,
+        env: [String: String]? = nil,
+        sandbox: SandboxSettings? = nil,
+        eventBus: EventBus? = nil,
+        maxSkillRecursionDepth: Int = 4
+    ) {
+        self.mcpServers = mcpServers
+        self.skillRegistry = skillRegistry
+        self.permissionMode = permissionMode
+        self.canUseTool = canUseTool
+        self.cwd = cwd
+        self.env = env
+        self.sandbox = sandbox
+        self.eventBus = eventBus
+        self.maxSkillRecursionDepth = maxSkillRecursionDepth
+    }
+}
+
 // MARK: - DefaultSubAgentSpawner
 
 /// Concrete implementation of ``SubAgentSpawner`` that creates real ``Agent`` instances.
@@ -39,6 +82,7 @@ final class DefaultSubAgentSpawner: SubAgentSpawner, @unchecked Sendable {
     private let parentTools: [ToolProtocol]
     private let provider: LLMProvider
     private let client: (any LLMClient)?
+    private let inheritanceContext: SubAgentInheritanceContext
 
     init(
         apiKey: String,
@@ -46,7 +90,8 @@ final class DefaultSubAgentSpawner: SubAgentSpawner, @unchecked Sendable {
         parentModel: String,
         parentTools: [ToolProtocol],
         provider: LLMProvider = .anthropic,
-        client: (any LLMClient)? = nil
+        client: (any LLMClient)? = nil,
+        inheritanceContext: SubAgentInheritanceContext = .empty
     ) {
         self.apiKey = apiKey
         self.baseURL = baseURL
@@ -54,6 +99,7 @@ final class DefaultSubAgentSpawner: SubAgentSpawner, @unchecked Sendable {
         self.parentTools = parentTools
         self.provider = provider
         self.client = client
+        self.inheritanceContext = inheritanceContext
     }
 
     func spawn(
@@ -112,23 +158,46 @@ final class DefaultSubAgentSpawner: SubAgentSpawner, @unchecked Sendable {
         // declaration contract to the final pool to avoid silently broadening.
         let allowedDeclarations = toolDeclarations(from: allowedTools)
         let disallowedDeclarations = toolDeclarations(from: disallowedTools)
-        let subTools = filterTools(
+        var subTools = filterTools(
             allowedDeclarations: allowedDeclarations,
             disallowedDeclarations: disallowedDeclarations
         ).filtered
+        subTools = filterInheritedMcpTools(subTools, mcpServers: mcpServers)
 
-        // 2. Resolve MCP servers from spec (reference lookup or inline)
+        let childSkillRegistry = makeChildSkillRegistry(skills: skills)
+        if let childSkillRegistry {
+            subTools = replacingSkillTool(in: subTools, registry: childSkillRegistry)
+        }
+
+        // 2. Resolve MCP servers from spec.
+        // Parent MCP references are already present in `parentTools` after the parent
+        // agent assembles its tool pool. Keep those inherited tool instances instead
+        // of reconnecting the whole server in the child, because `{ name, tools }`
+        // must be able to expose a server subset without re-adding every tool.
+        // Inline MCP configs are child-local and still need to be passed through.
         var resolvedMcpServers: [String: McpServerConfig] = [:]
+        var unresolvedMcpReferences: [String] = []
         if let mcpServers {
             for spec in mcpServers {
                 switch spec {
-                case .reference:
-                    // Reference lookup would require parent MCP config access.
-                    // For now, references are stored but not resolved at runtime.
-                    // Full runtime wiring is deferred to a future story.
-                    break
+                case .reference(let name):
+                    if !hasInheritedMcpTools(serverName: name) {
+                        if let config = inheritanceContext.mcpServers?[name] {
+                            resolvedMcpServers[name] = config
+                        } else {
+                            unresolvedMcpReferences.append(name)
+                        }
+                    }
+                case .referenceWithTools(let name, let tools):
+                    if !hasInheritedMcpTools(serverName: name) {
+                        if (tools?.isEmpty ?? true), let config = inheritanceContext.mcpServers?[name] {
+                            resolvedMcpServers[name] = config
+                        } else {
+                            unresolvedMcpReferences.append(name)
+                        }
+                    }
                 case .inline(let config):
-                    // Use a deterministic key for inline configs
+                    // Use a deterministic key for inline configs.
                     let key = "inline-\(resolvedMcpServers.count)"
                     resolvedMcpServers[key] = config
                 }
@@ -146,16 +215,23 @@ final class DefaultSubAgentSpawner: SubAgentSpawner, @unchecked Sendable {
             provider: provider,
             systemPrompt: systemPrompt,
             maxTurns: resolvedMaxTurns,
-            tools: subTools.isEmpty ? nil : subTools
+            permissionMode: mode ?? inheritanceContext.permissionMode ?? .default,
+            canUseTool: inheritanceContext.canUseTool,
+            cwd: inheritanceContext.cwd,
+            tools: subTools.isEmpty ? nil : subTools,
+            mcpServers: resolvedMcpServers.isEmpty ? nil : resolvedMcpServers,
+            skillRegistry: childSkillRegistry,
+            maxSkillRecursionDepth: inheritanceContext.maxSkillRecursionDepth,
+            sandbox: inheritanceContext.sandbox,
+            env: inheritanceContext.env,
+            eventBus: inheritanceContext.eventBus
         )
         options.allowedToolDeclarations = allowedDeclarations
         options.disallowedToolDeclarations = disallowedDeclarations
 
-        if !resolvedMcpServers.isEmpty { options.mcpServers = resolvedMcpServers }
-        if let mode { options.permissionMode = mode }
         if let name { options.agentName = name }
 
-        // Note: skills, runInBackground, isolation, teamName, and resume
+        // Note: runInBackground, isolation, teamName, and resume
         // are declared fields but full runtime wiring is deferred.
 
         // 3.5 Collect deferred-field diagnostics (Story 29.6). Surfaced on
@@ -166,9 +242,8 @@ final class DefaultSubAgentSpawner: SubAgentSpawner, @unchecked Sendable {
             runInBackground: runInBackground,
             isolation: isolation,
             teamName: teamName,
-            skills: skills,
             resume: resume,
-            mcpServers: mcpServers
+            unresolvedMcpReferences: unresolvedMcpReferences
         )
 
         // 4. Execute and collect result
@@ -181,6 +256,81 @@ final class DefaultSubAgentSpawner: SubAgentSpawner, @unchecked Sendable {
 
     // MARK: - Private
 
+    private func makeChildSkillRegistry(skills: [String]?) -> SkillRegistry? {
+        guard let parentRegistry = inheritanceContext.skillRegistry else { return nil }
+        guard let skills else { return parentRegistry }
+
+        let childRegistry = SkillRegistry()
+        for skillName in skills {
+            if let skill = parentRegistry.find(skillName) {
+                childRegistry.register(skill)
+            }
+        }
+        return childRegistry
+    }
+
+    private func replacingSkillTool(in tools: [ToolProtocol], registry: SkillRegistry) -> [ToolProtocol] {
+        let replacement = createSkillTool(registry: registry)
+        var replaced = false
+        let mapped = tools.map { tool -> ToolProtocol in
+            guard tool.name == "Skill" else { return tool }
+            replaced = true
+            return replacement
+        }
+        return replaced ? mapped : tools
+    }
+
+    private func filterInheritedMcpTools(_ tools: [ToolProtocol], mcpServers: [AgentMcpServerSpec]?) -> [ToolProtocol] {
+        guard let mcpServers else { return tools }
+        let filters = mcpToolFilters(from: mcpServers)
+        guard !filters.isEmpty else {
+            return tools.filter { Self.mcpToolParts($0.name) == nil }
+        }
+
+        return tools.filter { tool in
+            guard let parts = Self.mcpToolParts(tool.name) else { return true }
+            guard let allowedTools = filters[parts.server] else { return false }
+            guard let allowedTools else { return true }
+            return allowedTools.contains(parts.tool) || allowedTools.contains(tool.name.lowercased())
+        }
+    }
+
+    private func mcpToolFilters(from specs: [AgentMcpServerSpec]) -> [String: Set<String>?] {
+        var filters: [String: Set<String>?] = [:]
+        for spec in specs {
+            switch spec {
+            case .reference(let name):
+                filters.updateValue(nil, forKey: name.lowercased())
+            case .referenceWithTools(let name, let tools):
+                if let tools, !tools.isEmpty {
+                    filters.updateValue(Set(tools.map { $0.lowercased() }), forKey: name.lowercased())
+                } else {
+                    filters.updateValue(nil, forKey: name.lowercased())
+                }
+            case .inline:
+                continue
+            }
+        }
+        return filters
+    }
+
+    private func hasInheritedMcpTools(serverName: String) -> Bool {
+        let normalized = serverName.lowercased()
+        return parentTools.contains { tool in
+            Self.mcpToolParts(tool.name)?.server == normalized
+        }
+    }
+
+    private static func mcpToolParts(_ toolName: String) -> (server: String, tool: String)? {
+        guard toolName.hasPrefix("mcp__") else { return nil }
+        let parts = toolName.components(separatedBy: "__")
+        guard parts.count == 3, parts[0] == "mcp" else { return nil }
+        let server = parts[1].lowercased()
+        let tool = parts[2].lowercased()
+        guard !server.isEmpty, !tool.isEmpty else { return nil }
+        return (server, tool)
+    }
+
     /// Collect runtime diagnostics for subagent fields that the schema accepts but the
     /// SDK does not fully wire (Story 29.6).
     ///
@@ -188,21 +338,19 @@ final class DefaultSubAgentSpawner: SubAgentSpawner, @unchecked Sendable {
     /// Emits a diagnostic only when the caller actually opted into a deferred behavior:
     ///   - `run_in_background` truthy check is `== true` (a literal `false` is NOT deferred)
     ///   - string fields use a non-empty check (`""` is NOT deferred)
-    ///   - `skills` uses a non-empty-array check (`[]` is NOT deferred)
     ///   - each `.reference` MCP spec emits its own diagnostic (no dedup) so observers
     ///     see every unresolved reference
     ///
     /// Appends in a FIXED deterministic order so downstream assertions are stable (AC5):
-    /// `run_in_background` → `resume` → `isolation` → `team_name` → `skills` →
+    /// `run_in_background` → `resume` → `isolation` → `team_name` →
     /// `mcp_server_reference`. Returns an empty array when nothing is deferred; the caller
     /// decides whether to coerce `[]` → `nil` (AC8).
     private func collectFieldDiagnostics(
         runInBackground: Bool?,
         isolation: String?,
         teamName: String?,
-        skills: [String]?,
         resume: String?,
-        mcpServers: [AgentMcpServerSpec]?
+        unresolvedMcpReferences: [String]
     ) -> [SubAgentFieldDiagnostics] {
         var diags: [SubAgentFieldDiagnostics] = []
 
@@ -238,27 +386,13 @@ final class DefaultSubAgentSpawner: SubAgentSpawner, @unchecked Sendable {
                 reason: .teamCoordinationNotImplemented
             ))
         }
-        // 5. skills (non-empty array; comma-joined in order, no surrounding whitespace)
-        if let skills, !skills.isEmpty {
+        // 5. mcp_server_reference — only unresolved references emit diagnostics.
+        for name in unresolvedMcpReferences {
             diags.append(SubAgentFieldDiagnostics(
-                fieldName: "skills",
-                rawValue: skills.joined(separator: ","),
-                reason: .skillsWiringDeferred
+                fieldName: "mcp_server_reference",
+                rawValue: name,
+                reason: .mcpReferenceResolutionDeferred
             ))
-        }
-        // 6. mcp_server_reference — each `.reference` emits its own diagnostic (no dedup)
-        if let mcpServers {
-            for spec in mcpServers {
-                if case .reference(let name) = spec {
-                    diags.append(SubAgentFieldDiagnostics(
-                        fieldName: "mcp_server_reference",
-                        rawValue: name,
-                        reason: .mcpReferenceResolutionDeferred
-                    ))
-                }
-                // `.inline` configs ARE wired into the child agent's MCP config today,
-                // so they never produce a diagnostic.
-            }
         }
 
         return diags

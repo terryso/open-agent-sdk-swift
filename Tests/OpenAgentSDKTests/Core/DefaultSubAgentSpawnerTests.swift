@@ -48,6 +48,65 @@ final class DefaultSubAgentSpawnerTests: XCTestCase {
         return AnthropicClient(apiKey: "test-key", baseURL: nil, urlSession: urlSession)
     }
 
+    private final class CapturingToolsClient: LLMClient, @unchecked Sendable {
+        private let lock = NSLock()
+        private var _capturedTools: [[String: Any]]?
+
+        var capturedTools: [[String: Any]]? {
+            lock.withLock { _capturedTools }
+        }
+
+        nonisolated func sendMessage(
+            model: String,
+            messages: [[String: Any]],
+            maxTokens: Int,
+            system: String?,
+            tools: [[String: Any]]?,
+            toolChoice: [String: Any]?,
+            thinking: [String: Any]?,
+            temperature: Double?
+        ) async throws -> [String: Any] {
+            lock.withLock {
+                _capturedTools = tools
+            }
+            return [
+                "content": [["type": "text", "text": "child done"]],
+                "stop_reason": "end_turn",
+                "usage": ["input_tokens": 1, "output_tokens": 1],
+            ]
+        }
+
+        nonisolated func streamMessage(
+            model: String,
+            messages: [[String: Any]],
+            maxTokens: Int,
+            system: String?,
+            tools: [[String: Any]]?,
+            toolChoice: [String: Any]?,
+            thinking: [String: Any]?,
+            temperature: Double?
+        ) async throws -> AsyncThrowingStream<SSEEvent, Error> {
+            AsyncThrowingStream { continuation in
+                continuation.finish()
+            }
+        }
+    }
+
+    private func makeNamedTool(_ name: String) -> ToolProtocol {
+        defineTool(
+            name: name,
+            description: "Test tool \(name)",
+            inputSchema: ["type": "object"],
+            isReadOnly: true
+        ) { _ in
+            "ok"
+        }
+    }
+
+    private func capturedToolNames(from client: CapturingToolsClient) -> [String] {
+        (client.capturedTools ?? []).compactMap { $0["name"] as? String }
+    }
+
     // MARK: - AC4: Tool filtering — removes AgentTool
 
     /// AC4 [P0]: spawn filters out the "Agent" tool from the sub-agent's tool list.
@@ -845,20 +904,31 @@ final class DefaultSubAgentSpawnerTests: XCTestCase {
         XCTAssertEqual(teamDiags.first?.reason, .teamCoordinationNotImplemented)
     }
 
-    // MARK: AC7 -- skills deferred diagnostic with comma-joined rawValue
+    // MARK: AC7 -- skills inherited from parent registry
 
-    /// AC7 [P0]: spawn with `skills: ["commit", "review"]` emits a
-    /// `skillsWiringDeferred` diagnostic whose `rawValue` is the comma-joined list,
-    /// preserving order with no surrounding whitespace. Child skill registry wiring is
-    /// deferred (epic #3).
-    func testSpawn_skillsSet_emitsDiagnosticWithCommaJoinedValue() async throws {
-        let parentTools: [ToolProtocol] = [createReadTool()]
+    /// AC7 [P0]: spawn with `skills: ["commit"]` builds a child Skill tool from
+    /// the inherited parent registry and exposes only the requested skill.
+    func testSpawn_skillsSet_filtersInheritedSkillRegistry() async throws {
+        let registry = SkillRegistry()
+        registry.register(Skill(
+            name: "commit",
+            description: "Commit changes",
+            promptTemplate: "Commit prompt"
+        ))
+        registry.register(Skill(
+            name: "review",
+            description: "Review changes",
+            promptTemplate: "Review prompt"
+        ))
+        let client = CapturingToolsClient()
+        let parentTools: [ToolProtocol] = [createReadTool(), createSkillTool(registry: registry)]
         let spawner = DefaultSubAgentSpawner(
             apiKey: "test-key",
             baseURL: nil,
             parentModel: "claude-sonnet-4-6",
             parentTools: parentTools,
-            client: makeMockClient()
+            client: client,
+            inheritanceContext: SubAgentInheritanceContext(skillRegistry: registry)
         )
 
         let result = await spawner.spawn(
@@ -869,7 +939,7 @@ final class DefaultSubAgentSpawnerTests: XCTestCase {
             maxTurns: nil,
             disallowedTools: nil,
             mcpServers: nil,
-            skills: ["commit", "review"],
+            skills: ["commit"],
             runInBackground: nil,
             isolation: nil,
             name: nil,
@@ -878,12 +948,15 @@ final class DefaultSubAgentSpawnerTests: XCTestCase {
             resume: nil
         )
 
-        let diags = try XCTUnwrap(result.fieldDiagnostics, "skills non-empty must produce diagnostics")
-        let skillsDiags = diags.filter { $0.fieldName == "skills" }
-        XCTAssertEqual(skillsDiags.count, 1, "Exactly one skills diagnostic")
-        XCTAssertEqual(skillsDiags.first?.rawValue, "commit,review",
-                       "rawValue must be comma-joined in order with no spaces")
-        XCTAssertEqual(skillsDiags.first?.reason, .skillsWiringDeferred)
+        XCTAssertFalse(result.isError)
+        let skillDiags = (result.fieldDiagnostics ?? []).filter { $0.fieldName == "skills" }
+        XCTAssertTrue(skillDiags.isEmpty, "skills are wired, not reported as deferred")
+
+        let tools = try XCTUnwrap(client.capturedTools)
+        let skillTool = try XCTUnwrap(tools.first { ($0["name"] as? String) == "Skill" })
+        let description = try XCTUnwrap(skillTool["description"] as? String)
+        XCTAssertTrue(description.contains("commit"), "Requested skill should be listed")
+        XCTAssertFalse(description.contains("review"), "Unrequested skill should not be listed")
     }
 
     // MARK: AC4 -- MCP server reference diagnostics (inline excluded)
@@ -923,6 +996,191 @@ final class DefaultSubAgentSpawnerTests: XCTestCase {
         XCTAssertEqual(refDiags.count, 1, "Exactly one mcp_server_reference diagnostic")
         XCTAssertEqual(refDiags.first?.rawValue, "github-mcp")
         XCTAssertEqual(refDiags.first?.reason, .mcpReferenceResolutionDeferred)
+    }
+
+    /// AC4 [P0]: A Claude Code-style `{ name, tools }` MCP spec keeps only the
+    /// requested tools from that inherited MCP server and does not expose other
+    /// MCP servers.
+    func testSpawn_mcpReferenceWithTools_filtersInheritedMcpTools() async throws {
+        let client = CapturingToolsClient()
+        let parentTools: [ToolProtocol] = [
+            createReadTool(),
+            makeNamedTool("mcp__github__list_prs"),
+            makeNamedTool("mcp__github__create_issue"),
+            makeNamedTool("mcp__slack__post_message"),
+        ]
+        let spawner = DefaultSubAgentSpawner(
+            apiKey: "test-key",
+            baseURL: nil,
+            parentModel: "claude-sonnet-4-6",
+            parentTools: parentTools,
+            client: client
+        )
+
+        let result = await spawner.spawn(
+            prompt: "MCP filtered task",
+            model: nil,
+            systemPrompt: nil,
+            allowedTools: nil,
+            maxTurns: nil,
+            disallowedTools: nil,
+            mcpServers: [.referenceWithTools(name: "github", tools: ["list_prs"])],
+            skills: nil,
+            runInBackground: nil,
+            isolation: nil,
+            name: nil,
+            teamName: nil,
+            mode: nil,
+            resume: nil
+        )
+
+        XCTAssertFalse(result.isError)
+        XCTAssertFalse((result.fieldDiagnostics ?? []).contains { $0.fieldName == "mcp_server_reference" })
+        let names = capturedToolNames(from: client)
+        XCTAssertTrue(names.contains("Read"))
+        XCTAssertTrue(names.contains("mcp__github__list_prs"))
+        XCTAssertFalse(names.contains("mcp__github__create_issue"))
+        XCTAssertFalse(names.contains("mcp__slack__post_message"))
+    }
+
+    /// AC4 [P0]: A string MCP reference keeps every inherited tool from that
+    /// server while excluding tools from unrelated MCP servers.
+    func testSpawn_mcpReference_keepsAllInheritedToolsForServer() async throws {
+        let client = CapturingToolsClient()
+        let parentTools: [ToolProtocol] = [
+            createReadTool(),
+            makeNamedTool("mcp__github__list_prs"),
+            makeNamedTool("mcp__github__create_issue"),
+            makeNamedTool("mcp__slack__post_message"),
+        ]
+        let spawner = DefaultSubAgentSpawner(
+            apiKey: "test-key",
+            baseURL: nil,
+            parentModel: "claude-sonnet-4-6",
+            parentTools: parentTools,
+            client: client
+        )
+
+        let result = await spawner.spawn(
+            prompt: "MCP server task",
+            model: nil,
+            systemPrompt: nil,
+            allowedTools: nil,
+            maxTurns: nil,
+            disallowedTools: nil,
+            mcpServers: [.reference("github")],
+            skills: nil,
+            runInBackground: nil,
+            isolation: nil,
+            name: nil,
+            teamName: nil,
+            mode: nil,
+            resume: nil
+        )
+
+        XCTAssertFalse(result.isError)
+        XCTAssertFalse((result.fieldDiagnostics ?? []).contains { $0.fieldName == "mcp_server_reference" })
+        let names = capturedToolNames(from: client)
+        XCTAssertTrue(names.contains("Read"))
+        XCTAssertTrue(names.contains("mcp__github__list_prs"))
+        XCTAssertTrue(names.contains("mcp__github__create_issue"))
+        XCTAssertFalse(names.contains("mcp__slack__post_message"))
+    }
+
+    /// AC4 [P1]: If the parent tool pool does not yet contain inherited MCP
+    /// tools, a plain string server reference can fall back to the inherited
+    /// parent MCP config because it intentionally exposes the full server.
+    func testSpawn_mcpReferenceWithoutInheritedTools_fallsBackToParentConfig() async throws {
+        let client = CapturingToolsClient()
+        let server = InProcessMCPServer(
+            name: "github",
+            tools: [
+                makeNamedTool("list_prs"),
+                makeNamedTool("create_issue"),
+            ]
+        )
+        let spawner = DefaultSubAgentSpawner(
+            apiKey: "test-key",
+            baseURL: nil,
+            parentModel: "claude-sonnet-4-6",
+            parentTools: [createReadTool()],
+            client: client,
+            inheritanceContext: SubAgentInheritanceContext(
+                mcpServers: ["github": await server.asConfig()]
+            )
+        )
+
+        let result = await spawner.spawn(
+            prompt: "MCP server task",
+            model: nil,
+            systemPrompt: nil,
+            allowedTools: nil,
+            maxTurns: nil,
+            disallowedTools: nil,
+            mcpServers: [.reference("github")],
+            skills: nil,
+            runInBackground: nil,
+            isolation: nil,
+            name: nil,
+            teamName: nil,
+            mode: nil,
+            resume: nil
+        )
+
+        XCTAssertFalse(result.isError)
+        XCTAssertFalse((result.fieldDiagnostics ?? []).contains { $0.fieldName == "mcp_server_reference" })
+        let names = capturedToolNames(from: client)
+        XCTAssertTrue(names.contains("mcp__github__list_prs"))
+        XCTAssertTrue(names.contains("mcp__github__create_issue"))
+    }
+
+    /// AC4 [P1]: If `{ name, tools }` cannot be satisfied from inherited MCP
+    /// tool instances, the spawner must not reconnect the full parent server and
+    /// accidentally expose tools outside the requested subset.
+    func testSpawn_mcpReferenceWithToolsWithoutInheritedTools_emitsDiagnostic() async throws {
+        let client = CapturingToolsClient()
+        let server = InProcessMCPServer(
+            name: "github",
+            tools: [
+                makeNamedTool("list_prs"),
+                makeNamedTool("create_issue"),
+            ]
+        )
+        let spawner = DefaultSubAgentSpawner(
+            apiKey: "test-key",
+            baseURL: nil,
+            parentModel: "claude-sonnet-4-6",
+            parentTools: [createReadTool()],
+            client: client,
+            inheritanceContext: SubAgentInheritanceContext(
+                mcpServers: ["github": await server.asConfig()]
+            )
+        )
+
+        let result = await spawner.spawn(
+            prompt: "MCP filtered task",
+            model: nil,
+            systemPrompt: nil,
+            allowedTools: nil,
+            maxTurns: nil,
+            disallowedTools: nil,
+            mcpServers: [.referenceWithTools(name: "github", tools: ["list_prs"])],
+            skills: nil,
+            runInBackground: nil,
+            isolation: nil,
+            name: nil,
+            teamName: nil,
+            mode: nil,
+            resume: nil
+        )
+
+        XCTAssertFalse(result.isError)
+        let refDiags = try XCTUnwrap(result.fieldDiagnostics).filter { $0.fieldName == "mcp_server_reference" }
+        XCTAssertEqual(refDiags.count, 1)
+        XCTAssertEqual(refDiags.first?.rawValue, "github")
+        let names = capturedToolNames(from: client)
+        XCTAssertFalse(names.contains("mcp__github__list_prs"))
+        XCTAssertFalse(names.contains("mcp__github__create_issue"))
     }
 
     /// AC4 [P0]: An `AgentMcpServerSpec.inline(...)` config does NOT emit a
@@ -1002,7 +1260,7 @@ final class DefaultSubAgentSpawnerTests: XCTestCase {
 
     /// AC5 [P0]: When multiple deferred fields are set together, every field produces
     /// its own diagnostic, and the diagnostics appear in the fixed order
-    /// (run_in_background -> resume -> isolation -> team_name -> skills ->
+    /// (run_in_background -> resume -> isolation -> team_name ->
     /// mcp_server_reference) defined by Task 1.3. This makes the surface assertion-friendly.
     func testSpawn_multipleDeferredFields_allEmittedInOrder() async throws {
         let parentTools: [ToolProtocol] = [createReadTool()]
@@ -1034,13 +1292,12 @@ final class DefaultSubAgentSpawnerTests: XCTestCase {
         let diags = try XCTUnwrap(result.fieldDiagnostics, "Multiple deferred fields must produce diagnostics")
         XCTAssertGreaterThanOrEqual(diags.count, 5,
                                     "All five deferred categories must surface")
-        // Fixed order (AC5): run_in_background, resume, isolation, team_name, skills, mcp_server_reference
+        // Fixed order (AC5): run_in_background, resume, isolation, team_name, mcp_server_reference
         let expectedOrder = [
             "run_in_background",
             "resume",
             "isolation",
             "team_name",
-            "skills",
             "mcp_server_reference",
         ]
         let actualOrder = diags.map(\.fieldName)

@@ -77,7 +77,9 @@ This keeps the recursion boundary explicit: only the topmost agent in a chain ca
 
 ## Deferred Field Diagnostics
 
-`AgentToolInput` accepts several fields that mirror the Claude Code `Task` schema but are **not yet wired into runtime behavior**: `run_in_background`, `isolation`, `team_name`, `resume`, `skills`, and MCP server references. The SDK currently **accepts** these fields (so prompts that send them keep working) but treats them as deferred. Rather than silently dropping them, the spawner emits a per-field diagnostic so hosts can observe what was ignored.
+`AgentToolInput` accepts several fields that mirror the Claude Code `Task` schema. The SDK wires `skills` by inheriting the parent skill registry, and wires MCP server references by inheriting the parent tool pool. String MCP refs expose all inherited tools for that server; `{ name, tools }` refs expose only the named tool subset.
+
+Some runtime controls are still accepted but deferred: `run_in_background`, `isolation`, `team_name`, and `resume`. Rather than silently dropping those fields, the spawner emits a per-field diagnostic so hosts can observe what was ignored. An MCP reference also emits a diagnostic when it cannot be resolved from inherited MCP context.
 
 Each diagnostic is represented by ``SubAgentFieldDiagnostics`` and carries a machine-readable ``SubAgentFieldDiagnosticReason`` plus the raw value that was supplied. Diagnostics aggregate into ``SubAgentResult/fieldDiagnostics`` and render into the Agent tool's output as a clearly delimited block:
 
