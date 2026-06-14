@@ -413,4 +413,95 @@ final class ToolDeclarationFilterTests: XCTestCase {
         XCTAssertEqual(unknown.status, .unknown)
         XCTAssertNil(unknown.toolRestriction)
     }
+
+    // MARK: - Story 29.7: Full Declaration Spectrum Integration
+
+    /// Story 29.7 integration test exercising the **full** parse→filter chain across
+    /// all four declaration shapes in a single assertion. Unlike the 29.5 single-point
+    /// tests above (which each isolate one rule), this test feeds one `allowed-tools`
+    /// fragment containing all four declaration types simultaneously:
+    ///   - SDK name (`WebSearch`)
+    ///   - MCP namespaced (`mcp__github__list_prs`)
+    ///   - Pattern (`Bash(git diff:*)`)
+    ///   - Unknown (`UnknownTool`)
+    ///
+    /// and asserts that `parseToolDeclarations` preserves all four (29.4 AC1/AC2) AND
+    /// `filterToolsByDeclarations` routes them correctly: matched available tools stay,
+    /// the unknown declaration surfaces in `unmatchedDeclarations`, and the pattern
+    /// declaration surfaces in `patternDeclarations` (29.5 AC3).
+    ///
+    /// TDD phase note: Story 29.7 verifies ALREADY-IMPLEMENTED behavior from Stories
+    /// 29.4 + 29.5. There is no red phase — this test is expected to be green on first
+    /// run (per story Dev Notes line 206).
+    ///
+    /// Integration target: Stories 29.4 (parser preserves all statuses) + 29.5 (filter).
+    func testParseAndFilter_allFourDeclarationTypes_preservedAndRouted() throws {
+        // Given: a single allowed-tools fragment with all four declaration shapes
+        let allowedFragment = "WebSearch, mcp__github__list_prs, Bash(git diff:*), UnknownTool"
+        // Tokenize via the shared parser: fromToolNames trims/splits on commas.
+        // (SkillLoader.parseToolDelegates uses the same underlying tokenizer.)
+        let tokens = allowedFragment
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+        let declarations = ToolDeclaration.fromToolNames(tokens)
+
+        // (1) parse preserves all four (Story 29.4 AC1/AC2 — no status collapses)
+        XCTAssertEqual(declarations.count, 4,
+                       "All four declarations must survive parsing (no collapse to unrestricted)")
+        let byRawName = Dictionary(uniqueKeysWithValues: declarations.map { ($0.rawName, $0) })
+
+        let webSearch = try XCTUnwrap(byRawName["WebSearch"], "WebSearch declaration must be present")
+        XCTAssertEqual(webSearch.status, .recognizedSDK,
+                       "WebSearch must classify as .recognizedSDK")
+
+        let mcp = try XCTUnwrap(byRawName["mcp__github__list_prs"], "MCP declaration must be present")
+        XCTAssertEqual(mcp.status, .recognizedMCP,
+                       "MCP namespaced name must classify as .recognizedMCP")
+        XCTAssertNil(mcp.toolRestriction,
+                     "MCP declaration must have nil toolRestriction (no enum case)")
+
+        let bashPattern = try XCTUnwrap(byRawName["Bash(git diff:*)"], "Bash pattern declaration must be present")
+        XCTAssertEqual(bashPattern.normalizedName, "bash",
+                       "Pattern base name must normalize to 'bash'")
+        XCTAssertEqual(bashPattern.pattern, "git diff:*",
+                       "Pattern must be preserved through parsing")
+        XCTAssertEqual(bashPattern.status, .recognizedSDK,
+                       "Patterned SDK name must classify as .recognizedSDK on its base")
+
+        let unknown = try XCTUnwrap(byRawName["UnknownTool"], "Unknown declaration must be present")
+        XCTAssertEqual(unknown.status, .unknown,
+                       "Unknown name must classify as .unknown (never silently unrestricted)")
+
+        // (2) filter routes them correctly (Story 29.5 AC3)
+        // Available pool: matches three of the four (WebSearch, mcp__github__list_prs, Bash).
+        // UnknownTool has no matching available tool.
+        let available = makeTools("WebSearch", "Bash", "mcp__github__list_prs")
+
+        let (filtered, diagnostics) = filterToolsByDeclarations(
+            available: available,
+            allowed: declarations,
+            disallowed: nil
+        )
+
+        let filteredNames = Set(filtered.map { $0.name })
+        XCTAssertTrue(filteredNames.contains("WebSearch"),
+                      "WebSearch must be retained (declared + available)")
+        XCTAssertTrue(filteredNames.contains("Bash"),
+                      "Bash must be retained (pattern declaration matches base 'Bash')")
+        XCTAssertTrue(filteredNames.contains("mcp__github__list_prs"),
+                      "MCP tool must be retained (declared + available)")
+        XCTAssertEqual(filtered.count, 3,
+                       "Exactly the three matched tools must survive; got: \(filteredNames)")
+
+        // UnknownTool was declared but nothing matched → unmatchedDeclarations
+        let unmatchedRawNames = diagnostics.unmatchedDeclarations.map(\.rawName)
+        XCTAssertTrue(unmatchedRawNames.contains("UnknownTool"),
+                      "UnknownTool must surface in unmatchedDeclarations; got: \(unmatchedRawNames)")
+
+        // Bash(git diff:*) carries a pattern → patternDeclarations (parsed but not enforced)
+        let patternRawNames = diagnostics.patternDeclarations.map(\.rawName)
+        XCTAssertTrue(patternRawNames.contains("Bash(git diff:*)"),
+                      "Pattern declaration must surface in patternDeclarations; got: \(patternRawNames)")
+    }
 }

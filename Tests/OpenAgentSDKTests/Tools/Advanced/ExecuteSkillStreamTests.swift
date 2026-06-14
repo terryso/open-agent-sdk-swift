@@ -525,6 +525,72 @@ final class ExecuteSkillStreamTests: XCTestCase {
         XCTAssertTrue(promptText.contains("- baseDir: <none>"),
                       "Prompt must render missing baseDir as '- baseDir: <none>'; got: \(promptText)")
     }
+
+    // MARK: - Story 29.7: Package Context Integration
+
+    /// Story 29.7 integration test for the package-context + declaration-parsing seam.
+    ///
+    /// Unlike the 29.3 single-point tests above (which each isolate one package-context
+    /// field), this test assembles a filesystem Skill that has **all three** package
+    /// signals at once — `baseDir`, `supportingFiles`, AND `toolDeclarations` (the
+    /// 29.4 metadata) — and asserts the prompt still carries the absolute baseDir, the
+    /// relative supporting-file path, and the "Skill package context:" marker. This
+    /// proves that Story 29.4's `toolDeclarations` parsing does not break Story 29.3's
+    /// prompt assembly: the two features coexist on one Skill instance without
+    /// interference.
+    ///
+    /// TDD phase note: Story 29.7 verifies ALREADY-IMPLEMENTED behavior from Stories
+    /// 29.1–29.6. There is no red phase — this test is expected to be green on first
+    /// run (per story Dev Notes line 206).
+    ///
+    /// Integration target: Stories 29.3 (package context prompt) + 29.4 (declarations).
+    func testFilesystemSkill_withBaseDirAndSupportingFilesAndToolDeclarations_assemblesCompletePrompt() async throws {
+        // A filesystem Skill carrying all three signals at once. toolDeclarations is
+        // the 29.4 metadata (carried from frontmatter); it does NOT enter the prompt
+        // directly, but its presence must not break the package-context assembly.
+        let registry = SkillRegistry()
+        registry.register(Skill(
+            name: "full-filesystem-skill-29-7",
+            description: "Skill exercising baseDir + supportingFiles + toolDeclarations together",
+            toolDeclarations: [
+                ToolDeclaration.parse("mcp__github__list_prs"),
+                ToolDeclaration.parse("Read"),
+            ],
+            promptTemplate: "Run the workflow",
+            baseDir: "/abs/skill/dir-29-7",
+            supportingFiles: ["references/workflow-steps.md"]
+        ))
+
+        setupMockResponse()
+        let client = AnthropicClient(apiKey: "test-key", urlSession: makeMockSession())
+        let agent = Agent(options: AgentOptions(
+            apiKey: "test-key",
+            model: "claude-sonnet-4-6",
+            tools: getAllBaseTools(tier: .core),
+            skillRegistry: registry
+        ), client: client)
+
+        let stream = agent.executeSkillStream("full-filesystem-skill-29-7", args: "do thing")
+        for await _ in stream {}
+
+        guard let body = SkillStreamMockURLProtocol.lastRequestBody else {
+            XCTFail("No request body captured; mock did not intercept the streaming request")
+            return
+        }
+        let promptText = extractPromptTextFromRequestBody(body) ?? ""
+
+        // (a) absolute baseDir must still appear
+        XCTAssertTrue(promptText.contains("/abs/skill/dir-29-7"),
+                      "Prompt must contain absolute baseDir even when toolDeclarations are set; got: \(promptText)")
+        // (b) supporting file relative path must still appear (not expanded to absolute)
+        XCTAssertTrue(promptText.contains("references/workflow-steps.md"),
+                      "Prompt must list supporting file as a relative path; got: \(promptText)")
+        XCTAssertFalse(promptText.contains("/abs/skill/dir-29-7/references/workflow-steps.md"),
+                       "Supporting file must NOT be expanded to an absolute path (progressive disclosure); got: \(promptText)")
+        // (c) the package-context marker must still be present
+        XCTAssertTrue(promptText.contains("Skill package context:"),
+                      "Prompt must contain the 'Skill package context:' marker; got: \(promptText)")
+    }
 }
 
 // MARK: - Mock URL Protocol

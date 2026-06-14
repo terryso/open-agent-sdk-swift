@@ -1142,4 +1142,122 @@ final class DefaultSubAgentSpawnerTests: XCTestCase {
         XCTAssertNil(result.fieldDiagnostics,
                      "Default fieldDiagnostics must be nil for backward compatibility")
     }
+
+    // MARK: - Story 29.7: Dual Diagnostics Integration
+
+    /// Story 29.7 integration tests for the **dual diagnostic dimension boundary**:
+    /// `SubAgentFieldDiagnostics` (Story 29.6 — deferred-field dimension) must stay
+    /// independent of `ToolFilterDiagnostics` (Story 29.5 — tool-filtering dimension).
+    ///
+    /// Per Story 29.6 Dev Notes ("Boundary with 29.5"): the spawner currently discards
+    /// tool-filter diagnostics at the boundary (DefaultSubAgentSpawner.swift:108 keeps
+    /// only `.filtered`). These tests pin that boundary so a future change that
+    /// accidentally mixes the two dimensions would fail loudly.
+    ///
+    /// TDD phase note: Story 29.7 verifies ALREADY-IMPLEMENTED behavior from Stories
+    /// 29.1–29.6. There is no red phase — these tests are expected to be green on
+    /// first run (per story Dev Notes line 206).
+
+    /// AC5 [P0]: A spawn that simultaneously triggers BOTH a deferred-field diagnostic
+    /// (`run_in_background: true`) AND a tool-filter mismatch (`allowedTools` containing
+    /// an unknown name) must surface ONLY the field diagnostic in
+    /// `SubAgentResult.fieldDiagnostics`. Tool-filter diagnostics must NOT pollute the
+    /// field-diagnostics dimension — they are an orthogonal concern.
+    ///
+    /// Integration target: Stories 29.5 (filter diagnostics, discarded at boundary) +
+    /// 29.6 (field diagnostics, surfaced on the result).
+    func testSpawn_runInBackgroundAndUnknownAllowedTool_fieldDiagnosticsOnlyContainFields() async throws {
+        let parentTools: [ToolProtocol] = [createReadTool()]
+        let spawner = DefaultSubAgentSpawner(
+            apiKey: "test-key",
+            baseURL: nil,
+            parentModel: "claude-sonnet-4-6",
+            parentTools: parentTools,
+            client: makeMockClient()
+        )
+
+        // runInBackground triggers a 29.6 field diagnostic; allowedTools with an
+        // unknown name would trigger a 29.5 tool-filter diagnostic — but the latter
+        // is discarded at the spawner boundary (DefaultSubAgentSpawner.swift:108).
+        let result = await spawner.spawn(
+            prompt: "Deferred + unknown tool",
+            model: nil,
+            systemPrompt: nil,
+            allowedTools: ["Read", "UnknownTool"],
+            maxTurns: nil,
+            disallowedTools: nil,
+            mcpServers: nil,
+            skills: nil,
+            runInBackground: true,
+            isolation: nil,
+            name: nil,
+            teamName: nil,
+            mode: nil,
+            resume: nil
+        )
+
+        let diags = try XCTUnwrap(result.fieldDiagnostics,
+                                  "run_in_background:true must produce a field diagnostic")
+
+        // Exactly one field diagnostic — the run_in_background one.
+        // The unknown-tool filter mismatch must NOT appear here.
+        XCTAssertEqual(diags.count, 1,
+                       "fieldDiagnostics must contain exactly the deferred-field entry; got: \(diags.map(\.fieldName))")
+        XCTAssertEqual(diags.first?.fieldName, "run_in_background",
+                       "The single field diagnostic must be the run_in_background one")
+        // Explicit negative: no tool-filter signal leaks into the field dimension.
+        let fieldNames = diags.map(\.fieldName)
+        XCTAssertFalse(fieldNames.contains(where: { $0.lowercased().contains("tool") || $0.lowercased().contains("filter") }),
+                       "fieldDiagnostics must NOT carry any tool-filter dimension entries; got: \(fieldNames)")
+    }
+
+    /// AC5 [P0]: When the AgentTool rendering layer consumes a `SubAgentResult` carrying
+    /// `fieldDiagnostics`, its output must contain ONLY the deferred-field block — never
+    /// any tool-filter (e.g. `[Tools used:]`-adjacent) diagnostic. We drive this through
+    /// `createTaskTool()` with a `MockSubAgentSpawner` that returns a result with a
+    /// field diagnostic, asserting the rendered output carries the field block and does
+    /// not contain any tool-filter vocabulary (`unmatched`, `pattern`, etc.).
+    ///
+    /// The tool-filter diagnostics (Story 29.5) are discarded at the spawner boundary
+    /// before reaching `SubAgentResult`, so they can never reach the rendering layer —
+    /// this test pins that contract end-to-end through the public AgentTool surface.
+    ///
+    /// Integration target: Stories 29.5 (filter diagnostics live at spawner boundary) +
+    /// 29.6 (AgentTool renders fieldDiagnostics block).
+    func testAgentTool_outputWithFieldDiagnostics_doesNotLeakToolFilterInfo() async throws {
+        let mockSpawner = MockSubAgentSpawner.makeWithDiagnostics(
+            text: "Deferred field ran.",
+            toolCalls: ["Read"],
+            isError: false,
+            fieldDiagnostics: [
+                SubAgentFieldDiagnostics(
+                    fieldName: "run_in_background",
+                    rawValue: "true",
+                    reason: .backgroundExecutionNotImplemented
+                ),
+            ]
+        )
+        let tool = createTaskTool()
+        let context = ToolContext(cwd: "/tmp", agentSpawner: mockSpawner)
+
+        let input: [String: Any] = [
+            "prompt": "Background probe",
+            "description": "Probe",
+        ]
+        let result = await tool.call(input: input, context: context)
+
+        XCTAssertFalse(result.isError, "Field diagnostics are non-fatal — output must not be an error")
+        // The field diagnostic block must be present.
+        XCTAssertTrue(result.content.contains("run_in_background"),
+                      "Output must render the deferred-field diagnostics block")
+        XCTAssertTrue(result.content.contains("[Tools used:"),
+                      "Tool-call summary must still render")
+        // No tool-filter dimension vocabulary leaks into the rendered output text.
+        // (ToolFilterDiagnostics wording lives entirely at the spawner boundary and
+        // must never reach the AgentTool rendering surface.)
+        XCTAssertFalse(result.content.lowercased().contains("unmatched"),
+                       "Tool-filter 'unmatched' wording must NOT leak into the AgentTool output")
+        XCTAssertFalse(result.content.lowercased().contains("pattern declaration"),
+                       "Tool-filter 'pattern declaration' wording must NOT leak into the AgentTool output")
+    }
 }

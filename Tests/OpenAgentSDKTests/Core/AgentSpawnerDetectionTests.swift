@@ -218,4 +218,79 @@ final class AgentSpawnerDetectionTests: XCTestCase {
         XCTAssertFalse(names.contains("Agent"), "Default behavior: child must NOT inherit Agent")
         XCTAssertFalse(names.contains("Task"), "Default behavior: child must NOT inherit Task (escape hatch: no recursion by default)")
     }
+
+    // MARK: - Story 29.7: Task-Only Spawner Detection Integration
+
+    /// Story 29.7 integration tests for the spawner-detection + child-filtering seam.
+    ///
+    /// Unlike the 29.2 single-point tests above (which each verify one rule in isolation),
+    /// these tests exercise the **joined** path: a Task-only parent tool pool must still
+    /// inject a spawner (proving the `SubAgentLauncherNames.contains` detection covers
+    /// both names end-to-end), and a pool with BOTH launchers present must strip BOTH
+    /// from the child tool pool (proving `SubAgentLauncherNames.default` flows all the
+    /// way through `DefaultSubAgentSpawner.filterTools`).
+    ///
+    /// TDD phase note: Story 29.7 verifies ALREADY-IMPLEMENTED behavior from Stories
+    /// 29.1–29.6. There is no red phase — these tests are expected to be green on
+    /// first run (per story Dev Notes line 206).
+
+    /// AC2 [P0]: A tool pool containing ONLY `createTaskTool()` (no `createAgentTool()`)
+    /// still triggers spawner injection. We observe this indirectly: if the spawner were
+    /// NOT injected, the Task tool would emit the "spawner missing" error. After the
+    /// detection landed in 29.2, the spawner IS injected and the tool proceeds to spawn
+    /// (failing downstream with a network/auth error, never with a spawner error).
+    ///
+    /// Integration target: Stories 29.1 (Task alias) + 29.2 (Task-aware detection).
+    func testTaskOnlyToolPool_triggersSpawnerInjection() async throws {
+        // Only Task registered — no Agent. This is the Task-only pool shape.
+        let tools: [ToolProtocol] = [createReadTool(), createTaskTool()]
+        let agent = Agent(
+            options: makeOptions(tools: tools),
+            client: ToolUseThenEndMockClient(toolName: "Task")
+        )
+
+        let result = await agent.prompt("Probe the Task-only launcher.")
+
+        // Spawner MUST be injected: the tool output must NOT mention spawner-missing.
+        // (If the detection missed Task, the tool would surface "Task spawner not available".)
+        let text = result.text
+        XCTAssertFalse(
+            text.lowercased().contains("spawner") && text.lowercased().contains("not available"),
+            "Task-only pool must inject a spawner; got: \(text)"
+        )
+    }
+
+    /// AC2 [P0]: A parent pool with BOTH `Agent` and `Task` launchers present must strip
+    /// BOTH from the child tool pool (`SubAgentLauncherNames.default == ["Agent", "Task"]`).
+    /// We drive the spawner's filter directly — it is the same `filterTools` the runtime
+    /// uses to build child pools — and assert both launcher names vanish while ordinary
+    /// tools (Read) survive.
+    ///
+    /// Integration target: Stories 29.1 (Task alias) + 29.2 (dual launcher stripping).
+    func testAgentAndTaskBothPresent_childStripsBothLaunchers() async throws {
+        let parentTools: [ToolProtocol] = [
+            createReadTool(),
+            createAgentTool(),
+            createTaskTool(),
+        ]
+
+        let spawner = DefaultSubAgentSpawner(
+            apiKey: "test-key",
+            baseURL: nil,
+            parentModel: "claude-sonnet-4-6",
+            parentTools: parentTools,
+            client: ToolUseThenEndMockClient(toolName: "Task")
+        )
+
+        // No explicit allowed/disallowed list: default filter behavior must strip both launchers.
+        let filtered = spawner.filterToolsForTesting(allowedTools: nil, disallowedTools: nil)
+        let names = filtered.map { $0.name }
+
+        XCTAssertTrue(names.contains("Read"),
+                      "Ordinary tools (Read) must survive the launcher strip")
+        XCTAssertFalse(names.contains("Agent"),
+                       "Child pool must NOT inherit Agent (recursion guard)")
+        XCTAssertFalse(names.contains("Task"),
+                       "Child pool must NOT inherit Task (recursion guard)")
+    }
 }

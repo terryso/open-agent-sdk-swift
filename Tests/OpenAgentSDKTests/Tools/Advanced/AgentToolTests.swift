@@ -774,4 +774,93 @@ final class AgentToolTests: XCTestCase {
             XCTFail("Both deferred fields must appear in the diagnostics block")
         }
     }
+
+    // MARK: - Story 29.7: Epic-End Integration Coverage
+
+    /// Story 29.7 integration tests consolidate cross-feature seams across the entire
+    /// Epic 29 surface. Unlike the per-story single-point tests above (29.1 alias,
+    /// 29.6 rendering), these exercise **the joins between** features — e.g. that the
+    /// `Task` alias shares its spawn call semantics with `Agent`, that a Task-only tool
+    /// pool still triggers spawner injection, and that the two diagnostic dimensions
+    /// (deferred fields vs. tool filtering) do not pollute each other.
+    ///
+    /// TDD phase note: Story 29.7 verifies ALREADY-IMPLEMENTED behavior from Stories
+    /// 29.1–29.6. There is no red phase — these tests are expected to be green on
+    /// first run (per story Dev Notes line 206).
+
+    /// AC1 [P0]: `createTaskTool()` is a true alias of `createAgentTool()` — both share
+    /// the single `createSubAgentLauncherTool` factory, so the same input must reach the
+    /// spawner with identical field values. This proves the alias is not a second,
+    /// drift-prone implementation but the same factory invoked under a different name.
+    ///
+    /// Integration target: Stories 29.1 (alias) + 29.6 (spawn plumbing).
+    func testCreateTaskTool_aliasSharesSpawnCallSemanticsWithAgent() async throws {
+        // Given: two mock spawners, one fed to each launcher variant
+        let agentSpawner = MockSubAgentSpawner(result: SubAgentResult(
+            text: "Agent result", toolCalls: [], isError: false
+        ))
+        let taskSpawner = MockSubAgentSpawner(result: SubAgentResult(
+            text: "Task result", toolCalls: [], isError: false
+        ))
+
+        let agentTool = createAgentTool()
+        let taskTool = createTaskTool()
+
+        let agentContext = ToolContext(cwd: "/tmp", agentSpawner: agentSpawner)
+        let taskContext = ToolContext(cwd: "/tmp", agentSpawner: taskSpawner)
+
+        // Identical input on both paths — proves the alias is content-identical.
+        let sharedInput: [String: Any] = [
+            "prompt": "Shared investigation prompt",
+            "subagent_type": "Explore",
+            "description": "Shared description",
+            "maxTurns": 7,
+        ]
+
+        // When: invoking both launchers with the same input
+        let agentResult = await agentTool.call(input: sharedInput, context: agentContext)
+        let taskResult = await taskTool.call(input: sharedInput, context: taskContext)
+
+        // Then: both succeed (no spawner-missing error) and spawn was invoked identically
+        XCTAssertFalse(agentResult.isError, "Agent path must succeed with a spawner present")
+        XCTAssertFalse(taskResult.isError, "Task path must succeed with a spawner present")
+
+        let agentCall = try XCTUnwrap(agentSpawner.lastCall,
+                                      "Agent spawner must have been invoked")
+        let taskCall = try XCTUnwrap(taskSpawner.lastCall,
+                                     "Task spawner must have been invoked")
+
+        XCTAssertEqual(agentCall.prompt, taskCall.prompt,
+                       "Alias must forward an identical prompt to the spawner")
+        XCTAssertEqual(agentCall.maxTurns, taskCall.maxTurns,
+                       "Alias must forward identical maxTurns")
+        // subagent_type is not on SpawnCall (it resolves into model/systemPrompt) — but
+        // both paths use the same BUILTIN_AGENTS lookup, so the resolved model+systemPrompt
+        // must match too, proving the shared factory selected the same built-in agent.
+        XCTAssertEqual(agentCall.model, taskCall.model,
+                       "Alias must resolve to the same built-in model")
+    }
+
+    /// AC1 [P0]: When `createTaskTool()` is invoked but no spawner is configured
+    /// (`ToolContext.agentSpawner == nil`), the error message mentions "Task" specifically
+    /// (via the `\(name)` interpolation in `createSubAgentLauncherTool`). This pins the
+    /// alias's error path to Story 29.1 — the alias surfaces its OWN name in errors, not
+    /// the Agent name, confirming the factory is parameterized by name.
+    func testCreateTaskTool_spawnerMissingErrorMentionsTask() async throws {
+        let tool = createTaskTool()
+        // No agentSpawner injected — the canonical nil-spawner path.
+        let context = ToolContext(cwd: "/tmp", agentSpawner: nil)
+
+        let input: [String: Any] = [
+            "prompt": "Anything",
+            "description": "Probe",
+        ]
+        let result = await tool.call(input: input, context: context)
+
+        XCTAssertTrue(result.isError, "Missing spawner must surface as an error")
+        XCTAssertTrue(result.content.contains("Task"),
+                      "Error must name the 'Task' tool (alias surfaces its own name); got: \(result.content)")
+        XCTAssertTrue(result.content.lowercased().contains("spawner"),
+                      "Error must mention the spawner requirement; got: \(result.content)")
+    }
 }

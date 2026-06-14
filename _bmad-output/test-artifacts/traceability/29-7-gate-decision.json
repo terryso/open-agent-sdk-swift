@@ -1,0 +1,24 @@
+{
+  "schema_version": "0.1.0",
+  "evaluated_at": "2026-06-14T19:36:00Z",
+  "repo": "open-agent-sdk-swift",
+  "target": {
+    "type": "story",
+    "id": "29-7",
+    "label": "Tests and Documentation (Epic 29 closing story)"
+  },
+  "collection_status": "COLLECTED",
+  "gate_basis": "priority_thresholds",
+  "gate_status": "PASS",
+  "rationale": "P0 coverage 100%, overall coverage 100%. All 10 acceptance criteria have passing evidence (8 new integration tests verified passing in isolation + full suite of 5795; 2 doc deliverables verified on disk; build + DocC results confirmed). AC6 E2E is a justified, spec-sanctioned skip (epic 'E2E tests are optional' clause + CLAUDE.md 'no mock-based E2E' rule) recorded with explicit rationale, not an uncovered requirement.",
+  "p0_status": "MET",
+  "p1_status": "MET",
+  "overall_status": "MET",
+  "critical_open": 0,
+  "links": {
+    "trace_report_path": "_bmad-output/test-artifacts/traceability/29-7-traceability.md",
+    "trace_report_url": "",
+    "artifact_url": "",
+    "journey_evidence_url": ""
+  }
+}

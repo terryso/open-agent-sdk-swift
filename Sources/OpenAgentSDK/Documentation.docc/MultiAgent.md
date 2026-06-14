@@ -35,6 +35,64 @@ public struct AgentDefinition: Sendable {
 }
 ```
 
+## Task Tool: Claude Code-Compatible Alias
+
+``createTaskTool()`` is a drop-in alias of ``createAgentTool()``. Both factories return the same `createSubAgentLauncherTool` instance — they share the exact same JSON schema, execution body, and output rendering. The only difference is the tool's `name` (`"Agent"` vs. `"Task"`). This lets you port Claude Code workflow snippets that reference the `Task(...)` tool without rewriting prompts.
+
+```swift
+let agent = createAgent(options: AgentOptions(
+    apiKey: "sk-...",
+    // Either form works; both register a subagent launcher.
+    tools: getAllBaseTools(tier: .core) + [createTaskTool()]
+))
+
+// The parent agent can now invoke Claude Code-style Task(...) workflow
+// snippets verbatim — e.g. `Task(subagent_type: "Explore", prompt: ...)`.
+let result = await agent.prompt(
+    "Use the Task tool to spawn an Explore subagent that lists Swift files."
+)
+```
+
+Picking which one to register is purely a host-compatibility decision:
+
+- ``createAgentTool()`` — register when migrating from the OpenAgentSDK-native `Agent` tool name.
+- ``createTaskTool()`` — register when porting Claude Code skills or workflow YAML that already references `Task(subagent_type:, description:, prompt:)`. No prompt patching is required.
+
+## Spawner Detection and Launcher Filtering
+
+The SDK auto-detects whether a parent agent can spawn sub-agents by scanning its tool pool for a registered launcher. **Either** ``createAgentTool()`` **or** ``createTaskTool()`` is sufficient — a parent that registers only `Task` still gets a `SubAgentSpawner` injected at runtime (no "spawner missing" error). The set of recognized launcher tool names is captured by the internal `SubAgentLauncherNames` collection, whose default members are `["Agent", "Task"]`.
+
+To prevent runaway recursive spawning, a child agent's tool pool is filtered before the child runs: every tool whose name appears in `SubAgentLauncherNames.default` is stripped. If a parent pool contains **both** `Agent` and `Task`, the child pool strips **both** (neither launcher is forwarded to the child).
+
+```swift
+// Parent pool: Task + Read + Glob.
+// Child pool (after filtering): Read + Glob. "Task" is stripped.
+let parent = createAgent(options: AgentOptions(
+    apiKey: "sk-...",
+    tools: getAllBaseTools(tier: .core) + [createTaskTool()]
+))
+```
+
+This keeps the recursion boundary explicit: only the topmost agent in a chain can launch sub-agents, regardless of whether the host registered `Agent`, `Task`, or both.
+
+## Deferred Field Diagnostics
+
+`AgentToolInput` accepts several fields that mirror the Claude Code `Task` schema but are **not yet wired into runtime behavior**: `run_in_background`, `isolation`, `team_name`, `resume`, `skills`, and MCP server references. The SDK currently **accepts** these fields (so prompts that send them keep working) but treats them as deferred. Rather than silently dropping them, the spawner emits a per-field diagnostic so hosts can observe what was ignored.
+
+Each diagnostic is represented by ``SubAgentFieldDiagnostics`` and carries a machine-readable ``SubAgentFieldDiagnosticReason`` plus the raw value that was supplied. Diagnostics aggregate into ``SubAgentResult/fieldDiagnostics`` and render into the Agent tool's output as a clearly delimited block:
+
+```
+[Subagent field "run_in_background" ignored: not yet supported (raw value: true)]
+[Subagent field "isolation" ignored: not yet supported (raw value: "worktree")]
+```
+
+This block is **field-scoped only** — it never leaks tool-filter diagnostics (such as `unmatchedDeclarations` from ``filterToolsByDeclarations(available:allowed:disallowed:options:)``). The two diagnostic dimensions are intentionally independent:
+
+- ``SubAgentFieldDiagnostics`` — reports deferred input fields the spawner accepted but did not act on.
+- ``ToolFilterDiagnostics`` — reports skill `allowed-tools` declarations that did not match any available tool.
+
+Reading the rendered block tells a host integrator exactly which Claude Code fields are still awaiting runtime implementation, without coupling that signal to skill tool-filter outcomes.
+
 ## Inter-Agent Messaging
 
 ### MailboxStore

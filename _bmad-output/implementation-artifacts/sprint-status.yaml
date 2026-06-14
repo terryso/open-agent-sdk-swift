@@ -1,5 +1,5 @@
 # generated: 2026-05-25
-# last_updated: 2026-06-14 (Story 29-6 → done)
+# last_updated: 2026-06-14 (Story 29-7 → done, Epic 29 → done)
 
 # project: open-agent-sdk-swift
 # project_key: NOKEY
@@ -36,7 +36,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-05-25
-last_updated: 2026-06-14 (Story 29-6 → done)
+last_updated: 2026-06-14 (Story 29-7 → done, Epic 29 → done)
 project: open-agent-sdk-swift
 project_key: NOKEY
 tracking_system: file-system
@@ -314,12 +314,12 @@ development_status:
   epic-28-retrospective: done
 
   # Epic 29: Claude Code Skill/Subagent Compatibility
-  epic-29: in-progress
+  epic-29: done
   29-1-agent-task-shared-subagent-launcher: done
   29-2-spawner-detection-child-filtering: done
   29-3-direct-skill-package-context: done
   29-4-tool-declaration-compatibility-model: done
   29-5-shared-filtering-skills-subagents: done
   29-6-diagnostics-deferred-subagent-fields: done
-  29-7-tests-and-documentation: backlog
+  29-7-tests-and-documentation: done
   epic-29-retrospective: optional

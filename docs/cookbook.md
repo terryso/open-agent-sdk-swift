@@ -693,6 +693,25 @@ await registry.register(
 let agents = await registry.list()
 ```
 
+### 8.6 Claude Code 风格 Task alias
+
+`createTaskTool()` 是 `createAgentTool()` 的 Claude Code 兼容别名——两者返回同一个 `createSubAgentLauncherTool` 实例（共享 JSON schema、执行体、输出渲染），只有 tool `name` 不同（`"Task"` vs `"Agent"`）。移植 Claude Code workflow skill（含 `Task(subagent_type:, description:, prompt:)` 片段）到 OpenAgentSDK 时，注册 `createTaskTool()` 即可，**无需改 prompt**。
+
+```swift
+let agent = createAgent(options: AgentOptions(
+    apiKey: "sk-...",
+    // 注册 Task alias：父 agent 的 LLM 可直接调用 Claude Code 风格的 Task(...) 片段
+    tools: getAllBaseTools(tier: .core) + [createTaskTool()]
+))
+
+// 单 action prompt：触发 Task 工具派生 Explore 子 agent
+let result = await agent.prompt(
+    "Use the Task tool to spawn an Explore subagent that lists Swift files in the current directory."
+)
+```
+
+**适用场景：** 当 workflow YAML / skill prompt 已硬编码 `Task(subagent_type: "Explore", prompt: ...)` 时，注册 `createTaskTool()` 而非 `createAgentTool()`，可让原 prompt 零改动跑通。`Agent` 和 `Task` 任一存在即触发子 agent spawner 注入；子 agent 的工具池默认剥离两者（避免递归派生）。
+
 ---
 
 ## 场景 9：MCP 外部工具集成
@@ -876,6 +895,41 @@ let skill = Skill(
     }
 )
 ```
+
+### 10.5 allowed-tools 富声明（MCP / pattern / unknown）
+
+Skill frontmatter 的 `allowed-tools` 字段现已支持四种声明形态，SDK 会**无损**解析为 `ToolDeclaration` 数组（不会因遇到未知名而 collapse 成 unrestricted）：
+
+| 声明类型 | 示例 | 解析为 |
+|---------|------|--------|
+| SDK name | `WebSearch` | `ToolDeclaration(status: .recognizedSDK)` |
+| MCP namespaced | `mcp__github__list_prs` | `ToolDeclaration(status: .recognizedMCP)` |
+| Pattern | `Bash(git diff:*)` | `ToolDeclaration(status: .recognizedSDK)` + pattern |
+| Unknown | `UnknownTool` | `ToolDeclaration(status: .unknown)` |
+
+```markdown
+---
+name: my-skill
+description: 演示四种 allowed-tools 声明
+allowed-tools: WebSearch, mcp__github__list_prs, Bash(git diff:*), UnknownTool
+---
+```
+
+**关键语义：unknown 名不会让 skill 变成 unrestricted。** 一个 `ToolDeclaration(status: .unknown)` 会被保留并通过 `Skill.toolDeclarationDiagnostics` 暴露，方便宿主观察哪些声明未匹配。运行时 `filterToolsByDeclarations` 会把可用工具池中匹配的留下，未匹配声明进 `diagnostics.unmatchedDeclarations`，pattern 声明进 `diagnostics.patternDeclarations`：
+
+```swift
+// 假设可用工具池含 WebSearch、Bash、mcp__github__list_prs（不含 UnknownTool）
+// filterToolsByDeclarations 返回一个命名元组 (filtered:, diagnostics:)
+let (filtered, diagnostics) = filterToolsByDeclarations(
+    available: availableTools,
+    allowed: skill.toolDeclarations
+)
+// filtered                       -> [WebSearch, Bash, mcp__github__list_prs]   （3 个匹配）
+// diagnostics.unmatchedDeclarations -> [UnknownTool]                           （1 个未匹配）
+// diagnostics.patternDeclarations   -> [Bash(git diff:*)]                      （1 个 pattern）
+```
+
+**注意：** Pattern 声明当前为"parsed but not enforced"——即解析保留但 SDK 暂不按 pattern 细粒度过滤 Bash 子命令。fine-grained Bash pattern enforcement 是后续 epic 的延后项。本节示例遵循 SDK 既有 helper（`getAllBaseTools(tier:)`、`createAgent(options:)` 等）。
 
 ---
 
