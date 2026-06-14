@@ -24,10 +24,14 @@ private let BUILTIN_AGENTS: [String: AgentDefinition] = [
 
 // MARK: - AgentTool Input
 
-/// Input type for the Agent tool.
+/// Input type for the Agent / Task tools (shared subagent launcher).
 ///
 /// Field names use snake_case to match the LLM-side JSON schema
 /// (per project-context.md rule #19).
+///
+/// Note: This type is intentionally named `AgentToolInput` (not `TaskToolInput`
+/// or `Task`) to avoid shadowing Swift Concurrency's `Task` symbol
+/// (see project-context.md rule #15).
 private struct AgentToolInput: Codable {
     let prompt: String
     let description: String
@@ -91,9 +95,9 @@ private struct AgentToolInput: Codable {
     }
 }
 
-// MARK: - AgentTool Schema
+// MARK: - Subagent Launcher Schema (shared between Agent and Task tools)
 
-private nonisolated(unsafe) let agentToolSchema: ToolInputSchema = [
+private nonisolated(unsafe) let subAgentLauncherSchema: ToolInputSchema = [
     "type": "object",
     "properties": [
         "prompt": ["type": "string", "description": "The task for the agent to perform"] as [String: Any],
@@ -111,29 +115,30 @@ private nonisolated(unsafe) let agentToolSchema: ToolInputSchema = [
     "required": ["prompt", "description"]
 ]
 
-// MARK: - Factory Function
+// MARK: - Shared Subagent Launcher Factory
 
-/// Creates the Agent tool for spawning sub-agents.
+/// Shared factory for the subagent launcher tool, used by both the
+/// `Agent` and `Task` tool variants (Story 29.1).
 ///
-/// The Agent tool launches sub-agents to handle complex, multi-step tasks autonomously.
-/// Sub-agents have their own context and can run specialized tool sets.
+/// Both public factories (`createAgentTool()` and `createTaskTool()`) delegate
+/// to this helper, ensuring identical schema, execution body, and output format.
+/// Only the tool `name` and `description` (human-facing prose) differ.
 ///
-/// **Architecture:** This tool uses ``ToolContext/agentSpawner`` (a ``SubAgentSpawner``
-/// protocol defined in Types/) to create child agents without importing Core/.
-/// The spawner is injected by Core/ when the tool is registered.
-///
-/// - Returns: A ``ToolProtocol`` instance for the Agent tool.
-public func createAgentTool() -> ToolProtocol {
+/// - Parameters:
+///   - name: The LLM-facing tool name (`"Agent"` or `"Task"`).
+///   - description: The human-facing description shown to the model.
+/// - Returns: A ``ToolProtocol`` instance for the subagent launcher.
+private func createSubAgentLauncherTool(name: String, description: String) -> ToolProtocol {
     return defineTool(
-        name: "Agent",
-        description: "Launch a subagent to handle complex, multi-step tasks autonomously. Subagents have their own context and can run specialized tool sets.",
-        inputSchema: agentToolSchema,
+        name: name,
+        description: description,
+        inputSchema: subAgentLauncherSchema,
         isReadOnly: false
     ) { (input: AgentToolInput, context: ToolContext) async throws -> ToolExecuteResult in
         // Guard: spawner must be available
         guard let spawner = context.agentSpawner else {
             return ToolExecuteResult(
-                content: "Error: Agent spawner not available. The Agent tool requires a SubAgentSpawner to be configured.",
+                content: "Error: \(name) spawner not available. The \(name) tool requires a SubAgentSpawner to be configured.",
                 isError: true
             )
         }
@@ -171,4 +176,41 @@ public func createAgentTool() -> ToolProtocol {
 
         return ToolExecuteResult(content: output, isError: result.isError)
     }
+}
+
+// MARK: - Public Factory Functions
+
+/// Creates the Agent tool for spawning sub-agents.
+///
+/// The Agent tool launches sub-agents to handle complex, multi-step tasks autonomously.
+/// Sub-agents have their own context and can run specialized tool sets.
+///
+/// **Architecture:** This tool uses ``ToolContext/agentSpawner`` (a ``SubAgentSpawner``
+/// protocol defined in Types/) to create child agents without importing Core/.
+/// The spawner is injected by Core/ when the tool is registered.
+///
+/// - Returns: A ``ToolProtocol`` instance for the Agent tool.
+public func createAgentTool() -> ToolProtocol {
+    return createSubAgentLauncherTool(
+        name: "Agent",
+        description: "Launch a subagent to handle complex, multi-step tasks autonomously. Subagents have their own context and can run specialized tool sets."
+    )
+}
+
+/// Creates the Task tool — a Claude Code-compatible alias of ``createAgentTool()``.
+///
+/// `Task` shares the same schema, execution body, and output format as the `Agent` tool.
+/// Existing Claude Code workflow skills that emit `Task(subagent_type:, description:, prompt:)`
+/// snippets can run unmodified once this tool is registered.
+///
+/// **Note:** The Swift type name `Task` (Swift Concurrency) is intentionally NOT used —
+/// the tool name **string** `"Task"` is fine because it is a runtime identifier, not a type
+/// (see project-context.md rule #15). The shared input type remains `AgentToolInput`.
+///
+/// - Returns: A ``ToolProtocol`` instance for the Task tool.
+public func createTaskTool() -> ToolProtocol {
+    return createSubAgentLauncherTool(
+        name: "Task",
+        description: "Launch a subagent to handle complex, multi-step tasks autonomously. Subagents have their own context and can run specialized tool sets. Claude Code-compatible alias of the Agent tool."
+    )
 }

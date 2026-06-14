@@ -58,6 +58,7 @@
 /// - ``SubAgentResult`` — Result from sub-agent execution
 /// - ``AgentDefinition`` — Sub-agent configuration with tools and maxTurns
 /// - ``createAgentTool()`` — Factory for the Agent tool
+/// - ``createTaskTool()`` — Factory for the Task tool (Claude Code-compatible alias of Agent)
 /// - ``createSendMessageTool()`` — Factory for the SendMessage tool
 /// - ``createTaskCreateTool()`` — Factory for the TaskCreate tool
 /// - ``createTaskListTool()`` — Factory for the TaskList tool

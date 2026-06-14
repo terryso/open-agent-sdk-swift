@@ -413,4 +413,169 @@ final class AgentToolTests: XCTestCase {
         let tool = createAgentTool()
         XCTAssertFalse(tool.isReadOnly)
     }
+
+    // MARK: - Task Tool (Story 29.1)
+
+    /// ATDD RED PHASE: Tests for Story 29.1 -- `Task` alias of `Agent` (subagent launcher).
+    /// All tests assert EXPECTED behavior. They will FAIL until:
+    ///   - `createTaskTool()` public factory is implemented in Tools/Advanced/AgentTool.swift
+    ///   - Private `createSubAgentLauncherTool(name:description:)` shared helper is extracted
+    /// TDD Phase: RED (feature not implemented yet)
+
+    /// AC1 [P0]: createTaskTool() returns a ToolProtocol with name "Task".
+    /// Verifies the public alias surface exists and is named correctly.
+    func testCreateTaskTool_returnsToolNamedTask() async throws {
+        // When: creating the Task tool
+        let tool = createTaskTool()
+
+        // Then: it is a valid ToolProtocol named "Task"
+        XCTAssertEqual(tool.name, "Task")
+        XCTAssertFalse(tool.description.isEmpty)
+        XCTAssertFalse(tool.isReadOnly)
+    }
+
+    /// AC1 [P0]: Task tool exposes the same inputSchema (properties + required) as Agent.
+    /// Schema parity is mandatory so existing LLM prompts work without rewriting.
+    func testCreateTaskTool_schemaEquivalentToAgent() async throws {
+        let agentTool = createAgentTool()
+        let taskTool = createTaskTool()
+
+        let agentSchema = agentTool.inputSchema
+        let taskSchema = taskTool.inputSchema
+
+        // Both are objects
+        XCTAssertEqual(taskSchema["type"] as? String, "object")
+        XCTAssertEqual(taskSchema["type"] as? String, agentSchema["type"] as? String)
+
+        // Required arrays are identical
+        let agentRequired = agentSchema["required"] as? [String]
+        let taskRequired = taskSchema["required"] as? [String]
+        XCTAssertEqual(taskRequired, agentRequired)
+        XCTAssertEqual(taskRequired, ["prompt", "description"])
+
+        // Property keys are identical (no field drift)
+        let agentProps = agentSchema["properties"] as? [String: Any]
+        let taskProps = taskSchema["properties"] as? [String: Any]
+        XCTAssertNotNil(agentProps)
+        XCTAssertNotNil(taskProps)
+
+        let expectedKeys: Set<String> = [
+            "prompt", "description", "subagent_type", "model", "name",
+            "maxTurns", "run_in_background", "isolation", "team_name",
+            "mode", "resume"
+        ]
+        XCTAssertEqual(Set(taskProps!.keys), expectedKeys)
+        XCTAssertEqual(Set(taskProps!.keys), Set(agentProps!.keys))
+    }
+
+    /// AC2 [P0]: Task tool success path mirrors Agent's -- returns text result.
+    /// When spawner is set and LLM invokes Task(prompt:, description:), output flows back.
+    func testTaskTool_success_returnsTextResult() async throws {
+        // Given: a spawner that returns success
+        let mockSpawner = MockSubAgentSpawner(result: SubAgentResult(
+            text: "Exploration complete. Found 5 Swift files.",
+            toolCalls: [],
+            isError: false
+        ))
+        let tool = createTaskTool()
+        let context = ToolContext(cwd: "/tmp", agentSpawner: mockSpawner)
+
+        // When: calling the Task tool with valid input
+        let input: [String: Any] = [
+            "prompt": "Find all Swift files in the project",
+            "description": "Find Swift files"
+        ]
+        let result = await tool.call(input: input, context: context)
+
+        // Then: result is successful and routes through the spawn path
+        XCTAssertFalse(result.isError)
+        XCTAssertTrue(result.content.contains("Exploration complete"))
+        XCTAssertNotNil(mockSpawner.lastCall)
+    }
+
+    /// AC3 [P0]: Missing spawner produces an error equivalent to Agent's.
+    /// Tool must NOT throw; returns ToolExecuteResult(isError: true) with a spawner mention.
+    func testTaskTool_missingSpawner_returnsError() async throws {
+        let tool = createTaskTool()
+        let context = ToolContext(cwd: "/tmp")  // no agentSpawner
+
+        let input: [String: Any] = [
+            "prompt": "Do something",
+            "description": "Test task"
+        ]
+        let result = await tool.call(input: input, context: context)
+
+        XCTAssertTrue(result.isError)
+        XCTAssertTrue(
+            result.content.contains("spawner") ||
+            result.content.contains("not available") ||
+            result.content.contains("SubAgentSpawner"),
+            "Expected missing-spawner error message; got: \(result.content)"
+        )
+
+        // Error message parity (modulo tool-name token) with Agent's missing-spawner error
+        let agentTool = createAgentTool()
+        let agentResult = await agentTool.call(input: input, context: context)
+        XCTAssertTrue(agentResult.isError)
+        // Both must mention the spawner gap; tokens may differ but content shape must match
+        XCTAssertEqual(result.isError, agentResult.isError)
+    }
+
+    /// AC2 [P0]: Task tool resolves built-in subagent_type="Explore" with the Explore system prompt.
+    /// Confirms BUILTIN_AGENTS lookup is shared between Agent and Task execution bodies.
+    func testTaskTool_exploreType_passesExploreSystemPrompt() async throws {
+        let mockSpawner = MockSubAgentSpawner(result: SubAgentResult(
+            text: "Found 3 files",
+            toolCalls: [],
+            isError: false
+        ))
+        let tool = createTaskTool()
+        let context = ToolContext(cwd: "/tmp", agentSpawner: mockSpawner)
+
+        let input: [String: Any] = [
+            "prompt": "Find test files",
+            "description": "Find tests",
+            "subagent_type": "Explore"
+        ]
+        _ = await tool.call(input: input, context: context)
+
+        XCTAssertNotNil(mockSpawner.lastCall)
+        let call = mockSpawner.lastCall!
+        XCTAssertNotNil(call.systemPrompt)
+        XCTAssertTrue(
+            call.systemPrompt?.contains("exploration") == true ||
+            call.systemPrompt?.contains("Explore") == true ||
+            call.systemPrompt?.contains("codebase") == true,
+            "Expected Explore built-in system prompt; got: \(call.systemPrompt ?? "<nil>")"
+        )
+    }
+
+    /// AC4 [P0]: Task tool appends `[Tools used: ...]` summary when toolCalls is non-empty.
+    func testTaskTool_toolCallsSummaryAppended() async throws {
+        let mockSpawner = MockSubAgentSpawner(result: SubAgentResult(
+            text: "Found 3 files",
+            toolCalls: ["Glob", "Grep"],
+            isError: false
+        ))
+        let tool = createTaskTool()
+        let context = ToolContext(cwd: "/tmp", agentSpawner: mockSpawner)
+
+        let input: [String: Any] = [
+            "prompt": "Search",
+            "description": "Search"
+        ]
+        let result = await tool.call(input: input, context: context)
+
+        XCTAssertTrue(result.content.hasSuffix("[Tools used: Glob, Grep]"),
+                      "Expected output to end with tool summary; got: \(result.content)")
+    }
+
+    /// AC4 [P0]: Backward compatibility -- createAgentTool() still works and remains named "Agent".
+    /// Guarantees no public-API regression after Task alias lands.
+    func testCreateAgentTool_stillWorks_noRegression() async throws {
+        let tool = createAgentTool()
+        XCTAssertEqual(tool.name, "Agent")
+        XCTAssertFalse(tool.description.isEmpty)
+        XCTAssertFalse(tool.isReadOnly)
+    }
 }
