@@ -1,0 +1,123 @@
+{
+  "schema_version": "0.1.0",
+  "evaluated_at": "2026-06-14T00:00:00.000Z",
+  "repo": "open-agent-sdk-swift",
+  "target": {
+    "type": "story",
+    "id": "29-4",
+    "label": "Tool Declaration Compatibility Model"
+  },
+  "collection_status": "COLLECTED",
+  "gate_basis": "priority_thresholds",
+  "gate_status": "PASS",
+  "rationale": "P0 coverage is 100% (required: 100%), P1 coverage is 100% (target: 90%), overall coverage is 100% (minimum: 80%). All 6 acceptance criteria (AC1-AC6) are fully covered by 18 new passing unit tests (10 SkillLoader ATDD + 5 SkillTypes ATDD + 3 code-review regression fixes) plus 4 legacy parseAllowedTools regression tests that continue to pass. The ToolDeclaration / ToolDeclarationStatus / ToolDeclarationDiagnostics data model and parseToolDeclarations parser passed 3-layer adversarial code review with 3 in-scope correctness fixes applied (F1 empty-parens phantom pattern, F6 unclosed-paren silent demotion, F9 MCP-with-trailing-pattern normalized-name corruption), each with a dedicated regression test. Production code verified: SkillLoader.loadSkillFromDirectory dual-populates legacy toolRestrictions + new toolDeclarations/toolDeclarationDiagnostics (AC4 backward compatibility). No ToolRestriction.task case added (Dev Notes gap compliance). No critical, high, medium, or low coverage gaps identified. Full suite at 5738/5738 passing (baseline 5720 -> +18). Story status `done` (set by code-review step) confirmed correct.",
+  "p0_status": "MET",
+  "p1_status": "MET",
+  "overall_status": "MET",
+  "critical_open": 0,
+  "coverage": {
+    "total_acs": 6,
+    "fully_covered": 6,
+    "partially_covered": 0,
+    "uncovered": 0,
+    "overall_percentage": 100,
+    "p0": { "total": 5, "covered": 5, "percentage": 100, "required": 100 },
+    "p1": { "total": 3, "covered": 3, "percentage": 100, "target": 90, "minimum": 80 }
+  },
+  "ac_to_tests": {
+    "AC1": {
+      "description": "MCP namespaced tool declarations preserved (mcp__github__list_prs not dropped)",
+      "priority": "P0",
+      "coverage": "FULL",
+      "tests": [
+        "testParseToolDeclarations_preservesMCPNamespacedNames",
+        "testParseToolDeclarations_mixedKnownUnknownMCP",
+        "testLoadSkillFromDirectory_populatesToolDeclarations"
+      ]
+    },
+    "AC2": {
+      "description": "Unknown tool names do not collapse to unrestricted (returns non-nil)",
+      "priority": "P0",
+      "coverage": "FULL",
+      "tests": [
+        "testParseToolDeclarations_doesNotCollapseToUnrestricted",
+        "testParseToolDeclarations_unknownToolNotDropped",
+        "testToolDeclarationStatus_AllCases"
+      ]
+    },
+    "AC3": {
+      "description": "Permission pattern text preserved and annotated (Bash(git diff:*))",
+      "priority": "P0/P1",
+      "coverage": "FULL",
+      "tests": [
+        "testParseToolDeclarations_preservesPatternText",
+        "testParseToolDeclarations_patternEntersDiagnostics",
+        "testParseToolDeclarations_emptyParensProduceNoPhantomPattern",
+        "testParseToolDeclarations_unclosedParenStillRecognizesBase",
+        "testParseToolDeclarations_mcpNameWithTrailingPatternStripsParens",
+        "testLoadSkillFromDirectory_populatesToolDeclarations"
+      ]
+    },
+    "AC4": {
+      "description": "Backward compatibility - existing Skill.toolRestrictions field and consumers have no regression",
+      "priority": "P0",
+      "coverage": "FULL",
+      "tests": [
+        "testSkill_ToolDeclarations_DefaultsToNil",
+        "testSkill_ToolDeclarations_ExplicitlySet",
+        "testSkill_WithBaseDir_PreservesToolDeclarations",
+        "testSkill_Equality_ConsidersToolDeclarations",
+        "testParseAllowedTools_WithArguments",
+        "testParseAllowedTools_EmptyString",
+        "testParseAllowedTools_Nil",
+        "testParseAllowedTools_UnknownToolsIgnored",
+        "testLoadSkillFromDirectory_populatesToolDeclarations"
+      ]
+    },
+    "AC5": {
+      "description": "Common SDK/Claude tool names recognized (.recognizedSDK); Task gap handled",
+      "priority": "P0/P1",
+      "coverage": "FULL",
+      "tests": [
+        "testParseToolDeclarations_recognizesClaudeCodeNames",
+        "testParseToolDeclarations_taskRecognizedButNoEnumCase",
+        "testParseToolDeclarations_mcpNameWithTrailingPatternStripsParens"
+      ]
+    },
+    "AC6": {
+      "description": "Build + full regression (zero warnings, all tests pass)",
+      "priority": "P0",
+      "coverage": "FULL",
+      "tests": [
+        "swift build (zero new warnings)",
+        "swift test (5738/5738 passing, baseline 5720 +18)"
+      ]
+    }
+  },
+  "test_artifacts": {
+    "test_files": [
+      "Tests/OpenAgentSDKTests/Skills/SkillLoaderTests.swift",
+      "Tests/OpenAgentSDKTests/Types/SkillTypesTests.swift"
+    ],
+    "new_tests_in_story": 18,
+    "regression_tests_passing": 4,
+    "total_test_count": 5738,
+    "baseline_test_count": 5720,
+    "test_failures": 0
+  },
+  "deferred_to_29_5": [
+    "filterToolsByDeclarations shared filtering helper",
+    "Switch consumers (Agent.swift / SkillTool.swift / ToolRestrictionStack / DefaultSubAgentSpawner) to toolDeclarations",
+    "Fine-grained Bash permission pattern enforcement (epic deferred item 5)",
+    "MCP tool name with __ in tool part (current regex is permissive)",
+    "Comma-inside-parens pattern splitting",
+    "Duplicate declaration deduplication",
+    "Additional malformed paren-form robustness"
+  ],
+  "links": {
+    "trace_report_path": "_bmad-output/test-artifacts/traceability/29-4-traceability.md",
+    "trace_report_url": "",
+    "artifact_url": "_bmad-output/implementation-artifacts/29-4-tool-declaration-compatibility-model.md",
+    "journey_evidence_url": ""
+  }
+}

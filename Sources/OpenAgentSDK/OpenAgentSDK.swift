@@ -123,6 +123,9 @@
 /// - ``SkillRegistry`` — Thread-safe registry for managing skill definitions
 /// - ``BuiltInSkills`` — Convenience namespace for built-in skill definitions
 /// - ``ToolRestriction`` — Enum of tool names that can be restricted in skill definitions
+/// - ``ToolDeclaration`` — Lossless tool declaration preserving MCP names, patterns, and unknowns (Story 29.4)
+/// - ``ToolDeclarationStatus`` — How a ``ToolDeclaration`` was classified at parse time
+/// - ``ToolDeclarationDiagnostics`` — Unsupported and parsed-but-not-enforced pattern declarations
 /// - ``createSkillTool(registry:)`` — Factory for the Skill tool
 /// - ``ToolRestrictionStack`` — Stack-based tool restriction manager for nested skill execution
 ///

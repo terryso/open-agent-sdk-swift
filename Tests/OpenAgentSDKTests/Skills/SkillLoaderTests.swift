@@ -584,4 +584,341 @@ final class SkillLoaderTests: TempDirTestCase {
         // body 中的引用路径被解析为绝对路径
         XCTAssertTrue(skill!.promptTemplate.contains(skillDir + "/references/design.md"))
     }
+
+    // MARK: - Story 29.4: Tool Declaration Compatibility
+
+    // 本区段为 Story 29.4（Tool Declaration Compatibility Model）的红阶段单元测试。
+    // 解析器 parseToolDeclarations 是纯函数（字符串 → struct），无 LLM/网络/文件 I/O
+    // （project-context.md #27）。所有测试直接调用 static method 断言返回值。
+    //
+    // 红相说明：本 story 引入的新类型（ToolDeclaration / ToolDeclarationStatus /
+    // ToolDeclarationDiagnostics）、新字段（Skill.toolDeclarations /
+    // Skill.toolDeclarationDiagnostics）、新方法（SkillLoader.parseToolDeclarations）
+    // 在源码中尚不存在，故本区段测试在**编译阶段**即失败（Cannot find ... in scope）。
+    // 这是预期的 TDD 红相 —— 绿阶段实现后全部转绿。
+
+    // MARK: AC1 — MCP namespaced 工具声明被保留
+
+    /// AC1 [P0]: MCP namespaced 名（`mcp__github__list_prs`）不被丢弃，
+    /// 且与 SDK 工具名（WebSearch / Task）共存于声明数组。
+    func testParseToolDeclarations_preservesMCPNamespacedNames() {
+        // Given: frontmatter 值含 MCP namespaced 工具 + 两个 SDK 工具
+        let input = "WebSearch, mcp__github__list_prs, Task"
+
+        // When: 调用新解析器
+        let result = SkillLoader.parseToolDeclarations(input)
+
+        // Then: 解析输出非 nil，保留全部三个名字
+        XCTAssertNotNil(result, "parseToolDeclarations 必须返回非 nil 元组（即使含未知名）")
+        let declarations = result?.declarations ?? []
+        XCTAssertEqual(declarations.count, 3, "应保留全部三个声明")
+
+        let rawNames = declarations.map(\.rawName)
+        XCTAssertTrue(rawNames.contains("mcp__github__list_prs"),
+                      "MCP namespaced 名必须以完整 rawName 保留，不被截断或丢弃")
+        XCTAssertTrue(rawNames.contains("WebSearch"),
+                      "WebSearch 必须以 rawName 保留")
+        XCTAssertTrue(rawNames.contains("Task"),
+                      "Task 必须以 rawName 保留")
+
+        // MCP 声明的 status 应为 .recognizedMCP
+        let mcpDecl = declarations.first(where: { $0.rawName == "mcp__github__list_prs" })
+        XCTAssertNotNil(mcpDecl, "必须能按 rawName 查到 MCP 声明")
+        XCTAssertEqual(mcpDecl?.status, .recognizedMCP,
+                       "mcp__github__list_prs 应被识别为 .recognizedMCP")
+        // MCP 全名本身就是 normalized 形式，不应截断
+        XCTAssertEqual(mcpDecl?.normalizedName, "mcp__github__list_prs",
+                       "MCP normalizedName 应保留全名，不截断")
+    }
+
+    // MARK: AC2 — 未知工具名不 collapse 为 unrestricted
+
+    /// AC2 [P0]: 仅含未知工具名时，解析输出非 nil（与旧 parseAllowedTools 返回 nil 的语义对比）。
+    /// 这是本 story 修正"静默放权"bug 的核心断言。
+    func testParseToolDeclarations_doesNotCollapseToUnrestricted() {
+        // Given: frontmatter 值仅含一个无法识别的名字
+        let input = "UnknownTool"
+
+        // When: 调用新解析器
+        let result = SkillLoader.parseToolDeclarations(input)
+
+        // Then: 返回非 nil（关键：旧解析器在此输入下返回 nil = unrestricted）
+        XCTAssertNotNil(result,
+                        "全 unknown 输入必须返回非 nil，调用方能据此区分'显式受限但无可用'与'unrestricted'")
+        XCTAssertFalse(result?.declarations.isEmpty ?? true,
+                       "声明数组不应为空 —— UnknownTool 必须以声明形式可见")
+
+        // 对比：旧解析器在同一输入下应返回 nil（验证 bug 路径仍在，绿阶段不应被改动）
+        let legacy = SkillLoader.parseAllowedTools(input)
+        XCTAssertNil(legacy,
+                     "旧 parseAllowedTools 在全 unknown 输入下返回 nil（unrestricted）—— 本 story 不改此行为，但新增非 nil 语义")
+    }
+
+    /// AC2 [P0]: 未知工具以 diagnostic 形式可见（unsupportedDeclarations 非空）。
+    func testParseToolDeclarations_unknownToolNotDropped() {
+        // Given: 仅含一个未知工具
+        let input = "UnknownTool"
+
+        // When: 解析
+        let result = SkillLoader.parseToolDeclarations(input)
+
+        // Then: diagnostics.unsupportedDeclarations 含该声明
+        let diagnostics = result?.diagnostics
+        XCTAssertNotNil(diagnostics, "必须返回 diagnostics 载体")
+        let unsupported = diagnostics?.unsupportedDeclarations ?? []
+        XCTAssertEqual(unsupported.count, 1, "UnknownTool 必须出现在 unsupportedDeclarations")
+        XCTAssertEqual(unsupported.first?.rawName, "UnknownTool")
+        XCTAssertEqual(unsupported.first?.status, .unknown,
+                       "未知工具的 status 必须为 .unknown")
+    }
+
+    // MARK: AC3 — Permission pattern 文本被保留
+
+    /// AC3 [P0]: `Bash(git diff:*)` 的完整 pattern 文本被保留，
+    /// 且 base name `Bash` 正确识别为 SDK 工具。
+    func testParseToolDeclarations_preservesPatternText() {
+        // Given: 含参数 pattern 的 Bash 声明
+        let input = "Bash(git diff:*)"
+
+        // When: 解析
+        let result = SkillLoader.parseToolDeclarations(input)
+
+        // Then: declarations 保留完整 rawName（含括号 pattern）
+        let declarations = result?.declarations ?? []
+        XCTAssertEqual(declarations.count, 1)
+        let decl = declarations.first
+        XCTAssertEqual(decl?.rawName, "Bash(git diff:*)",
+                       "rawName 必须保留完整 pattern 文本（含括号）")
+        XCTAssertEqual(decl?.pattern, "git diff:*",
+                       "pattern 字段必须提取括号内的参数 pattern")
+        XCTAssertEqual(decl?.normalizedName, "bash",
+                       "normalizedName 应为去括号、小写化的 base name")
+        XCTAssertEqual(decl?.status, .recognizedSDK,
+                       "Bash 应被识别为 .recognizedSDK")
+        XCTAssertEqual(decl?.toolRestriction, .bash,
+                       "Bash 应映射到 ToolRestriction.bash")
+    }
+
+    /// AC3 [P1]: pattern 声明进入 diagnostics.patternDeclarations
+    /// （标注"已解析但未在 pattern 粒度强制执行"）。
+    func testParseToolDeclarations_patternEntersDiagnostics() {
+        // Given: 含 pattern 的声明
+        let input = "Bash(git diff:*)"
+
+        // When: 解析
+        let result = SkillLoader.parseToolDeclarations(input)
+
+        // Then: patternDeclarations 非空（即使 base 是 recognizedSDK，pattern 仍标"parsed but not enforced"）
+        let patternDecls = result?.diagnostics.patternDeclarations ?? []
+        XCTAssertFalse(patternDecls.isEmpty,
+                       "含 pattern 的声明必须进入 patternDeclarations，标注未强制执行")
+        XCTAssertEqual(patternDecls.first?.pattern, "git diff:*")
+    }
+
+    // MARK: AC5 — 常见 SDK/Claude 工具名被识别
+
+    /// AC5 [P0]: epic 实施步骤第 3 条列出的全部 13 个 Claude Code LLM-facing 名
+    /// 都被识别为 .recognizedSDK。
+    func testParseToolDeclarations_recognizesClaudeCodeNames() {
+        // Given: 全部 Claude Code 工具名
+        let input = "Read, Write, Edit, Glob, Grep, Bash, WebFetch, WebSearch, ToolSearch, AskUser, Skill, Agent, Task"
+
+        // When: 解析
+        let result = SkillLoader.parseToolDeclarations(input)
+
+        // Then: 每个名字都被识别为 .recognizedSDK
+        let declarations = result?.declarations ?? []
+        XCTAssertEqual(declarations.count, 13,
+                       "应保留全部 13 个声明")
+        let allSDK = declarations.allSatisfy { $0.status == .recognizedSDK }
+        XCTAssertTrue(allSDK,
+                      "全部 13 个 Claude Code 名应被识别为 .recognizedSDK")
+
+        // 抽样验证 normalized name 规范化正确
+        let bashDecl = declarations.first(where: { $0.rawName == "Bash" })
+        XCTAssertEqual(bashDecl?.normalizedName, "bash")
+        let webFetchDecl = declarations.first(where: { $0.rawName == "WebFetch" })
+        XCTAssertEqual(webFetchDecl?.normalizedName, "webfetch")
+        let skillDecl = declarations.first(where: { $0.rawName == "Skill" })
+        XCTAssertEqual(skillDecl?.normalizedName, "skill")
+
+        // 可映射到 enum 的应提供 toolRestriction
+        XCTAssertEqual(bashDecl?.toolRestriction, .bash)
+        XCTAssertEqual(webFetchDecl?.toolRestriction, .webFetch)
+        XCTAssertEqual(skillDecl?.toolRestriction, .skill)
+    }
+
+    /// AC5 [P1]: `Task` 在 ToolRestriction enum 中无对应 case（Dev Notes "ToolRestriction gap"），
+    /// 但仍应被识别为 .recognizedSDK，normalizedName = "task"，toolRestriction = nil。
+    func testParseToolDeclarations_taskRecognizedButNoEnumCase() {
+        // Given: 仅 Task
+        let input = "Task"
+
+        // When: 解析
+        let result = SkillLoader.parseToolDeclarations(input)
+
+        // Then: Task 被识别为 SDK 名，但 toolRestriction = nil（无 enum case）
+        let declarations = result?.declarations ?? []
+        XCTAssertEqual(declarations.count, 1)
+        let decl = declarations.first
+        XCTAssertEqual(decl?.rawName, "Task")
+        XCTAssertEqual(decl?.status, .recognizedSDK,
+                       "Task 应被识别为 .recognizedSDK（即使 enum 无 case）")
+        XCTAssertEqual(decl?.normalizedName, "task")
+        XCTAssertNil(decl?.toolRestriction,
+                     "Task 无对应 ToolRestriction enum case，toolRestriction 必须为 nil")
+    }
+
+    // MARK: AC1 + AC5 — 混合识别
+
+    /// AC1 + AC5 [P0]: 混合 known/unknown/MCP 同时识别，diagnostics 正确分类。
+    func testParseToolDeclarations_mixedKnownUnknownMCP() {
+        // Given: 混合三种 status
+        let input = "Bash, UnknownTool, mcp__srv__search"
+
+        // When: 解析
+        let result = SkillLoader.parseToolDeclarations(input)
+
+        // Then: 3 个 declaration，按 frontmatter 顺序保留
+        let declarations = result?.declarations ?? []
+        XCTAssertEqual(declarations.count, 3)
+        XCTAssertEqual(declarations[0].rawName, "Bash")
+        XCTAssertEqual(declarations[0].status, .recognizedSDK)
+        XCTAssertEqual(declarations[1].rawName, "UnknownTool")
+        XCTAssertEqual(declarations[1].status, .unknown)
+        XCTAssertEqual(declarations[2].rawName, "mcp__srv__search")
+        XCTAssertEqual(declarations[2].status, .recognizedMCP)
+
+        // diagnostics：unsupportedDeclarations 只含 UnknownTool
+        let unsupported = result?.diagnostics.unsupportedDeclarations ?? []
+        XCTAssertEqual(unsupported.count, 1)
+        XCTAssertEqual(unsupported.first?.rawName, "UnknownTool")
+    }
+
+    // MARK: 空输入语义
+
+    /// 边界 [P1]: nil 和空字符串输入返回 nil
+    /// （区分 unrestricted 与显式声明：nil 输入 = 无 frontmatter 字段 = unrestricted；
+    ///  非空但全 unknown = 显式声明但无可用 —— 见 testParseToolDeclarations_doesNotCollapseToUnrestricted）
+    func testParseToolDeclarations_emptyAndNil() {
+        // nil 输入 → nil（无声明）
+        let nilResult = SkillLoader.parseToolDeclarations(nil)
+        XCTAssertNil(nilResult, "nil 输入应返回 nil（无 frontmatter 字段，语义为 unrestricted）")
+
+        // 空字符串 → nil
+        let emptyResult = SkillLoader.parseToolDeclarations("")
+        XCTAssertNil(emptyResult, "空字符串输入应返回 nil")
+    }
+
+    // MARK: AC1 + AC2 + AC3 — loadSkillFromDirectory 端到端填充
+
+    /// AC1 + AC2 + AC3 + AC4 [P0]: loadSkillFromDirectory 同时填充新字段（toolDeclarations /
+    /// toolDeclarationDiagnostics）与旧字段（toolRestrictions），向后兼容。
+    func testLoadSkillFromDirectory_populatesToolDeclarations() {
+        // Given: 含 allowed-tools（含 pattern + SDK 工具）的 skill 目录
+        let skillDir = createSkillDir(
+            name: "decl-skill",
+            frontmatter: "name: decl\nallowed-tools: Bash(npx foo:*), Read, Write",
+            body: "Skill with declarations"
+        )
+
+        // When: 加载 skill
+        let skill = SkillLoader.loadSkillFromDirectory(skillDir)
+
+        // Then: 新字段被填充
+        XCTAssertNotNil(skill?.toolDeclarations,
+                       "toolDeclarations 必须被 loadSkillFromDirectory 填充")
+        XCTAssertEqual(skill?.toolDeclarations?.count, 3,
+                       "应保留全部三个声明（含 pattern）")
+        XCTAssertNotNil(skill?.toolDeclarationDiagnostics,
+                       "toolDeclarationDiagnostics 必须被填充")
+        XCTAssertFalse(skill?.toolDeclarationDiagnostics?.patternDeclarations.isEmpty ?? true,
+                       "Bash(npx foo:*) 应进入 patternDeclarations")
+
+        // And: 旧字段保持当前行为（AC4 向后兼容）
+        XCTAssertNotNil(skill?.toolRestrictions,
+                       "旧字段 toolRestrictions 必须保持填充（AC4 向后兼容）")
+        XCTAssertEqual(skill?.toolRestrictions?.count, 3,
+                       "旧字段应解析出 Bash / Read / Write 三个 restriction")
+        XCTAssertTrue(skill?.toolRestrictions?.contains(.bash) ?? false)
+        XCTAssertTrue(skill?.toolRestrictions?.contains(.read) ?? false)
+        XCTAssertTrue(skill?.toolRestrictions?.contains(.write) ?? false)
+    }
+
+    // MARK: - Story 29.4 Review Fixes — Pattern / MCP Robustness
+
+    /// Review fix [F1]: empty parens `Bash()` must NOT produce a phantom empty
+    /// pattern. The declaration is still recognized as `Bash` with `pattern == nil`
+    /// (so it does not pollute `patternDeclarations`).
+    func testParseToolDeclarations_emptyParensProduceNoPhantomPattern() {
+        // Given: an empty-pattern form
+        let input = "Bash()"
+
+        // When: parse
+        let result = SkillLoader.parseToolDeclarations(input)
+
+        // Then: Bash is recognized, pattern is nil (not "")
+        let declarations = result?.declarations ?? []
+        XCTAssertEqual(declarations.count, 1)
+        let decl = declarations.first
+        XCTAssertEqual(decl?.rawName, "Bash()")
+        XCTAssertEqual(decl?.normalizedName, "bash")
+        XCTAssertEqual(decl?.status, .recognizedSDK,
+                       "Bash() — base Bash still recognized despite empty parens")
+        XCTAssertNil(decl?.pattern,
+                     "empty parens must yield pattern == nil, not \"\"")
+        XCTAssertEqual(decl?.toolRestriction, .bash)
+        // And: no phantom pattern declaration in diagnostics
+        XCTAssertTrue(result?.diagnostics.patternDeclarations.isEmpty ?? true,
+                      "Bash() must not appear in patternDeclarations (no real pattern)")
+    }
+
+    /// Review fix [F6]: unclosed paren `Bash(git diff:*` (typo missing `)`)
+    /// must still recognize the `Bash` base name rather than silently demoting
+    /// it to `.unknown` (which would drop a recognized tool's permission).
+    func testParseToolDeclarations_unclosedParenStillRecognizesBase() {
+        // Given: a Bash declaration missing its closing paren
+        let input = "Bash(git diff:*"
+
+        // When: parse
+        let result = SkillLoader.parseToolDeclarations(input)
+
+        // Then: base Bash recognized despite the malformed form
+        let declarations = result?.declarations ?? []
+        XCTAssertEqual(declarations.count, 1)
+        let decl = declarations.first
+        XCTAssertEqual(decl?.rawName, "Bash(git diff:*",
+                       "rawName preserves the malformed form verbatim")
+        XCTAssertEqual(decl?.normalizedName, "bash",
+                       "base name Bash must be extracted despite unclosed paren")
+        XCTAssertEqual(decl?.status, .recognizedSDK,
+                       "Bash must remain .recognizedSDK — no silent demotion to .unknown")
+        XCTAssertEqual(decl?.toolRestriction, .bash)
+        XCTAssertNil(decl?.pattern,
+                     "unclosed paren yields no pattern (cannot reliably extract)")
+    }
+
+    /// Review fix [F9]: MCP name with a trailing pattern
+    /// (`mcp__github__list_prs(extra)`) must be classified against its bare
+    /// namespaced base, with parens stripped from the normalized name so the
+    /// declaration can actually match a registered MCP tool at runtime.
+    func testParseToolDeclarations_mcpNameWithTrailingPatternStripsParens() {
+        // Given: an MCP namespaced tool with a trailing permission pattern
+        let input = "mcp__github__list_prs(extra:*)"
+
+        // When: parse
+        let result = SkillLoader.parseToolDeclarations(input)
+
+        // Then: classified as MCP, normalized name has NO parens, pattern preserved
+        let declarations = result?.declarations ?? []
+        XCTAssertEqual(declarations.count, 1)
+        let decl = declarations.first
+        XCTAssertEqual(decl?.rawName, "mcp__github__list_prs(extra:*)")
+        XCTAssertEqual(decl?.normalizedName, "mcp__github__list_prs",
+                       "normalized MCP name must NOT contain parens (else runtime match fails)")
+        XCTAssertEqual(decl?.status, .recognizedMCP)
+        XCTAssertEqual(decl?.pattern, "extra:*",
+                       "trailing pattern preserved for the MCP declaration")
+        XCTAssertNil(decl?.toolRestriction)
+    }
 }

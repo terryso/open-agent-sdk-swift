@@ -69,6 +69,26 @@ public struct Skill: Sendable, Equatable {
     /// Tools the skill is allowed to use. `nil` means all tools are available.
     public let toolRestrictions: [ToolRestriction]?
 
+    /// Lossless tool declarations parsed from `allowed-tools` (Story 29.4).
+    ///
+    /// Unlike `toolRestrictions` (which only preserves names mappable to the
+    /// `ToolRestriction` enum and collapses unresolvable input to `nil` =
+    /// unrestricted), `toolDeclarations` preserves MCP namespaced names,
+    /// permission pattern text, and unknown names as `ToolDeclaration`
+    /// values with explicit statuses. `nil` here means the skill declared no
+    /// `allowed-tools` frontmatter (i.e. genuinely unrestricted), **not** that
+    /// unknown names were silently dropped.
+    ///
+    /// - Note: Consumers (Agent / SkillTool / ToolRestrictionStack /
+    ///   DefaultSubAgentSpawner) still read `toolRestrictions` for now; they
+    ///   migrate to `toolDeclarations` in Story 29.5.
+    public let toolDeclarations: [ToolDeclaration]?
+
+    /// Diagnostics companion to `toolDeclarations` (Story 29.4). Surface
+    /// unsupported (`.unknown`) declarations and parsed-but-not-enforced
+    /// pattern declarations. `nil` when `toolDeclarations` is `nil`.
+    public let toolDeclarationDiagnostics: ToolDeclarationDiagnostics?
+
     /// Model override for this skill (e.g., "claude-opus-4-6").
     public let modelOverride: String?
 
@@ -113,6 +133,8 @@ public struct Skill: Sendable, Equatable {
     ///   - aliases: Alternative names for lookup.
     ///   - userInvocable: Whether users can invoke via /command. Defaults to `true`.
     ///   - toolRestrictions: Allowed tools. `nil` means all tools. Defaults to `nil`.
+    ///   - toolDeclarations: Lossless tool declarations (Story 29.4). Defaults to `nil`.
+    ///   - toolDeclarationDiagnostics: Diagnostics for `toolDeclarations`. Defaults to `nil`.
     ///   - modelOverride: Model to use during execution. Defaults to `nil`.
     ///   - isAvailable: Runtime availability check. Defaults to `{ true }`.
     ///   - promptTemplate: The prompt template string.
@@ -127,6 +149,8 @@ public struct Skill: Sendable, Equatable {
         aliases: [String] = [],
         userInvocable: Bool = true,
         toolRestrictions: [ToolRestriction]? = nil,
+        toolDeclarations: [ToolDeclaration]? = nil,
+        toolDeclarationDiagnostics: ToolDeclarationDiagnostics? = nil,
         modelOverride: String? = nil,
         isAvailable: @escaping @Sendable () -> Bool = { true },
         promptTemplate: String,
@@ -141,6 +165,8 @@ public struct Skill: Sendable, Equatable {
         self.aliases = aliases
         self.userInvocable = userInvocable
         self.toolRestrictions = toolRestrictions
+        self.toolDeclarations = toolDeclarations
+        self.toolDeclarationDiagnostics = toolDeclarationDiagnostics
         self.modelOverride = modelOverride
         self.isAvailable = isAvailable
         self.promptTemplate = promptTemplate
@@ -162,6 +188,8 @@ public struct Skill: Sendable, Equatable {
             aliases: aliases,
             userInvocable: userInvocable,
             toolRestrictions: toolRestrictions,
+            toolDeclarations: toolDeclarations,
+            toolDeclarationDiagnostics: toolDeclarationDiagnostics,
             modelOverride: modelOverride,
             isAvailable: isAvailable,
             promptTemplate: promptTemplate,
@@ -179,6 +207,8 @@ public struct Skill: Sendable, Equatable {
         lhs.aliases == rhs.aliases &&
         lhs.userInvocable == rhs.userInvocable &&
         lhs.toolRestrictions == rhs.toolRestrictions &&
+        lhs.toolDeclarations == rhs.toolDeclarations &&
+        lhs.toolDeclarationDiagnostics == rhs.toolDeclarationDiagnostics &&
         lhs.modelOverride == rhs.modelOverride &&
         lhs.promptTemplate == rhs.promptTemplate &&
         lhs.whenToUse == rhs.whenToUse &&
