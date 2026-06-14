@@ -175,7 +175,7 @@ record("ToolAnnotations.openWorldHint", swiftField: "ToolAnnotations.openWorldHi
 let coreTools = getAllBaseTools(tier: .core)
 let toolMap = Dictionary(uniqueKeysWithValues: coreTools.map { ($0.name, $0) })
 
-let expectedReadOnly = ["Read", "Glob", "Grep", "WebFetch", "WebSearch", "AskUser", "ToolSearch"]
+let expectedReadOnly = ["Read", "Glob", "Grep", "WebFetch", "WebSearch", "AskUser", "ToolSearch", "pause_for_human"]
 for name in expectedReadOnly {
     if let tool = toolMap[name] {
         record("readOnlyHint=true for \(name)", swiftField: "\(name).isReadOnly", status: tool.isReadOnly ? "PASS" : "MISSING",
@@ -305,8 +305,8 @@ record("GrepInput.-B", swiftField: "GrepTool '-B' property", status: "PASS",
        note: grepProps?["-B"] != nil ? "Present" : "Missing")
 
 // Core tool count
-record("Core tool count", swiftField: "getAllBaseTools(tier: .core).count", status: coreTools.count == 10 ? "PASS" : "MISSING",
-       note: "Expected 10, got \(coreTools.count)")
+record("Core tool count", swiftField: "getAllBaseTools(tier: .core).count", status: coreTools.count == 11 ? "PASS" : "MISSING",
+       note: "Expected 11, got \(coreTools.count)")
 
 print("")
 

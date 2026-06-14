@@ -120,8 +120,13 @@ Use this tool when the user's request matches one of the available skills.
             "prompt": skill.promptTemplate
         ]
 
-        // Include allowedTools if skill has tool restrictions (backward-compatible rawValues)
-        if let restrictions = skill.toolRestrictions {
+        // Include allowedTools for consumers that still read the legacy field.
+        // When richer declarations exist, emit their raw names so MCP/custom/pattern
+        // entries are not lost. Legacy programmatic skills without declarations keep
+        // the historical ToolRestriction rawValue list.
+        if let declarations = skill.toolDeclarations {
+            result["allowedTools"] = declarations.map(\.rawName)
+        } else if let restrictions = skill.toolRestrictions {
             result["allowedTools"] = restrictions.map(\.rawValue)
         }
 

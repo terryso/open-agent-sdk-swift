@@ -889,6 +889,43 @@ for summary in event.messages {
 
 ---
 
+### 38. ClaudeCodeCompatExample — Epic 29 Claude Code Skill/Subagent Compatibility
+
+Verifies the public API surface introduced by **Epic 29** (Claude Code Skill/Subagent Compatibility): the low-level primitives that let Claude Code workflow skills run with minimal rewriting. This is a pure verification example: no API key is required, so it can run in CI as both documentation and regression coverage.
+
+```bash
+swift run ClaudeCodeCompatExample
+```
+
+**No API key required** — all checks are synchronous, pure-function calls against the public SDK surface.
+
+**What you'll learn (covering all 7 Epic 29 stories):**
+- **Story 29.1** — `createTaskTool()` is a Claude Code-compatible alias of `createAgentTool()` with shared schema, required fields, and launcher fields
+- **Story 29.2** — `Agent` / `Task` launcher detection contract and child tool-pool stripping to avoid recursive spawning
+- **Story 29.3** — `Skill.baseDir` / `Skill.supportingFiles` package context for filesystem skills vs programmatic skills
+- **Story 29.4** — lossless `ToolDeclaration` model for MCP namespaced names, permission patterns (`Bash(git diff:*)`), and unknown/custom names that never collapse to unrestricted
+- **Story 29.5** — shared `filterToolsByDeclarations` filtering for skills and subagents, with diagnostics that never silently widen access
+- **Story 29.6** — `SubAgentFieldDiagnostics` for deferred fields (`run_in_background`, `resume`, `isolation`, `team_name`, `skills`, MCP references)
+- **Story 29.7** — wiring guidance for registering the `Task` alias so `Task(...)` snippets can run without prompt rewrites
+
+**Key code:**
+```swift
+// Register Task for Claude Code workflow skills; it shares schema with Agent.
+let tools = getAllBaseTools(tier: .core) + [createTaskTool()]
+
+// Lossless ToolDeclaration preserves MCP/custom/unknown names and patterns.
+let decl = ToolDeclaration.parse("mcp__github__list_prs")  // .recognizedMCP
+let pattern = ToolDeclaration.parse("Bash(git diff:*)")    // base="bash", pattern="git diff:*"
+
+// Shared filtering exposes missing tools as diagnostics instead of widening access.
+let (kept, diags) = filterToolsByDeclarations(
+    available: tools, allowed: ToolDeclaration.fromToolNames(["Read", "Grep"]), disallowed: nil
+)
+// diags.unmatchedDeclarations lists tools that were declared but unavailable.
+```
+
+---
+
 ## Example Dependencies
 
 | Example                  | Requires MCP dependency | Extra setup              |
@@ -931,6 +968,7 @@ for summary in event.messages {
 | ReviewOrchestratorExample| No                     | None (config only)       |
 | EnvInjectionExample      | No                     | API key required         |
 | MessageSummaryExample    | No                     | API key required         |
+| ClaudeCodeCompatExample  | No                     | None (pure verification) |
 
 All examples are defined as executable targets in `Package.swift` — no additional configuration needed.
 
@@ -950,8 +988,9 @@ Five essential scenarios every developer should understand. Each links to the re
 | 8 | **Skill Persistence** — SkillWriter, SKILL.md files | `SkillWriterExample/` | `swift run SkillWriterExample` |
 | 9 | **Review Pipeline** — ReviewOrchestrator, promptSuffix, additional tools | `ReviewOrchestratorExample/` | `swift run ReviewOrchestratorExample` |
 | 10 | **Env Injection** — AgentOptions.env, ToolContext.env | `EnvInjectionExample/` | `swift run EnvInjectionExample` |
+| 11 | **Claude Code Compat (Epic 29)** — Task alias, ToolDeclaration model, shared filtering, deferred-field diagnostics | `ClaudeCodeCompatExample/` | `swift run ClaudeCodeCompatExample` |
 
-> **Tip:** Start with scenario 1 (BasicAgent), then explore each scenario in order. The full learning path below covers all 37 examples.
+> **Tip:** Start with scenario 1 (BasicAgent), then explore each scenario in order. The path below covers 38 tutorial sections across 47 runnable example targets.
 
 ## Recommended Learning Path
 
@@ -965,6 +1004,7 @@ BasicAgent → StreamingAgent → CustomTools → CustomSystemPromptExample
     → PolyvLiveExample → EventBusExample → SSEBridgeExample
     → SkillWriterExample → ReviewOrchestratorExample
     → EnvInjectionExample → MessageSummaryExample
+    → ClaudeCodeCompatExample
 ```
 
 1. **Start here:** BasicAgent, StreamingAgent — understand the core prompt/stream APIs
@@ -984,6 +1024,7 @@ BasicAgent → StreamingAgent → CustomTools → CustomSystemPromptExample
 15. **Runtime events:** EventBusExample, SSEBridgeExample — EventBus publish/subscribe, SSE bridge pipeline, token streaming
 16. **Skill persistence & review:** SkillWriterExample, ReviewOrchestratorExample — persist skills to disk, configure review scheduling
 17. **Env injection & message summaries:** EnvInjectionExample, MessageSummaryExample — inject env vars, observe LLM request summaries
+18. **Claude Code compat (Epic 29):** ClaudeCodeCompatExample — `Task` alias, lossless `ToolDeclaration` model, shared filtering, deferred-field diagnostics
 
 ## Troubleshooting
 
@@ -1017,16 +1058,24 @@ open Package.swift
 
 Then select any example target from the scheme selector and press Cmd+R to run.
 
-### Using with GLM / other OpenAI-compatible providers
+### Using GLM / Other Compatible Providers
 
-The examples default to `ANTHROPIC_API_KEY`, but you can modify them to use any OpenAI-compatible provider:
+Most examples read provider settings from environment variables, so you do not need to edit source code.
 
-```swift
-let agent = createAgent(options: AgentOptions(
-    apiKey: ProcessInfo.processInfo.environment["CODEANY_API_KEY"] ?? "your-key",
-    model: "glm-5.1",
-    baseURL: "https://open.bigmodel.cn/api/coding/paas/v4",
-    provider: .openai,
-    permissionMode: .bypassPermissions
-))
+For OpenAI-compatible providers:
+
+```bash
+export CODEANY_API_KEY=your-key
+export CODEANY_BASE_URL=https://open.bigmodel.cn/api/coding/paas/v4
+export CODEANY_MODEL=glm-5.1
+swift run BasicAgent
+```
+
+For Anthropic-compatible custom endpoints:
+
+```bash
+export ANTHROPIC_API_KEY=your-key
+export ANTHROPIC_BASE_URL=https://open.bigmodel.cn/api/anthropic
+export ANTHROPIC_MODEL=glm-5.2
+swift run BasicAgent
 ```

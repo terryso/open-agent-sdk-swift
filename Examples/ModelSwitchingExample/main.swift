@@ -1,19 +1,19 @@
 // ModelSwitchingExample 示例
 //
 // 演示如何在运行时动态切换 LLM 模型，包括：
-//   1. 使用默认模型（claude-sonnet-4-6）创建 Agent 并执行查询
-//   2. 使用 agent.switchModel() 切换到不同模型（claude-opus-4-6）
+//   1. 使用默认模型创建 Agent 并执行查询
+//   2. 使用 agent.switchModel() 切换到配置的第二模型
 //   3. 查看每个模型的 costBreakdown（per-model token counts 和 cost）
 //   4. 错误处理：传入空字符串时抛出 SDKError.invalidConfiguration
 //
 // Demonstrates runtime dynamic model switching with the SDK:
-//   1. Create Agent with default model (claude-sonnet-4-6) and execute a query
-//   2. Switch models at runtime using agent.switchModel("claude-opus-4-6")
+//   1. Create Agent with the configured default model and execute a query
+//   2. Switch models at runtime using the configured second model
 //   3. Inspect per-model cost breakdown (CostBreakdownEntry) from QueryResult
 //   4. Error handling: SDKError.invalidConfiguration for empty model name
 //
 // 运行方式：swift run ModelSwitchingExample
-// 说明：需要有效的 API Key（支持 claude-sonnet-4-6 和 claude-opus-4-6）
+// 说明：需要有效的 API Key；可通过 SECOND_MODEL、ANTHROPIC_SECOND_MODEL 或 CODEANY_SECOND_MODEL 指定切换目标。
 
 import Foundation
 import OpenAgentSDK
@@ -24,9 +24,13 @@ let dotEnv = loadDotEnv()
 let apiKey = getEnv("CODEANY_API_KEY", from: dotEnv)
     ?? getEnv("ANTHROPIC_API_KEY", from: dotEnv)
     ?? "sk-..."
-let defaultModel = getEnv("CODEANY_MODEL", from: dotEnv) ?? "claude-sonnet-4-6"
+let defaultModel = getEnv("ANTHROPIC_MODEL", from: dotEnv)
+    ?? getEnv("CODEANY_MODEL", from: dotEnv)
+    ?? "claude-sonnet-4-6"
 let useOpenAI = getEnv("CODEANY_API_KEY", from: dotEnv) != nil
-let secondModel = useOpenAI ? "glm-4-plus" : "claude-opus-4-6"
+let secondModel = getEnv("SECOND_MODEL", from: dotEnv)
+    ?? (useOpenAI ? getEnv("CODEANY_SECOND_MODEL", from: dotEnv) : getEnv("ANTHROPIC_SECOND_MODEL", from: dotEnv))
+    ?? defaultModel
 
 print("=== ModelSwitchingExample ===")
 print()
@@ -40,7 +44,7 @@ print()
 let agent = createAgent(options: AgentOptions(
     apiKey: apiKey,
     model: defaultModel,
-    baseURL: useOpenAI ? getDefaultOpenAIBaseURL(from: dotEnv) : nil,
+    baseURL: useOpenAI ? getDefaultOpenAIBaseURL(from: dotEnv) : getDefaultAnthropicBaseURL(from: dotEnv),
     provider: useOpenAI ? .openai : .anthropic,
     permissionMode: .bypassPermissions
 ))

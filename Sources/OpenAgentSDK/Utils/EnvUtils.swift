@@ -300,6 +300,17 @@ public func getDefaultOpenAIBaseURL(from dotEnv: [String: String] = [:]) -> Stri
         ?? "https://open.bigmodel.cn/api/coding/paas/v4"
 }
 
+/// Get the optional Anthropic-compatible base URL.
+///
+/// Priority: `ANTHROPIC_BASE_URL` environment variable > no override.
+/// When nil, the Anthropic client uses its built-in default endpoint.
+///
+/// - Parameter dotEnv: A dictionary loaded by ``loadDotEnv(path:)``.
+/// - Returns: The Anthropic-compatible base URL string, or nil for provider default.
+public func getDefaultAnthropicBaseURL(from dotEnv: [String: String] = [:]) -> String? {
+    getEnv("ANTHROPIC_BASE_URL", from: dotEnv)
+}
+
 // MARK: - YAML Helpers
 
 /// Escape special characters in a string for safe inclusion in a YAML double-quoted value.

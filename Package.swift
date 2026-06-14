@@ -291,6 +291,11 @@ let package = Package(
             path: "Examples/MessageSummaryExample"
         ),
         .executableTarget(
+            name: "ClaudeCodeCompatExample",
+            dependencies: ["OpenAgentSDK"],
+            path: "Examples/ClaudeCodeCompatExample"
+        ),
+        .executableTarget(
             name: "ScaffoldCLI",
             dependencies: [
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),

@@ -889,6 +889,43 @@ for summary in event.messages {
 
 ---
 
+### 38. ClaudeCodeCompatExample — Epic 29 Claude Code Skill/Subagent 兼容性
+
+验证 **Epic 29**（Claude Code Skill/Subagent 兼容性）引入的公共 API 表面 —— 让 Claude Code workflow skill 无需改写即可运行的底层原语。纯验证型示例：不需要 API Key，可在 CI 中运行，既是文档又是回归覆盖。
+
+```bash
+swift run ClaudeCodeCompatExample
+```
+
+**无需 API Key** — 所有断言都是对公共 SDK 表面的同步、纯函数调用。
+
+**你将学到（覆盖全部 7 个 Epic 29 story）：**
+- **Story 29.1** — `createTaskTool()` 是 `createAgentTool()` 的 Claude Code 兼容别名（共享 schema、required 字段、launcher 字段）
+- **Story 29.2** — `Agent` / `Task` 启动器检测契约与子代理工具池剥离（避免递归派生）
+- **Story 29.3** — `Skill.baseDir` / `Skill.supportingFiles` 包上下文（文件系统 skill vs 编程式 skill）
+- **Story 29.4** — `ToolDeclaration` 无损模型：MCP namespaced 名称、权限 pattern（`Bash(git diff:*)`）、未知/自定义名称绝不塌缩为 unrestricted
+- **Story 29.5** — `filterToolsByDeclarations` skill 与 subagent 共享过滤，带「绝不静默放权」诊断
+- **Story 29.6** — `SubAgentFieldDiagnostics` 延迟字段诊断（`run_in_background`、`resume`、`isolation`、`team_name`、`skills`、MCP 引用）
+- **Story 29.7** — 注册 `Task` 别名的接线指南，让 `Task(...)` 片段无需改写即可运行
+
+**关键代码：**
+```swift
+// Task 别名与 Agent 共享 schema —— 为 Claude Code workflow skill 注册它
+let tools = getAllBaseTools(tier: .core) + [createTaskTool()]
+
+// 无损 ToolDeclaration 保留 MCP/自定义/未知名称 + pattern
+let decl = ToolDeclaration.parse("mcp__github__list_prs")  // .recognizedMCP
+let pattern = ToolDeclaration.parse("Bash(git diff:*)")    // base="bash", pattern="git diff:*"
+
+// 共享过滤把缺失工具作为诊断暴露（绝不放权为 unrestricted）
+let (kept, diags) = filterToolsByDeclarations(
+    available: tools, allowed: ToolDeclaration.fromToolNames(["Read", "Grep"]), disallowed: nil
+)
+// diags.unmatchedDeclarations 列出「声明了但工具池里没有」的工具
+```
+
+---
+
 ## 示例依赖
 
 | 示例                     | 需要 MCP 依赖          | 额外配置                  |
@@ -932,6 +969,7 @@ for summary in event.messages {
 | ReviewOrchestratorExample| 否                     | 无（仅配置）              |
 | EnvInjectionExample      | 否                     | 需要 API Key              |
 | MessageSummaryExample    | 否                     | 需要 API Key              |
+| ClaudeCodeCompatExample  | 否                     | 无（纯验证）             |
 
 所有示例都已作为可执行目标定义在 `Package.swift` 中 — 无需额外配置。
 
@@ -951,8 +989,9 @@ for summary in event.messages {
 | 8 | **技能持久化** — SkillWriter、SKILL.md 文件 | `SkillWriterExample/` | `swift run SkillWriterExample` |
 | 9 | **审查管道** — ReviewOrchestrator、promptSuffix、额外工具 | `ReviewOrchestratorExample/` | `swift run ReviewOrchestratorExample` |
 | 10 | **环境变量注入** — AgentOptions.env、ToolContext.env | `EnvInjectionExample/` | `swift run EnvInjectionExample` |
+| 11 | **Claude Code 兼容（Epic 29）** — Task 别名、ToolDeclaration 模型、共享过滤、延迟字段诊断 | `ClaudeCodeCompatExample/` | `swift run ClaudeCodeCompatExample` |
 
-> **提示：** 从场景 1（BasicAgent）开始，按顺序探索每个场景。下方的完整学习路径覆盖全部 37 个示例。
+> **提示：** 从场景 1（BasicAgent）开始，按顺序探索每个场景。下方路径覆盖 38 个教程章节，对应 47 个可运行示例 target。
 
 ## 推荐学习路径
 
@@ -966,6 +1005,7 @@ BasicAgent → StreamingAgent → CustomTools → CustomSystemPromptExample
     → PolyvLiveExample → EventBusExample → SSEBridgeExample
     → SkillWriterExample → ReviewOrchestratorExample
     → EnvInjectionExample → MessageSummaryExample
+    → ClaudeCodeCompatExample
 ```
 
 1. **从这里开始：** BasicAgent、StreamingAgent — 理解核心 prompt/stream API
@@ -984,6 +1024,7 @@ BasicAgent → StreamingAgent → CustomTools → CustomSystemPromptExample
 14. **Runtime 事件：** EventBusExample、SSEBridgeExample — EventBus 发布/订阅、SSE 桥接管道、Token 流式输出
 15. **技能持久化与审查：** SkillWriterExample、ReviewOrchestratorExample — 技能写入磁盘、审查调度配置
 16. **环境注入与消息摘要：** EnvInjectionExample、MessageSummaryExample — 环境变量注入、LLM 请求摘要观察
+17. **Claude Code 兼容（Epic 29）：** ClaudeCodeCompatExample — `Task` 别名、无损 `ToolDeclaration` 模型、共享过滤、延迟字段诊断
 
 ## 常见问题
 
@@ -1017,16 +1058,24 @@ open Package.swift
 
 然后从方案选择器中选择任意示例目标，按 Cmd+R 运行。
 
-### 使用 GLM 或其他 OpenAI 兼容提供商
+### 使用 GLM 或其他兼容提供商
 
-示例默认使用 `ANTHROPIC_API_KEY`，你可以修改代码使用任意 OpenAI 兼容提供商：
+大多数示例会从环境变量读取 provider 配置，不需要修改源码。
 
-```swift
-let agent = createAgent(options: AgentOptions(
-    apiKey: ProcessInfo.processInfo.environment["CODEANY_API_KEY"] ?? "your-key",
-    model: "glm-5.1",
-    baseURL: "https://open.bigmodel.cn/api/coding/paas/v4",
-    provider: .openai,
-    permissionMode: .bypassPermissions
-))
+OpenAI 兼容 provider：
+
+```bash
+export CODEANY_API_KEY=your-key
+export CODEANY_BASE_URL=https://open.bigmodel.cn/api/coding/paas/v4
+export CODEANY_MODEL=glm-5.1
+swift run BasicAgent
+```
+
+Anthropic 兼容自定义 endpoint：
+
+```bash
+export ANTHROPIC_API_KEY=your-key
+export ANTHROPIC_BASE_URL=https://open.bigmodel.cn/api/anthropic
+export ANTHROPIC_MODEL=glm-5.2
+swift run BasicAgent
 ```

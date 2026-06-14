@@ -29,7 +29,9 @@ struct MessageSummaryExample {
             return
         }
 
-        let defaultModel = getEnv("CODEANY_MODEL", from: dotEnv) ?? "claude-sonnet-4-6"
+        let defaultModel = getEnv("ANTHROPIC_MODEL", from: dotEnv)
+            ?? getEnv("CODEANY_MODEL", from: dotEnv)
+            ?? "claude-sonnet-4-6"
         let useOpenAI = getEnv("CODEANY_API_KEY", from: dotEnv) != nil
 
         try await part1_SyntheticMessageSummary()
@@ -86,7 +88,7 @@ struct MessageSummaryExample {
         let agent = createAgent(options: AgentOptions(
             apiKey: apiKey,
             model: model,
-            baseURL: useOpenAI ? getDefaultOpenAIBaseURL(from: dotEnv) : nil,
+            baseURL: useOpenAI ? getDefaultOpenAIBaseURL(from: dotEnv) : getDefaultAnthropicBaseURL(from: dotEnv),
             provider: useOpenAI ? .openai : .anthropic,
             systemPrompt: "You are a helpful assistant. Keep responses brief.",
             permissionMode: .bypassPermissions,

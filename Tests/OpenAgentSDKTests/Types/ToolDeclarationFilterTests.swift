@@ -504,4 +504,39 @@ final class ToolDeclarationFilterTests: XCTestCase {
         XCTAssertTrue(patternRawNames.contains("Bash(git diff:*)"),
                       "Pattern declaration must surface in patternDeclarations; got: \(patternRawNames)")
     }
+
+    /// Review fix (HIGH): declaration filtering must run after the final Agent
+    /// tool pool is assembled. This catches the subagent/inline-MCP hole where the
+    /// parent-tool prefilter ran before MCP/default tools were added, causing the
+    /// child to regain undeclared tools.
+    func testAgentAssembleFullToolPool_appliesDeclarationsAfterMCPAssembly() async {
+        let readTool = makeTool(name: "Read")
+        let searchTool = makeTool(name: "search")
+        let server = InProcessMCPServer(
+            name: "srv",
+            version: "1.0.0",
+            tools: [searchTool]
+        )
+
+        var options = AgentOptions(
+            apiKey: "test-key",
+            model: "test-model",
+            tools: [readTool],
+            mcpServers: [
+                "srv": .sdk(McpSdkServerConfig(name: "srv", version: "1.0.0", server: server))
+            ]
+        )
+        options.allowedToolDeclarations = ToolDeclaration.fromToolNames([
+            "mcp__srv__search",
+            "Read",
+        ])
+        options.disallowedToolDeclarations = ToolDeclaration.fromToolNames(["Read"])
+
+        let agent = Agent(options: options)
+        let (tools, manager) = await agent.assembleFullToolPool()
+
+        XCTAssertNil(manager, "SDK MCP servers should not create an external MCP client manager")
+        XCTAssertEqual(tools.map(\.name), ["mcp__srv__search"],
+                       "Final declaration filter must keep the declared MCP tool and deny Read/default tools")
+    }
 }

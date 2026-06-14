@@ -27,7 +27,9 @@ let dotEnv = loadDotEnv()
 let apiKey = getEnv("CODEANY_API_KEY", from: dotEnv)
     ?? getEnv("ANTHROPIC_API_KEY", from: dotEnv)
     ?? "sk-..."
-let defaultModel = getEnv("CODEANY_MODEL", from: dotEnv) ?? "claude-sonnet-4-6"
+let defaultModel = getEnv("ANTHROPIC_MODEL", from: dotEnv)
+    ?? getEnv("CODEANY_MODEL", from: dotEnv)
+    ?? "claude-sonnet-4-6"
 let useOpenAI = getEnv("CODEANY_API_KEY", from: dotEnv) != nil
 
 print("=== ExecuteSkillExample ===")
@@ -52,7 +54,7 @@ registry.register(greetSkill)
 let agent = createAgent(options: AgentOptions(
     apiKey: apiKey,
     model: defaultModel,
-    baseURL: useOpenAI ? getDefaultOpenAIBaseURL(from: dotEnv) : nil,
+    baseURL: useOpenAI ? getDefaultOpenAIBaseURL(from: dotEnv) : getDefaultAnthropicBaseURL(from: dotEnv),
     provider: useOpenAI ? .openai : .anthropic,
     maxTurns: 25,
     permissionMode: .bypassPermissions,
@@ -130,7 +132,7 @@ let restrictedSkill = Skill(
     name: "read-only-analysis",
     description: "Analyze using read-only tools with a stronger model",
     toolRestrictions: [.bash, .read, .write],
-    modelOverride: "claude-sonnet-4-6",
+    modelOverride: defaultModel,
     promptTemplate: "Analyze the current project structure and summarize what you find."
 )
 registry.register(restrictedSkill)

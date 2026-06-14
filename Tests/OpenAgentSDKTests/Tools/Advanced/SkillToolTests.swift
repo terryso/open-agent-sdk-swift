@@ -526,6 +526,35 @@ final class SkillToolTests: XCTestCase {
                        "Pattern text must be preserved in metadata")
     }
 
+    /// Review fix (MEDIUM): declaration-only skills must still expose the legacy
+    /// `allowedTools` field using raw declaration names. Without this, MCP-only
+    /// skills returned `toolDeclarations` but omitted `allowedTools`, breaking
+    /// consumers that still read the compatibility field.
+    func testSkillTool_toolDeclarationsOnly_emitAllowedToolsRawNames() async throws {
+        let declarations = ToolDeclaration.fromToolNames(["mcp__srv__search"])
+        let skill = Skill(
+            name: "mcp-only-skill",
+            description: "skill with only an MCP declaration",
+            toolRestrictions: nil,
+            toolDeclarations: declarations,
+            promptTemplate: "Use the MCP search tool"
+        )
+        let registry = SkillRegistry()
+        registry.register(skill)
+
+        let tool = createSkillTool(registry: registry)
+        let result = await tool.call(input: ["skill": "mcp-only-skill"], context: ToolContext(cwd: "/tmp"))
+
+        XCTAssertFalse(result.isError, "Expected success, got: \(result.content)")
+        let jsonData = result.content.data(using: .utf8)!
+        let json = try JSONSerialization.jsonObject(with: jsonData) as! [String: Any]
+
+        XCTAssertEqual(json["allowedTools"] as? [String], ["mcp__srv__search"],
+                       "allowedTools must preserve raw MCP declarations for compatibility consumers")
+        let decls = json["toolDeclarations"] as? [[String: Any]]
+        XCTAssertEqual(decls?.first?["rawName"] as? String, "mcp__srv__search")
+    }
+
     /// AC6 [P0]: When a skill has NO `toolDeclarations` (nil), the JSON result behaves
     /// exactly as today — `allowedTools` rawValues present, `toolDeclarations` ABSENT
     /// (or nil). Backward compatibility for programmatic / pre-29.4 skills.

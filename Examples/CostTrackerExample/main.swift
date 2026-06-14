@@ -140,27 +140,38 @@ struct CostTrackerExample {
         print("--- Part 4: Agent Integration ---")
         print()
 
-        let apiKey = ProcessInfo.processInfo.environment["ANTHROPIC_API_KEY"] ?? ""
+        let dotEnv = loadDotEnv()
+        let apiKey = getEnv("CODEANY_API_KEY", from: dotEnv)
+            ?? getEnv("ANTHROPIC_API_KEY", from: dotEnv)
+            ?? ""
         guard !apiKey.isEmpty else {
-            print("  Skipping: set ANTHROPIC_API_KEY to run this part")
+            print("  Skipping: set CODEANY_API_KEY or ANTHROPIC_API_KEY to run this part")
             print()
             print("  Usage:")
-            print("    ANTHROPIC_API_KEY=sk-... swift run CostTrackerExample")
+            print("    ANTHROPIC_API_KEY=sk-... ANTHROPIC_MODEL=claude-sonnet-4-6 swift run CostTrackerExample")
+            print("    CODEANY_API_KEY=sk-... CODEANY_MODEL=glm-5.1 swift run CostTrackerExample")
             print()
             return
         }
+        let useOpenAI = getEnv("CODEANY_API_KEY", from: dotEnv) != nil
+        let model = getEnv("ANTHROPIC_MODEL", from: dotEnv)
+            ?? getEnv("CODEANY_MODEL", from: dotEnv)
+            ?? "claude-sonnet-4-6"
 
         let tmpDir = FileManager.default.temporaryDirectory
             .appendingPathComponent("openagent-agent-trace-\(ProcessInfo.processInfo.processIdentifier)")
 
         let agent = Agent(options: AgentOptions(
             apiKey: apiKey,
-            model: "claude-sonnet-4-6",
+            model: model,
+            baseURL: useOpenAI ? getDefaultOpenAIBaseURL(from: dotEnv) : getDefaultAnthropicBaseURL(from: dotEnv),
+            provider: useOpenAI ? .openai : .anthropic,
             maxBudgetUsd: 0.50,
             traceEnabled: true
         ))
 
         print("  Agent configured with:")
+        print("    model: \(model)")
         print("    maxBudgetUsd: $0.50")
         print("    traceEnabled: true")
         print()

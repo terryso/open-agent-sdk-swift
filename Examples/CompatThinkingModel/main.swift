@@ -214,18 +214,26 @@ let cachedUsage2 = TokenUsage(inputTokens: 100, outputTokens: 50, cacheCreationI
 record("ModelUsage.cacheCreationInputTokens", swiftField: "TokenUsage.cacheCreationInputTokens: Int?", status: "PASS",
        note: "cacheCreationInputTokens=\(cachedUsage2.cacheCreationInputTokens?.description ?? "nil")")
 
-// Check for missing fields
-let usageFields = Mirror(reflecting: usage).children.compactMap { $0.label }
-record("ModelUsage.webSearchRequests", swiftField: usageFields.contains("webSearchRequests") ? "TokenUsage.webSearchRequests" : "NO EQUIVALENT",
-       status: usageFields.contains("webSearchRequests") ? "PASS" : "MISSING",
-       note: "TS SDK ModelUsage has webSearchRequests?: number. Swift has no equivalent.")
+let modelUsageEntry = SDKMessage.ModelUsageEntry(
+    model: "claude-sonnet-4-6",
+    inputTokens: 100,
+    outputTokens: 50,
+    webSearchRequests: 2,
+    maxOutputTokens: 4096
+)
+let modelUsageFields = Mirror(reflecting: modelUsageEntry).children.compactMap { $0.label }
+record("ModelUsage.webSearchRequests",
+       swiftField: modelUsageFields.contains("webSearchRequests") ? "ModelUsageEntry.webSearchRequests: Int?" : "NO EQUIVALENT",
+       status: modelUsageFields.contains("webSearchRequests") ? "PASS" : "MISSING",
+       note: "webSearchRequests=\(modelUsageEntry.webSearchRequests?.description ?? "nil")")
 record("ModelUsage.costUSD", swiftField: "QueryResult.totalCostUsd + CostBreakdownEntry.costUsd", status: "PARTIAL",
        note: "TS SDK has costUSD on ModelUsage. Swift has totalCostUsd on QueryResult and costUsd on CostBreakdownEntry (different location).")
 record("ModelUsage.contextWindow", swiftField: "getContextWindowSize(model:)", status: "PARTIAL",
        note: "TS SDK has contextWindow on ModelUsage. Swift has getContextWindowSize() utility function (different API shape).")
-record("ModelUsage.maxOutputTokens", swiftField: usageFields.contains("maxOutputTokens") ? "TokenUsage.maxOutputTokens" : "NO EQUIVALENT",
-       status: usageFields.contains("maxOutputTokens") ? "PASS" : "MISSING",
-       note: "TS SDK ModelUsage has maxOutputTokens?: number. Swift has no equivalent.")
+record("ModelUsage.maxOutputTokens",
+       swiftField: modelUsageFields.contains("maxOutputTokens") ? "ModelUsageEntry.maxOutputTokens: Int?" : "NO EQUIVALENT",
+       status: modelUsageFields.contains("maxOutputTokens") ? "PASS" : "MISSING",
+       note: "maxOutputTokens=\(modelUsageEntry.maxOutputTokens?.description ?? "nil")")
 
 // Verify getContextWindowSize provides equivalent info
 let contextSize = getContextWindowSize(model: "claude-sonnet-4-6")

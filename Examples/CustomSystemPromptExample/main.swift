@@ -16,7 +16,9 @@ let dotEnv = loadDotEnv()
 let apiKey = getEnv("CODEANY_API_KEY", from: dotEnv)
     ?? getEnv("ANTHROPIC_API_KEY", from: dotEnv)
     ?? "sk-..."
-let defaultModel = getEnv("CODEANY_MODEL", from: dotEnv) ?? "claude-sonnet-4-6"
+let defaultModel = getEnv("ANTHROPIC_MODEL", from: dotEnv)
+    ?? getEnv("CODEANY_MODEL", from: dotEnv)
+    ?? "claude-sonnet-4-6"
 let useOpenAI = getEnv("CODEANY_API_KEY", from: dotEnv) != nil
 
 // MARK: - 创建专业化 Agent
@@ -26,7 +28,7 @@ let useOpenAI = getEnv("CODEANY_API_KEY", from: dotEnv) != nil
 let agent = createAgent(options: AgentOptions(
     apiKey: apiKey,
     model: defaultModel,
-    baseURL: useOpenAI ? getDefaultOpenAIBaseURL(from: dotEnv) : nil,
+    baseURL: useOpenAI ? getDefaultOpenAIBaseURL(from: dotEnv) : getDefaultAnthropicBaseURL(from: dotEnv),
     provider: useOpenAI ? .openai : .anthropic,
     systemPrompt: """
     You are a senior code reviewer with 15 years of experience in Swift and system programming.

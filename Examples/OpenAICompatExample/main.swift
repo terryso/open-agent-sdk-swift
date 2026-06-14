@@ -28,12 +28,15 @@ let dotEnv = loadDotEnv()
 let apiKey = getEnv("CODEANY_API_KEY", from: dotEnv)
     ?? getEnv("ANTHROPIC_API_KEY", from: dotEnv)
     ?? "sk-..."
-let defaultModel = getEnv("CODEANY_MODEL", from: dotEnv) ?? "claude-sonnet-4-6"
+let defaultModel = getEnv("ANTHROPIC_MODEL", from: dotEnv)
+    ?? getEnv("CODEANY_MODEL", from: dotEnv)
+    ?? "claude-sonnet-4-6"
 let useOpenAI = getEnv("CODEANY_API_KEY", from: dotEnv) != nil
 
 // 当检测到 CODEANY_API_KEY 时，使用 OpenAI 兼容提供商
 // When CODEANY_API_KEY is detected, use OpenAI-compatible provider
 let openAIBaseURL = getDefaultOpenAIBaseURL(from: dotEnv)
+let providerBaseURL: String? = useOpenAI ? openAIBaseURL : getDefaultAnthropicBaseURL(from: dotEnv)
 
 print("=== OpenAICompatExample ===")
 print()
@@ -68,7 +71,9 @@ print()
 // 关键区别：只需设置 provider: .openai 和 baseURL 即可切换提供商
 // Key difference: just set provider: .openai and baseURL to switch providers
 
-let currentProvider: String = useOpenAI ? "OpenAI-compatible (\(openAIBaseURL))" : "Anthropic (default)"
+let currentProvider: String = useOpenAI
+    ? "OpenAI-compatible (\(openAIBaseURL))"
+    : "Anthropic-compatible (\(providerBaseURL ?? "default endpoint"))"
 print("Current provider: \(currentProvider)")
 print("Model: \(defaultModel)")
 print("useOpenAI flag: \(useOpenAI)")
@@ -84,7 +89,7 @@ print()
 
 // MARK: - Part 2: Prompt with OpenAI Provider（使用 OpenAI 提供商发送 Prompt）
 
-print("--- Part 2: Prompt with OpenAI Provider ---")
+print("--- Part 2: Prompt with Configured Provider ---")
 print()
 
 // 创建 Agent，使用 OpenAI 兼容提供商（或 Anthropic 作为回退）
@@ -92,7 +97,7 @@ print()
 let agent = createAgent(options: AgentOptions(
     apiKey: apiKey,
     model: defaultModel,
-    baseURL: useOpenAI ? openAIBaseURL : nil,
+    baseURL: providerBaseURL,
     provider: useOpenAI ? .openai : .anthropic,
     permissionMode: .bypassPermissions
 ))
@@ -118,12 +123,12 @@ print()
 assert(!result.text.isEmpty, "Prompt response text should not be empty")
 print("Assertion: response text is non-empty: PASS")
 print()
-print("Part 2: Prompt with OpenAI provider: PASS")
+print("Part 2: Prompt with configured provider: PASS")
 print()
 
 // MARK: - Part 3: Streaming with OpenAI Provider（使用 OpenAI 提供商流式响应）
 
-print("--- Part 3: Streaming with OpenAI Provider ---")
+print("--- Part 3: Streaming with Configured Provider ---")
 print()
 
 // 使用 stream() 流式接收响应，收集 SDKMessage 事件
@@ -169,12 +174,12 @@ print()
 assert(!streamedText.isEmpty, "Streamed response should not be empty")
 print("Assertion: streaming response is non-empty: PASS")
 print()
-print("Part 3: Streaming with OpenAI provider: PASS")
+print("Part 3: Streaming with configured provider: PASS")
 print()
 
 // MARK: - Part 4: Tool Use with OpenAI Provider（使用 OpenAI 提供商进行工具调用）
 
-print("--- Part 4: Tool Use with OpenAI Provider ---")
+print("--- Part 4: Tool Use with Configured Provider ---")
 print()
 
 // 定义一个简单的自定义工具，使用 Codable 输入类型
@@ -216,7 +221,7 @@ print("[Defined greet_tool with Codable GreetInput struct]")
 let toolAgent = createAgent(options: AgentOptions(
     apiKey: apiKey,
     model: defaultModel,
-    baseURL: useOpenAI ? openAIBaseURL : nil,
+    baseURL: providerBaseURL,
     provider: useOpenAI ? .openai : .anthropic,
     permissionMode: .bypassPermissions,
     tools: [greetTool]
@@ -246,7 +251,7 @@ let responseContainsGreeting = toolResult.text.lowercased().contains("hello")
 assert(responseContainsGreeting, "Tool use response should contain greeting output (hello/Alice)")
 print("Assertion: tool use response contains greeting output: PASS")
 print()
-print("Part 4: Tool use with OpenAI provider: PASS")
+print("Part 4: Tool use with configured provider: PASS")
 print()
 
 print("=== OpenAICompatExample Complete ===")

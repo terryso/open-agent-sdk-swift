@@ -12,7 +12,10 @@ import OpenAgentSDK
 // MARK: - 加载 .env 文件
 
 let dotEnv = loadDotEnv()
-let defaultModel = getEnv("CODEANY_MODEL", from: dotEnv) ?? "claude-sonnet-4-6"
+let anthropicModel = getEnv("ANTHROPIC_MODEL", from: dotEnv)
+    ?? getEnv("CODEANY_MODEL", from: dotEnv)
+    ?? "claude-sonnet-4-6"
+let anthropicBaseURL = getEnv("ANTHROPIC_BASE_URL", from: dotEnv)
 
 // MARK: - 方式 1：使用 Anthropic（默认提供商）
 
@@ -21,7 +24,8 @@ let anthropicKey = getEnv("ANTHROPIC_API_KEY", from: dotEnv)
 if let apiKey = anthropicKey, !apiKey.isEmpty {
     let agent = createAgent(options: AgentOptions(
         apiKey: apiKey,
-        model: defaultModel,
+        model: anthropicModel,
+        baseURL: anthropicBaseURL,
         systemPrompt: "You are a helpful assistant. Be concise.",
         maxTurns: 10,
         permissionMode: .bypassPermissions
@@ -44,6 +48,10 @@ if let apiKey = anthropicKey, !apiKey.isEmpty {
     print("  Input tokens: \(result.usage.inputTokens)")
     print("  Output tokens: \(result.usage.outputTokens)")
     print("  Cost: $\(String(format: "%.6f", result.totalCostUsd))")
+    if result.status != .success {
+        print("[ERROR] Anthropic prompt failed with status: \(result.status)")
+        exit(1)
+    }
 } else {
     print("[SKIP] Anthropic example — ANTHROPIC_API_KEY not set.")
     print("  To enable: export ANTHROPIC_API_KEY=sk-...")

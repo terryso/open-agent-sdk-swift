@@ -105,7 +105,17 @@ final class DefaultSubAgentSpawner: SubAgentSpawner, @unchecked Sendable {
         // Story 29.5: filterTools now returns (filtered, diagnostics); we currently
         // discard diagnostics at the spawner boundary (deferred-field diagnostics
         // surfacing belongs to Story 29.6).
-        let subTools = filterTools(allowedTools: allowedTools, disallowedTools: disallowedTools).filtered
+        //
+        // Story 29.7 review fix: keep the parsed declarations and pass them into
+        // the child AgentOptions too. Inline MCP/default tools are assembled after
+        // this parent-tool prefilter, so the child must re-apply the same
+        // declaration contract to the final pool to avoid silently broadening.
+        let allowedDeclarations = toolDeclarations(from: allowedTools)
+        let disallowedDeclarations = toolDeclarations(from: disallowedTools)
+        let subTools = filterTools(
+            allowedDeclarations: allowedDeclarations,
+            disallowedDeclarations: disallowedDeclarations
+        ).filtered
 
         // 2. Resolve MCP servers from spec (reference lookup or inline)
         var resolvedMcpServers: [String: McpServerConfig] = [:]
@@ -138,6 +148,8 @@ final class DefaultSubAgentSpawner: SubAgentSpawner, @unchecked Sendable {
             maxTurns: resolvedMaxTurns,
             tools: subTools.isEmpty ? nil : subTools
         )
+        options.allowedToolDeclarations = allowedDeclarations
+        options.disallowedToolDeclarations = disallowedDeclarations
 
         if !resolvedMcpServers.isEmpty { options.mcpServers = resolvedMcpServers }
         if let mode { options.permissionMode = mode }
@@ -266,27 +278,35 @@ final class DefaultSubAgentSpawner: SubAgentSpawner, @unchecked Sendable {
     /// diagnostics and NEVER fall back to unrestricted). Launcher stripping stays here —
     /// the helper is single-responsibility and does not strip launchers.
     private func filterTools(allowedTools: [String]?, disallowedTools: [String]?) -> (filtered: [ToolProtocol], diagnostics: ToolFilterDiagnostics) {
+        let allowedDeclarations = toolDeclarations(from: allowedTools)
+        let disallowedDeclarations = toolDeclarations(from: disallowedTools)
+
+        return filterTools(
+            allowedDeclarations: allowedDeclarations,
+            disallowedDeclarations: disallowedDeclarations
+        )
+    }
+
+    private func filterTools(
+        allowedDeclarations: [ToolDeclaration]?,
+        disallowedDeclarations: [ToolDeclaration]?
+    ) -> (filtered: [ToolProtocol], diagnostics: ToolFilterDiagnostics) {
         // Strip all subagent launcher tools by default to prevent recursive spawning.
         // Escape hatch (explicit recursion-allowed config) is deferred to a future story;
         // current default MUST remain "strip both" per Story 29.2 AC5.
         let launcherStripped = parentTools.filter { !SubAgentLauncherNames.contains($0.name) }
-
-        // Convert the Claude Code-style `[String]?` inputs to declarations. `nil`/empty
-        // stays `nil` so the helper treats it as "no constraint" (not "allow nothing").
-        let allowedDeclarations: [ToolDeclaration]? = {
-            guard let allowedTools, !allowedTools.isEmpty else { return nil }
-            return ToolDeclaration.fromToolNames(allowedTools)
-        }()
-        let disallowedDeclarations: [ToolDeclaration]? = {
-            guard let disallowedTools, !disallowedTools.isEmpty else { return nil }
-            return ToolDeclaration.fromToolNames(disallowedTools)
-        }()
 
         return filterToolsByDeclarations(
             available: launcherStripped,
             allowed: allowedDeclarations,
             disallowed: disallowedDeclarations
         )
+    }
+
+    private func toolDeclarations(from toolNames: [String]?) -> [ToolDeclaration]? {
+        guard let toolNames, !toolNames.isEmpty else { return nil }
+        let declarations = ToolDeclaration.fromToolNames(toolNames)
+        return declarations.isEmpty ? nil : declarations
     }
 
     /// Test-only thin wrapper around the private ``filterTools`` so unit tests can assert

@@ -1059,23 +1059,27 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
         return (Self.applyAllowedDeclarations(to: pool, options: options), manager)
     }
 
-    /// Story 29.5: applies `filterToolsByDeclarations` to an assembled pool when
-    /// `options.allowedToolDeclarations` is non-empty. This is the runtime
-    /// consumption point for the lossless declaration model introduced in
+    /// Story 29.5/29.7: applies `filterToolsByDeclarations` to an assembled pool
+    /// when declaration-level allow or deny lists are present. This is the final
+    /// runtime consumption point for the lossless declaration model introduced in
     /// Story 29.4 — MCP / custom / pattern / unknown declarations are honored
-    /// here, where the legacy `allowedTools: [String]?` path could not express
-    /// them. No-op when `allowedToolDeclarations` is nil/empty (legacy path).
+    /// after MCP/default tool assembly, where the legacy `[String]?` paths cannot
+    /// express them safely. No-op when both declaration lists are nil/empty.
     private static func applyAllowedDeclarations(
         to pool: [ToolProtocol],
         options: AgentOptions
     ) -> [ToolProtocol] {
-        guard let declarations = options.allowedToolDeclarations, !declarations.isEmpty else {
+        let allowedDeclarations = options.allowedToolDeclarations
+        let disallowedDeclarations = options.disallowedToolDeclarations
+        let hasAllowed = allowedDeclarations?.isEmpty == false
+        let hasDisallowed = disallowedDeclarations?.isEmpty == false
+        guard hasAllowed || hasDisallowed else {
             return pool
         }
         let (filtered, _) = filterToolsByDeclarations(
             available: pool,
-            allowed: declarations,
-            disallowed: nil
+            allowed: allowedDeclarations,
+            disallowed: disallowedDeclarations
         )
         return filtered
     }

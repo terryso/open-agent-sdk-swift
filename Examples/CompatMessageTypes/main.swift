@@ -21,12 +21,16 @@ guard !apiKey.isEmpty else {
     exit(1)
 }
 
-let baseURL = getEnv("CODEANY_BASE_URL", from: dotEnv)
-let defaultModel = getEnv("CODEANY_MODEL", from: dotEnv) ?? "claude-sonnet-4-6"
+let defaultModel = getEnv("ANTHROPIC_MODEL", from: dotEnv)
+    ?? getEnv("CODEANY_MODEL", from: dotEnv)
+    ?? "claude-sonnet-4-6"
 
 // Detect provider from env: CODEANY_API_KEY implies OpenAI-compatible provider
 let isCodeany = getEnv("CODEANY_API_KEY", from: dotEnv) != nil
 let defaultProvider: LLMProvider = isCodeany ? .openai : .anthropic
+let baseURL: String? = isCodeany
+    ? getDefaultOpenAIBaseURL(from: dotEnv)
+    : getDefaultAnthropicBaseURL(from: dotEnv)
 
 // MARK: - Compat Report Tracking
 

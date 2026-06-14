@@ -665,7 +665,7 @@ API documentation and guides are available via Swift-DocC:
 - [Multi-Agent Orchestration](Sources/OpenAgentSDK/Documentation.docc/MultiAgent.md) — Sub-agents, teams, tasks
 - [MCP, Sessions & Hooks](Sources/OpenAgentSDK/Documentation.docc/MCPSessionHooks.md) — MCP integration, persistence, hook system
 - [Cookbook](docs/cookbook.md) — 18 real-world scenarios with runnable code (structured output, sandbox, multi-agent, self-evolution, runtime events, etc.)
-- [Runnable Examples](Examples/README.md) — 33 complete examples with step-by-step tutorial (20 feature demos + 12 compat verification + EventBus demo)
+- [Runnable Examples](Examples/README.md) — 47 runnable example targets with 38 tutorial sections, including Claude Code compatibility, EventBus, MCP, skills, and SDK parity demos
 
 ## Requirements
 

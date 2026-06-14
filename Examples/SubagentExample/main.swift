@@ -17,7 +17,9 @@ let dotEnv = loadDotEnv()
 let apiKey = getEnv("CODEANY_API_KEY", from: dotEnv)
     ?? getEnv("ANTHROPIC_API_KEY", from: dotEnv)
     ?? "sk-..."
-let defaultModel = getEnv("CODEANY_MODEL", from: dotEnv) ?? "claude-sonnet-4-6"
+let defaultModel = getEnv("ANTHROPIC_MODEL", from: dotEnv)
+    ?? getEnv("CODEANY_MODEL", from: dotEnv)
+    ?? "claude-sonnet-4-6"
 let useOpenAI = getEnv("CODEANY_API_KEY", from: dotEnv) != nil
 
 // MARK: - 2. 创建主 Agent（协调者）并注册 Agent 工具
@@ -38,7 +40,7 @@ Always use the Agent tool for investigation tasks rather than doing it yourself.
 let agent = createAgent(options: AgentOptions(
     apiKey: apiKey,
     model: defaultModel,
-    baseURL: useOpenAI ? getDefaultOpenAIBaseURL(from: dotEnv) : nil,
+    baseURL: useOpenAI ? getDefaultOpenAIBaseURL(from: dotEnv) : getDefaultAnthropicBaseURL(from: dotEnv),
     provider: useOpenAI ? .openai : .anthropic,
     systemPrompt: systemPrompt,
     maxTurns: 10,

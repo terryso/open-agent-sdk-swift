@@ -589,7 +589,7 @@ API 文档和指南通过 Swift-DocC 提供：
 - [多 Agent 编排](Sources/OpenAgentSDK/Documentation.docc/MultiAgent.md) — 子 Agent、团队、任务
 - [MCP、会话与钩子](Sources/OpenAgentSDK/Documentation.docc/MCPSessionHooks.md) — MCP 集成、持久化、钩子系统
 - [Cookbook 实战指南](docs/cookbook.md) — 18 个真实场景的完整代码示例（结构化输出、沙箱、多 Agent 编排、Runtime 事件等）
-- [可运行示例](Examples/README.md) — 33 个完整示例，含逐步教程（20 个功能演示 + 12 个兼容性验证 + EventBus 演示）
+- [可运行示例](Examples/README.md) — 47 个可运行示例 target，含 38 个教程章节，覆盖 Claude Code 兼容、EventBus、MCP、技能和 SDK 对齐演示
 
 ## 系统要求
 

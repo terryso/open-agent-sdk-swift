@@ -371,6 +371,14 @@ public struct AgentOptions: Sendable {
     /// `Skill.toolDeclarations`; restored to its prior value on completion.
     public var allowedToolDeclarations: [ToolDeclaration]?
 
+    /// Story 29.7: richer, lossless deny-list of tool declarations.
+    ///
+    /// Used together with ``allowedToolDeclarations`` by final tool-pool assembly
+    /// so child agents and declaration-based callers can deny MCP/custom/pattern
+    /// names that the legacy `disallowedTools: [String]?` path cannot express.
+    /// When `nil` or empty, no declaration-level deny filter is applied.
+    public var disallowedToolDeclarations: [ToolDeclaration]?
+
     /// Optional effort level controlling the model's reasoning depth.
     /// Maps to API-level thinking budget tokens when set.
     public var effort: EffortLevel?
@@ -559,6 +567,8 @@ public struct AgentOptions: Sendable {
         env: [String: String]? = nil,
         allowedTools: [String]? = nil,
         disallowedTools: [String]? = nil,
+        allowedToolDeclarations: [ToolDeclaration]? = nil,
+        disallowedToolDeclarations: [ToolDeclaration]? = nil,
         effort: EffortLevel? = nil,
         outputFormat: OutputFormat? = nil,
         toolConfig: ToolConfig? = nil,
@@ -632,7 +642,8 @@ public struct AgentOptions: Sendable {
         self.env = env
         self.allowedTools = allowedTools
         self.disallowedTools = disallowedTools
-        self.allowedToolDeclarations = nil  // Story 29.5: set by executeSkill when a skill carries toolDeclarations
+        self.allowedToolDeclarations = allowedToolDeclarations
+        self.disallowedToolDeclarations = disallowedToolDeclarations
         self.effort = effort
         self.outputFormat = outputFormat
         self.toolConfig = toolConfig
@@ -755,6 +766,7 @@ public struct AgentOptions: Sendable {
         self.allowedTools = nil
         self.disallowedTools = nil
         self.allowedToolDeclarations = nil  // Story 29.5
+        self.disallowedToolDeclarations = nil
         self.effort = nil
         self.outputFormat = nil
         self.toolConfig = nil
