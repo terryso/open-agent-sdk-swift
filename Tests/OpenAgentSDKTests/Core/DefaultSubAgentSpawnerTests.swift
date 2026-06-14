@@ -372,4 +372,81 @@ final class DefaultSubAgentSpawnerTests: XCTestCase {
         XCTAssertFalse(names.contains("Agent"), "Existing behavior: Agent must be stripped (no regression)")
         XCTAssertTrue(names.contains("Read"), "Existing behavior: Read survives (no regression)")
     }
+
+    // MARK: - Story 29.1 follow-up: toolCalls propagation on the real spawn path
+
+    /// toolCalls propagation [P0]: `mapQueryResultToSubAgentResult` extracts tool names
+    /// from the child agent's `QueryResult.toolPairs`, so the parent's `[Tools used: ...]`
+    /// summary reflects what the sub-agent actually invoked.
+    ///
+    /// Regression guard for the real (non-mock) spawn path: previously `executeAgent`
+    /// returned a hard-coded `toolCalls: []`, so the summary never appeared in production
+    /// — even though the mock-spawner `AgentToolTests` passed (they injected `toolCalls`
+    /// by hand). This test drives the mapping directly with no LLM round-trip
+    /// (project rule #27: no real I/O in unit tests).
+    func testMapQueryResultToSubAgentResult_preservesInvokedToolNames() {
+        let toolPairs: [SDKMessage.ToolExecutionPair] = [
+            SDKMessage.ToolExecutionPair(
+                toolUse: SDKMessage.ToolUseData(toolName: "Glob", toolUseId: "tu-1", input: "{}"),
+                toolResult: SDKMessage.ToolResultData(toolUseId: "tu-1", content: "files", isError: false)
+            ),
+            SDKMessage.ToolExecutionPair(
+                toolUse: SDKMessage.ToolUseData(toolName: "Grep", toolUseId: "tu-2", input: "{}"),
+                toolResult: SDKMessage.ToolResultData(toolUseId: "tu-2", content: "matches", isError: false)
+            ),
+        ]
+        let queryResult = QueryResult(
+            text: "Found 3 files",
+            usage: TokenUsage(inputTokens: 10, outputTokens: 5),
+            numTurns: 2,
+            durationMs: 100,
+            messages: [],
+            toolPairs: toolPairs
+        )
+
+        let result = DefaultSubAgentSpawner.mapQueryResultToSubAgentResult(queryResult)
+
+        XCTAssertEqual(result.toolCalls, ["Glob", "Grep"],
+                       "toolCalls must list tools the sub-agent invoked, in order")
+        XCTAssertEqual(result.text, "Found 3 files")
+        XCTAssertFalse(result.isError)
+    }
+
+    /// toolCalls propagation [P0]: when the child agent invoked no tools, `toolCalls`
+    /// is empty (not nil, not garbage). Guards the empty-`toolPairs` path.
+    func testMapQueryResultToSubAgentResult_emptyToolPairs_yieldsEmptyToolCalls() {
+        let queryResult = QueryResult(
+            text: "Direct answer, no tools.",
+            usage: TokenUsage(inputTokens: 5, outputTokens: 3),
+            numTurns: 1,
+            durationMs: 50,
+            messages: [],
+            toolPairs: []
+        )
+
+        let result = DefaultSubAgentSpawner.mapQueryResultToSubAgentResult(queryResult)
+
+        XCTAssertTrue(result.toolCalls.isEmpty, "No tool invocations must yield empty toolCalls")
+        XCTAssertEqual(result.text, "Direct answer, no tools.")
+        XCTAssertFalse(result.isError)
+    }
+
+    /// toolCalls propagation [P1]: empty sub-agent text falls back to the placeholder,
+    /// preserving prior behavior (no regression on the text-empty edge case), and an
+    /// error status surfaces as `isError`.
+    func testMapQueryResultToSubAgentResult_emptyTextAndErrorStatus_preserved() {
+        let queryResult = QueryResult(
+            text: "",
+            usage: TokenUsage(inputTokens: 5, outputTokens: 0),
+            numTurns: 5,
+            durationMs: 50,
+            messages: [],
+            status: .errorMaxTurns
+        )
+
+        let result = DefaultSubAgentSpawner.mapQueryResultToSubAgentResult(queryResult)
+
+        XCTAssertEqual(result.text, "(Subagent completed with no text output)")
+        XCTAssertTrue(result.isError, "errorMaxTurns status must surface as isError")
+    }
 }

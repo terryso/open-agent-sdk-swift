@@ -192,16 +192,31 @@ final class DefaultSubAgentSpawner: SubAgentSpawner, @unchecked Sendable {
         }
 
         let result = await agent.prompt(prompt)
+        return Self.mapQueryResultToSubAgentResult(result)
+    }
 
-        let isError = result.status != .success
+    /// Maps a child agent's ``QueryResult`` to a ``SubAgentResult``.
+    ///
+    /// Extracted as an `internal static` so the tool-name extraction can be unit-tested
+    /// directly without driving a full LLM round-trip (project rule #27: no real I/O in
+    /// unit tests).
+    ///
+    /// Previously this dropped `QueryResult.toolPairs` and returned a hard-coded empty
+    /// `toolCalls`, which made the parent's `[Tools used: ...]` summary — added in the
+    /// shared subagent launcher factory (Story 29.1) — never appear for real spawns. The
+    /// `AgentTool`/`TaskTool` mock-spawner tests gave false confidence because they
+    /// injected `toolCalls` by hand. Surfacing the tools the sub-agent actually invoked
+    /// lets the `Task` alias deliver its Claude Code-compatible contract.
+    internal static func mapQueryResultToSubAgentResult(_ result: QueryResult) -> SubAgentResult {
         let text = result.text.isEmpty
             ? "(Subagent completed with no text output)"
             : result.text
-
+        // Preserve invocation order; keep duplicates so reviewers see repeat calls too.
+        let toolNames = result.toolPairs.map { $0.toolUse.toolName }
         return SubAgentResult(
             text: text,
-            toolCalls: [],
-            isError: isError
+            toolCalls: toolNames,
+            isError: result.status != .success
         )
     }
 }
