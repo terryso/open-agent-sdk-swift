@@ -170,6 +170,16 @@ private func createSubAgentLauncherTool(name: String, description: String) -> To
 
         // Format output
         var output = result.text
+        // Story 29.6: surface deferred-field diagnostics so callers can see which
+        // subagent fields the SDK honored vs ignored. Block appears AFTER result.text
+        // and BEFORE the `[Tools used: ...]` summary so it never mangles either.
+        if let diags = result.fieldDiagnostics, !diags.isEmpty {
+            let lines = diags.map { diag -> String in
+                let reasonText = SubAgentFieldDiagnosticReason.shortHumanReadableText(diag.reason)
+                return "[Subagent field \"\(diag.fieldName)\" ignored: \(reasonText) (raw value: \(diag.rawValue))]"
+            }
+            output += "\n" + lines.joined(separator: "\n")
+        }
         if !result.toolCalls.isEmpty {
             output += "\n[Tools used: \(result.toolCalls.joined(separator: ", "))]"
         }

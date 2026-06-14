@@ -56,6 +56,8 @@
 /// ## Sub-Agent Spawning
 /// - ``SubAgentSpawner`` — Protocol for spawning sub-agents (defined in Types/)
 /// - ``SubAgentResult`` — Result from sub-agent execution
+/// - ``SubAgentFieldDiagnostics`` — Runtime diagnostic for a deferred subagent field (Story 29.6)
+/// - ``SubAgentFieldDiagnosticReason`` — Machine-readable reason for a deferred field
 /// - ``AgentDefinition`` — Sub-agent configuration with tools and maxTurns
 /// - ``createAgentTool()`` — Factory for the Agent tool
 /// - ``createTaskTool()`` — Factory for the Task tool (Claude Code-compatible alias of Agent)

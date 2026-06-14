@@ -146,11 +146,111 @@ final class DefaultSubAgentSpawner: SubAgentSpawner, @unchecked Sendable {
         // Note: skills, runInBackground, isolation, teamName, and resume
         // are declared fields but full runtime wiring is deferred.
 
+        // 3.5 Collect deferred-field diagnostics (Story 29.6). Surfaced on
+        // SubAgentResult.fieldDiagnostics so callers can tell which fields the
+        // SDK honored vs ignored. Does NOT change runtime behavior — the agent
+        // still runs in the foreground, is not resumed, is not isolated, etc.
+        let collectedDiagnostics = collectFieldDiagnostics(
+            runInBackground: runInBackground,
+            isolation: isolation,
+            teamName: teamName,
+            skills: skills,
+            resume: resume,
+            mcpServers: mcpServers
+        )
+
         // 4. Execute and collect result
-        return await executeAgent(prompt: prompt, options: options)
+        // AC8: when nothing was collected, pass `nil` (not an empty array) so
+        // downstream consumers can distinguish "no signal" from "signal ran but empty".
+        let fieldDiagnosticsToPropagate: [SubAgentFieldDiagnostics]? =
+            collectedDiagnostics.isEmpty ? nil : collectedDiagnostics
+        return await executeAgent(prompt: prompt, options: options, fieldDiagnostics: fieldDiagnosticsToPropagate)
     }
 
     // MARK: - Private
+
+    /// Collect runtime diagnostics for subagent fields that the schema accepts but the
+    /// SDK does not fully wire (Story 29.6).
+    ///
+    /// Pure synchronous function (no throws/async) so it is trivially testable.
+    /// Emits a diagnostic only when the caller actually opted into a deferred behavior:
+    ///   - `run_in_background` truthy check is `== true` (a literal `false` is NOT deferred)
+    ///   - string fields use a non-empty check (`""` is NOT deferred)
+    ///   - `skills` uses a non-empty-array check (`[]` is NOT deferred)
+    ///   - each `.reference` MCP spec emits its own diagnostic (no dedup) so observers
+    ///     see every unresolved reference
+    ///
+    /// Appends in a FIXED deterministic order so downstream assertions are stable (AC5):
+    /// `run_in_background` → `resume` → `isolation` → `team_name` → `skills` →
+    /// `mcp_server_reference`. Returns an empty array when nothing is deferred; the caller
+    /// decides whether to coerce `[]` → `nil` (AC8).
+    private func collectFieldDiagnostics(
+        runInBackground: Bool?,
+        isolation: String?,
+        teamName: String?,
+        skills: [String]?,
+        resume: String?,
+        mcpServers: [AgentMcpServerSpec]?
+    ) -> [SubAgentFieldDiagnostics] {
+        var diags: [SubAgentFieldDiagnostics] = []
+
+        // 1. run_in_background (truthy only — `false` is an explicit foreground request)
+        if let runInBackground, runInBackground {
+            diags.append(SubAgentFieldDiagnostics(
+                fieldName: "run_in_background",
+                rawValue: String(runInBackground),
+                reason: .backgroundExecutionNotImplemented
+            ))
+        }
+        // 2. resume (non-empty ID)
+        if let resume, !resume.isEmpty {
+            diags.append(SubAgentFieldDiagnostics(
+                fieldName: "resume",
+                rawValue: resume,
+                reason: .resumeNotImplemented
+            ))
+        }
+        // 3. isolation (non-empty mode string)
+        if let isolation, !isolation.isEmpty {
+            diags.append(SubAgentFieldDiagnostics(
+                fieldName: "isolation",
+                rawValue: isolation,
+                reason: .isolationNotImplemented
+            ))
+        }
+        // 4. team_name (non-empty)
+        if let teamName, !teamName.isEmpty {
+            diags.append(SubAgentFieldDiagnostics(
+                fieldName: "team_name",
+                rawValue: teamName,
+                reason: .teamCoordinationNotImplemented
+            ))
+        }
+        // 5. skills (non-empty array; comma-joined in order, no surrounding whitespace)
+        if let skills, !skills.isEmpty {
+            diags.append(SubAgentFieldDiagnostics(
+                fieldName: "skills",
+                rawValue: skills.joined(separator: ","),
+                reason: .skillsWiringDeferred
+            ))
+        }
+        // 6. mcp_server_reference — each `.reference` emits its own diagnostic (no dedup)
+        if let mcpServers {
+            for spec in mcpServers {
+                if case .reference(let name) = spec {
+                    diags.append(SubAgentFieldDiagnostics(
+                        fieldName: "mcp_server_reference",
+                        rawValue: name,
+                        reason: .mcpReferenceResolutionDeferred
+                    ))
+                }
+                // `.inline` configs ARE wired into the child agent's MCP config today,
+                // so they never produce a diagnostic.
+            }
+        }
+
+        return diags
+    }
 
     /// Filter parent tools: strip subagent launcher tools (``SubAgentLauncherNames.default``)
     /// and apply allowed/disallowed lists.
@@ -207,7 +307,15 @@ final class DefaultSubAgentSpawner: SubAgentSpawner, @unchecked Sendable {
     }
 
     /// Create an Agent with the given options, execute its prompt, and return a SubAgentResult.
-    private func executeAgent(prompt: String, options: AgentOptions) async -> SubAgentResult {
+    ///
+    /// `fieldDiagnostics` (Story 29.6) is the deferred-field diagnostics collected BEFORE the
+    /// agent runs. The agent's `QueryResult` does not carry them, so they are threaded in
+    /// explicitly and merged into the returned `SubAgentResult`.
+    private func executeAgent(
+        prompt: String,
+        options: AgentOptions,
+        fieldDiagnostics: [SubAgentFieldDiagnostics]? = nil
+    ) async -> SubAgentResult {
         let agent: Agent
         if let client = client {
             agent = Agent(options: options, client: client)
@@ -216,7 +324,7 @@ final class DefaultSubAgentSpawner: SubAgentSpawner, @unchecked Sendable {
         }
 
         let result = await agent.prompt(prompt)
-        return Self.mapQueryResultToSubAgentResult(result)
+        return Self.mapQueryResultToSubAgentResult(result, fieldDiagnostics: fieldDiagnostics)
     }
 
     /// Maps a child agent's ``QueryResult`` to a ``SubAgentResult``.
@@ -231,7 +339,15 @@ final class DefaultSubAgentSpawner: SubAgentSpawner, @unchecked Sendable {
     /// `AgentTool`/`TaskTool` mock-spawner tests gave false confidence because they
     /// injected `toolCalls` by hand. Surfacing the tools the sub-agent actually invoked
     /// lets the `Task` alias deliver its Claude Code-compatible contract.
-    internal static func mapQueryResultToSubAgentResult(_ result: QueryResult) -> SubAgentResult {
+    ///
+    /// Story 29.6: the optional `fieldDiagnostics` parameter lets callers (notably
+    /// ``executeAgent(prompt:options:fieldDiagnostics:)``) thread deferred-field
+    /// diagnostics collected before the LLM call into the resulting `SubAgentResult`.
+    /// Defaults to `nil` to keep existing single-arg call sites compiling (AC9).
+    internal static func mapQueryResultToSubAgentResult(
+        _ result: QueryResult,
+        fieldDiagnostics: [SubAgentFieldDiagnostics]? = nil
+    ) -> SubAgentResult {
         let text = result.text.isEmpty
             ? "(Subagent completed with no text output)"
             : result.text
@@ -240,7 +356,8 @@ final class DefaultSubAgentSpawner: SubAgentSpawner, @unchecked Sendable {
         return SubAgentResult(
             text: text,
             toolCalls: toolNames,
-            isError: result.status != .success
+            isError: result.status != .success,
+            fieldDiagnostics: fieldDiagnostics
         )
     }
 }

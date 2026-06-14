@@ -637,4 +637,509 @@ final class DefaultSubAgentSpawnerTests: XCTestCase {
             ToolExecuteResult(content: "stub", isError: false)
         }
     }
+
+    // MARK: - Story 29.6: Deferred Field Diagnostics Collection
+
+    /// ATDD RED PHASE: Tests for Story 29.6 -- `DefaultSubAgentSpawner.spawn(...)` must
+    /// collect runtime diagnostics for subagent fields that the schema accepts but the
+    /// SDK does not fully wire (`run_in_background`, `resume`, `isolation`, `team_name`,
+    /// `skills`, MCP server `.reference`). Each collected diagnostic is surfaced on
+    /// `SubAgentResult.fieldDiagnostics`.
+    ///
+    /// Tests below assert EXPECTED behavior. They will FAIL (compile-time) until:
+    ///   - `SubAgentFieldDiagnostics` / `SubAgentFieldDiagnosticReason` exist in Types/AgentTypes.swift
+    ///   - `SubAgentResult` gains `fieldDiagnostics: [SubAgentFieldDiagnostics]?`
+    ///   - `DefaultSubAgentSpawner.collectFieldDiagnostics(...)` is implemented and
+    ///     invoked from the enhanced `spawn(...)` overload
+    ///   - `mapQueryResultToSubAgentResult(_:fieldDiagnostics:)` propagates diagnostics
+    /// TDD Phase: RED (feature not implemented yet)
+    ///
+    /// Red mode: COMPILE-TIME -- the `fieldDiagnostics` symbols and the
+    /// `fieldDiagnostics:` parameter on `mapQueryResultToSubAgentResult` do not exist yet.
+
+    // MARK: AC3 -- run_in_background deferred diagnostic
+
+    /// AC3 [P0]: spawn with `run_in_background: true` emits exactly one diagnostic
+    /// describing that background execution is not wired. Runtime still executes in the
+    /// foreground (no behavior change beyond the diagnostic).
+    func testSpawn_runInBackgroundTrue_emitsDiagnostic() async throws {
+        let parentTools: [ToolProtocol] = [createReadTool()]
+        let spawner = DefaultSubAgentSpawner(
+            apiKey: "test-key",
+            baseURL: nil,
+            parentModel: "claude-sonnet-4-6",
+            parentTools: parentTools,
+            client: makeMockClient()
+        )
+
+        let result = await spawner.spawn(
+            prompt: "Background task",
+            model: nil,
+            systemPrompt: nil,
+            allowedTools: nil,
+            maxTurns: nil,
+            disallowedTools: nil,
+            mcpServers: nil,
+            skills: nil,
+            runInBackground: true,
+            isolation: nil,
+            name: nil,
+            teamName: nil,
+            mode: nil,
+            resume: nil
+        )
+
+        let diags = try XCTUnwrap(result.fieldDiagnostics, "run_in_background:true must produce diagnostics")
+        let backgroundDiags = diags.filter { $0.fieldName == "run_in_background" }
+        XCTAssertEqual(backgroundDiags.count, 1, "Exactly one run_in_background diagnostic")
+        XCTAssertEqual(backgroundDiags.first?.rawValue, "true")
+        XCTAssertEqual(backgroundDiags.first?.reason, .backgroundExecutionNotImplemented)
+    }
+
+    /// AC3 [P1]: `run_in_background: false` (or nil) does NOT emit the background
+    /// diagnostic — the field is only "deferred" when the user actually opts in.
+    func testSpawn_runInBackgroundFalse_noBackgroundDiagnostic() async throws {
+        let parentTools: [ToolProtocol] = [createReadTool()]
+        let spawner = DefaultSubAgentSpawner(
+            apiKey: "test-key",
+            baseURL: nil,
+            parentModel: "claude-sonnet-4-6",
+            parentTools: parentTools,
+            client: makeMockClient()
+        )
+
+        let result = await spawner.spawn(
+            prompt: "Foreground task",
+            model: nil,
+            systemPrompt: nil,
+            allowedTools: nil,
+            maxTurns: nil,
+            disallowedTools: nil,
+            mcpServers: nil,
+            skills: nil,
+            runInBackground: false,
+            isolation: nil,
+            name: nil,
+            teamName: nil,
+            mode: nil,
+            resume: nil
+        )
+
+        let backgroundDiags = (result.fieldDiagnostics ?? []).filter { $0.fieldName == "run_in_background" }
+        XCTAssertTrue(backgroundDiags.isEmpty,
+                      "run_in_background:false must not be treated as deferred")
+    }
+
+    // MARK: AC3 (sibling) -- resume deferred diagnostic
+
+    /// AC3 sibling [P0]: spawn with `resume: "abc123"` emits a `resumeNotImplemented`
+    /// diagnostic. Sub-agent resume by ID is a deferred capability (epic deferred item #4).
+    func testSpawn_resumeSet_emitsDiagnostic() async throws {
+        let parentTools: [ToolProtocol] = [createReadTool()]
+        let spawner = DefaultSubAgentSpawner(
+            apiKey: "test-key",
+            baseURL: nil,
+            parentModel: "claude-sonnet-4-6",
+            parentTools: parentTools,
+            client: makeMockClient()
+        )
+
+        let result = await spawner.spawn(
+            prompt: "Resume task",
+            model: nil,
+            systemPrompt: nil,
+            allowedTools: nil,
+            maxTurns: nil,
+            disallowedTools: nil,
+            mcpServers: nil,
+            skills: nil,
+            runInBackground: nil,
+            isolation: nil,
+            name: nil,
+            teamName: nil,
+            mode: nil,
+            resume: "abc123"
+        )
+
+        let diags = try XCTUnwrap(result.fieldDiagnostics, "resume non-empty must produce diagnostics")
+        let resumeDiags = diags.filter { $0.fieldName == "resume" }
+        XCTAssertEqual(resumeDiags.count, 1, "Exactly one resume diagnostic")
+        XCTAssertEqual(resumeDiags.first?.rawValue, "abc123")
+        XCTAssertEqual(resumeDiags.first?.reason, .resumeNotImplemented)
+    }
+
+    // MARK: AC3 (sibling) -- isolation deferred diagnostic
+
+    /// AC3 sibling [P0]: spawn with `isolation: "worktree"` emits an
+    /// `isolationNotImplemented` diagnostic. Worktree isolation is deferred (epic #4).
+    func testSpawn_isolationSet_emitsDiagnostic() async throws {
+        let parentTools: [ToolProtocol] = [createReadTool()]
+        let spawner = DefaultSubAgentSpawner(
+            apiKey: "test-key",
+            baseURL: nil,
+            parentModel: "claude-sonnet-4-6",
+            parentTools: parentTools,
+            client: makeMockClient()
+        )
+
+        let result = await spawner.spawn(
+            prompt: "Isolated task",
+            model: nil,
+            systemPrompt: nil,
+            allowedTools: nil,
+            maxTurns: nil,
+            disallowedTools: nil,
+            mcpServers: nil,
+            skills: nil,
+            runInBackground: nil,
+            isolation: "worktree",
+            name: nil,
+            teamName: nil,
+            mode: nil,
+            resume: nil
+        )
+
+        let diags = try XCTUnwrap(result.fieldDiagnostics, "isolation non-empty must produce diagnostics")
+        let isolationDiags = diags.filter { $0.fieldName == "isolation" }
+        XCTAssertEqual(isolationDiags.count, 1, "Exactly one isolation diagnostic")
+        XCTAssertEqual(isolationDiags.first?.rawValue, "worktree")
+        XCTAssertEqual(isolationDiags.first?.reason, .isolationNotImplemented)
+    }
+
+    // MARK: AC3 (sibling) -- team_name deferred diagnostic
+
+    /// AC3 sibling [P0]: spawn with `team_name: "swarm"` emits a
+    /// `teamCoordinationNotImplemented` diagnostic. Team coordination runtime is
+    /// deferred (epic #4).
+    func testSpawn_teamNameSet_emitsDiagnostic() async throws {
+        let parentTools: [ToolProtocol] = [createReadTool()]
+        let spawner = DefaultSubAgentSpawner(
+            apiKey: "test-key",
+            baseURL: nil,
+            parentModel: "claude-sonnet-4-6",
+            parentTools: parentTools,
+            client: makeMockClient()
+        )
+
+        let result = await spawner.spawn(
+            prompt: "Team task",
+            model: nil,
+            systemPrompt: nil,
+            allowedTools: nil,
+            maxTurns: nil,
+            disallowedTools: nil,
+            mcpServers: nil,
+            skills: nil,
+            runInBackground: nil,
+            isolation: nil,
+            name: nil,
+            teamName: "swarm",
+            mode: nil,
+            resume: nil
+        )
+
+        let diags = try XCTUnwrap(result.fieldDiagnostics, "team_name non-empty must produce diagnostics")
+        let teamDiags = diags.filter { $0.fieldName == "team_name" }
+        XCTAssertEqual(teamDiags.count, 1, "Exactly one team_name diagnostic")
+        XCTAssertEqual(teamDiags.first?.rawValue, "swarm")
+        XCTAssertEqual(teamDiags.first?.reason, .teamCoordinationNotImplemented)
+    }
+
+    // MARK: AC7 -- skills deferred diagnostic with comma-joined rawValue
+
+    /// AC7 [P0]: spawn with `skills: ["commit", "review"]` emits a
+    /// `skillsWiringDeferred` diagnostic whose `rawValue` is the comma-joined list,
+    /// preserving order with no surrounding whitespace. Child skill registry wiring is
+    /// deferred (epic #3).
+    func testSpawn_skillsSet_emitsDiagnosticWithCommaJoinedValue() async throws {
+        let parentTools: [ToolProtocol] = [createReadTool()]
+        let spawner = DefaultSubAgentSpawner(
+            apiKey: "test-key",
+            baseURL: nil,
+            parentModel: "claude-sonnet-4-6",
+            parentTools: parentTools,
+            client: makeMockClient()
+        )
+
+        let result = await spawner.spawn(
+            prompt: "Skilled task",
+            model: nil,
+            systemPrompt: nil,
+            allowedTools: nil,
+            maxTurns: nil,
+            disallowedTools: nil,
+            mcpServers: nil,
+            skills: ["commit", "review"],
+            runInBackground: nil,
+            isolation: nil,
+            name: nil,
+            teamName: nil,
+            mode: nil,
+            resume: nil
+        )
+
+        let diags = try XCTUnwrap(result.fieldDiagnostics, "skills non-empty must produce diagnostics")
+        let skillsDiags = diags.filter { $0.fieldName == "skills" }
+        XCTAssertEqual(skillsDiags.count, 1, "Exactly one skills diagnostic")
+        XCTAssertEqual(skillsDiags.first?.rawValue, "commit,review",
+                       "rawValue must be comma-joined in order with no spaces")
+        XCTAssertEqual(skillsDiags.first?.reason, .skillsWiringDeferred)
+    }
+
+    // MARK: AC4 -- MCP server reference diagnostics (inline excluded)
+
+    /// AC4 [P0]: spawn with `mcpServers: [.reference("github-mcp")]` emits a
+    /// `mcpReferenceResolutionDeferred` diagnostic. Parent MCP config resolution from
+    /// `.reference` is deferred (epic #2).
+    func testSpawn_mcpReference_emitsDiagnostic() async throws {
+        let parentTools: [ToolProtocol] = [createReadTool()]
+        let spawner = DefaultSubAgentSpawner(
+            apiKey: "test-key",
+            baseURL: nil,
+            parentModel: "claude-sonnet-4-6",
+            parentTools: parentTools,
+            client: makeMockClient()
+        )
+
+        let result = await spawner.spawn(
+            prompt: "MCP reference task",
+            model: nil,
+            systemPrompt: nil,
+            allowedTools: nil,
+            maxTurns: nil,
+            disallowedTools: nil,
+            mcpServers: [.reference("github-mcp")],
+            skills: nil,
+            runInBackground: nil,
+            isolation: nil,
+            name: nil,
+            teamName: nil,
+            mode: nil,
+            resume: nil
+        )
+
+        let diags = try XCTUnwrap(result.fieldDiagnostics, "MCP reference must produce diagnostics")
+        let refDiags = diags.filter { $0.fieldName == "mcp_server_reference" }
+        XCTAssertEqual(refDiags.count, 1, "Exactly one mcp_server_reference diagnostic")
+        XCTAssertEqual(refDiags.first?.rawValue, "github-mcp")
+        XCTAssertEqual(refDiags.first?.reason, .mcpReferenceResolutionDeferred)
+    }
+
+    /// AC4 [P0]: An `AgentMcpServerSpec.inline(...)` config does NOT emit a
+    /// `mcp_server_reference` diagnostic -- inline MCP servers are already wired into
+    /// the child agent's MCP config today.
+    func testSpawn_mcpInline_noReferenceDiagnostic() async throws {
+        let parentTools: [ToolProtocol] = [createReadTool()]
+        let spawner = DefaultSubAgentSpawner(
+            apiKey: "test-key",
+            baseURL: nil,
+            parentModel: "claude-sonnet-4-6",
+            parentTools: parentTools,
+            client: makeMockClient()
+        )
+
+        let inlineSpec = AgentMcpServerSpec.inline(
+            .stdio(McpStdioConfig(command: "npx", args: ["-y", "my-mcp-server"]))
+        )
+        let result = await spawner.spawn(
+            prompt: "Inline MCP task",
+            model: nil,
+            systemPrompt: nil,
+            allowedTools: nil,
+            maxTurns: nil,
+            disallowedTools: nil,
+            mcpServers: [inlineSpec],
+            skills: nil,
+            runInBackground: nil,
+            isolation: nil,
+            name: nil,
+            teamName: nil,
+            mode: nil,
+            resume: nil
+        )
+
+        let refDiags = (result.fieldDiagnostics ?? []).filter { $0.fieldName == "mcp_server_reference" }
+        XCTAssertTrue(refDiags.isEmpty,
+                      "Inline MCP config must NOT produce a reference diagnostic")
+    }
+
+    /// AC4 [P1]: Each repeated `.reference(...)` produces its own diagnostic (no
+    /// deduplication) so callers can observe every unresolved reference.
+    func testSpawn_duplicateMcpReference_emitsPerReferenceDiagnostic() async throws {
+        let parentTools: [ToolProtocol] = [createReadTool()]
+        let spawner = DefaultSubAgentSpawner(
+            apiKey: "test-key",
+            baseURL: nil,
+            parentModel: "claude-sonnet-4-6",
+            parentTools: parentTools,
+            client: makeMockClient()
+        )
+
+        let result = await spawner.spawn(
+            prompt: "Duplicate reference task",
+            model: nil,
+            systemPrompt: nil,
+            allowedTools: nil,
+            maxTurns: nil,
+            disallowedTools: nil,
+            mcpServers: [.reference("github-mcp"), .reference("github-mcp")],
+            skills: nil,
+            runInBackground: nil,
+            isolation: nil,
+            name: nil,
+            teamName: nil,
+            mode: nil,
+            resume: nil
+        )
+
+        let diags = try XCTUnwrap(result.fieldDiagnostics, "Two references must produce diagnostics")
+        let refDiags = diags.filter { $0.fieldName == "mcp_server_reference" }
+        XCTAssertEqual(refDiags.count, 2, "Each repeated reference must produce its own diagnostic")
+        XCTAssertEqual(refDiags.map(\.rawValue), ["github-mcp", "github-mcp"])
+    }
+
+    // MARK: AC5 -- multiple deferred fields emitted in deterministic order
+
+    /// AC5 [P0]: When multiple deferred fields are set together, every field produces
+    /// its own diagnostic, and the diagnostics appear in the fixed order
+    /// (run_in_background -> resume -> isolation -> team_name -> skills ->
+    /// mcp_server_reference) defined by Task 1.3. This makes the surface assertion-friendly.
+    func testSpawn_multipleDeferredFields_allEmittedInOrder() async throws {
+        let parentTools: [ToolProtocol] = [createReadTool()]
+        let spawner = DefaultSubAgentSpawner(
+            apiKey: "test-key",
+            baseURL: nil,
+            parentModel: "claude-sonnet-4-6",
+            parentTools: parentTools,
+            client: makeMockClient()
+        )
+
+        let result = await spawner.spawn(
+            prompt: "Everything deferred",
+            model: nil,
+            systemPrompt: nil,
+            allowedTools: nil,
+            maxTurns: nil,
+            disallowedTools: nil,
+            mcpServers: [.reference("github-mcp")],
+            skills: ["commit", "review"],
+            runInBackground: true,
+            isolation: "worktree",
+            name: nil,
+            teamName: "swarm",
+            mode: nil,
+            resume: "abc123"
+        )
+
+        let diags = try XCTUnwrap(result.fieldDiagnostics, "Multiple deferred fields must produce diagnostics")
+        XCTAssertGreaterThanOrEqual(diags.count, 5,
+                                    "All five deferred categories must surface")
+        // Fixed order (AC5): run_in_background, resume, isolation, team_name, skills, mcp_server_reference
+        let expectedOrder = [
+            "run_in_background",
+            "resume",
+            "isolation",
+            "team_name",
+            "skills",
+            "mcp_server_reference",
+        ]
+        let actualOrder = diags.map(\.fieldName)
+        XCTAssertEqual(actualOrder, expectedOrder,
+                       "Diagnostics must appear in the fixed deterministic order")
+    }
+
+    // MARK: AC8 -- no deferred fields => fieldDiagnostics is nil
+
+    /// AC8 [P0]: When NO deferred field is set (all nil/empty), the resulting
+    /// `fieldDiagnostics` is `nil` -- not an empty array. `nil` is the explicit
+    /// "no diagnostic signal" state; `[]` would mean "collection ran but produced
+    /// nothing", which this story never emits.
+    func testSpawn_noDeferredFields_diagnosticsIsNil() async throws {
+        let parentTools: [ToolProtocol] = [createReadTool()]
+        let spawner = DefaultSubAgentSpawner(
+            apiKey: "test-key",
+            baseURL: nil,
+            parentModel: "claude-sonnet-4-6",
+            parentTools: parentTools,
+            client: makeMockClient()
+        )
+
+        let result = await spawner.spawn(
+            prompt: "Plain task",
+            model: nil,
+            systemPrompt: nil,
+            allowedTools: nil,
+            maxTurns: nil,
+            disallowedTools: nil,
+            mcpServers: nil,
+            skills: nil,
+            runInBackground: nil,
+            isolation: nil,
+            name: nil,
+            teamName: nil,
+            mode: nil,
+            resume: nil
+        )
+
+        XCTAssertNil(result.fieldDiagnostics,
+                     "No deferred field must yield nil, not an empty array (AC8)")
+    }
+
+    // MARK: AC2 / AC9 -- mapQueryResultToSubAgentResult propagates diagnostics
+
+    /// AC2 [P0]: `mapQueryResultToSubAgentResult(_:fieldDiagnostics:)` propagates the
+    /// supplied diagnostics into the resulting `SubAgentResult.fieldDiagnostics`.
+    /// Drives the mapping directly with no LLM round-trip (project rule #27).
+    func testMapQueryResultToSubAgentResult_propagatesDiagnostics() {
+        let queryResult = QueryResult(
+            text: "Done",
+            usage: TokenUsage(inputTokens: 10, outputTokens: 5),
+            numTurns: 1,
+            durationMs: 50,
+            messages: [],
+            toolPairs: []
+        )
+        let diagnostics: [SubAgentFieldDiagnostics] = [
+            SubAgentFieldDiagnostics(
+                fieldName: "run_in_background",
+                rawValue: "true",
+                reason: .backgroundExecutionNotImplemented
+            ),
+            SubAgentFieldDiagnostics(
+                fieldName: "isolation",
+                rawValue: "worktree",
+                reason: .isolationNotImplemented
+            ),
+        ]
+
+        let result = DefaultSubAgentSpawner.mapQueryResultToSubAgentResult(
+            queryResult,
+            fieldDiagnostics: diagnostics
+        )
+
+        XCTAssertEqual(result.fieldDiagnostics, diagnostics,
+                       "Supplied diagnostics must propagate to SubAgentResult")
+        XCTAssertEqual(result.text, "Done")
+        XCTAssertFalse(result.isError)
+    }
+
+    /// AC9 [P0]: `mapQueryResultToSubAgentResult(_:)` retains backward compatibility:
+    /// the existing single-arg call site (no `fieldDiagnostics`) still compiles and
+    /// yields `fieldDiagnostics == nil`. Regression guard for existing callers.
+    func testMapQueryResultToSubAgentResult_backwardCompat_defaultsToNilDiagnostics() {
+        let queryResult = QueryResult(
+            text: "Plain",
+            usage: TokenUsage(inputTokens: 1, outputTokens: 1),
+            numTurns: 1,
+            durationMs: 10,
+            messages: [],
+            toolPairs: []
+        )
+
+        // Existing single-arg call site must keep compiling (default fieldDiagnostics: nil)
+        let result = DefaultSubAgentSpawner.mapQueryResultToSubAgentResult(queryResult)
+
+        XCTAssertNil(result.fieldDiagnostics,
+                     "Default fieldDiagnostics must be nil for backward compatibility")
+    }
 }

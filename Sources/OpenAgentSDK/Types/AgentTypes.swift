@@ -1134,16 +1134,97 @@ public enum AgentOutput: Sendable, Equatable {
 
 // MARK: - Sub-Agent Spawning
 
+/// Why a deferred subagent field is not wired at runtime (Story 29.6).
+///
+/// The raw values are stable, machine-readable identifiers that hosts can match on
+/// (e.g. "notify the user when `resumeNotImplemented` is emitted"). The matching
+/// human-readable prose for tool output is provided by
+/// ``shortHumanReadableText(_:)``.
+public enum SubAgentFieldDiagnosticReason: String, Sendable, Equatable, CaseIterable {
+    /// `run_in_background: true` was requested but background execution is not implemented.
+    case backgroundExecutionNotImplemented
+    /// A non-empty `resume` ID was supplied but sub-agent resume is not implemented.
+    case resumeNotImplemented
+    /// A non-empty `isolation` mode was supplied but isolation is not implemented.
+    case isolationNotImplemented
+    /// A non-empty `team_name` was supplied but team coordination runtime is not implemented.
+    case teamCoordinationNotImplemented
+    /// A non-empty `skills` array was supplied but child skill registry wiring is deferred.
+    case skillsWiringDeferred
+    /// An `AgentMcpServerSpec.reference(...)` appeared but parent MCP config resolution is deferred.
+    case mcpReferenceResolutionDeferred
+}
+
+extension SubAgentFieldDiagnosticReason {
+    /// Short, human-readable prose describing why the field is not wired. Used by
+    /// `AgentTool` to render diagnostics into the tool output so callers can see which
+    /// subagent fields the SDK honored vs ignored.
+    ///
+    /// Kept `internal` rather than `public`: it is presentation text, not a stable API
+    /// surface. Hosts should match on the enum/rawValue for policy decisions.
+    internal static func shortHumanReadableText(_ reason: SubAgentFieldDiagnosticReason) -> String {
+        switch reason {
+        case .backgroundExecutionNotImplemented:
+            return "background execution is not implemented"
+        case .resumeNotImplemented:
+            return "sub-agent resume is not implemented"
+        case .isolationNotImplemented:
+            return "isolation mode is not implemented"
+        case .teamCoordinationNotImplemented:
+            return "team coordination is not implemented"
+        case .skillsWiringDeferred:
+            return "child skill registry wiring is deferred"
+        case .mcpReferenceResolutionDeferred:
+            return "parent MCP server reference resolution is deferred"
+        }
+    }
+}
+
+/// Runtime diagnostic for a single subagent field that the SDK accepted by schema but
+/// does not fully wire at runtime (Story 29.6).
+///
+/// - `fieldName`: the schema field name (e.g. `"run_in_background"`, `"resume"`,
+///   `"isolation"`, `"team_name"`, `"skills"`, `"mcp_server_reference"`).
+/// - `rawValue`: the user-supplied input stringified (e.g. `"true"`, `"abc123"`,
+///   `"worktree"`, `"github-mcp"`; multi-value inputs like `skills: ["a","b"]` are
+///   comma-joined in order with no surrounding whitespace).
+/// - `reason`: why the field is not wired (machine-readable enum).
+public struct SubAgentFieldDiagnostics: Sendable, Equatable {
+    public let fieldName: String
+    public let rawValue: String
+    public let reason: SubAgentFieldDiagnosticReason
+
+    public init(fieldName: String, rawValue: String, reason: SubAgentFieldDiagnosticReason) {
+        self.fieldName = fieldName
+        self.rawValue = rawValue
+        self.reason = reason
+    }
+}
+
 /// Result returned from a sub-agent execution.
 public struct SubAgentResult: Sendable, Equatable {
     public let text: String
     public let toolCalls: [String]
     public let isError: Bool
 
-    public init(text: String, toolCalls: [String] = [], isError: Bool = false) {
+    /// Deferred-field diagnostics collected by the spawner (Story 29.6).
+    ///
+    /// `nil` means "no deferred-field diagnostic signal" (the default, backward-compatible
+    /// state). A non-nil array carries one entry per deferred field actually supplied by
+    /// the caller. This story never emits an empty array: when nothing is deferred, the
+    /// spawner passes `nil`.
+    public let fieldDiagnostics: [SubAgentFieldDiagnostics]?
+
+    public init(
+        text: String,
+        toolCalls: [String] = [],
+        isError: Bool = false,
+        fieldDiagnostics: [SubAgentFieldDiagnostics]? = nil
+    ) {
         self.text = text
         self.toolCalls = toolCalls
         self.isError = isError
+        self.fieldDiagnostics = fieldDiagnostics
     }
 }
 

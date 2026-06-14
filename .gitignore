@@ -11,3 +11,4 @@ DerivedData/
 .claude/.story-automator-active
 __pycache__/
 *.pyc
+logs/

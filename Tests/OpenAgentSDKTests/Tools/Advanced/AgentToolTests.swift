@@ -30,6 +30,23 @@ final class MockSubAgentSpawner: SubAgentSpawner, @unchecked Sendable {
         self.result = result
     }
 
+    /// Story 29.6 test hook: configure the mock to return a result with the given
+    /// `fieldDiagnostics`. Used by the deferred-field rendering tests below. Default
+    /// parameter keeps every existing 13+ call sites compiling unchanged.
+    static func makeWithDiagnostics(
+        text: String = "Done",
+        toolCalls: [String] = [],
+        isError: Bool = false,
+        fieldDiagnostics: [SubAgentFieldDiagnostics]
+    ) -> MockSubAgentSpawner {
+        return MockSubAgentSpawner(result: SubAgentResult(
+            text: text,
+            toolCalls: toolCalls,
+            isError: isError,
+            fieldDiagnostics: fieldDiagnostics
+        ))
+    }
+
     func spawn(
         prompt: String,
         model: String?,
@@ -577,5 +594,184 @@ final class AgentToolTests: XCTestCase {
         XCTAssertEqual(tool.name, "Agent")
         XCTAssertFalse(tool.description.isEmpty)
         XCTAssertFalse(tool.isReadOnly)
+    }
+
+    // MARK: - Story 29.6: Deferred Field Diagnostics Rendering
+
+    /// ATDD RED PHASE: Tests for Story 29.6 -- `createSubAgentLauncherTool`'s execution
+    /// body must render deferred-field diagnostics into the tool output, so that callers
+    /// using Claude Code-style workflow skills can see which subagent fields the SDK
+    /// honored vs ignored.
+    ///
+    /// Tests below assert EXPECTED behavior. They will FAIL (compile-time) until:
+    ///   - `SubAgentFieldDiagnostics` / `SubAgentFieldDiagnosticReason` exist in Types/
+    ///   - `SubAgentResult.fieldDiagnostics` is added (with default nil)
+    ///   - `createSubAgentLauncherTool` rendering branch inserts a diagnostics block
+    ///     between `result.text` and `[Tools used: ...]`
+    /// TDD Phase: RED (feature not implemented yet)
+    ///
+    /// Red mode: COMPILE-TIME -- `SubAgentFieldDiagnostics`, the `fieldDiagnostics:`
+    /// parameter on `SubAgentResult.init`, and `MockSubAgentSpawner.makeWithDiagnostics`
+    /// do not exist yet.
+
+    /// AC6 [P0]: When the spawner returns `fieldDiagnostics`, the AgentTool output
+    /// contains a diagnostics block naming each deferred field. The block appears
+    /// AFTER `result.text` and BEFORE any `[Tools used: ...]` summary.
+    func testAgentTool_outputIncludesDiagnosticsBlock() async throws {
+        // Given: a spawner returning diagnostics for run_in_background
+        let mockSpawner = MockSubAgentSpawner.makeWithDiagnostics(
+            text: "Background task completed.",
+            toolCalls: ["Read"],
+            isError: false,
+            fieldDiagnostics: [
+                SubAgentFieldDiagnostics(
+                    fieldName: "run_in_background",
+                    rawValue: "true",
+                    reason: .backgroundExecutionNotImplemented
+                ),
+            ]
+        )
+        let tool = createAgentTool()
+        let context = ToolContext(cwd: "/tmp", agentSpawner: mockSpawner)
+
+        // When: calling the Agent tool
+        let input: [String: Any] = [
+            "prompt": "Run in background",
+            "description": "Bg task"
+        ]
+        let result = await tool.call(input: input, context: context)
+
+        // Then: output mentions the deferred field and stays non-error
+        XCTAssertFalse(result.isError)
+        XCTAssertTrue(result.content.contains("Background task completed."),
+                      "Primary text must still appear first")
+        XCTAssertTrue(
+            result.content.contains("run_in_background"),
+            "Diagnostics block must name the deferred field"
+        )
+        XCTAssertTrue(
+            result.content.contains("[Tools used:"),
+            "Tool-call summary must still appear after diagnostics"
+        )
+        // Diagnostics block must precede [Tools used:]
+        if let diagRange = result.content.range(of: "run_in_background"),
+           let toolsRange = result.content.range(of: "[Tools used:") {
+            XCTAssertLessThan(diagRange.lowerBound, toolsRange.lowerBound,
+                              "Diagnostics block must precede [Tools used:]")
+        }
+    }
+
+    /// AC6 [P0]: The Task tool (Story 29.1 alias) shares the same rendering factory,
+    /// so its output also surfaces the diagnostics block.
+    func testTaskTool_outputIncludesDiagnosticsBlock() async throws {
+        let mockSpawner = MockSubAgentSpawner.makeWithDiagnostics(
+            text: "Resumed task.",
+            toolCalls: [],
+            isError: false,
+            fieldDiagnostics: [
+                SubAgentFieldDiagnostics(
+                    fieldName: "resume",
+                    rawValue: "abc123",
+                    reason: .resumeNotImplemented
+                ),
+            ]
+        )
+        let tool = createTaskTool()
+        let context = ToolContext(cwd: "/tmp", agentSpawner: mockSpawner)
+
+        let input: [String: Any] = [
+            "prompt": "Resume task",
+            "description": "Resume"
+        ]
+        let result = await tool.call(input: input, context: context)
+
+        XCTAssertFalse(result.isError)
+        XCTAssertTrue(result.content.contains("resume"),
+                      "Task tool must also render the deferred-field diagnostics block")
+    }
+
+    /// AC6 [P0]: Backward compatibility -- when `fieldDiagnostics` is nil, the output
+    /// is byte-for-byte identical to the pre-29.6 behavior (no diagnostics block).
+    /// Guards every existing 13+ AgentToolTests call site.
+    func testAgentTool_noDiagnostics_outputUnchanged() async throws {
+        // Given: a spawner returning nil fieldDiagnostics (default SubAgentResult path)
+        let mockSpawner = MockSubAgentSpawner(result: SubAgentResult(
+            text: "Plain answer",
+            toolCalls: ["Read"],
+            isError: false
+        ))
+        let tool = createAgentTool()
+        let context = ToolContext(cwd: "/tmp", agentSpawner: mockSpawner)
+
+        let input: [String: Any] = [
+            "prompt": "Quick search",
+            "description": "Search"
+        ]
+        let result = await tool.call(input: input, context: context)
+
+        // Then: no diagnostics markers in output
+        XCTAssertFalse(result.content.contains("ignored:"),
+                       "No diagnostics block when fieldDiagnostics is nil")
+        XCTAssertTrue(result.content.hasSuffix("[Tools used: Read]"),
+                      "Output must remain byte-identical to pre-29.6 behavior")
+    }
+
+    /// AC6 [P1]: When `fieldDiagnostics` is nil AND there are no tool calls, the
+    /// output is just the bare text -- no diagnostics, no tool summary.
+    func testAgentTool_noDiagnosticsNoToolCalls_bareOutput() async throws {
+        let mockSpawner = MockSubAgentSpawner(result: SubAgentResult(
+            text: "Direct answer",
+            toolCalls: [],
+            isError: false
+        ))
+        let tool = createAgentTool()
+        let context = ToolContext(cwd: "/tmp", agentSpawner: mockSpawner)
+
+        let input: [String: Any] = [
+            "prompt": "Math",
+            "description": "Math"
+        ]
+        let result = await tool.call(input: input, context: context)
+
+        XCTAssertEqual(result.content, "Direct answer",
+                       "Output must be exactly the bare text when no diagnostics and no tool calls")
+    }
+
+    /// AC6 [P1]: Multiple diagnostics are rendered as multiple lines in order.
+    func testAgentTool_multipleDiagnostics_renderedInOrder() async throws {
+        let mockSpawner = MockSubAgentSpawner.makeWithDiagnostics(
+            text: "Done",
+            toolCalls: [],
+            isError: false,
+            fieldDiagnostics: [
+                SubAgentFieldDiagnostics(
+                    fieldName: "run_in_background",
+                    rawValue: "true",
+                    reason: .backgroundExecutionNotImplemented
+                ),
+                SubAgentFieldDiagnostics(
+                    fieldName: "isolation",
+                    rawValue: "worktree",
+                    reason: .isolationNotImplemented
+                ),
+            ]
+        )
+        let tool = createAgentTool()
+        let context = ToolContext(cwd: "/tmp", agentSpawner: mockSpawner)
+
+        let input: [String: Any] = [
+            "prompt": "Multi deferred",
+            "description": "Multi"
+        ]
+        let result = await tool.call(input: input, context: context)
+
+        // Both diagnostics must appear in order
+        if let bgRange = result.content.range(of: "run_in_background"),
+           let isoRange = result.content.range(of: "isolation") {
+            XCTAssertLessThan(bgRange.lowerBound, isoRange.lowerBound,
+                              "Diagnostics must be rendered in collection order")
+        } else {
+            XCTFail("Both deferred fields must appear in the diagnostics block")
+        }
     }
 }
