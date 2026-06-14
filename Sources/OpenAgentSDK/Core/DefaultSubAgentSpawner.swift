@@ -1,5 +1,27 @@
 import Foundation
 
+// MARK: - SubAgentLauncherNames
+
+/// LLM-facing tool names that can spawn subagents.
+///
+/// `Agent` is the canonical SDK name; `Task` is the Claude Code-compatible alias
+/// (introduced in Story 29.1). Spawner detection AND child filtering must both
+/// recognize every name in this list so that:
+///   1. Registering only `Task` still injects a spawner into `ToolContext`
+///      (prevents the "spawner missing" runtime hole).
+///   2. Both names are stripped from the child tool pool by default
+///      (prevents unbounded recursive spawning).
+enum SubAgentLauncherNames {
+    /// Default set of subagent launcher tool names recognized by the SDK.
+    /// Order does not matter (membership checks only); kept as `Array` per project rule #46.
+    static let `default`: [String] = ["Agent", "Task"]
+
+    /// Returns `true` when `toolName` is one of the default launcher names.
+    static func contains(_ toolName: String) -> Bool {
+        `default`.contains(toolName)
+    }
+}
+
 // MARK: - DefaultSubAgentSpawner
 
 /// Concrete implementation of ``SubAgentSpawner`` that creates real ``Agent`` instances.
@@ -127,9 +149,16 @@ final class DefaultSubAgentSpawner: SubAgentSpawner, @unchecked Sendable {
 
     // MARK: - Private
 
-    /// Filter parent tools: remove AgentTool, apply allowed/disallowed lists.
+    /// Filter parent tools: strip subagent launcher tools (``SubAgentLauncherNames.default``)
+    /// and apply allowed/disallowed lists.
+    ///
+    /// Default behavior strips BOTH `Agent` and `Task` so that a child cannot recursively
+    /// spawn grandchildren without explicit host opt-in. See Story 29.2 AC5.
     private func filterTools(allowedTools: [String]?, disallowedTools: [String]?) -> [ToolProtocol] {
-        var subTools = parentTools.filter { $0.name != "Agent" }
+        // Strip all subagent launcher tools by default to prevent recursive spawning.
+        // Escape hatch (explicit recursion-allowed config) is deferred to a future story;
+        // current default MUST remain "strip both" per Story 29.2 AC5.
+        var subTools = parentTools.filter { !SubAgentLauncherNames.contains($0.name) }
 
         if let allowed = allowedTools, !allowed.isEmpty {
             let allowedSet = Set(allowed)
@@ -142,6 +171,15 @@ final class DefaultSubAgentSpawner: SubAgentSpawner, @unchecked Sendable {
         }
 
         return subTools
+    }
+
+    /// Test-only thin wrapper around the private ``filterTools`` so unit tests can assert
+    /// the filtering contract directly without driving a full `spawn` round-trip.
+    ///
+    /// Project rule #22 (prefer `internal`) makes this safe: `@testable import OpenAgentSDK`
+    /// already has internal access; this adds only a one-line indirection, no new behavior.
+    internal func filterToolsForTesting(allowedTools: [String]?, disallowedTools: [String]?) -> [ToolProtocol] {
+        return filterTools(allowedTools: allowedTools, disallowedTools: disallowedTools)
     }
 
     /// Create an Agent with the given options, execute its prompt, and return a SubAgentResult.

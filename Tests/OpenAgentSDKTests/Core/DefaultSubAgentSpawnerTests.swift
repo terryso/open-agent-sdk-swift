@@ -250,4 +250,126 @@ final class DefaultSubAgentSpawnerTests: XCTestCase {
         // Then: default maxTurns (10) is used — mock error proves completion
         XCTAssertTrue(result.isError, "Should get error from mock 401 response")
     }
+
+    // MARK: - Story 29.2: Spawner Detection and Child Filtering
+
+    /// ATDD RED PHASE: Tests for Story 29.2 -- spawner detection recognizes both
+    /// `Agent` and `Task`, and child tool pool filtering strips BOTH launcher names
+    /// by default to prevent unbounded recursive spawning.
+    ///
+    /// Tests below assert EXPECTED behavior. They will FAIL until:
+    ///   - `enum SubAgentLauncherNames` exists in Core/DefaultSubAgentSpawner.swift
+    ///   - `DefaultSubAgentSpawner.filterTools` strips via `!SubAgentLauncherNames.contains($0.name)`
+    ///   - `internal func filterToolsForTesting(...)` wrapper is exposed for direct assertion
+    /// TDD Phase: RED (feature not implemented yet)
+
+    // MARK: AC2 + AC3: Default filtering strips both launcher names
+
+    /// AC2 [P0]: filterTools strips "Agent" by default when parent pool contains it.
+    func testFilterTools_stripsAgentByDefault() async throws {
+        let parentTools: [ToolProtocol] = [createBashTool(), createReadTool(), createAgentTool()]
+        let spawner = DefaultSubAgentSpawner(
+            apiKey: "test-key",
+            baseURL: nil,
+            parentModel: "claude-sonnet-4-6",
+            parentTools: parentTools,
+            client: makeMockClient()
+        )
+
+        let filtered = spawner.filterToolsForTesting(allowedTools: nil, disallowedTools: nil)
+        let names = filtered.map { $0.name }
+
+        XCTAssertFalse(names.contains("Agent"), "Child pool must NOT contain 'Agent' (prevents recursion)")
+        XCTAssertTrue(names.contains("Bash"), "Non-launcher tools must survive filtering")
+        XCTAssertTrue(names.contains("Read"), "Non-launcher tools must survive filtering")
+    }
+
+    /// AC3 [P0]: filterTools strips "Task" by default when parent pool contains it.
+    /// This is the new behavior introduced by Story 29.2 (RED — currently fails because
+    /// `filterTools` only removes "Agent").
+    func testFilterTools_stripsTaskByDefault() async throws {
+        let parentTools: [ToolProtocol] = [createBashTool(), createReadTool(), createTaskTool()]
+        let spawner = DefaultSubAgentSpawner(
+            apiKey: "test-key",
+            baseURL: nil,
+            parentModel: "claude-sonnet-4-6",
+            parentTools: parentTools,
+            client: makeMockClient()
+        )
+
+        let filtered = spawner.filterToolsForTesting(allowedTools: nil, disallowedTools: nil)
+        let names = filtered.map { $0.name }
+
+        XCTAssertFalse(names.contains("Task"), "Child pool must NOT contain 'Task' (prevents recursion via Task alias)")
+        XCTAssertTrue(names.contains("Bash"), "Non-launcher tools must survive filtering")
+        XCTAssertTrue(names.contains("Read"), "Non-launcher tools must survive filtering")
+    }
+
+    /// AC2 + AC3 [P0]: filterTools strips BOTH "Agent" and "Task" when parent pool contains both.
+    /// Verifies the canonical Epic 29 regression case (parent registers both launcher names).
+    func testFilterTools_stripsBothAgentAndTaskWhenBothPresent() async throws {
+        let parentTools: [ToolProtocol] = [
+            createBashTool(),
+            createAgentTool(),
+            createTaskTool(),
+        ]
+        let spawner = DefaultSubAgentSpawner(
+            apiKey: "test-key",
+            baseURL: nil,
+            parentModel: "claude-sonnet-4-6",
+            parentTools: parentTools,
+            client: makeMockClient()
+        )
+
+        let filtered = spawner.filterToolsForTesting(allowedTools: nil, disallowedTools: nil)
+        let names = filtered.map { $0.name }
+
+        XCTAssertFalse(names.contains("Agent"), "Child pool must NOT contain 'Agent'")
+        XCTAssertFalse(names.contains("Task"), "Child pool must NOT contain 'Task'")
+        XCTAssertTrue(names.contains("Bash"), "Non-launcher tools must survive filtering")
+        XCTAssertEqual(filtered.count, 1, "Only the non-launcher tool should remain")
+    }
+
+    /// AC2 + AC3 [P1]: filterTools preserves every non-launcher tool when none are launchers.
+    /// Sanity check that the strip filter is not over-aggressive.
+    func testFilterTools_preservesNonLauncherTools() async throws {
+        let parentTools: [ToolProtocol] = [
+            createBashTool(),
+            createReadTool(),
+            createGrepTool(),
+        ]
+        let spawner = DefaultSubAgentSpawner(
+            apiKey: "test-key",
+            baseURL: nil,
+            parentModel: "claude-sonnet-4-6",
+            parentTools: parentTools,
+            client: makeMockClient()
+        )
+
+        let filtered = spawner.filterToolsForTesting(allowedTools: nil, disallowedTools: nil)
+        let names = filtered.map { $0.name }
+
+        XCTAssertEqual(Set(names), Set(["Bash", "Read", "Grep"]), "All non-launcher tools must survive")
+    }
+
+    // MARK: AC6: Backward compatibility
+
+    /// AC6 [P0]: filterTools still strips "Agent" when parent pool has only Agent (no Task).
+    /// Verifies existing pre-29.2 behavior is preserved after the helper is introduced.
+    func testSpawn_preservesBackwardCompat_whenOnlyAgentPresent() async throws {
+        let parentTools: [ToolProtocol] = [createReadTool(), createAgentTool()]
+        let spawner = DefaultSubAgentSpawner(
+            apiKey: "test-key",
+            baseURL: nil,
+            parentModel: "claude-sonnet-4-6",
+            parentTools: parentTools,
+            client: makeMockClient()
+        )
+
+        let filtered = spawner.filterToolsForTesting(allowedTools: nil, disallowedTools: nil)
+        let names = filtered.map { $0.name }
+
+        XCTAssertFalse(names.contains("Agent"), "Existing behavior: Agent must be stripped (no regression)")
+        XCTAssertTrue(names.contains("Read"), "Existing behavior: Read survives (no regression)")
+    }
 }

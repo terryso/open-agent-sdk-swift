@@ -922,9 +922,9 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
     ///
     /// - Returns: An array of ``AgentInfo`` instances.
     public func supportedAgents() -> [AgentInfo] {
-        // Check if the Agent tool is present in the tool pool
-        let hasAgentTool = options.tools?.contains(where: { $0.name == "Agent" }) ?? false
-        guard hasAgentTool else { return [] }
+        // Check if any subagent launcher tool is present in the tool pool
+        let hasLauncher = options.tools?.contains(where: { SubAgentLauncherNames.contains($0.name) }) ?? false
+        guard hasLauncher else { return [] }
 
         // Return the known built-in agent types that the Agent tool supports.
         // These mirror BUILTIN_AGENTS in AgentTool.swift.
@@ -3218,10 +3218,11 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
         return .success((skill, prompt))
     }
 
-    /// Creates a sub-agent spawner if the tool pool contains the Agent tool.
+    /// Creates a sub-agent spawner if the tool pool contains ANY subagent launcher tool
+    /// (`Agent` or the Claude Code-compatible `Task` alias — see ``SubAgentLauncherNames``).
     ///
-    /// Centralizes the hasAgentTool check + DefaultSubAgentSpawner construction
-    /// duplicated between `promptImpl` and `stream` tool execution blocks.
+    /// Centralizes the launcher detection check + ``DefaultSubAgentSpawner`` construction
+    /// shared between `promptImpl` and `stream` tool execution blocks.
     private static func createSubAgentSpawner(
         tools: [ToolProtocol],
         apiKey: String,
@@ -3229,8 +3230,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
         parentModel: String,
         provider: LLMProvider
     ) -> SubAgentSpawner? {
-        let hasAgentTool = tools.contains { $0.name == "Agent" }
-        guard hasAgentTool else { return nil }
+        let hasLauncher = tools.contains { SubAgentLauncherNames.contains($0.name) }
+        guard hasLauncher else { return nil }
         return DefaultSubAgentSpawner(
             apiKey: apiKey,
             baseURL: baseURL,
