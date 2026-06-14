@@ -1,0 +1,24 @@
+{
+  "schema_version": "0.1.0",
+  "evaluated_at": "2026-06-14T00:00:00.000Z",
+  "repo": "open-agent-sdk-swift",
+  "target": {
+    "type": "story",
+    "id": "29-3",
+    "label": "Direct Skill Package Context"
+  },
+  "collection_status": "COLLECTED",
+  "gate_basis": "priority_thresholds",
+  "gate_status": "PASS",
+  "rationale": "P0 coverage is 100% (required: 100%), overall coverage is 100% (minimum: 80%). All 6 acceptance criteria are fully covered by 11 passing unit tests (8 stream + 3 non-stream). Production code byte-verified against epic prompt-shape spec; two test-quality patches from code review harden the suite (AC2 vacuous-true fixed, AC4 pinned). No critical, high, medium, or low gaps identified. Story status `done` (set by code-review step) confirmed correct.",
+  "p0_status": "MET",
+  "p1_status": "MET",
+  "overall_status": "MET",
+  "critical_open": 0,
+  "links": {
+    "trace_report_path": "_bmad-output/test-artifacts/traceability/29-3-traceability.md",
+    "trace_report_url": "",
+    "artifact_url": "",
+    "journey_evidence_url": ""
+  }
+}

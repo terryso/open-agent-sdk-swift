@@ -914,10 +914,11 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
 
     /// Returns configured sub-agent definitions.
     ///
-    /// Returns the built-in sub-agent types (Explore, Plan) when the Agent tool is
-    /// configured in the tool pool. Returns an empty array if no Agent tool is present.
+    /// Returns the built-in sub-agent types (Explore, Plan) when any subagent launcher
+    /// tool (`Agent` or `Task`) is configured in the tool pool. Returns an empty array
+    /// if no launcher tool is present.
     ///
-    /// - Note: Sub-agent definitions are discovered at spawn time by the Agent tool.
+    /// - Note: Sub-agent definitions are discovered at spawn time by the launcher tool.
     ///   This method returns the known built-in types for discovery purposes.
     ///
     /// - Returns: An array of ``AgentInfo`` instances.
@@ -926,7 +927,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
         let hasLauncher = options.tools?.contains(where: { SubAgentLauncherNames.contains($0.name) }) ?? false
         guard hasLauncher else { return [] }
 
-        // Return the known built-in agent types that the Agent tool supports.
+        // Return the known built-in agent types that the launcher tools support.
         // These mirror BUILTIN_AGENTS in AgentTool.swift.
         return [
             AgentInfo(
@@ -3201,6 +3202,16 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
     ///
     /// Centralizes the skill lookup → availability check → prompt assembly sequence
     /// duplicated between `executeSkill` and `executeSkillStream`.
+    ///
+    /// Prompt assembly rules (Story 29.3):
+    /// - **Programmatic skill** (`baseDir == nil && supportingFiles.isEmpty`) — keeps the legacy
+    ///   prompt shape exactly: `promptTemplate` + optional `---\nUser request: <args>`.
+    ///   Backward compatibility is enforced character-for-character.
+    /// - **Filesystem skill** (`baseDir != nil` OR `supportingFiles` non-empty) — appends a compact
+    ///   `Skill package context:` block between `promptTemplate` and the optional `User request:`
+    ///   line. Only paths are listed (no file contents — progressive disclosure, see
+    ///   `Skill.supportingFiles` doc comment).
+    ///
     /// Returns `.success((skill, prompt))` or `.failure(SkillResolutionError)`.
     private func resolveSkillForExecution(_ skillName: String, args: String?) -> Result<(Skill, String), SkillResolutionError> {
         guard let skill = options.skillRegistry?.find(skillName) else {
@@ -3209,13 +3220,58 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
         guard skill.isAvailable() else {
             return .failure(SkillResolutionError(message: "Skill \"\(skillName)\" is not available in the current environment"))
         }
-        let prompt: String
-        if let args, !args.isEmpty {
-            prompt = "\(skill.promptTemplate)\n\n---\nUser request: \(args)"
-        } else {
-            prompt = skill.promptTemplate
-        }
+        let prompt = buildSkillExecutionPrompt(skill: skill, args: args)
         return .success((skill, prompt))
+    }
+
+    /// Builds the prompt string delivered to the LLM for direct skill execution.
+    ///
+    /// Pure string constructor (no I/O, no throws) shared by `executeSkill` and
+    /// `executeSkillStream` via `resolveSkillForExecution`. Branches on whether the
+    /// skill has filesystem metadata (`baseDir` / `supportingFiles`):
+    ///
+    /// 1. Legacy / programmatic path — emits the pre-Story-29.3 shape character-for-character.
+    /// 2. Package-context path — inserts a compact block listing paths only, then the
+    ///    optional `User request:` line.
+    ///
+    /// - Parameters:
+    ///   - skill: A validated, available `Skill`.
+    ///   - args: Optional user arguments. `nil` or empty string omits the `User request:` line.
+    /// - Returns: The assembled prompt string.
+    private func buildSkillExecutionPrompt(skill: Skill, args: String?) -> String {
+        let hasPackageContext = skill.baseDir != nil || !skill.supportingFiles.isEmpty
+        let trimmedArgs = args.map { $0.isEmpty ? nil : $0 } ?? nil
+
+        // Legacy path: programmatic skills keep the exact pre-29.3 prompt shape.
+        guard hasPackageContext else {
+            if let trimmedArgs {
+                return "\(skill.promptTemplate)\n\n---\nUser request: \(trimmedArgs)"
+            }
+            return skill.promptTemplate
+        }
+
+        // Package-context path: build the epic-spec prompt shape.
+        // See docs/epics/epic-29-claude-code-skill-subagent-compat.md (prompt shape section).
+        var contextLines: [String] = []
+        contextLines.append("- baseDir: \(skill.baseDir ?? "<none>")")
+        if !skill.supportingFiles.isEmpty {
+            contextLines.append("- supportingFiles:")
+            // Preserve array order (project-context.md #46: Array over Set for ordered lists).
+            for file in skill.supportingFiles {
+                contextLines.append("  - \(file)")
+            }
+        }
+        let guidance = "Resolve bare supporting-file paths relative to baseDir. Read supporting files only when the skill instructions require them."
+
+        var prompt = skill.promptTemplate
+        prompt += "\n\n---\nSkill package context:\n"
+        prompt += contextLines.joined(separator: "\n")
+        prompt += "\n\n\(guidance)"
+
+        if let trimmedArgs {
+            prompt += "\n\n---\nUser request: \(trimmedArgs)"
+        }
+        return prompt
     }
 
     /// Creates a sub-agent spawner if the tool pool contains ANY subagent launcher tool
