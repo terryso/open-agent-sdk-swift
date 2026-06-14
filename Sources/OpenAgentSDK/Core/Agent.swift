@@ -1010,7 +1010,10 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
         let baseTools = options.tools ?? []
 
         guard let mcpServers = options.mcpServers, !mcpServers.isEmpty else {
-            return (baseTools, nil)
+            // No MCP servers — the pool is just the configured base tools.
+            // Story 29.5: still apply declaration-based filtering when a skill
+            // execution path populated `allowedToolDeclarations`.
+            return (Self.applyAllowedDeclarations(to: baseTools, options: options), nil)
         }
 
         let (sdkTools, externalServers) = await Self.processMcpConfigs(mcpServers)
@@ -1026,7 +1029,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                 allowed: options.allowedTools,
                 disallowed: options.disallowedTools
             )
-            return (pool, existing)
+            return (Self.applyAllowedDeclarations(to: pool, options: options), existing)
         }
 
         // Connect external MCP servers (stdio, sse, http)
@@ -1053,7 +1056,28 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
             disallowed: options.disallowedTools
         )
 
-        return (pool, manager)
+        return (Self.applyAllowedDeclarations(to: pool, options: options), manager)
+    }
+
+    /// Story 29.5: applies `filterToolsByDeclarations` to an assembled pool when
+    /// `options.allowedToolDeclarations` is non-empty. This is the runtime
+    /// consumption point for the lossless declaration model introduced in
+    /// Story 29.4 — MCP / custom / pattern / unknown declarations are honored
+    /// here, where the legacy `allowedTools: [String]?` path could not express
+    /// them. No-op when `allowedToolDeclarations` is nil/empty (legacy path).
+    private static func applyAllowedDeclarations(
+        to pool: [ToolProtocol],
+        options: AgentOptions
+    ) -> [ToolProtocol] {
+        guard let declarations = options.allowedToolDeclarations, !declarations.isEmpty else {
+            return pool
+        }
+        let (filtered, _) = filterToolsByDeclarations(
+            available: pool,
+            allowed: declarations,
+            disallowed: nil
+        )
+        return filtered
     }
 
     // MARK: - MCP Runtime Management
@@ -1254,10 +1278,23 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
 
         // Save current state for restoration after execution
         let savedAllowedTools = options.allowedTools
+        let savedAllowedDeclarations = options.allowedToolDeclarations  // Story 29.5
         let savedModel = model
 
-        // Apply skill overrides: tool restrictions → allowedTools filter
-        if let restrictions = skill.toolRestrictions {
+        // Apply skill overrides.
+        // Story 29.5: prefer the lossless `toolDeclarations` path (preserves MCP /
+        // custom / pattern / unknown declarations); fall back to the legacy
+        // `toolRestrictions` enum path for programmatic / pre-29.4 skills.
+        if let declarations = skill.toolDeclarations, !declarations.isEmpty {
+            options.allowedToolDeclarations = declarations
+            // Story 29.5 review fix: when the declaration path is taken, clear the
+            // legacy `allowedTools` so `assembleFullToolPool` does not double-filter
+            // (legacy filter would otherwise drop MCP/custom tools before the
+            // declaration filter ever sees them). `savedAllowedTools` is restored in
+            // the defer below, so the host's pre-existing value is preserved across
+            // the call.
+            options.allowedTools = nil
+        } else if let restrictions = skill.toolRestrictions {
             options.allowedTools = restrictions.map(\.rawValue)
         }
 
@@ -1274,6 +1311,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
         defer {
             // Restore original state
             options.allowedTools = savedAllowedTools
+            options.allowedToolDeclarations = savedAllowedDeclarations  // Story 29.5
             if hasModelOverride {
                 self.model = savedModel
                 options.model = savedModel
@@ -1321,9 +1359,19 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
         }
 
         let savedAllowedTools = options.allowedTools
+        let savedAllowedDeclarations = options.allowedToolDeclarations  // Story 29.5
         let savedModel = model
 
-        if let restrictions = skill.toolRestrictions {
+        // Story 29.5: prefer the lossless `toolDeclarations` path; fall back to
+        // the legacy `toolRestrictions` enum path for programmatic / pre-29.4 skills.
+        if let declarations = skill.toolDeclarations, !declarations.isEmpty {
+            options.allowedToolDeclarations = declarations
+            // Story 29.5 review fix: clear legacy `allowedTools` on the declaration
+            // path so `assembleFullToolPool` does not double-filter (legacy filter
+            // would drop MCP/custom tools before the declaration filter sees them).
+            // `savedAllowedTools` is restored on stream completion / termination.
+            options.allowedTools = nil
+        } else if let restrictions = skill.toolRestrictions {
             options.allowedTools = restrictions.map(\.rawValue)
         }
         let hasModelOverride: Bool
@@ -1345,6 +1393,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                 }
                 // Restore original state after stream completes
                 self.options.allowedTools = savedAllowedTools
+                self.options.allowedToolDeclarations = savedAllowedDeclarations  // Story 29.5
                 if hasModelOverride {
                     self.model = savedModel
                     self.options.model = savedModel
@@ -1355,6 +1404,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                 task.cancel()
                 // Restore state on early termination too
                 self.options.allowedTools = savedAllowedTools
+                self.options.allowedToolDeclarations = savedAllowedDeclarations  // Story 29.5
                 if hasModelOverride {
                     self.model = savedModel
                     self.options.model = savedModel

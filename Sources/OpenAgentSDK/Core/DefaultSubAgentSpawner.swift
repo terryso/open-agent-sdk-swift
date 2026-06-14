@@ -102,7 +102,10 @@ final class DefaultSubAgentSpawner: SubAgentSpawner, @unchecked Sendable {
         resume: String?
     ) async -> SubAgentResult {
         // 1. Filter tools
-        let subTools = filterTools(allowedTools: allowedTools, disallowedTools: disallowedTools)
+        // Story 29.5: filterTools now returns (filtered, diagnostics); we currently
+        // discard diagnostics at the spawner boundary (deferred-field diagnostics
+        // surfacing belongs to Story 29.6).
+        let subTools = filterTools(allowedTools: allowedTools, disallowedTools: disallowedTools).filtered
 
         // 2. Resolve MCP servers from spec (reference lookup or inline)
         var resolvedMcpServers: [String: McpServerConfig] = [:]
@@ -154,23 +157,36 @@ final class DefaultSubAgentSpawner: SubAgentSpawner, @unchecked Sendable {
     ///
     /// Default behavior strips BOTH `Agent` and `Task` so that a child cannot recursively
     /// spawn grandchildren without explicit host opt-in. See Story 29.2 AC5.
-    private func filterTools(allowedTools: [String]?, disallowedTools: [String]?) -> [ToolProtocol] {
+    ///
+    /// Story 29.5: allowed/disallowed matching is delegated to the shared
+    /// `filterToolsByDeclarations` helper (via `ToolDeclaration.fromToolNames`) so that
+    /// subagent `tools`/`disallowedTools` use the same matching rules as skill
+    /// `allowed-tools` (lowercased base-name match; MCP names work without an enum case;
+    /// `Bash(git diff:*)` matches by base name; declared-but-missing tools surface in
+    /// diagnostics and NEVER fall back to unrestricted). Launcher stripping stays here —
+    /// the helper is single-responsibility and does not strip launchers.
+    private func filterTools(allowedTools: [String]?, disallowedTools: [String]?) -> (filtered: [ToolProtocol], diagnostics: ToolFilterDiagnostics) {
         // Strip all subagent launcher tools by default to prevent recursive spawning.
         // Escape hatch (explicit recursion-allowed config) is deferred to a future story;
         // current default MUST remain "strip both" per Story 29.2 AC5.
-        var subTools = parentTools.filter { !SubAgentLauncherNames.contains($0.name) }
+        let launcherStripped = parentTools.filter { !SubAgentLauncherNames.contains($0.name) }
 
-        if let allowed = allowedTools, !allowed.isEmpty {
-            let allowedSet = Set(allowed)
-            subTools = subTools.filter { allowedSet.contains($0.name) }
-        }
+        // Convert the Claude Code-style `[String]?` inputs to declarations. `nil`/empty
+        // stays `nil` so the helper treats it as "no constraint" (not "allow nothing").
+        let allowedDeclarations: [ToolDeclaration]? = {
+            guard let allowedTools, !allowedTools.isEmpty else { return nil }
+            return ToolDeclaration.fromToolNames(allowedTools)
+        }()
+        let disallowedDeclarations: [ToolDeclaration]? = {
+            guard let disallowedTools, !disallowedTools.isEmpty else { return nil }
+            return ToolDeclaration.fromToolNames(disallowedTools)
+        }()
 
-        if let disallowed = disallowedTools, !disallowed.isEmpty {
-            let disallowedSet = Set(disallowed)
-            subTools = subTools.filter { !disallowedSet.contains($0.name) }
-        }
-
-        return subTools
+        return filterToolsByDeclarations(
+            available: launcherStripped,
+            allowed: allowedDeclarations,
+            disallowed: disallowedDeclarations
+        )
     }
 
     /// Test-only thin wrapper around the private ``filterTools`` so unit tests can assert
@@ -179,6 +195,14 @@ final class DefaultSubAgentSpawner: SubAgentSpawner, @unchecked Sendable {
     /// Project rule #22 (prefer `internal`) makes this safe: `@testable import OpenAgentSDK`
     /// already has internal access; this adds only a one-line indirection, no new behavior.
     internal func filterToolsForTesting(allowedTools: [String]?, disallowedTools: [String]?) -> [ToolProtocol] {
+        return filterTools(allowedTools: allowedTools, disallowedTools: disallowedTools).filtered
+    }
+
+    /// Story 29.5: test-only wrapper exposing the full `(filtered, diagnostics)`
+    /// tuple. The existing ``filterToolsForTesting`` keeps its `[ToolProtocol]`
+    /// return type so Story 29.2 regression tests compile unchanged; this new
+    /// entry point lets 29.5 tests assert diagnostics directly.
+    internal func filterToolsWithDiagnosticsForTesting(allowedTools: [String]?, disallowedTools: [String]?) -> (filtered: [ToolProtocol], diagnostics: ToolFilterDiagnostics) {
         return filterTools(allowedTools: allowedTools, disallowedTools: disallowedTools)
     }
 

@@ -1,0 +1,185 @@
+{
+  "schema_version": "0.1.0",
+  "evaluated_at": "2026-06-14T00:00:00.000Z",
+  "repo": "open-agent-sdk-swift",
+  "target": {
+    "type": "story",
+    "id": "29-5",
+    "label": "Shared Filtering for Skill and Subagent Tool Sets"
+  },
+  "collection_status": "COLLECTED",
+  "gate_basis": "priority_thresholds",
+  "gate_status": "PASS",
+  "rationale": "P0 coverage is 100% (required: 100%), P1 coverage is 100% (target: 90%), overall coverage is 100% (minimum: 80%). All 8 acceptance criteria (AC1-AC8) are fully covered by 31 new passing unit tests (26 ATDD red-phase tests + 5 code-review regression fixes) plus extensive pre-existing regression protection (ToolRestrictionStackTests 28, ToolRegistryTests.filterTools_*, SkillLoaderTests.parseToolDeclarations_* 10 from 29.4, DefaultSubAgentSpawnerTests 29.2 filterTests 5). The filterToolsByDeclarations helper, ToolFilterDiagnostics/ToolFilterOptions carriers, DefaultSubAgentSpawner rewiring, executeSkill/executeSkillStream migration, assembleFullToolPool integration, SkillTool metadata enrichment, and ToolDeclaration.parse/fromToolNames tokenizer hoist all passed 3-layer adversarial code review with 3 in-scope correctness fixes applied (CRITICAL mixed-case MCP normalizedName casing asymmetry that broke AC3, HIGH declaration path not clearing legacy allowedTools causing double-filter regression, HIGH fromToolNames not filtering empty/whitespace tokens), each with a dedicated regression test. All 5 Epic 29 red lines verified honored: (1) ToolRegistry.filterTools signature unchanged, (2) no .task case added to ToolRestriction enum, (3) launcher stripping stays in DefaultSubAgentSpawner not in helper, (4) empty pool + diagnostics when all allowed unmatched (never unrestricted fallback), (5) sibling code paths consistent (executeSkill, executeSkillStream, assembleFullToolPool all route through applyAllowedDeclarations). Full suite at 5769/5769 passing (baseline 5738 -> +26 ATDD +5 review regression = +31). Story status done. No critical, high, medium, or low coverage gaps identified.",
+  "p0_status": "MET",
+  "p1_status": "MET",
+  "overall_status": "MET",
+  "critical_open": 0,
+  "coverage": {
+    "total_acs": 8,
+    "fully_covered": 8,
+    "partially_covered": 0,
+    "uncovered": 0,
+    "overall_percentage": 100,
+    "p0": { "total": 6, "covered": 6, "percentage": 100, "required": 100 },
+    "p1": { "total": 2, "covered": 2, "percentage": 100, "target": 90, "minimum": 80 }
+  },
+  "ac_to_tests": {
+    "AC1": {
+      "description": "Helper function filterToolsByDeclarations exists in correct module (Types/ToolDeclaration.swift) with ToolFilterDiagnostics/ToolFilterOptions carriers, pure function with no cross-layer imports",
+      "priority": "P0",
+      "coverage": "FULL",
+      "tests": [
+        "testToolFilterDiagnostics_isPublicEquatableStruct",
+        "testFilterToolsByDeclarations_callableAndReturnsTuple",
+        "testToolFilterOptions_hasDefaultInit"
+      ]
+    },
+    "AC2": {
+      "description": "Subagent tool pool filtered by declarations - allowed preserves only matching tools, disallowed overrides allowed, case-insensitive, nil/empty allowed returns all",
+      "priority": "P0",
+      "coverage": "FULL",
+      "tests": [
+        "testFilter_preservesOnlyAllowedTools",
+        "testFilter_caseInsensitive",
+        "testFilter_disallowed_overridesAllowed",
+        "testFilter_nilAllowed_returnsAll",
+        "testFilter_emptyAllowed_returnsAll",
+        "testFilter_patternDeclaration_matchesByBaseNameAndSurfacesInDiagnostics",
+        "testFromToolNames_preservesOrderAndPatternAndMCP",
+        "testFromToolNames_empty_returnsEmptyArray",
+        "testFilterTools_declarationBased_keepsOnlyMatching",
+        "testFilterTools_launcherStrippingStillWorks",
+        "testFilterTools_patternInAllowed_matchesByBaseName"
+      ]
+    },
+    "AC3": {
+      "description": "MCP tool declaration matches without enum case (status .recognizedMCP, toolRestriction nil)",
+      "priority": "P0",
+      "coverage": "FULL",
+      "tests": [
+        "testFilter_mcpDeclaration_matchesWithoutEnumCase",
+        "testFilter_mcpDeclaration_mixedCase_matchesCaseInsensitive",
+        "testFilter_mcpDeclaration_lowercasedDeclaration_matchesMixedCaseAvailable",
+        "testFilterTools_mcpAllowed_keepsMcp",
+        "testExecuteSkill_mcpDeclarationSurvivableViaFilterHelper"
+      ]
+    },
+    "AC4": {
+      "description": "Declared-but-no-available-tool produces diagnostics.unmatchedDeclarations, NEVER falls back to unrestricted (single unmatched + all unmatched both yield empty pool)",
+      "priority": "P0",
+      "coverage": "FULL",
+      "tests": [
+        "testFilter_unknownDeclaration_notUnrestricted",
+        "testFilter_allDeclarationsUnmatched_poolStillEmpty",
+        "testFilterTools_unknownAllowed_notUnrestricted",
+        "testFromToolNames_skipsEmptyAndWhitespaceEntries"
+      ]
+    },
+    "AC5": {
+      "description": "Skill execution path (executeSkill/executeSkillStream) consumes skill.toolDeclarations, preserves MCP tools that legacy toolRestrictions path drops, falls back to toolRestrictions when declarations nil",
+      "priority": "P0",
+      "coverage": "FULL",
+      "tests": [
+        "testExecuteSkill_agentOptions_allowedToolDeclarations_defaultsToNil",
+        "testExecuteSkill_toolDeclarations_appliedAndRestored",
+        "testExecuteSkill_mcpDeclarationSurvivableViaFilterHelper",
+        "testExecuteSkill_fallsBackToToolRestrictions_whenNoDeclarations",
+        "testExecuteSkill_declarationPath_clearsAndRestoresLegacyAllowedTools"
+      ]
+    },
+    "AC6": {
+      "description": "SkillTool metadata exposes richer toolDeclarations (rawName/normalizedName/status/pattern/hasToolRestriction per declaration), backward compatible when nil",
+      "priority": "P0",
+      "coverage": "FULL",
+      "tests": [
+        "testSkillTool_toolDeclarations_includedInJSON_whenPresent",
+        "testSkillTool_toolDeclarations_absent_whenSkillHasNone"
+      ]
+    },
+    "AC7": {
+      "description": "Backward compatibility - no regression on ToolRestrictionStack (28 tests), ExecuteSkill/ExecuteSkillStream, SkillTool, SkillLoader, DefaultSubAgentSpawner (29.2 filterTools), ToolRegistry.filterTools signature unchanged, 6 BuiltInSkills toolRestrictions inits unchanged",
+      "priority": "P0/P1",
+      "coverage": "FULL",
+      "tests": [
+        "testFilterTools_launcherStrippingStillWorks",
+        "testSkillTool_toolDeclarations_absent_whenSkillHasNone",
+        "testExecuteSkill_fallsBackToToolRestrictions_whenNoDeclarations",
+        "testExecuteSkill_declarationPath_clearsAndRestoresLegacyAllowedTools",
+        "testFromToolNames_trimsSurroundingWhitespace",
+        "Pre-existing regression suites (verified green): ToolRestrictionStackTests (28), ToolRegistryTests.filterTools_*, SkillLoaderTests.parseToolDeclarations_* (10), DefaultSubAgentSpawnerTests.filterTools_* 29.2 (5), ExecuteSkillTests/ExecuteSkillStreamTests existing"
+      ]
+    },
+    "AC8": {
+      "description": "Build clean with zero new warnings and full test suite passes (baseline 5738 + 31 new = 5769)",
+      "priority": "P0",
+      "coverage": "FULL",
+      "tests": [
+        "swift build (zero new warnings)",
+        "swift test (5769/5769 passing, baseline 5738 +31)"
+      ]
+    }
+  },
+  "test_artifacts": {
+    "test_files": [
+      "Tests/OpenAgentSDKTests/Types/ToolDeclarationFilterTests.swift",
+      "Tests/OpenAgentSDKTests/Core/DefaultSubAgentSpawnerTests.swift",
+      "Tests/OpenAgentSDKTests/Tools/Advanced/SkillToolTests.swift",
+      "Tests/OpenAgentSDKTests/Tools/Advanced/ExecuteSkillTests.swift"
+    ],
+    "new_tests_in_story": 31,
+    "atdd_tests": 26,
+    "review_regression_tests": 5,
+    "total_test_count": 5769,
+    "baseline_test_count": 5738,
+    "test_failures": 0
+  },
+  "review_fixes_applied_with_regression_tests": {
+    "critical": [
+      {
+        "finding": "MCP normalizedName casing asymmetry broke AC3 for mixed-case MCP names (mcp__GitHub__ListPRs never matched the lowercased available set)",
+        "regression_tests": [
+          "testFilter_mcpDeclaration_mixedCase_matchesCaseInsensitive",
+          "testFilter_mcpDeclaration_lowercasedDeclaration_matchesMixedCaseAvailable"
+        ]
+      }
+    ],
+    "high": [
+      {
+        "finding": "Declaration path did not clear options.allowedTools causing double-filter regression that dropped MCP tools when host had pre-set allowlist",
+        "regression_tests": [
+          "testExecuteSkill_declarationPath_clearsAndRestoresLegacyAllowedTools"
+        ]
+      },
+      {
+        "finding": "fromToolNames did not filter empty/whitespace tokens producing phantom .unknown declarations",
+        "regression_tests": [
+          "testFromToolNames_skipsEmptyAndWhitespaceEntries",
+          "testFromToolNames_trimsSurroundingWhitespace"
+        ]
+      }
+    ]
+  },
+  "red_lines_verified_honored": [
+    "ToolRegistry.filterTools (Tools/ layer) signature unchanged, not deleted",
+    "No .task case added to ToolRestriction enum - Task matched via knownClaudeCodeOnly string set",
+    "Launcher stripping stays in DefaultSubAgentSpawner, NOT in the helper (filterToolsByDeclarations contains zero launcher logic)",
+    "When allowed declarations all unmatched, helper returns EMPTY pool, never unrestricted fallback",
+    "Sibling code paths consistent - executeSkill, executeSkillStream, assembleFullToolPool all route through applyAllowedDeclarations -> filterToolsByDeclarations; both skill paths save/restore savedAllowedDeclarations"
+  ],
+  "deferred_to_later_stories": [
+    "Fine-grained Bash permission pattern enforcement (epic deferred item 5) - Story 29.7+",
+    "Deferred field diagnostics (run_in_background/resume/isolation/team_name/skills/MCP reference) - Story 29.6",
+    "SubAgentResult structured diagnostics surfacing - Story 29.6",
+    "E2E tests - Story 29.7 (project-context.md #29)",
+    "Restore race on options mutations during concurrent executeSkillStream (pre-existing for allowedTools, cloned for allowedToolDeclarations, MEDIUM deferred)",
+    "Stray ) and __ inside MCP tool names edge cases (MEDIUM deferred, requires parser semantics decisions)",
+    "patternDeclarations dedup by rawName and unmatchedDeclarations dedup (LOW cosmetic, deferred)"
+  ],
+  "links": {
+    "trace_report_path": "_bmad-output/test-artifacts/traceability/29-5-traceability.md",
+    "trace_report_url": "",
+    "artifact_url": "_bmad-output/implementation-artifacts/29-5-shared-filtering-skills-subagents.md",
+    "journey_evidence_url": ""
+  }
+}

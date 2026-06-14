@@ -358,6 +358,19 @@ public struct AgentOptions: Sendable {
     /// lists, it is blocked.
     public var disallowedTools: [String]?
 
+    /// Story 29.5: richer, lossless allow-list of tool declarations.
+    ///
+    /// When non-`nil` and non-empty, `assembleFullToolPool` applies
+    /// `filterToolsByDeclarations(available:allowed:disallowed:nil)` to the
+    /// assembled pool, preserving MCP namespaced tools, custom names, and
+    /// pattern base-name matching that the legacy `allowedTools: [String]?`
+    /// path cannot express. When `nil`, the legacy `allowedTools` path is used
+    /// unchanged (backward compatibility for programmatic / pre-29.4 skills).
+    ///
+    /// Set by `Agent.executeSkill` / `executeSkillStream` when a skill carries
+    /// `Skill.toolDeclarations`; restored to its prior value on completion.
+    public var allowedToolDeclarations: [ToolDeclaration]?
+
     /// Optional effort level controlling the model's reasoning depth.
     /// Maps to API-level thinking budget tokens when set.
     public var effort: EffortLevel?
@@ -619,6 +632,7 @@ public struct AgentOptions: Sendable {
         self.env = env
         self.allowedTools = allowedTools
         self.disallowedTools = disallowedTools
+        self.allowedToolDeclarations = nil  // Story 29.5: set by executeSkill when a skill carries toolDeclarations
         self.effort = effort
         self.outputFormat = outputFormat
         self.toolConfig = toolConfig
@@ -740,6 +754,7 @@ public struct AgentOptions: Sendable {
         self.env = nil
         self.allowedTools = nil
         self.disallowedTools = nil
+        self.allowedToolDeclarations = nil  // Story 29.5
         self.effort = nil
         self.outputFormat = nil
         self.toolConfig = nil

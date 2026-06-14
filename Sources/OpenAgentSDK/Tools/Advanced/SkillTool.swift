@@ -120,9 +120,29 @@ Use this tool when the user's request matches one of the available skills.
             "prompt": skill.promptTemplate
         ]
 
-        // Include allowedTools if skill has tool restrictions
+        // Include allowedTools if skill has tool restrictions (backward-compatible rawValues)
         if let restrictions = skill.toolRestrictions {
             result["allowedTools"] = restrictions.map(\.rawValue)
+        }
+
+        // Story 29.5: also surface the richer `toolDeclarations` when present, so the
+        // host can distinguish SDK / MCP / unknown / pattern declarations (the legacy
+        // `allowedTools` rawValue list cannot represent these). Omitted entirely when the
+        // skill has no declarations (programmatic / pre-29.4 skills behave exactly as before).
+        if let declarations = skill.toolDeclarations {
+            result["toolDeclarations"] = declarations.map { d in
+                var entry: [String: Any] = [
+                    "rawName": d.rawName,
+                    "normalizedName": d.normalizedName,
+                    "status": d.status.rawValue,
+                    "hasToolRestriction": d.toolRestriction != nil,
+                ]
+                // nil-safe pattern: omit when absent (keeps legacy-shape consumers happy).
+                if let pattern = d.pattern {
+                    entry["pattern"] = pattern
+                }
+                return entry
+            }
         }
 
         // Include model if skill has a model override

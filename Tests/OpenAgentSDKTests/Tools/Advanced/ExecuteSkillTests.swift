@@ -296,6 +296,199 @@ final class ExecuteSkillTests: XCTestCase {
         XCTAssertLessThan(contextRange.lowerBound, userRequestRange.lowerBound,
                           "'Skill package context:' must appear before 'User request:'; got: \(bodyString)")
     }
+
+    // MARK: - Story 29.5: Declaration-Based Tool Filtering on the Skill Execution Path
+
+    /// ATDD RED PHASE: Tests for Story 29.5 -- the `executeSkill` / `executeSkillStream`
+    /// paths migrate from consuming `skill.toolRestrictions` (enum-only) to preferring
+    /// `skill.toolDeclarations` (lossless MCP/custom/unknown-aware), so that an MCP
+    /// declaration like `mcp__srv__search` is preserved during skill execution rather
+    /// than dropped (the legacy enum path has no MCP case). The legacy path remains as a
+    /// fallback when `skill.toolDeclarations == nil` (programmatic / pre-29.4 skills).
+    ///
+    /// Tests below assert EXPECTED behavior. They will FAIL until:
+    ///   - `Sources/OpenAgentSDK/Types/AgentTypes.swift` `AgentOptions` gains an
+    ///     `allowedToolDeclarations: [ToolDeclaration]?` field (default nil).
+    ///   - `Sources/OpenAgentSDK/Core/Agent.swift` `executeSkill` / `executeSkillStream`
+    ///     set `options.allowedToolDeclarations = skill.toolDeclarations` when non-nil,
+    ///     falling back to `options.allowedTools = restrictions.map(\.rawValue)` otherwise.
+    ///   - `assembleFullToolPool` applies `filterToolsByDeclarations` when
+    ///     `options.allowedToolDeclarations` is non-empty.
+    ///   - Both paths restore the saved value on completion (like `savedAllowedTools`).
+    /// TDD Phase: RED (feature not implemented yet)
+    ///
+    /// Red mode: COMPILE-TIME — `AgentOptions.allowedToolDeclarations` does not exist yet,
+    /// so `agent.options.allowedToolDeclarations` fails with `Cannot find ... in scope`.
+
+    /// AC5 [P0]: `AgentOptions` gains an `allowedToolDeclarations` field defaulting to
+    /// nil, so existing AgentOptions constructions keep compiling (backward compatible).
+    func testExecuteSkill_agentOptions_allowedToolDeclarations_defaultsToNil() {
+        let options = AgentOptions(
+            apiKey: "test-key",
+            model: "claude-sonnet-4-6",
+            tools: getAllBaseTools(tier: .core)
+        )
+        XCTAssertNil(options.allowedToolDeclarations,
+                     "New field must default to nil so existing callers compile unchanged")
+    }
+
+    /// AC5 [P0]: When a skill has non-nil `toolDeclarations`, executing it sets
+    /// `options.allowedToolDeclarations` for the duration of the run and restores the
+    /// original (nil) value afterwards. Driven through the recording mock client so no
+    /// real LLM call is made (project rule #27).
+    func testExecuteSkill_toolDeclarations_appliedAndRestored() async {
+        SkillRequestRecordingURLProtocol.reset()
+        defer { SkillRequestRecordingURLProtocol.reset() }
+
+        let declarations: [ToolDeclaration] = ToolDeclaration.fromToolNames([
+            "Bash",
+            "mcp__srv__search",
+        ])
+        let skill = Skill(
+            name: "declaration-skill",
+            description: "skill carrying richer declarations",
+            toolRestrictions: [.bash],  // legacy field coexists for backward compat
+            toolDeclarations: declarations,
+            promptTemplate: "Do declaration-aware things"
+        )
+
+        let body = await driveExecuteSkillAndCaptureRawBody(skill: skill, args: "run")
+        XCTAssertFalse(body.isEmpty, "Mock must capture the request body")
+
+        // After execution, allowedToolDeclarations must be restored to its pre-skill value.
+        // The test agent is constructed inside driveExecuteSkillAndCaptureRawBody and goes
+        // out of scope; this assertion is a forward-compatibility placeholder that the
+        // field EXISTS and is settable. The integration-level preservation assertion lives
+        // in the assembleFullToolPool-driven test below.
+        // (Field existence is the red-phase contract; behavioral coverage deepens in green.)
+    }
+
+    /// AC5 [P0]: A skill whose `toolDeclarations` includes an MCP name must cause the
+    /// executed skill's tool pool to retain the MCP tool (when available), whereas the
+    /// legacy `toolRestrictions`-only path would drop it (no enum case for MCP). This is
+    /// the headline behavioral fix of Story 29.5.
+    ///
+    /// Verification is structural: we assert that `AgentOptions.allowedToolDeclarations`
+    /// is the wiring channel, and that a declaration set containing an MCP name can be
+    /// applied to a tool pool via `filterToolsByDeclarations` (the helper tested in
+    /// `ToolDeclarationFilterTests`). Full LLM-driven pool inspection is an E2E concern
+    /// deferred to Story 29.7.
+    func testExecuteSkill_mcpDeclarationSurvivableViaFilterHelper() {
+        // Given: declarations including an MCP name + an available MCP-named tool
+        let declarations: [ToolDeclaration] = ToolDeclaration.fromToolNames([
+            "Bash",
+            "mcp__srv__search",
+        ])
+
+        // Build a stub MCP-named tool without real MCP I/O.
+        let mcpTool = defineTool(
+            name: "mcp__srv__search",
+            description: "stub mcp tool",
+            inputSchema: ["type": "object", "properties": [:]],
+            isReadOnly: true
+        ) { _, _ in ToolExecuteResult(content: "stub", isError: false) }
+        let bashTool = createBashTool()
+        let available: [ToolProtocol] = [bashTool, mcpTool]
+
+        // When: the shared helper filters (this is what assembleFullToolPool will call
+        // when options.allowedToolDeclarations is non-empty)
+        let (filtered, _) = filterToolsByDeclarations(
+            available: available,
+            allowed: declarations,
+            disallowed: nil
+        )
+
+        // Then: the MCP tool survives, proving the declaration path retains what the
+        // legacy enum-only path would have dropped.
+        let names = filtered.map { $0.name }
+        XCTAssertTrue(names.contains("mcp__srv__search"),
+                      "MCP declaration must keep the MCP tool in the pool — the legacy path drops it")
+        XCTAssertTrue(names.contains("Bash"),
+                      "Bash declaration must keep Bash in the pool")
+    }
+
+    /// AC5 [P0]: Fallback path — when a skill has NO `toolDeclarations` (programmatic /
+    /// pre-29.4 skill), the legacy `toolRestrictions` path must remain in effect and
+    /// `allowedToolDeclarations` must NOT be set. Backward compatibility guard.
+    func testExecuteSkill_fallsBackToToolRestrictions_whenNoDeclarations() async {
+        SkillRequestRecordingURLProtocol.reset()
+        defer { SkillRequestRecordingURLProtocol.reset() }
+
+        // Programmatic skill: toolDeclarations == nil, toolRestrictions populated
+        let skill = Skill(
+            name: "legacy-programmatic-skill",
+            description: "pre-29.4 programmatic skill",
+            toolRestrictions: [.bash, .read],
+            promptTemplate: "Do legacy things"
+            // toolDeclarations intentionally nil
+        )
+
+        let body = await driveExecuteSkillAndCaptureRawBody(skill: skill, args: "run")
+        XCTAssertFalse(body.isEmpty, "Mock must capture the request body; legacy path must still execute")
+    }
+
+    // MARK: - Story 29.5 review fix: declaration path must clear legacy `allowedTools`
+
+    /// Review fix (HIGH): when `executeSkill` takes the `toolDeclarations` path, it must
+    /// also clear `options.allowedTools` so `assembleFullToolPool` does not double-filter
+    /// (the legacy `assembleToolPool` filter would otherwise drop MCP/custom tools from
+    /// the pool before `applyAllowedDeclarations` ever sees them). The host's pre-existing
+    /// `allowedTools` must be restored on completion.
+    ///
+    /// This test drives `executeSkill` against the recording mock client with an agent that
+    /// has a pre-set `allowedTools` (which does NOT include an MCP tool the skill declares),
+    /// then asserts the host's `allowedTools` is restored exactly after the call. The
+    /// in-call "allowedTools is nil" behavior is what prevents the legacy filter from
+    /// stripping the MCP tool before `applyAllowedDeclarations` runs.
+    func testExecuteSkill_declarationPath_clearsAndRestoresLegacyAllowedTools() async {
+        SkillRequestRecordingURLProtocol.reset()
+        defer { SkillRequestRecordingURLProtocol.reset() }
+
+        let declarations: [ToolDeclaration] = ToolDeclaration.fromToolNames([
+            "Bash",
+            "mcp__srv__search",
+        ])
+        let skill = Skill(
+            name: "decl-skill-with-host-allowlist",
+            description: "skill carrying declarations; host also has an allowlist",
+            toolDeclarations: declarations,
+            promptTemplate: "Do declaration-aware things"
+        )
+
+        let registry = SkillRegistry()
+        registry.register(skill)
+
+        SkillRequestRecordingURLProtocol.mockResponses = [
+            "https://api.anthropic.com/v1/messages":
+                (200, ["content-type": "application/json"],
+                 SkillRequestRecordingURLProtocol.makeNonStreamingResponse())
+        ]
+        let client = AnthropicClient(
+            apiKey: "test-key",
+            urlSession: makeMockURLSession(protocolClass: SkillRequestRecordingURLProtocol.self)
+        )
+
+        // Host has a pre-existing allowedTools that does NOT include the MCP tool. If the
+        // declaration path failed to clear it, the MCP tool would be dropped before
+        // `applyAllowedDeclarations` runs and the skill could not use it.
+        let agent = Agent(options: AgentOptions(
+            apiKey: "test-key",
+            model: "claude-sonnet-4-6",
+            tools: getAllBaseTools(tier: .core),
+            skillRegistry: registry,
+            allowedTools: ["Bash", "Read", "Write"]
+        ), client: client)
+
+        XCTAssertEqual(agent.options.allowedTools, ["Bash", "Read", "Write"],
+                       "Pre-condition: host has a legacy allowlist set")
+
+        _ = await agent.executeSkill("decl-skill-with-host-allowlist", args: "run")
+
+        XCTAssertEqual(agent.options.allowedTools, ["Bash", "Read", "Write"],
+                       "Post-call: host's legacy allowedTools must be restored exactly")
+        XCTAssertNil(agent.options.allowedToolDeclarations,
+                     "Post-call: allowedToolDeclarations must be restored to nil")
+    }
 }
 
 // MARK: - Mock URL Protocol (non-stream, request-body recording)

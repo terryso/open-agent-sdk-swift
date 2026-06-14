@@ -449,4 +449,192 @@ final class DefaultSubAgentSpawnerTests: XCTestCase {
         XCTAssertEqual(result.text, "(Subagent completed with no text output)")
         XCTAssertTrue(result.isError, "errorMaxTurns status must surface as isError")
     }
+
+    // MARK: - Story 29.5: Declaration-Based Filtering
+
+    /// ATDD RED PHASE: Tests for Story 29.5 -- `DefaultSubAgentSpawner.filterTools`
+    /// migrates from the legacy case-SENSITIVE `Set([String])` matcher to the shared
+    /// `filterToolsByDeclarations` helper. This unifies skill `allowed-tools` and
+    /// subagent `tools` / `disallowedTools` behind the same matching rules so that the
+    /// same declaration means the same thing across direct skills and spawned agents.
+    ///
+    /// Tests below assert EXPECTED behavior. They will FAIL until:
+    ///   - `Sources/OpenAgentSDK/Core/DefaultSubAgentSpawner.swift:157-174` is rewritten
+    ///     to convert the `[String]?` allowed/disallowed inputs via
+    ///     `ToolDeclaration.fromToolNames(...)` and delegate to
+    ///     `filterToolsByDeclarations(...)`.
+    ///   - `internal func filterToolsWithDiagnosticsForTesting(...)` is exposed, returning
+    ///     the full `(filtered, diagnostics)` tuple (the existing
+    ///     `filterToolsForTesting` keeps its `[ToolProtocol]` signature for the 29.2
+    ///     regression tests).
+    ///   - `SubAgentLauncherNames`-based stripping STILL runs first (29.2 behavior
+    ///     preserved — helper does NOT strip Agent/Task itself).
+    /// TDD Phase: RED (feature not implemented yet)
+    ///
+    /// Red mode: COMPILE-TIME — `filterToolsWithDiagnosticsForTesting` does not exist yet.
+
+    // MARK: AC2 — 子代理工具池按 declarations 过滤
+
+    /// AC2 [P0]: allowedTools keeps only matching tools. `Read` matches, `Grep` is
+    /// declared but absent from the parent pool. `Write` / `Bash` are NOT in
+    /// allowedTools and must be absent from the child pool.
+    func testFilterTools_declarationBased_keepsOnlyMatching() async throws {
+        let parentTools: [ToolProtocol] = [
+            createBashTool(),
+            createReadTool(),
+            createWriteTool(),
+        ]
+        let spawner = DefaultSubAgentSpawner(
+            apiKey: "test-key",
+            baseURL: nil,
+            parentModel: "claude-sonnet-4-6",
+            parentTools: parentTools,
+            client: makeMockClient()
+        )
+
+        let (filtered, diagnostics) = spawner.filterToolsWithDiagnosticsForTesting(
+            allowedTools: ["Read", "Grep"],
+            disallowedTools: nil
+        )
+        let names = filtered.map { $0.name }
+
+        XCTAssertEqual(names, ["Read"], "Only declared-and-available Read must survive")
+        XCTAssertFalse(names.contains("Bash"), "Bash is not allowed -> must be absent")
+        XCTAssertFalse(names.contains("Write"), "Write is not allowed -> must be absent")
+        XCTAssertEqual(diagnostics.unmatchedDeclarations.map(\.rawName), ["Grep"],
+                       "Grep was declared but is not in the parent pool -> unmatched")
+    }
+
+    // MARK: AC3 — MCP 工具声明匹配无需 enum case
+
+    /// AC3 [P0]: An MCP-named allowed tool is retained even though `ToolRestriction`
+    /// has no MCP case. The legacy string `Set` matcher already matched MCP exact names,
+    /// but the new path must preserve this AND surface no false unmatched diagnostic.
+    func testFilterTools_mcpAllowed_keepsMcp() async throws {
+        let parentTools: [ToolProtocol] = [
+            createReadTool(),
+            // A tool whose name follows the MCP namespaced convention.
+            // Built via the project's tool builder to keep the test free of real MCP I/O.
+            Self.makeStubTool(name: "mcp__srv__search"),
+        ]
+        let spawner = DefaultSubAgentSpawner(
+            apiKey: "test-key",
+            baseURL: nil,
+            parentModel: "claude-sonnet-4-6",
+            parentTools: parentTools,
+            client: makeMockClient()
+        )
+
+        let (filtered, diagnostics) = spawner.filterToolsWithDiagnosticsForTesting(
+            allowedTools: ["mcp__srv__search"],
+            disallowedTools: nil
+        )
+        let names = filtered.map { $0.name }
+
+        XCTAssertTrue(names.contains("mcp__srv__search"),
+                      "Declared MCP tool present in parent pool must be retained")
+        XCTAssertFalse(names.contains("Read"),
+                       "Read is not in allowedTools -> must be absent")
+        XCTAssertTrue(diagnostics.unmatchedDeclarations.isEmpty,
+                      "Matched MCP declaration must NOT be reported unmatched")
+    }
+
+    // MARK: AC4 — 声明了但无可用工具 → 绝不 unrestricted
+
+    /// AC4 [P0]: An allowedTools list referencing only a missing tool (`PhantomTool`)
+    /// yields an EMPTY child pool — never the unrestricted parent pool. Epic 29
+    /// "不静默放权" red line, verified at the spawner integration boundary.
+    func testFilterTools_unknownAllowed_notUnrestricted() async throws {
+        let parentTools: [ToolProtocol] = [createBashTool(), createReadTool()]
+        let spawner = DefaultSubAgentSpawner(
+            apiKey: "test-key",
+            baseURL: nil,
+            parentModel: "claude-sonnet-4-6",
+            parentTools: parentTools,
+            client: makeMockClient()
+        )
+
+        let (filtered, diagnostics) = spawner.filterToolsWithDiagnosticsForTesting(
+            allowedTools: ["PhantomTool"],
+            disallowedTools: nil
+        )
+
+        XCTAssertTrue(filtered.isEmpty,
+                      "Allowed-but-missing must yield empty pool, never the full parent pool")
+        XCTAssertEqual(diagnostics.unmatchedDeclarations.map(\.rawName), ["PhantomTool"],
+                       "PhantomTool must surface as unmatched")
+    }
+
+    // MARK: AC7 — 向后兼容：launcher 剥离不变
+
+    /// AC7 [P0]: launcher stripping (`Agent` / `Task`) is preserved — the helper does
+    /// NOT strip launchers; the spawner still strips them via `SubAgentLauncherNames`
+    /// BEFORE delegating to the helper. Regression guard for Story 29.2 behavior.
+    func testFilterTools_launcherStrippingStillWorks() async throws {
+        let parentTools: [ToolProtocol] = [
+            createBashTool(),
+            createAgentTool(),
+            createTaskTool(),
+        ]
+        let spawner = DefaultSubAgentSpawner(
+            apiKey: "test-key",
+            baseURL: nil,
+            parentModel: "claude-sonnet-4-6",
+            parentTools: parentTools,
+            client: makeMockClient()
+        )
+
+        let (filtered, _) = spawner.filterToolsWithDiagnosticsForTesting(
+            allowedTools: nil,
+            disallowedTools: nil
+        )
+        let names = filtered.map { $0.name }
+
+        XCTAssertFalse(names.contains("Agent"), "Agent launcher must still be stripped (29.2 preserved)")
+        XCTAssertFalse(names.contains("Task"), "Task launcher must still be stripped (29.2 preserved)")
+        XCTAssertTrue(names.contains("Bash"), "Non-launcher tools must survive")
+    }
+
+    // MARK: Pattern 处理（按 base name 匹配）
+
+    /// AC2 + pattern [P0]: A pattern-style allowed entry `Bash(git diff:*)` matches the
+    /// available `Bash` tool by base name. The legacy case-sensitive `Set` matcher
+    /// FAILED this case because `"Bash" != "Bash(git diff:*)"`. The declaration-based
+    /// path must match by base name and NOT drop Bash.
+    func testFilterTools_patternInAllowed_matchesByBaseName() async throws {
+        let parentTools: [ToolProtocol] = [createBashTool(), createReadTool()]
+        let spawner = DefaultSubAgentSpawner(
+            apiKey: "test-key",
+            baseURL: nil,
+            parentModel: "claude-sonnet-4-6",
+            parentTools: parentTools,
+            client: makeMockClient()
+        )
+
+        let (filtered, _) = spawner.filterToolsWithDiagnosticsForTesting(
+            allowedTools: ["Bash(git diff:*)"],
+            disallowedTools: nil
+        )
+        let names = filtered.map { $0.name }
+
+        XCTAssertTrue(names.contains("Bash"),
+                      "Pattern entry Bash(git diff:*) must match available Bash by base name")
+        XCTAssertFalse(names.contains("Read"),
+                       "Read is not allowed -> must be absent")
+    }
+
+    // MARK: - Story 29.5 helper
+
+    /// Minimal `ToolProtocol` builder for MCP-named tools used in the filter tests
+    /// above. Keeps the test free of real MCP server I/O (project rule #27).
+    private static func makeStubTool(name: String) -> ToolProtocol {
+        return defineTool(
+            name: name,
+            description: "stub tool for 29.5 filter test",
+            inputSchema: ["type": "object", "properties": [:]],
+            isReadOnly: true
+        ) { _, _ in
+            ToolExecuteResult(content: "stub", isError: false)
+        }
+    }
 }

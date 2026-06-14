@@ -441,4 +441,126 @@ final class SkillToolTests: XCTestCase {
         XCTAssertTrue(allowedTools!.contains("bash"))
         XCTAssertTrue(allowedTools!.contains("read"))
     }
+
+    // MARK: - Story 29.5: SkillTool richer `toolDeclarations` metadata
+
+    /// ATDD RED PHASE: Tests for Story 29.5 -- `SkillTool`'s JSON result must expose a
+    /// richer `toolDeclarations` field (alongside the existing `allowedTools`
+    /// rawValues) so the host can distinguish SDK / MCP / unknown / pattern
+    /// declarations. The legacy `allowedTools` field stays for backward compatibility.
+    ///
+    /// Tests below assert EXPECTED behavior. They will FAIL until:
+    ///   - `Sources/OpenAgentSDK/Tools/Advanced/SkillTool.swift` adds a `toolDeclarations`
+    ///     entry to its `[String: Any]` result dict when `skill.toolDeclarations != nil`.
+    ///   - Each declaration in the array carries `rawName`, `normalizedName`, `status`,
+    ///     `pattern` (nullable), and `hasToolRestriction`.
+    ///   - When `skill.toolDeclarations == nil`, the result behaves exactly as today
+    ///     (only `allowedTools` rawValues, no `toolDeclarations` key).
+    /// TDD Phase: RED (feature not implemented yet)
+    ///
+    /// Red mode: RUNTIME assertion failure — the JSON today lacks the `toolDeclarations`
+    /// key, so `json["toolDeclarations"]` resolves to nil and the XCTAssertNotNil fails.
+    /// (Skill + ToolDeclaration types already exist from 29.4; only the SkillTool emit
+    /// path is missing.)
+
+    /// AC6 [P0]: When a skill has `toolDeclarations`, the SkillTool JSON result includes
+    /// a `toolDeclarations` array with per-declaration metadata, AND keeps the backward-
+    /// compatible `allowedTools` rawValue list.
+    func testSkillTool_toolDeclarations_includedInJSON_whenPresent() async throws {
+        // Given: a skill whose toolDeclarations mix SDK, MCP, and pattern forms.
+        // SkillLoader normally parses these from frontmatter; here we construct them
+        // directly via the 29.5 single-token parser to keep the test pure (no file I/O).
+        let declarations: [ToolDeclaration] = ToolDeclaration.fromToolNames([
+            "Bash",
+            "mcp__srv__search",
+            "Bash(git diff:*)",
+        ])
+        let skill = Skill(
+            name: "rich-skill",
+            description: "skill with richer tool declarations",
+            toolRestrictions: [.bash],
+            toolDeclarations: declarations,
+            promptTemplate: "Do rich things"
+        )
+        let registry = SkillRegistry()
+        registry.register(skill)
+
+        // When: invoking the SkillTool
+        let tool = createSkillTool(registry: registry)
+        let context = ToolContext(cwd: "/tmp")
+        let input: [String: Any] = ["skill": "rich-skill"]
+        let result = await tool.call(input: input, context: context)
+
+        // Then: JSON contains both the legacy allowedTools AND the new toolDeclarations
+        XCTAssertFalse(result.isError, "Expected success, got: \(result.content)")
+        let jsonData = result.content.data(using: .utf8)!
+        let json = try JSONSerialization.jsonObject(with: jsonData) as! [String: Any]
+
+        // Backward-compatible allowedTools still present
+        let allowedTools = json["allowedTools"] as? [String]
+        XCTAssertNotNil(allowedTools, "allowedTools rawValues must remain for backward compatibility")
+
+        // New richer field
+        let declsAny = json["toolDeclarations"]
+        XCTAssertNotNil(declsAny,
+                        "toolDeclarations must be present when skill.toolDeclarations is non-nil")
+        let decls = declsAny as? [[String: Any]]
+        XCTAssertEqual(decls?.count, 3, "All three declarations must be serialized")
+
+        // Each entry carries the documented metadata keys
+        let rawNames = decls?.compactMap { $0["rawName"] as? String }
+        XCTAssertEqual(Set(rawNames ?? []),
+                       Set(["Bash", "mcp__srv__search", "Bash(git diff:*)"]),
+                       "rawName must round-trip verbatim")
+
+        // MCP entry must classify as recognizedMCP and have hasToolRestriction == false
+        let mcpEntry = decls?.first { ($0["rawName"] as? String) == "mcp__srv__search" }
+        XCTAssertEqual(mcpEntry?["status"] as? String, "recognizedMCP",
+                       "MCP declaration status must serialize as recognizedMCP")
+        XCTAssertEqual(mcpEntry?["hasToolRestriction"] as? Bool, false,
+                       "MCP declaration has no ToolRestriction enum case")
+
+        // Pattern entry must carry its pattern text
+        let patternEntry = decls?.first { ($0["rawName"] as? String) == "Bash(git diff:*)" }
+        XCTAssertEqual(patternEntry?["pattern"] as? String, "git diff:*",
+                       "Pattern text must be preserved in metadata")
+    }
+
+    /// AC6 [P0]: When a skill has NO `toolDeclarations` (nil), the JSON result behaves
+    /// exactly as today — `allowedTools` rawValues present, `toolDeclarations` ABSENT
+    /// (or nil). Backward compatibility for programmatic / pre-29.4 skills.
+    func testSkillTool_toolDeclarations_absent_whenSkillHasNone() async throws {
+        // Given: a skill with toolRestrictions but toolDeclarations == nil
+        // (the programmatic-skill shape that predates Story 29.4)
+        let skill = Skill(
+            name: "legacy-skill",
+            description: "pre-29.4 programmatic skill",
+            toolRestrictions: [.bash, .read],
+            promptTemplate: "Do legacy things"
+            // toolDeclarations intentionally omitted -> nil
+        )
+        let registry = SkillRegistry()
+        registry.register(skill)
+
+        // When: invoking the SkillTool
+        let tool = createSkillTool(registry: registry)
+        let context = ToolContext(cwd: "/tmp")
+        let input: [String: Any] = ["skill": "legacy-skill"]
+        let result = await tool.call(input: input, context: context)
+
+        // Then: legacy behavior preserved
+        XCTAssertFalse(result.isError, "Expected success, got: \(result.content)")
+        let jsonData = result.content.data(using: .utf8)!
+        let json = try JSONSerialization.jsonObject(with: jsonData) as! [String: Any]
+
+        let allowedTools = json["allowedTools"] as? [String]
+        XCTAssertEqual(Set(allowedTools ?? []), Set(["bash", "read"]),
+                       "allowedTools rawValues must be unchanged for legacy skills")
+
+        // toolDeclarations must NOT introduce a new key for legacy skills
+        if let decls = json["toolDeclarations"] {
+            XCTAssertNil(decls,
+                         "toolDeclarations must be null/absent when skill has no declarations, got: \(decls)")
+        }
+    }
 }

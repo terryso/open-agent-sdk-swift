@@ -126,6 +126,8 @@
 /// - ``ToolDeclaration`` — Lossless tool declaration preserving MCP names, patterns, and unknowns (Story 29.4)
 /// - ``ToolDeclarationStatus`` — How a ``ToolDeclaration`` was classified at parse time
 /// - ``ToolDeclarationDiagnostics`` — Unsupported and parsed-but-not-enforced pattern declarations
+/// - ``ToolFilterDiagnostics`` — Runtime filter diagnostics: unmatched and pattern declarations (Story 29.5)
+/// - ``filterToolsByDeclarations(available:allowed:disallowed:options:)`` — Shared declaration-based tool filter (Story 29.5)
 /// - ``createSkillTool(registry:)`` — Factory for the Skill tool
 /// - ``ToolRestrictionStack`` — Stack-based tool restriction manager for nested skill execution
 ///

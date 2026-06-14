@@ -385,7 +385,10 @@ public enum SkillLoader {
 
         guard !tokens.isEmpty else { return nil }
 
-        let declarations = tokens.map { tokenizeToolDeclaration($0) }
+        // Story 29.5: the tokenizer logic was hoisted into
+        // `ToolDeclaration.parse(_:)` so that both this parser and
+        // `ToolDeclaration.fromToolNames(_:)` share one tokenizer.
+        let declarations = tokens.map { ToolDeclaration.parse($0) }
 
         let unsupported = declarations.filter { $0.status == .unknown }
         let patterned = declarations.filter { $0.pattern != nil }
@@ -398,113 +401,11 @@ public enum SkillLoader {
         return (declarations, diagnostics)
     }
 
-    /// Classifies a single trimmed `allowed-tools` token into a `ToolDeclaration`.
-    ///
-    /// Handles three shapes:
-    /// 1. MCP namespaced: `mcp__<server>__<tool>` → `.recognizedMCP`
-    /// 2. Pattern form: `Bash(git diff:*)` → split base/pattern, classify base
-    /// 3. Plain name: `Read` / `Task` / `UnknownTool` → classify by lookup
-    private static func tokenizeToolDeclaration(_ token: String) -> ToolDeclaration {
-        let rawName = token
-
-        // Split base name and optional `(...)` pattern BEFORE the MCP check so
-        // that an MCP name with a trailing pattern (`mcp__github__list_prs(extra)`)
-        // is classified against its bare namespaced base, not the raw token with
-        // parens baked in (which would never match a registered MCP tool).
-        let (baseName, pattern) = splitBaseAndPattern(token)
-
-        // Detect MCP namespaced form against the base name (pattern already split off).
-        if isMCPNamespacedName(baseName) {
-            return ToolDeclaration(
-                rawName: rawName,
-                normalizedName: baseName,  // MCP full name already normalized
-                pattern: pattern,
-                status: .recognizedMCP,
-                toolRestriction: nil
-            )
-        }
-
-        let lowercasedBase = baseName.lowercased()
-
-        // Recognized Claude Code LLM-facing name? (may or may not have enum case)
-        if let restriction = ClaudeCodeToolNames.restriction(forLowercased: lowercasedBase) {
-            return ToolDeclaration(
-                rawName: rawName,
-                normalizedName: lowercasedBase,
-                pattern: pattern,
-                status: .recognizedSDK,
-                toolRestriction: restriction
-            )
-        }
-
-        // Known Claude Code name without an enum case (e.g. `Task`).
-        if ClaudeCodeToolNames.isKnown(lowercasedBase) {
-            return ToolDeclaration(
-                rawName: rawName,
-                normalizedName: lowercasedBase,
-                pattern: pattern,
-                status: .recognizedSDK,
-                toolRestriction: nil
-            )
-        }
-
-        // Unresolvable — still recorded (non-nil tuple) so caller does not
-        // treat the skill as unrestricted.
-        return ToolDeclaration(
-            rawName: rawName,
-            normalizedName: lowercasedBase,
-            pattern: pattern,
-            status: .unknown,
-            toolRestriction: nil
-        )
-    }
-
-    /// Returns `true` when `name` matches the MCP namespaced convention
-    /// `mcp__<server>__<tool>` (server/tool names may not themselves contain
-    /// `__`, per `MCPToolDefinition`'s precondition).
-    private static func isMCPNamespacedName(_ name: String) -> Bool {
-        guard name.hasPrefix("mcp__") else { return false }
-        let afterPrefix = String(name.dropFirst("mcp__".count))
-        // Must contain exactly one more `__` separator.
-        let parts = afterPrefix.components(separatedBy: "__")
-        guard parts.count == 2 else { return false }
-        let server = parts[0]
-        let tool = parts[1]
-        return !server.isEmpty && !tool.isEmpty
-    }
-
-    /// Splits a token into `(baseName, pattern)`. For `Bash(git diff:*)` →
-    /// `("Bash", "git diff:*")`. For `Read` → `("Read", nil)`.
-    ///
-    /// Edge cases handled (Story 29.4 review):
-    /// - `Bash()` (empty parens) → `("Bash", nil)` — an empty pattern is not a
-    ///   real pattern declaration, so `nil` avoids a phantom entry in
-    ///   `ToolDeclarationDiagnostics.patternDeclarations`.
-    /// - `Bash(` (unclosed paren) → `("Bash", nil)` — the dangling `(` is
-    ///   stripped from the base so a recognized tool is not silently demoted
-    ///   to `.unknown` by a typo. The malformed form is still captured in
-    ///   `rawName` verbatim.
-    private static func splitBaseAndPattern(_ token: String) -> (base: String, pattern: String?) {
-        guard let openParen = token.firstIndex(of: "(") else {
-            // No opening paren at all — plain name.
-            return (token, nil)
-        }
-        let base = String(token[..<openParen])
-        // Need a closing paren at the end to treat the interior as a pattern.
-        guard token.last == ")" else {
-            // Unclosed paren (e.g. `Bash(git diff:*`). Strip the dangling `(` so
-            // the base name stays recognizable, but record no pattern.
-            return (base, nil)
-        }
-        let patternStart = token.index(after: openParen)
-        let patternEnd = token.index(before: token.endIndex)
-        guard patternStart < patternEnd else {
-            // Empty parens `Bash()` — treat as no pattern.
-            return (base, nil)
-        }
-        let pattern = String(token[patternStart..<patternEnd])
-        return (base, pattern)
-    }
+    // Story 29.5: the single-token tokenizer (`tokenizeToolDeclaration`), the
+    // MCP / base-pattern splitters, and the `ClaudeCodeToolNames` lookup were
+    // all hoisted into `ToolDeclaration.parse(_:)` (see
+    // `Sources/OpenAgentSDK/Types/ToolDeclaration.swift`). This file now calls
+    // that shared parser; the duplicated private implementations are removed.
 
     /// Extracts aliases from frontmatter.
     static func extractAliases(_ frontmatter: [String: String]) -> [String] {
@@ -526,49 +427,8 @@ public enum SkillLoader {
         (path as NSString).standardizingPath
     }
 
-    // MARK: - Claude Code Tool Name Recognition
-
-    /// Lookup table for Claude Code LLM-facing tool names recognized at parse
-    /// time even when they have no `ToolRestriction` enum case (e.g. `Task`).
-    ///
-    /// Per Epic 29 implementation step 3: `Read, Write, Edit, Glob, Grep, Bash,
-    /// WebFetch, WebSearch, ToolSearch, AskUser, Skill, Agent, Task`.
-    ///
-    /// `ToolRestriction` raw values are camelCase (`webFetch`, `webSearch`,
-    /// `toolSearch`, `askUser`) while the frontmatter / Claude Code names are
-    /// PascalCase. `restrictionByLowercasedName` bridges the two so the parser
-    /// can match case-insensitively. Names present in this map are recognized
-    /// as SDK names; `knownClaudeCodeOnly` catches names the enum lacks
-    /// (currently just `Task`, per the "ToolRestriction gap" design decision).
-    private enum ClaudeCodeToolNames {
-        /// Lowercased name → ToolRestriction. Covers all enum cases the parser
-        /// should recognize (the full enum is broader, but the parser only
-        /// surfaces names that Claude Code authors write in frontmatter).
-        static let restrictionByLowercasedName: [String: ToolRestriction] = {
-            var map: [String: ToolRestriction] = [:]
-            for restriction in ToolRestriction.allCases {
-                map[restriction.rawValue.lowercased()] = restriction
-            }
-            return map
-        }()
-
-        /// Claude Code names recognized as SDK names but without an enum case.
-        static let knownClaudeCodeOnly: Set<String> = ["task"]
-
-        /// Lowercased set of all recognized Claude Code LLM-facing names
-        /// (enum-mappable + gap names like `Task`).
-        static let knownLowercased: Set<String> = {
-            var set = Set(restrictionByLowercasedName.keys)
-            set.formUnion(knownClaudeCodeOnly)
-            return set
-        }()
-
-        static func restriction(forLowercased lowercasedName: String) -> ToolRestriction? {
-            restrictionByLowercasedName[lowercasedName]
-        }
-
-        static func isKnown(_ lowercasedName: String) -> Bool {
-            knownLowercased.contains(lowercasedName)
-        }
-    }
+    // Story 29.5: the `ClaudeCodeToolNames` private enum was hoisted into
+    // `ToolDeclaration` (file-private storage there). This file now reaches the
+    // name-recognition logic through `ToolDeclaration.parse(_:)`; the duplicate
+    // private enum is removed.
 }
