@@ -1,0 +1,33 @@
+{
+  "version": "1.0.0",
+  "presets": [
+    {
+      "name": "all-claude",
+      "createdAt": "2026-05-20T11:54:02Z",
+      "config": {
+        "complexityBased": false,
+        "default": {
+          "create": {
+            "primary": "claude",
+            "fallback": ""
+          },
+          "dev": {
+            "primary": "claude",
+            "fallback": ""
+          },
+          "auto": {
+            "primary": "claude",
+            "fallback": ""
+          },
+          "review": {
+            "primary": "claude",
+            "fallback": ""
+          }
+        },
+        "auto": {
+          "skip": false
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "env PROJECT_ROOT=/Users/nick/CascadeProjects/open-agent-sdk-swift /Users/nick/CascadeProjects/open-agent-sdk-swift/.claude/skills/bmad-story-automator/scripts/story-automator stop-hook",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
