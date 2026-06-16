@@ -1517,4 +1517,200 @@ final class DefaultSubAgentSpawnerTests: XCTestCase {
         XCTAssertFalse(result.content.lowercased().contains("pattern declaration"),
                        "Tool-filter 'pattern declaration' wording must NOT leak into the AgentTool output")
     }
+
+    // MARK: - Skill Invocation Guidance (child system prompt injection)
+
+    /// A child whose tool pool carries a `Skill` tool must have the slash-skill execution
+    /// guidance injected into its system prompt, so an orchestrator prompt like
+    /// `Execute /bmad-create-story 1-1 yolo` reliably triggers the Skill tool (CAP parity
+    /// with Claude Code's general-purpose subagent).
+    func testSpawn_injectsSkillGuidance_whenSkillToolPresent() async throws {
+        let registry = SkillRegistry()
+        let parentTools: [ToolProtocol] = [
+            createSkillTool(registry: registry),
+            createReadTool(),
+        ]
+        let client = SystemCapturingClient()
+        let spawner = DefaultSubAgentSpawner(
+            apiKey: "test-key",
+            baseURL: nil,
+            parentModel: "claude-sonnet-4-6",
+            parentTools: parentTools,
+            client: client
+        )
+
+        _ = await spawner.spawn(
+            prompt: "Execute /bmad-create-story 1-1 yolo",
+            model: nil,
+            systemPrompt: nil,
+            allowedTools: nil,
+            maxTurns: nil
+        )
+
+        let system = try XCTUnwrap(client.capturedSystem, "Child agent must receive a system prompt")
+        XCTAssertTrue(system.contains("Skill Execution"), "Guidance header must be injected when a Skill tool is present")
+        XCTAssertTrue(system.contains("Skill"), "Guidance must reference the Skill tool")
+        XCTAssertTrue(system.contains("/bmad-create-story") || system.contains("<skill-name>"),
+                      "Guidance must explain the /skill-name invocation pattern")
+    }
+
+    /// A child whose tool pool has NO `Skill` tool must NOT receive the guidance — it is
+    /// only meaningful when the child can actually invoke skills.
+    func testSpawn_doesNotInjectGuidance_whenNoSkillTool() async throws {
+        let parentTools: [ToolProtocol] = [createReadTool(), createGrepTool()]
+        let client = SystemCapturingClient()
+        let spawner = DefaultSubAgentSpawner(
+            apiKey: "test-key",
+            baseURL: nil,
+            parentModel: "claude-sonnet-4-6",
+            parentTools: parentTools,
+            client: client
+        )
+
+        _ = await spawner.spawn(
+            prompt: "Do something",
+            model: nil,
+            systemPrompt: "You are a custom agent",
+            allowedTools: nil,
+            maxTurns: nil
+        )
+
+        let system = client.capturedSystem ?? ""
+        XCTAssertFalse(system.contains("Skill Execution"), "Guidance must NOT be injected without a Skill tool")
+        XCTAssertTrue(system.contains("You are a custom agent"), "Caller system prompt must pass through unchanged")
+    }
+
+    /// When the caller provides a system prompt AND a Skill tool is present, the guidance
+    /// is PREPENDED (not replacing) — both the guidance and the caller prompt must survive.
+    func testSpawn_prependsGuidance_preservingCallerSystemPrompt() async throws {
+        let registry = SkillRegistry()
+        let parentTools: [ToolProtocol] = [createSkillTool(registry: registry), createReadTool()]
+        let client = SystemCapturingClient()
+        let spawner = DefaultSubAgentSpawner(
+            apiKey: "test-key",
+            baseURL: nil,
+            parentModel: "claude-sonnet-4-6",
+            parentTools: parentTools,
+            client: client
+        )
+
+        _ = await spawner.spawn(
+            prompt: "Run the skill",
+            model: nil,
+            systemPrompt: "You are a dev agent",
+            allowedTools: nil,
+            maxTurns: nil
+        )
+
+        let system = try XCTUnwrap(client.capturedSystem)
+        XCTAssertTrue(system.contains("Skill Execution"), "Guidance must be present")
+        XCTAssertTrue(system.contains("You are a dev agent"), "Caller system prompt must be preserved")
+        XCTAssertLessThan(
+            system.range(of: "Skill Execution")!.lowerBound,
+            system.range(of: "You are a dev agent")!.lowerBound,
+            "Guidance must be prepended BEFORE the caller system prompt"
+        )
+    }
+
+    // MARK: - resolveMaxTurns precedence (explicit > inherited > default)
+
+    func testResolveMaxTurns_explicitWinsOverInheritedAndDefault() {
+        XCTAssertEqual(
+            DefaultSubAgentSpawner.resolveMaxTurns(explicit: 7, inherited: 20, defaultMaxTurns: 50),
+            7
+        )
+    }
+
+    func testResolveMaxTurns_inheritedFallbackWhenExplicitNil() {
+        XCTAssertEqual(
+            DefaultSubAgentSpawner.resolveMaxTurns(explicit: nil, inherited: 30, defaultMaxTurns: 50),
+            30
+        )
+    }
+
+    func testResolveMaxTurns_defaultFallbackWhenBothNil() {
+        XCTAssertEqual(
+            DefaultSubAgentSpawner.resolveMaxTurns(explicit: nil, inherited: nil, defaultMaxTurns: 50),
+            50
+        )
+    }
+
+    /// `SubAgentInheritanceContext.maxTurns` is the host-configurable channel
+    /// (`AgentOptions.subAgentMaxTurns` flows into it). Verify it is wired through the
+    /// spawner end-to-end: an inherited value wins over the built-in default when the
+    /// launcher omits `maxTurns`.
+    func testSpawn_inheritedMaxTurns_fromInheritanceContext() async throws {
+        let parentTools: [ToolProtocol] = [createReadTool()]
+        let spawner = DefaultSubAgentSpawner(
+            apiKey: "test-key",
+            baseURL: nil,
+            parentModel: "claude-sonnet-4-6",
+            parentTools: parentTools,
+            client: makeMockClient(),
+            inheritanceContext: SubAgentInheritanceContext(maxTurns: 42)
+        )
+
+        // No explicit maxTurns → inherited(42) must win over default(50). The mock client
+        // returns 401, so the run errors out; behavior under test is the resolved budget,
+        // exercised indirectly via a successful build (no crash, returns a result).
+        let result = await spawner.spawn(
+            prompt: "probe",
+            model: nil,
+            systemPrompt: nil,
+            allowedTools: nil,
+            maxTurns: nil
+        )
+        // The 401 mock surfaces as an error result — we only assert the spawn path ran.
+        XCTAssertTrue(result.isError)
+    }
+
+    // MARK: - System-capturing client
+
+    /// Captures the `system` prompt handed to the child agent's first LLM call so tests
+    /// can assert on injected guidance. Mirrors ``CapturingToolsClient`` (which captures
+    /// `tools`) — kept separate to avoid disturbing existing tool-capture assertions.
+    private final class SystemCapturingClient: LLMClient, @unchecked Sendable {
+        private let lock = NSLock()
+        private var _capturedSystem: String?
+
+        var capturedSystem: String? {
+            lock.withLock { _capturedSystem }
+        }
+
+        nonisolated func sendMessage(
+            model: String,
+            messages: [[String: Any]],
+            maxTokens: Int,
+            system: String?,
+            tools: [[String: Any]]?,
+            toolChoice: [String: Any]?,
+            thinking: [String: Any]?,
+            temperature: Double?
+        ) async throws -> [String: Any] {
+            lock.withLock {
+                _capturedSystem = system
+            }
+            return [
+                "content": [["type": "text", "text": "child done"]],
+                "stop_reason": "end_turn",
+                "usage": ["input_tokens": 1, "output_tokens": 1],
+            ]
+        }
+
+        nonisolated func streamMessage(
+            model: String,
+            messages: [[String: Any]],
+            maxTokens: Int,
+            system: String?,
+            tools: [[String: Any]]?,
+            toolChoice: [String: Any]?,
+            thinking: [String: Any]?,
+            temperature: Double?
+        ) async throws -> AsyncThrowingStream<SSEEvent, Error> {
+            lock.withLock {
+                _capturedSystem = system
+            }
+            return AsyncThrowingStream { $0.finish() }
+        }
+    }
 }

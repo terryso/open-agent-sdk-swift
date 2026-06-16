@@ -1783,7 +1783,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                             env: options.env,
                             sandbox: options.sandbox,
                             eventBus: options.eventBus,
-                            maxSkillRecursionDepth: options.maxSkillRecursionDepth
+                            maxSkillRecursionDepth: options.maxSkillRecursionDepth,
+                            maxTurns: options.subAgentMaxTurns
                         )
                     )
                     let toolResults = await ToolExecutor.executeTools(
@@ -2019,6 +2020,7 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
         let capturedHookRegistry = options.hookRegistry
         let capturedSkillRegistry = options.skillRegistry
         let capturedMaxSkillRecursionDepth = options.maxSkillRecursionDepth
+        let capturedSubAgentMaxTurns = options.subAgentMaxTurns
         // Create restriction stack once so it persists across stream turns
         let capturedRestrictionStack = options.skillRegistry != nil ? ToolRestrictionStack() : nil
         // Session memory: shared with agent instance for cross-query retention
@@ -2683,7 +2685,8 @@ public class Agent: CustomStringConvertible, CustomDebugStringConvertible, @unch
                                     env: capturedEnv,
                                     sandbox: capturedSandbox,
                                     eventBus: capturedEventBus,
-                                    maxSkillRecursionDepth: capturedMaxSkillRecursionDepth
+                                    maxSkillRecursionDepth: capturedMaxSkillRecursionDepth,
+                                    maxTurns: capturedSubAgentMaxTurns
                                 )
                             )
                             let toolResults = await ToolExecutor.executeTools(

@@ -39,6 +39,10 @@ struct SubAgentInheritanceContext: Sendable {
     var sandbox: SandboxSettings?
     var eventBus: EventBus?
     var maxSkillRecursionDepth: Int
+    /// Host-configurable default turn budget for spawned child agents
+    /// (`AgentOptions.subAgentMaxTurns`). Used only when the launcher call does
+    /// not specify `maxTurns` explicitly. See ``DefaultSubAgentSpawner/resolveMaxTurns(explicit:inherited:defaultMaxTurns:)``.
+    var maxTurns: Int?
 
     static let empty = SubAgentInheritanceContext()
 
@@ -51,7 +55,8 @@ struct SubAgentInheritanceContext: Sendable {
         env: [String: String]? = nil,
         sandbox: SandboxSettings? = nil,
         eventBus: EventBus? = nil,
-        maxSkillRecursionDepth: Int = 4
+        maxSkillRecursionDepth: Int = 4,
+        maxTurns: Int? = nil
     ) {
         self.mcpServers = mcpServers
         self.skillRegistry = skillRegistry
@@ -62,6 +67,7 @@ struct SubAgentInheritanceContext: Sendable {
         self.sandbox = sandbox
         self.eventBus = eventBus
         self.maxSkillRecursionDepth = maxSkillRecursionDepth
+        self.maxTurns = maxTurns
     }
 }
 
@@ -206,14 +212,30 @@ final class DefaultSubAgentSpawner: SubAgentSpawner, @unchecked Sendable {
 
         // 3. Build options
         let resolvedModel = model ?? parentModel
-        let resolvedMaxTurns = maxTurns ?? 10
+        let resolvedMaxTurns = Self.resolveMaxTurns(
+            explicit: maxTurns,
+            inherited: inheritanceContext.maxTurns,
+            defaultMaxTurns: 50
+        )
+
+        // Inject the slash-skill execution guidance into the child's system prompt
+        // whenever the child tool pool carries a Skill tool. A child spawned by an
+        // orchestrator (e.g. a BMAD pipeline) receives a prompt like
+        // "Execute /bmad-create-story 1-1 yolo"; without this guidance, weaker models
+        // treat the slash command as chat or a shell command instead of invoking the
+        // Skill tool, so the target skill never loads. Mirrors the host-side guidance
+        // Claude Code injects for its general-purpose subagent (CAP parity).
+        let resolvedSystemPrompt = injectingSkillInvocationGuidance(
+            into: systemPrompt,
+            hasSkillTool: subTools.contains { $0.name == "Skill" }
+        )
 
         var options = AgentOptions(
             apiKey: apiKey,
             model: resolvedModel,
             baseURL: baseURL,
             provider: provider,
-            systemPrompt: systemPrompt,
+            systemPrompt: resolvedSystemPrompt,
             maxTurns: resolvedMaxTurns,
             permissionMode: mode ?? inheritanceContext.permissionMode ?? .default,
             canUseTool: inheritanceContext.canUseTool,
@@ -255,6 +277,47 @@ final class DefaultSubAgentSpawner: SubAgentSpawner, @unchecked Sendable {
     }
 
     // MARK: - Private
+
+    // MARK: Skill Invocation Guidance
+
+    /// Guidance injected into a child agent's system prompt so it reliably invokes the
+    /// `Skill` tool when its task contains a `/skill-name` instruction. Without it, a
+    /// child spawned with an orchestrator-style prompt (e.g.
+    /// `Execute /bmad-create-story 1-1 yolo`) may treat the slash command as chat or a
+    /// shell command and never load the target skill. Mirrors the host-side guidance
+    /// Claude Code provides its general-purpose subagent.
+    private static let childSkillInvocationGuidance = #"""
+
+    ## Skill Execution
+
+    Your task may instruct you to execute a skill written as `/<skill-name> <args>`
+    (for example: `Execute /bmad-create-story 1-1 yolo`). When it does, you MUST invoke
+    the `Skill` tool with `skill="<skill-name>"` and `args="<args>"` — the available
+    skills and their names are listed in the `Skill` tool's description. Do NOT treat
+    the slash command as plain chat text or as a shell command; it is an instruction to
+    run that skill. Once the skill loads, follow its instructions exactly.
+    """#
+
+    /// Prepends ``childSkillInvocationGuidance`` to `systemPrompt` when the child tool
+    /// pool carries a Skill tool; returns `systemPrompt` unchanged otherwise. Preserves
+    /// any caller-provided system prompt (guidance is prepended, not replaced).
+    private func injectingSkillInvocationGuidance(into systemPrompt: String?, hasSkillTool: Bool) -> String? {
+        guard hasSkillTool else { return systemPrompt }
+        let guidance = Self.childSkillInvocationGuidance
+        if let systemPrompt, !systemPrompt.isEmpty {
+            return guidance + "\n\n" + systemPrompt
+        }
+        return guidance
+    }
+
+    /// Resolves the child agent's turn budget with explicit > inherited > default
+    /// precedence. Extracted as `internal static` so the precedence contract is unit-
+    /// testable without driving a full `spawn` round-trip (project rule #27: no real
+    /// I/O in unit tests). The host configures `inherited` via
+    /// `AgentOptions.subAgentMaxTurns` (flowed into `SubAgentInheritanceContext.maxTurns`).
+    internal static func resolveMaxTurns(explicit: Int?, inherited: Int?, defaultMaxTurns: Int) -> Int {
+        explicit ?? inherited ?? defaultMaxTurns
+    }
 
     private func makeChildSkillRegistry(skills: [String]?) -> SkillRegistry? {
         guard let parentRegistry = inheritanceContext.skillRegistry else { return nil }

@@ -309,6 +309,12 @@ public struct AgentOptions: Sendable {
     /// Maximum allowed skill recursion depth. Defaults to 4.
     /// Prevents infinite loops when skills call other skills.
     public var maxSkillRecursionDepth: Int
+    /// Host-configurable default turn budget for spawned child agents. Used only when
+    /// the launcher (Task/Agent tool) call does not specify `maxTurns` explicitly;
+    /// flowed into the child's `SubAgentInheritanceContext.maxTurns`. `nil` falls back
+    /// to the spawner's built-in default. See
+    /// ``DefaultSubAgentSpawner/resolveMaxTurns(explicit:inherited:defaultMaxTurns:)``.
+    public var subAgentMaxTurns: Int?
     /// Maximum number of entries in the file cache. Defaults to 100.
     public var fileCacheMaxEntries: Int
     /// Maximum total size of the file cache in bytes. Defaults to 25 MB.
@@ -555,6 +561,7 @@ public struct AgentOptions: Sendable {
         skillDirectories: [String]? = nil,
         skillNames: [String]? = nil,
         maxSkillRecursionDepth: Int = 4,
+        subAgentMaxTurns: Int? = nil,
         fileCacheMaxEntries: Int = 100,
         fileCacheMaxSizeBytes: Int = 25 * 1024 * 1024,
         fileCacheMaxEntrySizeBytes: Int = 5 * 1024 * 1024,
@@ -630,6 +637,7 @@ public struct AgentOptions: Sendable {
         self.skillDirectories = skillDirectories
         self.skillNames = skillNames
         self.maxSkillRecursionDepth = maxSkillRecursionDepth
+        self.subAgentMaxTurns = subAgentMaxTurns
         self.fileCacheMaxEntries = fileCacheMaxEntries
         self.fileCacheMaxSizeBytes = fileCacheMaxSizeBytes
         self.fileCacheMaxEntrySizeBytes = fileCacheMaxEntrySizeBytes
@@ -752,6 +760,7 @@ public struct AgentOptions: Sendable {
         self.hookRegistry = nil
         self.skillRegistry = nil
         self.maxSkillRecursionDepth = 4
+        self.subAgentMaxTurns = nil
         self.fileCacheMaxEntries = config.fileCacheMaxEntries
         self.fileCacheMaxSizeBytes = config.fileCacheMaxSizeBytes
         self.fileCacheMaxEntrySizeBytes = config.fileCacheMaxEntrySizeBytes
