@@ -469,4 +469,56 @@ final class ToolExecutorMixedScenarioTests: XCTestCase {
         XCTAssertEqual(resultContents, expectedContents,
                        "All results should contain expected content")
     }
+
+    // MARK: - Tool lifecycle event emission (sessionId optionality)
+
+    /// emitToolStarted must publish even when sessionId is nil: subagents (Task/Agent
+    /// spawned children) carry no sessionId/sessionStore, and the previous guard
+    /// silently suppressed ALL of their tool events — making subagent activity invisible
+    /// to EventBus subscribers.
+    func testEmitToolStarted_publishesWhenSessionIdNil() async {
+        let bus = EventBus()
+        let stream = await bus.subscribe(ToolStartedEvent.self)
+
+        await ToolExecutor.emitToolStarted(
+            sessionId: nil,
+            toolName: "Read",
+            toolUseId: "tu-1",
+            input: ["file_path": "/tmp/x.md"],
+            eventBus: bus
+        )
+
+        var received: ToolStartedEvent?
+        for await event in stream {
+            received = event
+            break
+        }
+
+        XCTAssertNotNil(received, "ToolStartedEvent must publish even with nil sessionId (subagents)")
+        XCTAssertEqual(received?.toolName, "Read")
+        XCTAssertNil(received?.sessionId, "sessionId should be preserved as nil")
+    }
+
+    /// Regression guard: emitToolStarted still publishes with a non-nil sessionId.
+    func testEmitToolStarted_publishesWithSessionId() async {
+        let bus = EventBus()
+        let stream = await bus.subscribe(ToolStartedEvent.self)
+
+        await ToolExecutor.emitToolStarted(
+            sessionId: "s-1",
+            toolName: "Bash",
+            toolUseId: "tu-2",
+            input: ["command": "ls"],
+            eventBus: bus
+        )
+
+        var received: ToolStartedEvent?
+        for await event in stream {
+            received = event
+            break
+        }
+
+        XCTAssertEqual(received?.sessionId, "s-1")
+        XCTAssertEqual(received?.toolName, "Bash")
+    }
 }

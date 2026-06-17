@@ -154,7 +154,10 @@ enum ToolExecutor {
         input: Any,
         eventBus: EventBus?
     ) async {
-        guard let eventBus = eventBus, let sessionId = sessionId else { return }
+        // Publish even when sessionId is nil: subagents (spawned via Task/Agent) carry no
+        // sessionId/sessionStore, so requiring it here would silently suppress ALL of their
+        // tool lifecycle events. ToolStartedEvent.sessionId is optional, so nil is valid.
+        guard let eventBus = eventBus else { return }
         let inputStr: String? = {
             if let dict = input as? [String: Any],
                let data = try? JSONSerialization.data(withJSONObject: dict, options: [.sortedKeys]),
@@ -213,8 +216,11 @@ enum ToolExecutor {
             context: context
         )
 
-        // Emit completed/failed event
-        if let eventBus = context.eventBus, let sessionId = context.sessionId {
+        // Emit completed/failed event. sessionId may be nil for subagents (no sessionStore);
+        // publish regardless so child tool lifecycle is observable. Both event sessionId
+        // fields are optional.
+        if let eventBus = context.eventBus {
+            let sessionId = context.sessionId
             if result.isError {
                 await eventBus.publish(ToolFailedEvent(
                     sessionId: sessionId,
