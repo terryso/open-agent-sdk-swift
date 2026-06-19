@@ -44,6 +44,7 @@ let package = Package(
             name: "OpenAgentSDKTests",
             dependencies: ["OpenAgentSDK",
                 .product(name: "Hummingbird", package: "hummingbird"),
+                .product(name: "HummingbirdTesting", package: "hummingbird"),
             ],
             path: "Tests/OpenAgentSDKTests"
         ),
