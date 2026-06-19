@@ -607,7 +607,7 @@ final class SandboxAgentOptionsTests: XCTestCase {
 
 // MARK: - AC7: SandboxPathNormalizer utility
 
-final class SandboxPathNormalizerTests: XCTestCase {
+final class SandboxPathNormalizerTests: TempDirTestCase {
 
     /// AC7 [P0]: Normalizes path with dot-dot traversal.
     func testPathNormalizer_ResolvesDotDot() {
@@ -679,6 +679,102 @@ final class SandboxPathNormalizerTests: XCTestCase {
         // Resolved should not contain ".."
         XCTAssertFalse(normalized.contains(".."),
                         "Path should be resolved without dot-dot segments")
+    }
+
+    // MARK: - Filesystem-isolated edge cases (added to pin down real symlink behavior)
+
+    /// Root path returns root; the trailing-slash guard must not strip it to "".
+    func testPathNormalizer_RootPath_ReturnsRootExactly() {
+        XCTAssertEqual(SandboxPathNormalizer.normalize("/"), "/")
+    }
+
+    /// A real symlink is resolved to its target's absolute path.
+    func testPathNormalizer_ResolvesRealSymlink() throws {
+        let real = (tempDir as NSString).appendingPathComponent("real")
+        let link = (tempDir as NSString).appendingPathComponent("link")
+        try FileManager.default.createDirectory(atPath: real, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(atPath: link, withDestinationPath: real)
+
+        let normalized = SandboxPathNormalizer.normalize(link)
+        XCTAssertEqual(normalized, real,
+                       "Symlink should resolve to target; got \(normalized)")
+        XCTAssertFalse(normalized.hasSuffix("/link"))
+    }
+
+    /// A symlink chain (A → B → real) collapses all the way to the target.
+    func testPathNormalizer_ResolvesSymlinkChain() throws {
+        let real = (tempDir as NSString).appendingPathComponent("realdir")
+        let link1 = (tempDir as NSString).appendingPathComponent("link1")
+        let link2 = (tempDir as NSString).appendingPathComponent("link2")
+        try FileManager.default.createDirectory(atPath: real, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(atPath: link1, withDestinationPath: real)
+        try FileManager.default.createSymbolicLink(atPath: link2, withDestinationPath: link1)
+
+        let normalized = SandboxPathNormalizer.normalize(link2)
+        XCTAssertEqual(normalized, real,
+                       "Symlink chain should collapse fully; got \(normalized)")
+    }
+
+    /// Real filesystem case folding: tempDir + "./sub" should equal tempDir + "/sub".
+    func testPathNormalizer_FoldsDotSegment_RealFS() throws {
+        let sub = (tempDir as NSString).appendingPathComponent("realdir")
+        try FileManager.default.createDirectory(atPath: sub, withIntermediateDirectories: true)
+
+        let input = (tempDir as NSString).appendingPathComponent("./realdir")
+        XCTAssertEqual(SandboxPathNormalizer.normalize(input), sub)
+    }
+
+    /// Real filesystem: tempDir/sub/.. should fold back to tempDir exactly.
+    func testPathNormalizer_FoldsDotDot_RealFS() throws {
+        let parent = (tempDir as NSString).appendingPathComponent("parent")
+        let child = (parent as NSString).appendingPathComponent("child")
+        try FileManager.default.createDirectory(atPath: child, withIntermediateDirectories: true)
+
+        let input = (child as NSString).appendingPathComponent("..")
+        XCTAssertEqual(SandboxPathNormalizer.normalize(input), parent)
+    }
+
+    /// Double slashes inside the path are collapsed.
+    func testPathNormalizer_CollapsesDoubleSlashes_RealFS() throws {
+        let sub = (tempDir as NSString).appendingPathComponent("target")
+        try FileManager.default.createDirectory(atPath: sub, withIntermediateDirectories: true)
+
+        let input = tempDir + "//target"
+        XCTAssertEqual(SandboxPathNormalizer.normalize(input), sub)
+    }
+
+    /// Normalization must be idempotent (normalize(normalize(p)) == normalize(p)).
+    func testPathNormalizer_IsIdempotent() {
+        let once = SandboxPathNormalizer.normalize(tempDir)
+        let twice = SandboxPathNormalizer.normalize(once)
+        XCTAssertEqual(once, twice)
+    }
+
+    /// Path component case is preserved (case-sensitive filesystems matter for sandboxing).
+    func testPathNormalizer_PreservesCase() {
+        let input = (tempDir as NSString).appendingPathComponent("MixedCase-Name")
+        let normalized = SandboxPathNormalizer.normalize(input)
+        XCTAssertTrue(normalized.hasSuffix("MixedCase-Name"),
+                      "Case should be preserved; got \(normalized)")
+    }
+
+    /// Trailing slash on a temp subdirectory is stripped.
+    func testPathNormalizer_StripsTrailingSlash_RealFS() throws {
+        let sub = (tempDir as NSString).appendingPathComponent("trailing")
+        try FileManager.default.createDirectory(atPath: sub, withIntermediateDirectories: true)
+
+        let normalized = SandboxPathNormalizer.normalize(sub + "/")
+        XCTAssertFalse(normalized.hasSuffix("/"))
+        XCTAssertEqual(normalized, sub)
+    }
+
+    /// Non-existent path: still returns a non-empty, slash-stripped, absolute form.
+    func testPathNormalizer_NonExistentPath_DoesNotReturnEmpty() {
+        let input = (tempDir as NSString).appendingPathComponent("does-not-exist") + "/"
+        let normalized = SandboxPathNormalizer.normalize(input)
+        XCTAssertFalse(normalized.isEmpty)
+        XCTAssertFalse(normalized.hasSuffix("/"))
+        XCTAssertTrue(normalized.hasSuffix("does-not-exist"))
     }
 }
 
