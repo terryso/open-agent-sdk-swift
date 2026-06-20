@@ -334,4 +334,104 @@ final class ReviewOrchestratorTests: XCTestCase {
         XCTAssertNotNil(options.reviewScheduleConfig)
         XCTAssertEqual(options.reviewScheduleConfig?.memoryReviewInterval, 2)
     }
+
+    // MARK: - formatMessagesForReview (coverage gap revealed by llvm-cov)
+
+    /// Empty message list yields an empty transcript.
+    func testFormatMessagesForReview_emptyReturnsEmptyString() {
+        XCTAssertEqual(ReviewOrchestrator.formatMessagesForReview([]), "")
+    }
+
+    /// User messages render as "User: <text>".
+    func testFormatMessagesForReview_userMessages() {
+        let msgs: [SDKMessage] = [
+            .userMessage(SDKMessage.UserMessageData(message: "hello")),
+            .userMessage(SDKMessage.UserMessageData(message: "are you there?")),
+        ]
+        let result = ReviewOrchestrator.formatMessagesForReview(msgs)
+        XCTAssertEqual(result, "User: hello\n\nUser: are you there?")
+    }
+
+    /// Assistant messages with non-empty text render as "Assistant: <text>".
+    func testFormatMessagesForReview_assistantWithText() {
+        let msgs: [SDKMessage] = [
+            .assistant(SDKMessage.AssistantData(text: "Hi there", model: "claude-sonnet-4-6", stopReason: "end_turn")),
+        ]
+        let result = ReviewOrchestrator.formatMessagesForReview(msgs)
+        XCTAssertEqual(result, "Assistant: Hi there")
+    }
+
+    /// Assistant messages with empty text are SKIPPED (the `if !data.text.isEmpty` branch).
+    func testFormatMessagesForReview_assistantWithEmptyTextIsSkipped() {
+        let msgs: [SDKMessage] = [
+            .assistant(SDKMessage.AssistantData(text: "", model: "claude-sonnet-4-6", stopReason: "end_turn")),
+            .userMessage(SDKMessage.UserMessageData(message: "after empty")),
+        ]
+        let result = ReviewOrchestrator.formatMessagesForReview(msgs)
+        XCTAssertEqual(result, "User: after empty",
+                       "Empty assistant message must not contribute a line")
+    }
+
+    /// Tool results render as "Tool Result: <content>".
+    func testFormatMessagesForReview_toolResults() {
+        let msgs: [SDKMessage] = [
+            .toolResult(SDKMessage.ToolResultData(toolUseId: "tu_1", content: "{\"ok\":true}", isError: false)),
+        ]
+        let result = ReviewOrchestrator.formatMessagesForReview(msgs)
+        XCTAssertEqual(result, "Tool Result: {\"ok\":true}")
+    }
+
+    /// Tool results marked as errors are STILL formatted (the function does not branch on isError).
+    func testFormatMessagesForReview_toolResultErrorIsStillFormatted() {
+        let msgs: [SDKMessage] = [
+            .toolResult(SDKMessage.ToolResultData(toolUseId: "tu_1", content: "boom", isError: true)),
+        ]
+        let result = ReviewOrchestrator.formatMessagesForReview(msgs)
+        XCTAssertEqual(result, "Tool Result: boom")
+    }
+
+    /// Other SDKMessage cases (system, result, toolUse, toolProgress, etc.) hit the
+    /// `default: break` branch and contribute nothing.
+    func testFormatMessagesForReview_otherCasesAreDropped() {
+        let resultData = SDKMessage.ResultData(
+            subtype: .success,
+            text: "final answer",
+            usage: nil,
+            numTurns: 1,
+            durationMs: 100
+        )
+        let msgs: [SDKMessage] = [
+            .result(resultData),
+            .toolUse(SDKMessage.ToolUseData(toolName: "Bash", toolUseId: "tu_1", input: "{}")),
+        ]
+        let result = ReviewOrchestrator.formatMessagesForReview(msgs)
+        XCTAssertEqual(result, "",
+                       "result/toolUse cases must hit default branch and contribute nothing")
+    }
+
+    /// Mixed conversation renders in order with \n\n separators.
+    func testFormatMessagesForReview_mixedConversationInOrder() {
+        let msgs: [SDKMessage] = [
+            .userMessage(SDKMessage.UserMessageData(message: "first")),
+            .assistant(SDKMessage.AssistantData(text: "response", model: "claude-sonnet-4-6", stopReason: "end_turn")),
+            .toolResult(SDKMessage.ToolResultData(toolUseId: "tu_1", content: "ok", isError: false)),
+            .userMessage(SDKMessage.UserMessageData(message: "second")),
+        ]
+        let result = ReviewOrchestrator.formatMessagesForReview(msgs)
+        XCTAssertEqual(result,
+                       "User: first\n\nAssistant: response\n\nTool Result: ok\n\nUser: second")
+    }
+
+    /// ToolResult content with JSON / multiline text is preserved verbatim.
+    func testFormatMessagesForReview_preservesMultilineToolResultContent() {
+        let msgs: [SDKMessage] = [
+            .toolResult(SDKMessage.ToolResultData(
+                toolUseId: "tu_1",
+                content: "line1\nline2\nline3",
+                isError: false
+            )),
+        ]
+        let result = ReviewOrchestrator.formatMessagesForReview(msgs)
+        XCTAssertEqual(result, "Tool Result: line1\nline2\nline3")
+    }
 }

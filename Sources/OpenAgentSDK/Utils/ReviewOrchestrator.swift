@@ -242,10 +242,14 @@ public struct ReviewOrchestrator: Sendable {
         return actions
     }
 
-    // MARK: - Private Helpers
+    // MARK: - Internal Helpers (exposed for unit testing)
 
     /// Formats messages into a readable transcript for the review agent.
-    private static func formatMessagesForReview(_ messages: [SDKMessage]) -> String {
+    ///
+    /// Internal (not private) so unit tests can exercise the per-SDKMessage
+    /// branching directly without needing a full mock LLM client setup.
+    /// Logic is unchanged.
+    static func formatMessagesForReview(_ messages: [SDKMessage]) -> String {
         var lines: [String] = []
         for msg in messages {
             switch msg {
