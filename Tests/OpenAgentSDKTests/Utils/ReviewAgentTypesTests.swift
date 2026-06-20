@@ -123,4 +123,43 @@ final class ReviewAgentTypesTests: XCTestCase {
         XCTAssertEqual(result.summary, "Nothing to save.")
         XCTAssertTrue(result.reviewMessages.isEmpty)
     }
+
+    // MARK: - didSet precondition paths (covers lines 20, 26)
+
+    /// Setting maxTurns via property assignment triggers the didSet
+    /// precondition (must be > 0). Valid value → no crash.
+    func testConfig_maxTurnsSetter_acceptsPositiveValue() {
+        var config = ReviewAgentConfig()
+        config.maxTurns = 32
+        XCTAssertEqual(config.maxTurns, 32)
+    }
+
+    /// Setting allowedTools via property assignment triggers the didSet
+    /// precondition (must be non-empty). Valid value → no crash.
+    func testConfig_allowedToolsSetter_acceptsNonEmptyArray() {
+        var config = ReviewAgentConfig()
+        config.allowedTools = ["review_save_memory", "review_update_skill"]
+        XCTAssertEqual(config.allowedTools.count, 2)
+    }
+
+    /// Setting promptSuffix via property assignment.
+    func testConfig_promptSuffixSetter_acceptsNilAndValue() {
+        var config = ReviewAgentConfig()
+        XCTAssertNil(config.promptSuffix)
+        config.promptSuffix = "Focus on memory facts."
+        XCTAssertEqual(config.promptSuffix, "Focus on memory facts.")
+        config.promptSuffix = nil
+        XCTAssertNil(config.promptSuffix)
+    }
+
+    /// Init with custom promptSuffix.
+    func testConfig_initWithPromptSuffix() {
+        let config = ReviewAgentConfig(promptSuffix: "Additional guidance")
+        XCTAssertEqual(config.promptSuffix, "Additional guidance")
+    }
+
+    /// Default config has promptSuffix == nil.
+    func testConfig_defaultPromptSuffix_isNil() {
+        XCTAssertNil(ReviewAgentConfig().promptSuffix)
+    }
 }

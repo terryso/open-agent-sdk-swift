@@ -112,4 +112,81 @@ final class MCPConfigTests: XCTestCase {
         let b = McpServerConfig.sse(McpSseConfig(url: "http://localhost"))
         XCTAssertNotEqual(a, b)
     }
+
+    // MARK: - McpSdkServerConfig equality (covers == operator)
+
+    /// Two McpSdkServerConfigs with the same server reference AND matching
+    /// name/version are equal.
+    func testMcpSdkServerConfig_equality_sameServerSameFields() async {
+        let server = InProcessMCPServer(name: "x", version: "1.0", tools: [])
+        let a = McpSdkServerConfig(name: "n", version: "v", server: server)
+        let b = McpSdkServerConfig(name: "n", version: "v", server: server)
+        XCTAssertEqual(a, b,
+                       "Same server instance + identical name/version must be equal")
+    }
+
+    /// Same server reference but different name → not equal.
+    func testMcpSdkServerConfig_inequality_sameServerDifferentName() async {
+        let server = InProcessMCPServer(name: "x", version: "1.0", tools: [])
+        let a = McpSdkServerConfig(name: "n1", version: "v", server: server)
+        let b = McpSdkServerConfig(name: "n2", version: "v", server: server)
+        XCTAssertNotEqual(a, b)
+    }
+
+    /// Same server reference but different version → not equal.
+    func testMcpSdkServerConfig_inequality_sameServerDifferentVersion() async {
+        let server = InProcessMCPServer(name: "x", version: "1.0", tools: [])
+        let a = McpSdkServerConfig(name: "n", version: "v1", server: server)
+        let b = McpSdkServerConfig(name: "n", version: "v2", server: server)
+        XCTAssertNotEqual(a, b)
+    }
+
+    /// Different server instances (even with same name/version) → not equal.
+    /// This pins down the ObjectIdentifier-based equality contract.
+    func testMcpSdkServerConfig_inequality_differentServerInstances() async {
+        let server1 = InProcessMCPServer(name: "x", version: "1.0", tools: [])
+        let server2 = InProcessMCPServer(name: "x", version: "1.0", tools: [])
+        let a = McpSdkServerConfig(name: "n", version: "v", server: server1)
+        let b = McpSdkServerConfig(name: "n", version: "v", server: server2)
+        XCTAssertNotEqual(a, b,
+                          "Different server actor instances must not be equal, even with matching name/version")
+    }
+
+    /// McpServerConfig.sdk case wraps McpSdkServerConfig and inherits its equality.
+    func testMcpServerConfig_sdkCase_equalityFollowsServerIdentity() async {
+        let server = InProcessMCPServer(name: "x", version: "1.0", tools: [])
+        let a = McpServerConfig.sdk(McpSdkServerConfig(name: "n", version: "v", server: server))
+        let b = McpServerConfig.sdk(McpSdkServerConfig(name: "n", version: "v", server: server))
+        XCTAssertEqual(a, b)
+    }
+
+    /// init rejects names containing "__" (would create ambiguous tool namespacing).
+    func testMcpSdkServerConfig_init_rejectsDoubleUnderscoreName() async {
+        let server = InProcessMCPServer(name: "x", version: "1.0", tools: [])
+        // precondition failure is a process crash, not a throwable. We can't
+        // catch it in XCTest, so we only verify the happy path here; the
+        // rejection contract is documented in the precondition message.
+        let valid = McpSdkServerConfig(name: "single-segment", version: "1.0", server: server)
+        XCTAssertEqual(valid.name, "single-segment")
+    }
+
+    // MARK: - McpClaudeAIProxyConfig equality
+
+    func testMcpClaudeAIProxyConfig_equality() {
+        let a = McpClaudeAIProxyConfig(url: "https://claude.ai/proxy", id: "srv-1")
+        let b = McpClaudeAIProxyConfig(url: "https://claude.ai/proxy", id: "srv-1")
+        XCTAssertEqual(a, b)
+    }
+
+    func testMcpClaudeAIProxyConfig_inequality_differentUrl() {
+        let a = McpClaudeAIProxyConfig(url: "https://claude.ai/a", id: "srv-1")
+        let b = McpClaudeAIProxyConfig(url: "https://claude.ai/b", id: "srv-1")
+        XCTAssertNotEqual(a, b)
+    }
+
+    func testMcpClaudeAIProxyConfig_inequality_differentId() {
+        let a = McpClaudeAIProxyConfig(url: "https://claude.ai/proxy", id: "srv-1")
+        let b = McpClaudeAIProxyConfig(url: "https://claude.ai/proxy", id: "srv-2")
+        XCTAssertNotEqual(a, b)
+    }
 }

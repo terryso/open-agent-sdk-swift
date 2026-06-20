@@ -434,4 +434,175 @@ final class OpenAIClientTests: XCTestCase {
         XCTAssertEqual(function?["name"] as? String, "bash")
         XCTAssertNotNil(function?["parameters"])
     }
+
+    // ================================================================
+    // MARK: - convertAssistantContent (Anthropic → OpenAI message conversion)
+    // ================================================================
+    //
+    // llvm-cov showed convertAssistantContent (40 lines) entirely uncovered.
+    // This function is called from convertMessages (the request path), so
+    // existing tests — which only verify the response — never exercise it.
+    // We capture request bodies via MockURLProtocol.lastRequest and assert
+    // the converted shape.
+
+    private func captureSentMessages(_ assistantMessage: [String: Any]) async throws -> [[String: Any]]? {
+        let responseBody = makeOpenAIResponse(content: "ok")
+        registerMock(url: "https://api.test.com/v1/chat/completions", body: responseBody)
+
+        let client = makeOpenAISUT()
+        _ = try await client.sendMessage(
+            model: "gpt-4",
+            messages: [["role": "user", "content": "hi"], assistantMessage],
+            maxTokens: 100
+        )
+
+        guard let body = MockURLProtocol.lastRequest?.httpBody,
+              let json = try? JSONSerialization.jsonObject(with: body) as? [String: Any],
+              let messages = json["messages"] as? [[String: Any]] else {
+            return nil
+        }
+        return messages
+    }
+
+    /// Assistant message with tool_use blocks → produces OpenAI tool_calls.
+    func testConvertAssistantContent_toolUseBlocks_becomeToolCalls() async throws {
+        let messages = try await captureSentMessages([
+            "role": "assistant",
+            "content": [
+                ["type": "tool_use", "id": "call_1", "name": "get_weather", "input": ["city": "SF"]],
+            ],
+        ])
+
+        let assistant = messages?.first { $0["role"] as? String == "assistant" }
+        XCTAssertNotNil(assistant)
+        let toolCalls = assistant?["tool_calls"] as? [[String: Any]]
+        XCTAssertEqual(toolCalls?.count, 1)
+        XCTAssertEqual(toolCalls?.first?["id"] as? String, "call_1")
+        XCTAssertEqual(toolCalls?.first?["type"] as? String, "function")
+        let fn = toolCalls?.first?["function"] as? [String: Any]
+        XCTAssertEqual(fn?["name"] as? String, "get_weather")
+        // arguments must be a JSON string of the input dict
+        let args = fn?["arguments"] as? String
+        XCTAssertNotNil(args)
+        let parsedArgs = try? JSONSerialization.jsonObject(with: Data(args!.utf8)) as? [String: Any]
+        XCTAssertEqual(parsedArgs?["city"] as? String, "SF")
+    }
+
+    /// Assistant message with text content only → no tool_calls, content preserved.
+    func testConvertAssistantContent_textOnly_preservesContent() async throws {
+        let messages = try await captureSentMessages([
+            "role": "assistant",
+            "content": [
+                ["type": "text", "text": "hello there"],
+            ],
+        ])
+
+        let assistant = messages?.first { $0["role"] as? String == "assistant" }
+        XCTAssertEqual(assistant?["content"] as? String, "hello there")
+        XCTAssertNil(assistant?["tool_calls"],
+                     "No tool_use blocks should not generate tool_calls")
+    }
+
+    /// Assistant message with mixed text + tool_use → both content and tool_calls.
+    func testConvertAssistantContent_mixedTextAndToolUse_keepsBoth() async throws {
+        let messages = try await captureSentMessages([
+            "role": "assistant",
+            "content": [
+                ["type": "text", "text": "let me check"],
+                ["type": "tool_use", "id": "c1", "name": "search", "input": [:]],
+            ],
+        ])
+
+        let assistant = messages?.first { $0["role"] as? String == "assistant" }
+        XCTAssertEqual(assistant?["content"] as? String, "let me check")
+        let toolCalls = assistant?["tool_calls"] as? [[String: Any]]
+        XCTAssertEqual(toolCalls?.count, 1)
+    }
+
+    /// Assistant message with empty text + tool_use → content is nil (not empty string).
+    func testConvertAssistantContent_emptyTextWithToolUse_dropsContentField() async throws {
+        let messages = try await captureSentMessages([
+            "role": "assistant",
+            "content": [
+                ["type": "text", "text": ""],
+                ["type": "tool_use", "id": "c1", "name": "x", "input": [:]],
+            ],
+        ])
+
+        let assistant = messages?.first { $0["role"] as? String == "assistant" }
+        XCTAssertNil(assistant?["content"],
+                     "Empty text content with tool_use must be dropped (set to nil)")
+        XCTAssertNotNil(assistant?["tool_calls"])
+    }
+
+    /// Assistant message with plain String content (not array) → preserved as string.
+    func testConvertAssistantContent_plainStringContent_preservedAsString() async throws {
+        let messages = try await captureSentMessages([
+            "role": "assistant",
+            "content": "plain string reply",
+        ])
+
+        let assistant = messages?.first { $0["role"] as? String == "assistant" }
+        XCTAssertEqual(assistant?["content"] as? String, "plain string reply")
+        XCTAssertNil(assistant?["tool_calls"])
+    }
+
+    /// Assistant message with nil content → empty string content fallback.
+    func testConvertAssistantContent_nilContent_returnsEmptyContent() async throws {
+        let messages = try await captureSentMessages([
+            "role": "assistant",
+            "content": nil,
+        ] as [String: Any])
+
+        let assistant = messages?.first { $0["role"] as? String == "assistant" }
+        XCTAssertEqual(assistant?["content"] as? String, "",
+                       "nil content must fall back to empty string per the guard branch")
+    }
+
+    /// Tool_use block missing id → falls back to "call_<index>".
+    func testConvertAssistantContent_toolUseMissingId_usesIndexFallback() async throws {
+        let messages = try await captureSentMessages([
+            "role": "assistant",
+            "content": [
+                ["type": "tool_use", "name": "no_id_tool", "input": [:]],
+            ],
+        ])
+
+        let assistant = messages?.first { $0["role"] as? String == "assistant" }
+        let toolCalls = assistant?["tool_calls"] as? [[String: Any]]
+        XCTAssertEqual(toolCalls?.first?["id"] as? String, "call_0",
+                       "Missing id must use 'call_<index>' fallback")
+    }
+
+    /// Tool_use block missing name → empty string name fallback.
+    func testConvertAssistantContent_toolUseMissingName_usesEmptyStringFallback() async throws {
+        let messages = try await captureSentMessages([
+            "role": "assistant",
+            "content": [
+                ["type": "tool_use", "id": "c1", "input": [:]],
+            ],
+        ])
+
+        let assistant = messages?.first { $0["role"] as? String == "assistant" }
+        let fn = (assistant?["tool_calls"] as? [[String: Any]])?.first?["function"] as? [String: Any]
+        XCTAssertEqual(fn?["name"] as? String, "",
+                       "Missing name must fall back to empty string")
+    }
+
+    /// Multiple tool_use blocks → index reflects enumeration order.
+    func testConvertAssistantContent_multipleToolUses_preservesOrder() async throws {
+        let messages = try await captureSentMessages([
+            "role": "assistant",
+            "content": [
+                ["type": "tool_use", "id": "first", "name": "a", "input": [:]],
+                ["type": "tool_use", "id": "second", "name": "b", "input": [:]],
+            ],
+        ])
+
+        let assistant = messages?.first { $0["role"] as? String == "assistant" }
+        let toolCalls = assistant?["tool_calls"] as? [[String: Any]]
+        XCTAssertEqual(toolCalls?.count, 2)
+        XCTAssertEqual(toolCalls?[0]["id"] as? String, "first")
+        XCTAssertEqual(toolCalls?[1]["id"] as? String, "second")
+    }
 }

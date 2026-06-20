@@ -935,3 +935,249 @@ final class CompactMetadataTests: XCTestCase {
         XCTAssertEqual(result.error, "Compaction failed (consecutive failures: 1)")
     }
 }
+
+// MARK: - CompactSessionMemoryExtractionTests
+
+/// Covers `extractSessionMemory(client:model:summary:into:retryConfig:)` —
+/// the largest remaining gap in Compact.swift (llvm-cov showed 55/61 lines
+/// uncovered). Three branches: short summary (< 200 chars, fallback),
+/// long summary + valid JSON (parse + append each item), long summary +
+/// failure (LLM throw or malformed JSON → fallback).
+final class CompactSessionMemoryExtractionTests: XCTestCase {
+
+    // MARK: - Helpers
+
+    /// Build an LLM response whose text content is `text`.
+    private func makeTextResponse(text: String) -> Data {
+        let response: [String: Any] = [
+            "id": "msg_extract_\(UUID().uuidString.prefix(8))",
+            "type": "message",
+            "role": "assistant",
+            "content": [["type": "text", "text": text]],
+            "model": "claude-sonnet-4-6",
+            "stop_reason": "end_turn",
+            "stop_sequence": NSNull(),
+            "usage": ["input_tokens": 100, "output_tokens": 50]
+        ]
+        return try! JSONSerialization.data(withJSONObject: response, options: [])
+    }
+
+    private func makeClient() -> AnthropicClient {
+        let urlSession = makeMockURLSession(protocolClass: CompactMockURLProtocol.self)
+        return AnthropicClient(apiKey: "sk-test-key", baseURL: nil, urlSession: urlSession)
+    }
+
+    private func fastRetry() -> RetryConfig {
+        RetryConfig(maxRetries: 0, baseDelayMs: 0, maxDelayMs: 0, retryableStatusCodes: [])
+    }
+
+    private func registerResponses(_ responses: [(Int, [String: String], Data)]) {
+        CompactMockURLProtocol.sequentialResponses = responses
+        CompactMockURLProtocol.responseIndex = 0
+    }
+
+    // MARK: - Short summary path (< 200 chars)
+
+    func testExtractSessionMemory_shortSummary_skipsLLMAndStoresFallback() async {
+        let client = makeClient()
+        let memory = SessionMemory()
+        let shortSummary = "User prefers concise answers."
+
+        // No mock responses registered — if LLM is called, the test will fail.
+        // Short-circuit path should bypass LLM entirely.
+        await extractSessionMemory(
+            client: client,
+            model: "claude-sonnet-4-6",
+            summary: shortSummary,
+            into: memory,
+            retryConfig: fastRetry()
+        )
+
+        let formatted = memory.formatForPrompt()
+        XCTAssertNotNil(formatted, "Fallback entry should be appended")
+        XCTAssertTrue(formatted?.contains(shortSummary) ?? false,
+                      "Short summary must be stored verbatim as fallback")
+        XCTAssertTrue(formatted?.contains("[decision]") ?? false,
+                      "Fallback entries default to 'decision' category")
+    }
+
+    // MARK: - Long summary + valid JSON
+
+    func testExtractSessionMemory_longSummaryWithValidJSON_appendsAllItems() async {
+        let client = makeClient()
+        let memory = SessionMemory()
+
+        // Long summary (> 200 chars) + LLM returns valid JSON array
+        let longSummary = String(repeating: "User discussed implementation details about the project. ", count: 10)
+        let jsonResponse = """
+        [
+          {"category": "decision", "summary": "Use auto-compaction", "context": "src/compact.swift"},
+          {"category": "preference", "summary": "Prefer Chinese docs", "context": ""},
+          {"category": "constraint", "summary": "No external deps", "context": "Package.swift"}
+        ]
+        """
+        registerResponses([(200, ["content-type": "application/json"], makeTextResponse(text: jsonResponse))])
+
+        await extractSessionMemory(
+            client: client,
+            model: "claude-sonnet-4-6",
+            summary: longSummary,
+            into: memory,
+            retryConfig: fastRetry()
+        )
+
+        let formatted = memory.formatForPrompt() ?? ""
+        XCTAssertTrue(formatted.contains("Use auto-compaction"))
+        XCTAssertTrue(formatted.contains("[decision]"))
+        XCTAssertTrue(formatted.contains("Prefer Chinese docs"))
+        XCTAssertTrue(formatted.contains("[preference]"))
+        XCTAssertTrue(formatted.contains("No external deps"))
+        XCTAssertTrue(formatted.contains("[constraint]"))
+    }
+
+    func testExtractSessionMemory_longSummaryWithJSONInCodeFences_stripsFencesAndParses() async {
+        // LLM responses commonly wrap JSON in ``` fences. extractSessionMemory
+        // must strip them before parsing (via stripCodeFences).
+        let client = makeClient()
+        let memory = SessionMemory()
+        let longSummary = String(repeating: "x", count: 250)
+
+        let jsonInFence = "```json\n[{\"category\":\"decision\",\"summary\":\"fenced\",\"context\":\"\"}]\n```"
+        registerResponses([(200, ["content-type": "application/json"], makeTextResponse(text: jsonInFence))])
+
+        await extractSessionMemory(
+            client: client,
+            model: "claude-sonnet-4-6",
+            summary: longSummary,
+            into: memory,
+            retryConfig: fastRetry()
+        )
+
+        let formatted = memory.formatForPrompt() ?? ""
+        XCTAssertTrue(formatted.contains("fenced"),
+                      "JSON wrapped in code fences must still be parsed")
+    }
+
+    // MARK: - Long summary + edge cases in JSON
+
+    func testExtractSessionMemory_unknownCategoryDefaultsToDecision() async {
+        let client = makeClient()
+        let memory = SessionMemory()
+        let longSummary = String(repeating: "y", count: 250)
+
+        let json = """
+        [{"category": "bogus-category", "summary": "should default", "context": ""}]
+        """
+        registerResponses([(200, ["content-type": "application/json"], makeTextResponse(text: json))])
+
+        await extractSessionMemory(
+            client: client, model: "claude-sonnet-4-6",
+            summary: longSummary, into: memory, retryConfig: fastRetry()
+        )
+
+        let formatted = memory.formatForPrompt() ?? ""
+        XCTAssertTrue(formatted.contains("[decision]"),
+                      "Unknown category must fall back to 'decision'")
+        XCTAssertTrue(formatted.contains("should default"))
+    }
+
+    func testExtractSessionMemory_emptySummaryFieldSkipsItem() async {
+        let client = makeClient()
+        let memory = SessionMemory()
+        let longSummary = String(repeating: "z", count: 250)
+
+        let json = """
+        [
+          {"category": "decision", "summary": "", "context": "skip me"},
+          {"category": "preference", "summary": "keep me", "context": ""}
+        ]
+        """
+        registerResponses([(200, ["content-type": "application/json"], makeTextResponse(text: json))])
+
+        await extractSessionMemory(
+            client: client, model: "claude-sonnet-4-6",
+            summary: longSummary, into: memory, retryConfig: fastRetry()
+        )
+
+        let formatted = memory.formatForPrompt() ?? ""
+        XCTAssertFalse(formatted.contains("skip me"),
+                       "Item with empty summary must be skipped")
+        XCTAssertTrue(formatted.contains("keep me"))
+    }
+
+    func testExtractSessionMemory_missingFieldsUseDefaults() async {
+        let client = makeClient()
+        let memory = SessionMemory()
+        let longSummary = String(repeating: "w", count: 250)
+
+        // Only summary field present — category and context should default.
+        let json = """
+        [{"summary": "bare minimum"}]
+        """
+        registerResponses([(200, ["content-type": "application/json"], makeTextResponse(text: json))])
+
+        await extractSessionMemory(
+            client: client, model: "claude-sonnet-4-6",
+            summary: longSummary, into: memory, retryConfig: fastRetry()
+        )
+
+        let formatted = memory.formatForPrompt() ?? ""
+        XCTAssertTrue(formatted.contains("[decision]"),
+                      "Missing category must default to 'decision'")
+        XCTAssertTrue(formatted.contains("bare minimum"))
+    }
+
+    // MARK: - Long summary + failure paths
+
+    func testExtractSessionMemory_invalidJSONResponse_fallsBackToRawSummary() async {
+        let client = makeClient()
+        let memory = SessionMemory()
+        let longSummary = String(repeating: "a", count: 250) + " UNIQUE_MARKER"
+
+        registerResponses([(200, ["content-type": "application/json"], makeTextResponse(text: "this is not JSON"))])
+
+        await extractSessionMemory(
+            client: client, model: "claude-sonnet-4-6",
+            summary: longSummary, into: memory, retryConfig: fastRetry()
+        )
+
+        let formatted = memory.formatForPrompt() ?? ""
+        XCTAssertTrue(formatted.contains("UNIQUE_MARKER"),
+                      "When JSON parsing fails, the raw summary must be appended as fallback")
+    }
+
+    func testExtractSessionMemory_llmThrows_fallsBackToRawSummary() async {
+        let client = makeClient()
+        let memory = SessionMemory()
+        let longSummary = String(repeating: "b", count: 250) + " FALLBACK_MARKER"
+
+        // 500 response triggers withRetry exhaustion → throws → caught → fallback
+        registerResponses([(500, ["content-type": "application/json"], Data())])
+
+        await extractSessionMemory(
+            client: client, model: "claude-sonnet-4-6",
+            summary: longSummary, into: memory, retryConfig: fastRetry()
+        )
+
+        let formatted = memory.formatForPrompt() ?? ""
+        XCTAssertTrue(formatted.contains("FALLBACK_MARKER"),
+                      "When LLM throws, the raw summary must be appended as fallback")
+    }
+
+    func testExtractSessionMemory_emptyResponseText_fallsBackToRawSummary() async {
+        let client = makeClient()
+        let memory = SessionMemory()
+        let longSummary = String(repeating: "c", count: 250) + " EMPTY_TEXT_MARKER"
+
+        // LLM returns empty text — JSON parse fails on empty string → fallback
+        registerResponses([(200, ["content-type": "application/json"], makeTextResponse(text: ""))])
+
+        await extractSessionMemory(
+            client: client, model: "claude-sonnet-4-6",
+            summary: longSummary, into: memory, retryConfig: fastRetry()
+        )
+
+        let formatted = memory.formatForPrompt() ?? ""
+        XCTAssertTrue(formatted.contains("EMPTY_TEXT_MARKER"))
+    }
+}
