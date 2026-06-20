@@ -660,6 +660,231 @@ final class AgentMCPServerTests: XCTestCase {
         await client1.disconnect()
         await client2.disconnect()
     }
+
+    // ================================================================
+    // MARK: - agent_prompt handler branches (covers lines 162-169)
+    // ================================================================
+    //
+    // llvm-cov showed the agent_prompt handler closure body (the four
+    // branches: missing task, no agent, agent errorDuringExecution, success)
+    // was partially uncovered. The existing missingTask test already covers
+    // the first branch; these tests cover the other three.
+
+    /// agent_prompt with a valid task but no agent configured (createSession
+    /// never sets agent — only run(agent:) does) returns an error explaining
+    /// how to fix it.
+    func testAgentMCPServer_agentPrompt_validTaskButNoAgent_returnsNoAgentError() async throws {
+        let (_, mcpServer, client) = try await createConnectedSession(tools: [])
+
+        let result = try await client.callTool(
+            name: "agent_prompt",
+            arguments: ["task": .string("do something")]
+        )
+
+        XCTAssertEqual(result.isError, true,
+                       "Without an agent, agent_prompt should surface an error")
+        // We don't pin the exact wording (that lives in ToolExecutionError.message),
+        // but MCP must mark the call as an error.
+
+        await mcpServer.stop()
+        await client.disconnect()
+    }
+
+    /// agent_prompt with non-string task type also fails the type-coercion
+    /// guard (case .string pattern doesn't match).
+    func testAgentMCPServer_agentPrompt_nonStringTask_returnsError() async throws {
+        let (_, mcpServer, client) = try await createConnectedSession(tools: [])
+
+        let result = try await client.callTool(
+            name: "agent_prompt",
+            arguments: ["task": .int(42)]
+        )
+
+        XCTAssertEqual(result.isError, true,
+                       "Non-string task value must fail the pattern match")
+
+        await mcpServer.stop()
+        await client.disconnect()
+    }
+
+    /// agent_prompt with extra args alongside task is accepted by the handler
+    /// (it only checks task, ignoring extras). Verifies the no-agent branch
+    /// fires regardless of how many extra fields are passed.
+    func testAgentMCPServer_agentPrompt_extraArgumentsIgnoredWhenNoAgent() async throws {
+        let (_, mcpServer, client) = try await createConnectedSession(tools: [])
+
+        let result = try await client.callTool(
+            name: "agent_prompt",
+            arguments: [
+                "task": .string("hello"),
+                "extra": .string("ignored"),
+            ]
+        )
+
+        XCTAssertEqual(result.isError, true)
+
+        await mcpServer.stop()
+        await client.disconnect()
+    }
+
+    /// Verify the no-agent error path is consistent across multiple calls —
+    /// the handler closure must not cache state between invocations.
+    func testAgentMCPServer_agentPrompt_multipleCallsEachReturnNoAgentError() async throws {
+        let (_, mcpServer, client) = try await createConnectedSession(tools: [])
+
+        for _ in 0..<3 {
+            let result = try await client.callTool(
+                name: "agent_prompt",
+                arguments: ["task": .string("repeat")]
+            )
+            XCTAssertEqual(result.isError, true,
+                           "Each call without an agent should consistently error")
+        }
+
+        await mcpServer.stop()
+        await client.disconnect()
+    }
+
+    /// After one session ends, a new session on the same server still has
+    /// no agent (agent is only set via run(agent:) which we never call here).
+    /// This pins down the agent-state isolation: state does not leak from
+    /// any prior hypothetical run(agent:) into createSession() paths.
+    func testAgentMCPServer_agentPrompt_freshSessionStillHasNoAgent() async throws {
+        let agentServer = AgentMCPServer(name: "isolation", version: "1.0.0", tools: [])
+
+        // First session
+        let (mcpServer1, transport1) = try await agentServer.createSession()
+        let client1 = Client(name: "c1", version: "1.0")
+        try await client1.connect(transport: transport1)
+        let r1 = try await client1.callTool(name: "agent_prompt", arguments: ["task": .string("x")])
+        XCTAssertEqual(r1.isError, true)
+        await mcpServer1.stop()
+        await client1.disconnect()
+
+        // Second session, same server
+        let (mcpServer2, transport2) = try await agentServer.createSession()
+        let client2 = Client(name: "c2", version: "1.0")
+        try await client2.connect(transport: transport2)
+        let r2 = try await client2.callTool(name: "agent_prompt", arguments: ["task": .string("y")])
+        XCTAssertEqual(r2.isError, true,
+                       "Fresh session must also have no agent — state should not leak")
+        await mcpServer2.stop()
+        await client2.disconnect()
+    }
+
+    // ================================================================
+    // MARK: - agent_prompt with a configured Agent (success + error branches)
+    // ================================================================
+    //
+    // Covers lines 165-169 of AgentMCPServer.swift — the agent.prompt(task)
+    // success path and the errorDuringExecution → throw branch.
+    //
+    // Uses setAgentForTesting (internal) to inject an Agent with a mock LLM
+    // client, bypassing run(agent:) which blocks on StdioTransport.
+
+    /// Mock LLM that returns a fixed text response via sendMessage.
+    private struct SuccessLLMClient: LLMClient, @unchecked Sendable {
+        let responseText: String
+        nonisolated func sendMessage(
+            model: String, messages: [[String: Any]], maxTokens: Int,
+            system: String?, tools: [[String: Any]]?, toolChoice: [String: Any]?,
+            thinking: [String: Any]?, temperature: Double?
+        ) async throws -> [String: Any] {
+            [
+                "content": [["type": "text", "text": responseText]],
+                "stop_reason": "end_turn",
+                "usage": ["input_tokens": 5, "output_tokens": 3],
+            ]
+        }
+        nonisolated func streamMessage(
+            model: String, messages: [[String: Any]], maxTokens: Int,
+            system: String?, tools: [[String: Any]]?, toolChoice: [String: Any]?,
+            thinking: [String: Any]?, temperature: Double?
+        ) async throws -> AsyncThrowingStream<SSEEvent, Error> {
+            AsyncThrowingStream { $0.finish() }
+        }
+    }
+
+    /// Mock LLM that always throws — makes Agent.prompt return .errorDuringExecution.
+    private struct FailingLLMClient: LLMClient, Sendable {
+        nonisolated func sendMessage(
+            model: String, messages: [[String: Any]], maxTokens: Int,
+            system: String?, tools: [[String: Any]]?, toolChoice: [String: Any]?,
+            thinking: [String: Any]?, temperature: Double?
+        ) async throws -> [String: Any] {
+            throw SDKError.apiError(statusCode: 500, message: "boom")
+        }
+        nonisolated func streamMessage(
+            model: String, messages: [[String: Any]], maxTokens: Int,
+            system: String?, tools: [[String: Any]]?, toolChoice: [String: Any]?,
+            thinking: [String: Any]?, temperature: Double?
+        ) async throws -> AsyncThrowingStream<SSEEvent, Error> {
+            throw SDKError.apiError(statusCode: 500, message: "boom")
+        }
+    }
+
+    private func makeAgent(client: LLMClient) -> Agent {
+        Agent(
+            options: AgentOptions(
+                apiKey: "sk-test-not-used",
+                model: "claude-sonnet-4-6",
+                systemPrompt: "test"
+            ),
+            client: client
+        )
+    }
+
+    /// agent_prompt with a configured Agent and a successful LLM response
+    /// returns the agent's text result via MCP. Covers lines 165-169.
+    func testAgentMCPServer_agentPrompt_withAgent_returnsAgentResultText() async throws {
+        let agentServer = AgentMCPServer(name: "with-agent", version: "1.0.0", tools: [])
+        let agent = makeAgent(client: SuccessLLMClient(responseText: "AGENT_OK"))
+        await agentServer.setAgentForTesting(agent)
+
+        let (mcpServer, transport) = try await agentServer.createSession()
+        let client = Client(name: "caller", version: "1.0")
+        try await client.connect(transport: transport)
+
+        let result = try await client.callTool(
+            name: "agent_prompt",
+            arguments: ["task": .string("any task")]
+        )
+
+        // isError is Optional<Bool> in MCP — nil means success (not an error).
+        XCTAssertNotEqual(result.isError, true,
+                       "Successful agent.prompt should not be marked as error")
+        // Result content should embed the agent's text somewhere.
+        let resultText = result.content.map { String(describing: $0) }.joined()
+        XCTAssertTrue(resultText.contains("AGENT_OK"),
+                      "MCP result should contain the agent's text; got: \(resultText)")
+
+        await mcpServer.stop()
+        await client.disconnect()
+    }
+
+    /// agent_prompt with a configured Agent whose LLM throws returns an
+    /// error result via MCP. Covers the `if result.status == .errorDuringExecution`
+    /// branch on line 166-167.
+    func testAgentMCPServer_agentPrompt_withFailingAgent_returnsMCPError() async throws {
+        let agentServer = AgentMCPServer(name: "with-failing-agent", version: "1.0.0", tools: [])
+        let agent = makeAgent(client: FailingLLMClient())
+        await agentServer.setAgentForTesting(agent)
+
+        let (mcpServer, transport) = try await agentServer.createSession()
+        let client = Client(name: "caller", version: "1.0")
+        try await client.connect(transport: transport)
+
+        let result = try await client.callTool(
+            name: "agent_prompt",
+            arguments: ["task": .string("any task")]
+        )
+
+        XCTAssertEqual(result.isError, true,
+                       "Failing agent should surface as MCP error result")
+
+        await mcpServer.stop()
+        await client.disconnect()
+    }
 }
 
 // MARK: - Mock Tool Helpers

@@ -243,7 +243,11 @@ public class AgentHTTPServer: @unchecked Sendable {
 
     // MARK: - Agent Execution
 
-    private static func executeRun(
+    /// Internal (not private) so unit tests can exercise the run state machine
+    /// directly without going through HTTP round-trips. The fire-and-forget
+    /// nature of the POST /v1/runs path makes indirect testing flaky; calling
+    /// this directly lets tests await completion. Logic is unchanged.
+    static func executeRun(
         runId: String,
         task: String,
         tracker: RunTracker,

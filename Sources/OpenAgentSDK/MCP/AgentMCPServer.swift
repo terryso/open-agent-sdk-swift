@@ -107,6 +107,16 @@ public actor AgentMCPServer {
         await session.waitUntilCompleted()
     }
 
+    /// Internal: sets the Agent without starting the stdio transport.
+    ///
+    /// `run(agent:)` blocks on `StdioTransport` and cannot be used in unit
+    /// tests. This entry point lets tests inject an Agent so they can
+    /// exercise the agent_prompt handler's success and error branches via
+    /// `createSession()` + MCP client calls.
+    internal func setAgentForTesting(_ agent: Agent) {
+        self.agent = agent
+    }
+
     /// Runs the MCP server with stdio transport, exposing only the registered tools.
     ///
     /// The `agent_prompt` tool is registered but returns an error when called,

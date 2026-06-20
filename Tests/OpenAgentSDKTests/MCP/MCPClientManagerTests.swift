@@ -1357,6 +1357,243 @@ final class MCPClientManagerTests: XCTestCase {
         XCTAssertNotEqual(stdio, http)
         XCTAssertNotEqual(sse, http)
     }
+
+    // ================================================================
+    // MARK: - HTTP/SSE URL validation (covers connectHTTP URL guard branch)
+    // ================================================================
+    //
+    // llvm-cov showed lines 166-219 of MCPClientManager.swift (the entire
+    // connectHTTP body including URL validation and error catch) were
+    // completely uncovered. These tests exercise the URL-validation guard
+    // without touching the network — invalid URLs short-circuit before
+    // HTTPClientTransport is constructed.
+
+    private func makeTransportConfig(url: String, headers: [String: String]? = nil) -> McpTransportConfig {
+        McpTransportConfig(url: url, headers: headers)
+    }
+
+    func testConnectHTTP_emptyUrl_marksErrorImmediately() async {
+        let manager = MCPClientManager()
+        await manager.connect(name: "empty", config: makeTransportConfig(url: ""), streaming: true)
+        let connections = await manager.getConnections()
+        XCTAssertEqual(connections["empty"]?.status, .error,
+                       "Empty URL must short-circuit to error without invoking transport")
+        XCTAssertTrue(connections["empty"]?.tools.isEmpty ?? false,
+                      "Error connections must have empty tools")
+    }
+
+    func testConnectHTTP_malformedUrlString_marksError() async {
+        let manager = MCPClientManager()
+        // "not-a-url" parses as a relative URL with no scheme — rejected.
+        await manager.connect(name: "malformed", config: makeTransportConfig(url: "not-a-url"), streaming: true)
+        let connections = await manager.getConnections()
+        XCTAssertEqual(connections["malformed"]?.status, .error)
+    }
+
+    func testConnectHTTP_fileScheme_marksError() async {
+        let manager = MCPClientManager()
+        await manager.connect(name: "file", config: makeTransportConfig(url: "file:///tmp/foo"), streaming: true)
+        let connections = await manager.getConnections()
+        XCTAssertEqual(connections["file"]?.status, .error,
+                       "file:// scheme must be rejected — only http/https are valid MCP transports")
+    }
+
+    func testConnectHTTP_ftpScheme_marksError() async {
+        let manager = MCPClientManager()
+        await manager.connect(name: "ftp", config: makeTransportConfig(url: "ftp://example.com:21"), streaming: true)
+        let connections = await manager.getConnections()
+        XCTAssertEqual(connections["ftp"]?.status, .error,
+                       "ftp:// scheme must be rejected")
+    }
+
+    func testConnectHTTP_javascriptScheme_marksError() async {
+        let manager = MCPClientManager()
+        await manager.connect(name: "js", config: makeTransportConfig(url: "javascript:void(0)"), streaming: true)
+        let connections = await manager.getConnections()
+        XCTAssertEqual(connections["js"]?.status, .error)
+    }
+
+    func testConnectHTTP_validHttpsButUnreachable_marksErrorViaCatch() async {
+        // A syntactically valid HTTPS URL that no server answers. Exercises
+        // the catch branch at line 220-228 of MCPClientManager.swift — the
+        // URL validation passes, HTTPClientTransport is constructed, but
+        // mcpClient.connect throws because nothing answers.
+        //
+        // Port 1 is reserved and almost never listening, so connection
+        // refused comes back quickly.
+        let manager = MCPClientManager()
+        await manager.connect(
+            name: "unreachable",
+            config: makeTransportConfig(url: "https://127.0.0.1:1/sse"),
+            streaming: true
+        )
+        let connections = await manager.getConnections()
+        XCTAssertEqual(connections["unreachable"]?.status, .error,
+                       "Connection failure should be caught and recorded as error, not crash")
+        XCTAssertTrue(connections["unreachable"]?.tools.isEmpty ?? false)
+    }
+
+    func testConnectHTTP_streamingFalseAlsoValidatesUrl() async {
+        // streaming: false should also reach the URL validation guard.
+        let manager = MCPClientManager()
+        await manager.connect(
+            name: "bad-streaming-false",
+            config: makeTransportConfig(url: "ftp://bad.example.com"),
+            streaming: false
+        )
+        let connections = await manager.getConnections()
+        XCTAssertEqual(connections["bad-streaming-false"]?.status, .error)
+    }
+
+    func testConnectHTTP_validUrlThatFails_stillCreatesConnectionEntry() async {
+        // Even when the URL is valid but connection fails, the manager must
+        // still create a connections entry (so callers can query status).
+        // This distinguishes the catch-branch behavior from "silently dropped".
+        let manager = MCPClientManager()
+        await manager.connect(
+            name: "valid-but-fails",
+            config: makeTransportConfig(url: "https://127.0.0.1:1"),
+            streaming: true
+        )
+        let connections = await manager.getConnections()
+        XCTAssertNotNil(connections["valid-but-fails"],
+                        "connections dict must contain an entry even for failed connects")
+    }
+
+    func testConnectHTTP_multipleFailedServers_eachRecordedSeparately() async {
+        // Verify the catch branch is exercised multiple times without state bleed.
+        let manager = MCPClientManager()
+        await manager.connect(name: "a", config: makeTransportConfig(url: "ftp://a"), streaming: true)
+        await manager.connect(name: "b", config: makeTransportConfig(url: "file:///b"), streaming: true)
+        await manager.connect(name: "c", config: makeTransportConfig(url: ""), streaming: true)
+
+        let connections = await manager.getConnections()
+        XCTAssertEqual(connections["a"]?.status, .error)
+        XCTAssertEqual(connections["b"]?.status, .error)
+        XCTAssertEqual(connections["c"]?.status, .error)
+        XCTAssertEqual(connections.count, 3, "Each failed connect should get its own entry")
+    }
+
+    // ================================================================
+    // MARK: - getStatus / reconnect / toggle (covers lines 302-389)
+    // ================================================================
+    //
+    // llvm-cov showed getStatus() (35 lines), reconnect(name:), and
+    // toggle(name:enabled:) all at zero coverage. These tests exercise
+    // their branches without needing a real MCP server.
+
+    func testGetStatus_freshManager_returnsEmptyDict() async {
+        let manager = MCPClientManager()
+        let status = await manager.getStatus()
+        XCTAssertTrue(status.isEmpty,
+                      "Fresh manager should report no server statuses")
+    }
+
+    func testGetStatus_afterFailedStdioConnect_returnsFailedStatus() async {
+        let manager = MCPClientManager()
+        await manager.connect(name: "failed", config: makeStdioConfig(command: "/nonexistent"))
+        let status = await manager.getStatus()
+        XCTAssertEqual(status["failed"]?.status, .failed,
+                       "Failed connection should map to .failed in public status")
+        XCTAssertNotNil(status["failed"]?.error,
+                        "Failed status should populate the error field")
+    }
+
+    func testGetStatus_afterFailedHttpConnect_returnsFailedStatus() async {
+        let manager = MCPClientManager()
+        await manager.connect(name: "h", config: makeTransportConfig(url: "https://127.0.0.1:1"), streaming: true)
+        let status = await manager.getStatus()
+        XCTAssertEqual(status["h"]?.status, .failed)
+    }
+
+    func testGetStatus_afterConnectAll_includesAllOriginalConfigs() async {
+        // connectAll stores originalConfigs; getStatus unions them with
+        // current connections so all configured servers appear.
+        let manager = MCPClientManager()
+        let servers: [String: McpServerConfig] = [
+            "s1": .stdio(McpStdioConfig(command: "/nonexistent")),
+            "s2": .http(McpHttpConfig(url: "https://127.0.0.1:1")),
+        ]
+        await manager.connectAll(servers: servers)
+        let status = await manager.getStatus()
+        XCTAssertNotNil(status["s1"])
+        XCTAssertNotNil(status["s2"])
+        XCTAssertEqual(status.count, 2)
+    }
+
+    func testToggle_disable_putsServerInDisabledState() async throws {
+        let manager = MCPClientManager()
+        let servers: [String: McpServerConfig] = [
+            "s1": .stdio(McpStdioConfig(command: "/nonexistent")),
+        ]
+        await manager.connectAll(servers: servers)
+
+        try await manager.toggle(name: "s1", enabled: false)
+        let status = await manager.getStatus()
+        XCTAssertEqual(status["s1"]?.status, .disabled,
+                       "Disabled server should report .disabled status")
+    }
+
+    func testToggle_enable_reconnectsAndReturnsToFailedOrConnected() async throws {
+        let manager = MCPClientManager()
+        let servers: [String: McpServerConfig] = [
+            "s1": .stdio(McpStdioConfig(command: "/nonexistent")),
+        ]
+        await manager.connectAll(servers: servers)
+        try await manager.toggle(name: "s1", enabled: false)
+        // Re-enable — connection retry happens, fails again because /nonexistent
+        try await manager.toggle(name: "s1", enabled: true)
+        let status = await manager.getStatus()
+        XCTAssertNotNil(status["s1"],
+                        "Re-enabled server should still appear in status dict")
+    }
+
+    func testToggle_unknownServer_throwsServerNotFound() async {
+        let manager = MCPClientManager()
+        do {
+            try await manager.toggle(name: "ghost", enabled: false)
+            XCTFail("toggle on unknown server should throw")
+        } catch let error as MCPClientManagerError {
+            // Verify it's the serverNotFound case
+            XCTAssertEqual(error, .serverNotFound("ghost"))
+        } catch {
+            XCTFail("Expected MCPClientManagerError, got \(error)")
+        }
+    }
+
+    func testReconnect_unknownServer_throwsServerNotFound() async {
+        let manager = MCPClientManager()
+        do {
+            try await manager.reconnect(name: "ghost")
+            XCTFail("reconnect on unknown server should throw")
+        } catch let error as MCPClientManagerError {
+            XCTAssertEqual(error, .serverNotFound("ghost"))
+        } catch {
+            XCTFail("Expected MCPClientManagerError, got \(error)")
+        }
+    }
+
+    func testGetStatus_afterDisconnect_removesEntry() async {
+        // Disconnect should remove from connections, but if the server was
+        // originally configured via connectAll it remains in originalConfigs
+        // and getStatus still reports it as .pending.
+        let manager = MCPClientManager()
+        let servers: [String: McpServerConfig] = [
+            "s1": .stdio(McpStdioConfig(command: "/nonexistent")),
+        ]
+        await manager.connectAll(servers: servers)
+        await manager.disconnect(name: "s1")
+
+        let connections = await manager.getConnections()
+        XCTAssertNil(connections["s1"],
+                     "disconnect should remove the connections entry")
+
+        // getStatus unions originalConfigs with connections, so s1 still shows.
+        let status = await manager.getStatus()
+        XCTAssertNotNil(status["s1"],
+                        "getStatus should still report disconnected server as .pending")
+        XCTAssertEqual(status["s1"]?.status, .pending)
+    }
 }
 
 // MARK: - Mock Helpers
